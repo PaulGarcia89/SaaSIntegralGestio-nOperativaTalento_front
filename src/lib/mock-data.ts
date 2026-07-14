@@ -1,9 +1,16 @@
 import type {
   AppDatasetsDto,
+  BranchDto,
+  CandidateDto,
+  InventoryItemDto,
+  VacancyDto,
   ModuleKey,
+  ModuleAssignmentDto,
   PermissionKey,
   RoleKey,
+  RoleDefinitionDto,
   SessionDto,
+  SubscriptionDto,
   TenantDto,
   UserDto,
 } from "@/lib/contracts";
@@ -17,7 +24,7 @@ export type NavItem = {
 };
 
 export const appNavigation: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", group: "General", module: "dashboard", permission: "dashboard.view" },
+  { href: "/dashboard", label: "Panel principal", group: "General", module: "dashboard", permission: "dashboard.view" },
   { href: "/notifications", label: "Notificaciones", group: "General", module: "notifications", permission: "notifications.view" },
   { href: "/reports", label: "Reportes", group: "General", module: "reports", permission: "reports.view" },
   { href: "/ats/vacancies", label: "Vacantes", group: "RRHH", module: "ats", permission: "ats.view" },
@@ -30,6 +37,9 @@ export const appNavigation: NavItem[] = [
   { href: "/productivity", label: "Productividad IA", group: "Operacion", module: "productivity", permission: "productivity.view" },
   { href: "/inventory", label: "Inventario", group: "Operacion", module: "inventory", permission: "inventory.view" },
   { href: "/admin", label: "Panel SaaS", group: "Administracion", module: "admin", permission: "admin.view" },
+  { href: "/admin/tenants", label: "Empresas", group: "Administracion", module: "admin", permission: "admin.view" },
+  { href: "/admin/branches", label: "Sucursales", group: "Administracion", module: "admin", permission: "admin.company" },
+  { href: "/admin/modules", label: "Modulos", group: "Administracion", module: "admin", permission: "admin.company" },
   { href: "/admin/users", label: "Usuarios", group: "Administracion", module: "admin", permission: "admin.users" },
   { href: "/admin/roles", label: "Roles y permisos", group: "Administracion", module: "admin", permission: "admin.roles" },
   { href: "/admin/company", label: "Configuracion empresa", group: "Administracion", module: "admin", permission: "admin.company" },
@@ -106,59 +116,194 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
 export const mockTenants: TenantDto[] = [
   {
     id: "tenant-1",
-    slug: "grupo-andina",
-    name: "Grupo Andina",
+    slug: "talentos-cloud-usa",
+    name: "TalentOS Cloud USA",
     plan: "enterprise",
+    status: "active",
     enabledModules: ["dashboard", "ats", "onboarding", "training", "productivity", "inventory", "admin", "reports", "notifications", "profile"],
-    branding: { accent: "#0EA5B7", supportEmail: "soporte@grupoandina.com" },
+    branding: { accent: "#0EA5B7", supportEmail: "ops@talentoscloud.com" },
   },
   {
     id: "tenant-2",
-    slug: "salud-integral",
-    name: "Salud Integral",
+    slug: "sunrise-health-florida",
+    name: "Sunrise Health Florida",
     plan: "growth",
-    enabledModules: ["dashboard", "ats", "onboarding", "training", "reports", "notifications", "profile"],
-    branding: { accent: "#2563EB", supportEmail: "ayuda@saludintegral.com" },
+    status: "trial",
+    enabledModules: ["dashboard", "ats", "onboarding", "training", "admin", "reports", "notifications", "profile"],
+    branding: { accent: "#2563EB", supportEmail: "support@sunrisehealthfl.com" },
   },
   {
     id: "tenant-3",
-    slug: "educa-norte",
-    name: "Educa Norte",
+    slug: "gulfshore-logistics",
+    name: "Gulfshore Logistics",
     plan: "starter",
-    enabledModules: ["dashboard", "training", "notifications", "profile"],
-    branding: { accent: "#14B8A6", supportEmail: "admin@educanorte.edu" },
+    status: "active",
+    enabledModules: ["dashboard", "inventory", "notifications", "profile"],
+    branding: { accent: "#14B8A6", supportEmail: "hello@gulfshorelogistics.com" },
   },
 ];
 
+export const mockBranches: BranchDto[] = [
+  {
+    id: "branch-1",
+    tenantId: "tenant-1",
+    name: "Sede principal de Miami",
+    city: "Miami, FL",
+    manager: "Ava Thompson",
+    employees: 82,
+    status: "active",
+  },
+  {
+    id: "branch-2",
+    tenantId: "tenant-2",
+    name: "Centro asistencial de Orlando",
+    city: "Orlando, FL",
+    manager: "Olivia Carter",
+    employees: 146,
+    status: "active",
+  },
+  {
+    id: "branch-3",
+    tenantId: "tenant-2",
+    name: "Hub clinico de Tampa",
+    city: "Tampa, FL",
+    manager: "Mason Reed",
+    employees: 64,
+    status: "active",
+  },
+  {
+    id: "branch-4",
+    tenantId: "tenant-3",
+    name: "Patio de distribucion de Jacksonville",
+    city: "Jacksonville, FL",
+    manager: "Jordan Blake",
+    employees: 51,
+    status: "active",
+  },
+];
+
+export const mockRoleDefinitions: RoleDefinitionDto[] = [
+  {
+    id: "role-def-1",
+    tenantId: "tenant-1",
+    name: "Superadministrador",
+    scope: "global",
+    permissions: rolePermissions.admin_saas,
+    members: 1,
+  },
+  {
+    id: "role-def-2",
+    tenantId: "tenant-2",
+    name: "RRHH",
+    scope: "module",
+    permissions: rolePermissions.rrhh,
+    members: 6,
+  },
+  {
+    id: "role-def-3",
+    tenantId: "tenant-3",
+    name: "Supervisor",
+    scope: "module",
+    permissions: rolePermissions.lider_area,
+    members: 3,
+  },
+];
+
+export const mockSubscriptions: SubscriptionDto[] = [
+  {
+    id: "sub-1",
+    tenantId: "tenant-1",
+    plan: "enterprise",
+    billingCycle: "annual",
+    status: "active",
+    price: 4200,
+    renewalDate: "2026-09-01",
+  },
+  {
+    id: "sub-2",
+    tenantId: "tenant-2",
+    plan: "growth",
+    billingCycle: "monthly",
+    status: "trial",
+    price: 890,
+    renewalDate: "2026-07-15",
+  },
+  {
+    id: "sub-3",
+    tenantId: "tenant-3",
+    plan: "starter",
+    billingCycle: "annual",
+    status: "active",
+    price: 960,
+    renewalDate: "2027-02-12",
+  },
+];
+
+export const mockModuleAssignments: ModuleAssignmentDto[] = mockTenants.flatMap((tenant) =>
+  (["dashboard", "ats", "onboarding", "training", "productivity", "inventory", "admin", "reports", "notifications", "profile"] as ModuleKey[]).map(
+    (module) => ({
+      id: `${tenant.id}-${module}`,
+      tenantId: tenant.id,
+      module,
+      enabled: tenant.enabledModules.includes(module),
+      source: tenant.enabledModules.includes(module) ? "plan" : "manual",
+    }),
+  ),
+);
+
 export const mockUsers: UserDto[] = [
   {
-    id: "user-1",
-    fullName: "Sofia Herrera",
-    email: "sofia.herrera@grupoandina.com",
-    role: "admin_empresa",
+    id: "user-0",
+    fullName: "Ava Thompson",
+    email: "ava.thompson@talentoscloud.com",
+    role: "admin_saas",
     tenantId: "tenant-1",
+    status: "active",
+  },
+  {
+    id: "user-5",
+    fullName: "Noah Bennett",
+    email: "noah.bennett@sunrisehealthfl.com",
+    role: "admin_saas",
+    tenantId: "tenant-2",
+    status: "active",
+  },
+  {
+    id: "user-6",
+    fullName: "Harper Stone",
+    email: "harper.stone@gulfshorelogistics.com",
+    role: "admin_saas",
+    tenantId: "tenant-3",
+    status: "active",
+  },
+  {
+    id: "user-1",
+    fullName: "Olivia Carter",
+    email: "olivia.carter@sunrisehealthfl.com",
+    role: "admin_empresa",
+    tenantId: "tenant-2",
     status: "active",
   },
   {
     id: "user-2",
-    fullName: "Mario Suarez",
-    email: "mario.suarez@grupoandina.com",
+    fullName: "Mason Reed",
+    email: "mason.reed@sunrisehealthfl.com",
     role: "rrhh",
-    tenantId: "tenant-1",
+    tenantId: "tenant-2",
     status: "active",
   },
   {
     id: "user-3",
-    fullName: "Diana Castro",
-    email: "diana.castro@saludintegral.com",
+    fullName: "Jordan Blake",
+    email: "jordan.blake@gulfshorelogistics.com",
     role: "lider_area",
-    tenantId: "tenant-2",
+    tenantId: "tenant-3",
     status: "invited",
   },
   {
     id: "user-4",
-    fullName: "Nicolas Lopez",
-    email: "nicolas.lopez@educanorte.edu",
+    fullName: "Emma Collins",
+    email: "emma.collins@gulfshorelogistics.com",
     role: "empleado",
     tenantId: "tenant-3",
     status: "active",
@@ -168,8 +313,8 @@ export const mockUsers: UserDto[] = [
 export const mockSession: SessionDto = {
   token: "mock-jwt-token",
   tenantId: "tenant-1",
-  userId: "user-1",
-  role: "admin_empresa",
+  userId: "user-0",
+  role: "admin_saas",
 };
 
 export const marketingModules = [
@@ -182,7 +327,7 @@ export const marketingModules = [
     copy: "Coordina firmas, checklists, vencimientos y seguimiento del ingreso en tiempo real.",
   },
   {
-    title: "Training y certificacion",
+    title: "Capacitacion y certificacion",
     copy: "Biblioteca de cursos, evaluaciones obligatorias y progreso por persona, cargo y sede.",
   },
   {
@@ -194,124 +339,165 @@ export const marketingModules = [
     copy: "Stock, movimientos, mantenimiento y asignacion de herramientas o equipos a empleados.",
   },
   {
-    title: "Administracion multi-tenant",
+    title: "Administracion multiempresa",
     copy: "Planes, empresas, usuarios, permisos dinamicos y activacion modular por suscripcion.",
   },
 ];
 
 export const dashboardKpis = [
-  { label: "Vacantes activas", value: "48", detail: "+12% esta semana" },
-  { label: "Onboardings en curso", value: "126", detail: "18 pendientes de firma" },
-  { label: "Cumplimiento formativo", value: "94%", detail: "4 cursos vencen hoy" },
-  { label: "Productividad promedio", value: "87.6", detail: "IA detecta mejora en Operaciones" },
+  { label: "Vacantes activas", value: "37", detail: "+9% esta semana en Florida" },
+  { label: "Onboardings en curso", value: "94", detail: "12 pendientes de firma en Miami y Orlando" },
+  { label: "Cumplimiento formativo", value: "96%", detail: "3 cursos vencen hoy" },
+  { label: "Productividad promedio", value: "89.1", detail: "IA detecta mejora en Jacksonville" },
 ];
 
 export const alerts = [
   {
     title: "Onboarding incompleto",
-    description: "18 ingresos aun esperan firma documental antes de su fecha de inicio.",
+    description: "12 nuevos ingresos en Orlando aun esperan firma documental antes de su fecha de inicio.",
     tone: "warning",
   },
   {
     title: "Stock critico",
-    description: "Faltan 12 equipos de campo para la sede Bogota y 4 licencias temporales.",
+    description: "Faltan 9 scanners portatiles en Jacksonville y 6 tablets clinicas en Tampa.",
     tone: "danger",
   },
   {
     title: "Capacitacion vencida",
-    description: "4 lideres de operaciones deben renovar su certificacion obligatoria.",
+    description: "3 supervisores en Miami deben renovar la capacitacion OSHA e HIPAA esta semana.",
     tone: "info",
   },
 ];
 
 export const pipelineStages = [
-  { name: "Aplicados", count: 124 },
-  { name: "Filtro RRHH", count: 68 },
-  { name: "Entrevista", count: 32 },
-  { name: "Oferta", count: 12 },
-  { name: "Contratados", count: 9 },
+  { name: "Aplicados", count: 118 },
+  { name: "Filtro RRHH", count: 54 },
+  { name: "Entrevista", count: 24 },
+  { name: "Oferta", count: 11 },
+  { name: "Contratados", count: 7 },
 ];
 
-export const jobs = [
-  { id: "vac-1", title: "Analista de reclutamiento", area: "RRHH", mode: "Hibrido", status: "Activa", location: "Bogota", applicants: 42, owner: "Sofia Herrera" },
-  { id: "vac-2", title: "Supervisor de campo", area: "Operaciones", mode: "Presencial", status: "En entrevistas", location: "Medellin", applicants: 31, owner: "Mario Suarez" },
-  { id: "vac-3", title: "Coordinador de onboarding", area: "Talento", mode: "Remoto", status: "Borrador", location: "Remoto", applicants: 0, owner: "Sofia Herrera" },
+export const jobs: VacancyDto[] = [
+  {
+    id: "vac-1",
+    title: "Especialista senior de adquisicion de talento",
+    area: "RRHH",
+    mode: "Hibrido",
+    status: "Activa",
+    location: "Miami, FL",
+    applicants: 38,
+    owner: "Ava Thompson",
+    image: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    id: "vac-2",
+    title: "Coordinador clinico de onboarding",
+    area: "Operaciones",
+    mode: "Presencial",
+    status: "En entrevistas",
+    location: "Orlando, FL",
+    applicants: 26,
+    owner: "Olivia Carter",
+    image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    id: "vac-3",
+    title: "Supervisor de operaciones de almacen",
+    area: "Logistica",
+    mode: "Presencial",
+    status: "Activa",
+    location: "Jacksonville, FL",
+    applicants: 19,
+    owner: "Jordan Blake",
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    id: "vac-4",
+    title: "Analista de programas de capacitacion",
+    area: "Aprendizaje",
+    mode: "Remoto",
+    status: "Borrador",
+    location: "Tampa, FL",
+    applicants: 0,
+    owner: "Mason Reed",
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
+  },
 ];
 
-export const candidates = [
-  { id: "can-1", name: "Laura Medina", role: "Product Designer", stage: "Entrevista tecnica", score: 91, summary: "Fuerte match para producto y colaboracion cross-funcional." },
-  { id: "can-2", name: "Carlos Ospina", role: "Supervisor de campo", stage: "Oferta enviada", score: 88, summary: "Experiencia solida en operaciones de campo y liderazgo." },
-  { id: "can-3", name: "Nina Salazar", role: "Analista RRHH", stage: "Filtro RRHH", score: 84, summary: "Buen ajuste cultural y dominio de coordinacion administrativa." },
+export const candidates: CandidateDto[] = [
+  { id: "can-1", name: "Lauren Bennett", role: "Especialista en adquisicion de talento", stage: "Entrevista tecnica", score: 93, summary: "Fuerte experiencia en reclutamiento de salud en hospitales del sur de Florida." },
+  { id: "can-2", name: "Marcus Hill", role: "Supervisor de operaciones de almacen", stage: "Oferta enviada", score: 89, summary: "Solida experiencia liderando operaciones logisticas entre Jacksonville y Savannah." },
+  { id: "can-3", name: "Natalie Brooks", role: "Coordinadora de onboarding", stage: "Filtro RRHH", score: 86, summary: "Gran disciplina de procesos y experiencia en cumplimiento documental para equipos regulados." },
 ];
 
 export const interviews = [
-  { candidate: "Carlos Ospina", when: "Hoy · 3:00 PM", panel: "Operaciones", status: "Confirmada" },
-  { candidate: "Valentina Ruiz", when: "Manana · 9:30 AM", panel: "RRHH + Lider", status: "Pendiente feedback" },
-  { candidate: "Javier Leon", when: "Viernes · 11:00 AM", panel: "Comercial", status: "Programada" },
+  { candidate: "Marcus Hill", when: "Hoy · 3:00 PM ET", panel: "Operaciones", status: "Confirmada" },
+  { candidate: "Natalie Brooks", when: "Manana · 9:30 AM ET", panel: "RRHH + Supervisor", status: "Pendiente feedback" },
+  { candidate: "Derek Coleman", when: "Viernes · 11:00 AM ET", panel: "Capacitacion", status: "Programada" },
 ];
 
 export const documents = [
-  { name: "Contrato laboral", owner: "Andres Peña", status: "Firmado", expires: "N/A" },
-  { name: "Examen medico", owner: "Laura Medina", status: "Pendiente", expires: "2 jul 2026" },
-  { name: "Certificado bancario", owner: "Carlos Ospina", status: "Revisado", expires: "N/A" },
+  { name: "Acuerdo laboral", owner: "Natalie Brooks", status: "Firmado", expires: "N/A" },
+  { name: "Verificacion de antecedentes", owner: "Lauren Bennett", status: "Pendiente", expires: "2 jul 2026" },
+  { name: "Acuse de recibo OSHA", owner: "Marcus Hill", status: "Revisado", expires: "N/A" },
 ];
 
 export const courses = [
-  { title: "Induccion corporativa", progress: "100%", type: "Obligatorio" },
-  { title: "Seguridad operacional", progress: "72%", type: "Recertificacion" },
-  { title: "Liderazgo de equipos", progress: "34%", type: "Desarrollo" },
+  { title: "Onboarding laboral en EE. UU.", progress: "100%", type: "Obligatorio" },
+  { title: "HIPAA y privacidad del paciente", progress: "72%", type: "Recertificacion" },
+  { title: "Fundamentos de liderazgo operativo", progress: "34%", type: "Desarrollo" },
 ];
 
 export const evaluations = [
-  { name: "Politicas internas", pending: "12 pendientes", passRate: "96%" },
-  { name: "Seguridad industrial", pending: "4 pendientes", passRate: "89%" },
-  { name: "Servicio al cliente", pending: "21 pendientes", passRate: "92%" },
+  { name: "Politicas internas", pending: "10 pendientes", passRate: "97%" },
+  { name: "Fundamentos de seguridad OSHA", pending: "5 pendientes", passRate: "91%" },
+  { name: "Estandares de atencion al cliente", pending: "14 pendientes", passRate: "94%" },
 ];
 
 export const productivityRows = [
-  { area: "Operaciones", productivity: "91.2", trend: "+4.1%", alert: "Sin alertas" },
-  { area: "Logistica", productivity: "84.9", trend: "-1.8%", alert: "2 patrones atipicos" },
-  { area: "RRHH", productivity: "88.4", trend: "+2.3%", alert: "1 retraso documental" },
+  { area: "Operaciones Miami", productivity: "92.4", trend: "+3.6%", alert: "Sin alertas activas" },
+  { area: "Logistica Jacksonville", productivity: "85.7", trend: "-1.2%", alert: "2 ventanas atipicas de inactividad" },
+  { area: "RRHH Orlando", productivity: "89.1", trend: "+2.8%", alert: "1 retraso de cumplimiento documental" },
 ];
 
-export const inventoryRows = [
-  { id: "inv-1", item: "Tabletas de campo", stock: 14, assigned: 62, status: "Critico", location: "Bogota" },
-  { id: "inv-2", item: "Cascos industriales", stock: 84, assigned: 210, status: "Estable", location: "Cali" },
-  { id: "inv-3", item: "Lectores QR", stock: 28, assigned: 41, status: "Reposicion", location: "Medellin" },
+export const inventoryRows: InventoryItemDto[] = [
+  { id: "inv-1", item: "Escaneres portatiles", stock: 11, assigned: 46, status: "Critico", location: "Jacksonville, FL" },
+  { id: "inv-2", item: "Tablets clinicas", stock: 27, assigned: 93, status: "Reposicion", location: "Tampa, FL" },
+  { id: "inv-3", item: "Cascos de seguridad", stock: 76, assigned: 164, status: "Estable", location: "Miami, FL" },
 ];
 
 export const users = [
-  { name: "Sofia Herrera", role: "Admin Empresa", access: "Activo", lastSeen: "Hace 5 min" },
-  { name: "Mario Suarez", role: "RRHH", access: "Activo", lastSeen: "Hace 1 h" },
-  { name: "Diana Castro", role: "Lider de area", access: "Invitada", lastSeen: "Nunca" },
+  { name: "Ava Thompson", role: "Superadministrador", access: "Activo", lastSeen: "Hace 2 min" },
+  { name: "Olivia Carter", role: "Administrador de empresa", access: "Activo", lastSeen: "Hace 18 min" },
+  { name: "Jordan Blake", role: "Supervisor", access: "Invitado", lastSeen: "Nunca" },
 ];
 
 export const notifications = [
-  { title: "Firma completada", meta: "Contrato laboral firmado por Laura Medina", kind: "success" },
-  { title: "Stock bajo", meta: "Equipos de campo por debajo del umbral configurado", kind: "warning" },
-  { title: "Nueva postulacion", meta: "23 nuevas aplicaciones para Supervisor de campo", kind: "info" },
+  { title: "Firma completada", meta: "Paquete laboral firmado por Natalie Brooks en Orlando", kind: "success" },
+  { title: "Alerta de stock bajo", meta: "Los escaneres portatiles estan por debajo del umbral en Jacksonville", kind: "warning" },
+  { title: "Nueva postulacion", meta: "19 nuevas postulaciones para Supervisor de operaciones de almacen", kind: "info" },
 ];
 
 export const reports = [
-  { name: "Embudo de contratacion", owner: "RRHH", cadence: "Semanal" },
-  { name: "Cumplimiento documental", owner: "Onboarding", cadence: "Diaria" },
-  { name: "Productividad por area", owner: "Operaciones", cadence: "Tiempo real" },
+  { name: "Embudo de contratacion por sucursal", owner: "RRHH", cadence: "Semanal" },
+  { name: "Cumplimiento documental por fecha de ingreso", owner: "Onboarding", cadence: "Diaria" },
+  { name: "Productividad por sucursal", owner: "Operaciones", cadence: "Tiempo real" },
 ];
 
 export const appDatasets: Record<string, AppDatasetsDto> = {
-  "grupo-andina": {
+  "talentos-cloud-usa": {
     vacancies: jobs,
     candidates,
     inventory: inventoryRows,
   },
-  "salud-integral": {
-    vacancies: [jobs[1]],
-    candidates: [candidates[2]],
+  "sunrise-health-florida": {
+    vacancies: [jobs[0], jobs[1], jobs[3]],
+    candidates: [candidates[0], candidates[2]],
     inventory: [],
   },
-  "educa-norte": {
-    vacancies: [],
-    candidates: [],
-    inventory: [],
+  "gulfshore-logistics": {
+    vacancies: [jobs[2]],
+    candidates: [candidates[1]],
+    inventory: inventoryRows,
   },
 };

@@ -1,44 +1,165 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DomainTable, DrawerPreview, FilterToolbar, StateCard } from "@/components/domain";
-import { PageIntro, SectionCard, SplitPanel } from "@/components/ui";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { toast } from "sonner";
+import type { RoleKey, UserDto } from "@/lib/contracts";
+import { createTenantUser, deleteTenantUser, fetchTenantUsers, updateTenantUser } from "@/lib/mock-backend";
+import { roleLabels, userStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
+import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
+import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FormSelect } from "@/components/ui/form-select";
+
+const userSchema = z.object({
+  fullName: z.string().min(2),
+  email: z.email(),
+  role: z.enum(["admin_saas", "admin_empresa", "rrhh", "lider_area", "empleado"]),
+  status: z.enum(["active", "invited", "suspended"]),
+});
+
+type UserFormValues = z.infer<typeof userSchema>;
 
 export default function UsersPage() {
-  const { can, currentTenant, users } = useAppStore();
+  const { can, currentTenant } = useAppStore();
+  const queryClient = useQueryClient();
+  const usersQuery = useQuery({
+    queryKey: ["tenant-users", currentTenant.id],
+    queryFn: () => fetchTenantUsers(currentTenant.id),
+  });
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<UserDto | null>(null);
+  const [deleting, setDeleting] = useState<UserDto | null>(null);
+
+  const form = useForm<UserFormValues>({
+    resolver: zodResolver(userSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      role: "empleado",
+      status: "active",
+    },
+  });
+
   const scopedUsers = useMemo(
     () =>
-      users
-        .filter((user) => user.tenantId === currentTenant.id)
-        .filter((user) =>
-          [user.fullName, user.email, user.role, user.status]
-            .join(" ")
-            .toLowerCase()
-            .includes(query.toLowerCase()),
-        ),
-    [currentTenant.id, query, users],
+      (usersQuery.data ?? []).filter((user) =>
+        [user.fullName, user.email, user.role, user.status]
+          .join(" ")
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      ),
+    [query, usersQuery.data],
   );
-  const [selectedId, setSelectedId] = useState(scopedUsers[0]?.id ?? "");
-  const selected = scopedUsers.find((user) => user.id === selectedId) ?? scopedUsers[0];
+
+  const saveMutation = useMutation({
+    mutationFn: (values: UserFormValues) =>
+      editing
+        ? updateTenantUser(editing.id, { ...editing, ...values, tenantId: currentTenant.id })
+        : createTenantUser({ ...values, tenantId: currentTenant.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-users", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      setOpen(false);
+      setEditing(null);
+      form.reset();
+      toast.success(editing ? "Usuario actualizado" : "Usuario creado");
+    },
+    onError: () => toast.error("Error al guardar el usuario"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTenantUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-users", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      setDeleting(null);
+      toast.success("Usuario eliminado");
+    },
+    onError: () => toast.error("Error al eliminar el usuario"),
+  });
 
   if (!can("admin.users")) {
     return (
       <StateCard
         tone="restricted"
-        title="Sin acceso a gestion de usuarios"
-        description="El rol actual no puede invitar, suspender ni revisar accesos de otros usuarios."
+        title="Administracion de usuarios bloqueada"
+        description="El rol actual no tiene permiso para inspeccionar identidades, invitaciones o gobierno de accesos."
       />
     );
   }
 
   return (
-    <>
-      <PageIntro
-        eyebrow="Gestion de usuarios"
-        title="Accesos, estados y gobierno de identidad por tenant."
-        description="La tabla permite revisar usuarios, mientras el drawer lateral ayuda a decidir invitaciones, suspensiones o ajustes de rol."
+    <div className="space-y-5">
+      <CrudHeader
+        title="Gestion de usuarios"
+        description="Consulta, crea, modifica y elimina usuarios internos de la empresa, incluyendo rol y estado de acceso."
+        badge="Administracion"
+        action={
+          <FormDialog
+            open={open}
+            onOpenChange={(value) => {
+              setOpen(value);
+              if (!value) {
+                setEditing(null);
+                form.reset();
+              }
+            }}
+            title={editing ? "Editar usuario" : "Crear usuario"}
+            description="Invita o actualiza usuarios de la empresa activa."
+            trigger={<Button onClick={() => setOpen(true)}>Nuevo usuario</Button>}
+          >
+            <form className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
+              <div className="space-y-2">
+                <Label>Nombre completo</Label>
+                <Input {...form.register("fullName")} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input {...form.register("email")} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Rol</Label>
+                  <FormSelect
+                    className="h-11 w-full rounded-2xl"
+                    value={form.watch("role")}
+                    onValueChange={(v) => form.setValue("role", v as "admin_saas" | "admin_empresa" | "rrhh" | "lider_area" | "empleado")}
+                    options={(["admin_saas", "admin_empresa", "rrhh", "lider_area", "empleado"] as RoleKey[]).map((role) => ({ label: roleLabels[role], value: role }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Estado</Label>
+                  <FormSelect
+                    className="h-11 w-full rounded-2xl"
+                    value={form.watch("status")}
+                    onValueChange={(v) => form.setValue("status", v as "active" | "invited" | "suspended")}
+                    options={[
+                      { label: "activo", value: "active" },
+                      { label: "invitado", value: "invited" },
+                      { label: "suspendido", value: "suspended" },
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? "Guardando..." : "Guardar"}
+                </Button>
+              </div>
+            </form>
+          </FormDialog>
+        }
       />
 
       <FilterToolbar
@@ -53,37 +174,62 @@ export default function UsersPage() {
         onChange={setQuery}
       />
 
-      <SplitPanel
-        left={
-          <SectionCard title="Usuarios por empresa" subtitle={currentTenant.name}>
-            <DomainTable
-              data={scopedUsers}
-              getKey={(user) => user.id}
-              onSelect={(user) => setSelectedId(user.id)}
-              columns={[
-                { key: "name", header: "Nombre", render: (user) => user.fullName },
-                { key: "role", header: "Rol", render: (user) => user.role },
-                { key: "status", header: "Estado", render: (user) => user.status },
-                { key: "email", header: "Correo", render: (user) => user.email },
-              ]}
-            />
-          </SectionCard>
-        }
-        right={
-          selected ? (
-            <DrawerPreview title={selected.fullName} subtitle="Acceso y permisos">
-              <div className="detail-stack">
-                <div className="detail-row"><span>Correo</span><strong>{selected.email}</strong></div>
-                <div className="detail-row"><span>Rol</span><strong>{selected.role}</strong></div>
-                <div className="detail-row"><span>Estado</span><strong>{selected.status}</strong></div>
-                <div className="detail-row"><span>Tenant</span><strong>{currentTenant.name}</strong></div>
-              </div>
-            </DrawerPreview>
-          ) : (
-            <StateCard tone="empty" title="Sin usuarios visibles" description="No hay usuarios para este tenant o el filtro actual no devolvio resultados." />
-          )
-        }
+      <CrudPanel>
+        {scopedUsers.length === 0 ? (
+          <StateCard
+            tone="empty"
+            title="No se encontraron usuarios"
+            description="Esta empresa no tiene usuarios visibles para los filtros seleccionados."
+          />
+        ) : (
+          <DomainTable exportable
+            data={scopedUsers}
+            getKey={(user) => user.id}
+            columns={[
+              { key: "name", header: "Nombre", sortable: true, render: (user) => user.fullName },
+              { key: "role", header: "Rol", sortable: true, render: (user) => roleLabels[user.role] },
+              { key: "status", header: "Estado", sortable: true, render: (user) => userStatusLabels[user.status] },
+              { key: "email", header: "Email", sortable: true, render: (user) => user.email },
+              {
+                key: "actions",
+                header: "Acciones",
+                render: (user) => (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setEditing(user);
+                        form.reset({
+                          fullName: user.fullName,
+                          email: user.email,
+                          role: user.role,
+                          status: user.status,
+                        });
+                        setOpen(true);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => setDeleting(user)}>
+                      Eliminar
+                    </Button>
+                  </div>
+                ),
+              },
+            ]}
+          />
+        )}
+      </CrudPanel>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleting)}
+        onOpenChange={(value) => !value && setDeleting(null)}
+        title="Eliminar usuario"
+        description={`Se eliminara el usuario ${deleting?.fullName ?? ""}.`}
+        pending={deleteMutation.isPending}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
       />
-    </>
+    </div>
   );
 }

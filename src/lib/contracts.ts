@@ -37,11 +37,49 @@ export interface TenantDto {
   slug: string;
   name: string;
   plan: PlanTier;
+  status?: "active" | "trial" | "suspended";
   enabledModules: ModuleKey[];
   branding: {
     accent: string;
     supportEmail: string;
   };
+}
+
+export interface BranchDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  city: string;
+  manager: string;
+  employees: number;
+  status: "active" | "inactive";
+}
+
+export interface RoleDefinitionDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  scope: "global" | "tenant" | "module";
+  permissions: PermissionKey[];
+  members: number;
+}
+
+export interface SubscriptionDto {
+  id: string;
+  tenantId: string;
+  plan: PlanTier;
+  billingCycle: "monthly" | "annual";
+  status: "active" | "trial" | "past_due";
+  price: number;
+  renewalDate: string;
+}
+
+export interface ModuleAssignmentDto {
+  id: string;
+  tenantId: string;
+  module: ModuleKey;
+  enabled: boolean;
+  source: "plan" | "manual";
 }
 
 export interface UserDto {
@@ -69,6 +107,7 @@ export interface VacancyDto {
   location: string;
   applicants: number;
   owner: string;
+  image?: string;
 }
 
 export interface CandidateDto {

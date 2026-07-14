@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
-import { AppStoreProvider } from "@/store/app-store";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -20,9 +20,9 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TalentOS | Reclutamiento, Operacion y Productividad con IA",
+  title: "TalentOS | SaaS multiempresa de RRHH",
   description:
-    "Plataforma SaaS multi-tenant para reclutamiento, onboarding, entrenamiento, inventario y productividad empresarial con IA.",
+    "Frontend SaaS empresarial para reclutamiento, onboarding, capacitacion, productividad con IA, inventario y administracion.",
 };
 
 export default function RootLayout({
@@ -33,10 +33,11 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      data-scroll-behavior="smooth"
       className={`${plusJakartaSans.variable} ${ibmPlexSans.variable} ${jetBrainsMono.variable}`}
     >
-      <body>
-        <AppStoreProvider>{children}</AppStoreProvider>
+      <body suppressHydrationWarning>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

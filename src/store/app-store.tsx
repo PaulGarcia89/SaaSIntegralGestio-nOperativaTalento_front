@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -20,13 +21,20 @@ import type {
   UserDto,
 } from "@/lib/contracts";
 import {
+  clearStoredAuth,
   fetchBranches,
+  fetchCurrentAuthUser,
+  fetchTenantUsers,
   fetchTenants,
-  fetchUsers,
   fetchWorkspaceDatasets,
-} from "@/lib/mock-backend";
-import { appNavigation, mockSession, rolePermissions } from "@/lib/mock-data";
-import { getFallbackTenant, getPreferredUserForTenant } from "@/lib/ui-labels";
+  getStoredSession,
+  getStoredTenantId,
+  logoutCurrentSession,
+  mapAuthUserToUi,
+  persistSelectedTenantId,
+} from "@/lib/backend";
+import { appNavigation } from "@/lib/navigation";
+import { getFallbackTenant } from "@/lib/ui-labels";
 
 type AppState = {
   tenants: TenantDto[];
@@ -44,8 +52,8 @@ type AppState = {
   setCurrentTenantId: (tenantId: string) => void;
   setCurrentBranchId: (branchId: string) => void;
   setCurrentUserId: (userId: string) => void;
-  signIn: (email: string) => void;
-  signOut: () => void;
+  refreshSession: () => Promise<void>;
+  signOut: () => Promise<void>;
   can: (permission: PermissionKey) => boolean;
   hasModule: (module: ModuleKey) => boolean;
   allowedNav: typeof appNavigation;
@@ -54,32 +62,83 @@ type AppState = {
 const AppStoreContext = createContext<AppState | null>(null);
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<SessionDto | null>(mockSession);
-  const [currentTenantId, setCurrentTenantIdState] = useState(mockSession.tenantId);
-  const [currentUserId, setCurrentUserIdState] = useState(mockSession.userId);
+  const [session, setSession] = useState<SessionDto | null>(null);
+  const [currentTenantId, setCurrentTenantIdState] = useState("");
   const [currentBranchId, setCurrentBranchIdState] = useState("");
+  const [currentUserId, setCurrentUserIdState] = useState("");
+  const [hasHydratedSession, setHasHydratedSession] = useState(false);
+
+  useEffect(() => {
+    const storedSession = getStoredSession();
+    const storedTenantId = getStoredTenantId();
+
+    setSession(storedSession);
+    setCurrentTenantIdState(storedTenantId || storedSession?.tenantId || "");
+    setCurrentUserIdState(storedSession?.userId || "");
+    setHasHydratedSession(true);
+  }, []);
+
+  const authQuery = useQuery({
+    queryKey: ["auth-me", session?.token],
+    queryFn: fetchCurrentAuthUser,
+    enabled: hasHydratedSession && Boolean(session?.token),
+    retry: false,
+  });
 
   const tenantsQuery = useQuery({
-    queryKey: ["admin-tenants"],
+    queryKey: ["admin-tenants", session?.token],
     queryFn: fetchTenants,
+    enabled: hasHydratedSession && Boolean(session?.token),
   });
+
   const branchesQuery = useQuery({
-    queryKey: ["branches"],
-    queryFn: () => fetchBranches(),
+    queryKey: ["branches", currentTenantId],
+    queryFn: () => fetchBranches(currentTenantId),
+    enabled: hasHydratedSession && Boolean(session?.token && currentTenantId),
   });
+
   const usersQuery = useQuery({
-    queryKey: ["all-users"],
-    queryFn: fetchUsers,
+    queryKey: ["tenant-users", currentTenantId],
+    queryFn: () => fetchTenantUsers(currentTenantId),
+    enabled: hasHydratedSession && Boolean(session?.token && currentTenantId),
   });
+
   const datasetsQuery = useQuery({
     queryKey: ["workspace-datasets", currentTenantId],
     queryFn: () => fetchWorkspaceDatasets(currentTenantId),
-    enabled: Boolean(currentTenantId),
+    enabled: hasHydratedSession && Boolean(session?.token && currentTenantId),
   });
+
+  const authContext = useMemo(
+    () => (authQuery.data ? mapAuthUserToUi(authQuery.data) : null),
+    [authQuery.data],
+  );
 
   const tenants = useMemo(() => tenantsQuery.data ?? [], [tenantsQuery.data]);
   const branches = useMemo(() => branchesQuery.data ?? [], [branchesQuery.data]);
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
+
+  useEffect(() => {
+    if (!authContext) return;
+
+    setSession({
+      token: getStoredSession()?.token ?? "",
+      tenantId: authContext.user.tenantId,
+      userId: authContext.user.id,
+      role: authContext.role,
+    });
+    setCurrentUserIdState(authContext.user.id);
+    setCurrentTenantIdState((previous) => previous || getStoredTenantId() || authContext.user.tenantId);
+  }, [authContext]);
+
+  useEffect(() => {
+    if (!authQuery.error) return;
+    clearStoredAuth();
+    setSession(null);
+    setCurrentTenantIdState("");
+    setCurrentBranchIdState("");
+    setCurrentUserIdState("");
+  }, [authQuery.error]);
 
   const currentTenant =
     tenants.find((tenant) => tenant.id === currentTenantId) ??
@@ -107,74 +166,91 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [currentTenant.id, users],
   );
 
+  useEffect(() => {
+    if (tenantBranches.length === 0) {
+      setCurrentBranchIdState("");
+      return;
+    }
+
+    const branchStillVisible = tenantBranches.some((branch) => branch.id === currentBranchId);
+    if (!branchStillVisible) {
+      setCurrentBranchIdState(tenantBranches[0]?.id ?? "");
+    }
+  }, [currentBranchId, tenantBranches]);
+
   const currentBranch = useMemo(
     () => tenantBranches.find((branch) => branch.id === currentBranchId) ?? tenantBranches[0] ?? null,
     [currentBranchId, tenantBranches],
   );
 
-  const currentUser = useMemo(
-    () =>
-      tenantUsers.find((user) => user.id === currentUserId) ??
-      users.find((user) => user.id === currentUserId) ??
-      tenantUsers[0] ??
-      users[0] ??
-      ({
-        id: "",
-        fullName: "Sin usuario activo",
-        email: "",
-        role: "empleado",
-        tenantId: currentTenant.id,
-        status: "suspended",
-      } satisfies UserDto),
-    [currentTenant.id, currentUserId, tenantUsers, users],
-  );
+  const currentUser = authContext?.user ??
+    tenantUsers.find((user) => user.id === currentUserId) ??
+    tenantUsers[0] ??
+    ({
+      id: "",
+      fullName: "Sin usuario activo",
+      email: "",
+      role: "empleado",
+      tenantId: currentTenant.id,
+      status: "suspended",
+    } satisfies UserDto);
 
-  const currentRole = currentUser.role;
+  const currentRole = authContext?.role ?? currentUser.role;
+  const currentPermissions = authContext?.permissions ?? [];
+  const currentModules = currentTenant.enabledModules.length > 0
+    ? currentTenant.enabledModules
+    : authContext?.enabledModules ?? [];
   const datasets = useMemo(
     () => datasetsQuery.data ?? { vacancies: [], candidates: [], inventory: [] },
     [datasetsQuery.data],
   );
-  const isBootstrapping = tenantsQuery.isLoading || branchesQuery.isLoading || usersQuery.isLoading;
-
-  const syncSession = useCallback(
-    (user: UserDto | null) => {
-      if (!user) {
-        setSession(null);
-        setCurrentTenantIdState("");
-        setCurrentUserIdState("");
-        setCurrentBranchIdState("");
-        return;
-      }
-
-      const nextBranchId = branches.find((branch) => branch.tenantId === user.tenantId)?.id ?? "";
-
-      setCurrentTenantIdState(user.tenantId);
-      setCurrentUserIdState(user.id);
-      setCurrentBranchIdState(nextBranchId);
-      setSession({
-        token: "mock-jwt-token",
-        tenantId: user.tenantId,
-        userId: user.id,
-        role: user.role,
-      });
-    },
-    [branches],
-  );
+  const isBootstrapping =
+    !hasHydratedSession ||
+    (Boolean(session?.token) &&
+      (authQuery.isLoading || tenantsQuery.isLoading || branchesQuery.isLoading || usersQuery.isLoading));
 
   const can = useCallback(
-    (permission: PermissionKey) => rolePermissions[currentRole]?.includes(permission) ?? false,
-    [currentRole],
+    (permission: PermissionKey) => currentPermissions.includes(permission),
+    [currentPermissions],
   );
 
   const hasModule = useCallback(
-    (module: ModuleKey) => currentTenant.enabledModules.includes(module),
-    [currentTenant.enabledModules],
+    (module: ModuleKey) => currentModules.includes(module),
+    [currentModules],
   );
 
   const allowedNav = useMemo(
-    () => appNavigation.filter((item) => hasModule(item.module) && can(item.permission)),
-    [can, hasModule],
+    () =>
+      appNavigation.filter((item) => {
+        if (!hasModule(item.module) || !can(item.permission)) {
+          return false;
+        }
+
+        if (item.audience === "saas") {
+          return currentRole === "admin_saas";
+        }
+
+        if (item.audience === "tenant") {
+          return currentRole === "admin_saas" || currentRole === "admin_empresa";
+        }
+
+        return true;
+      }),
+    [can, currentRole, hasModule],
   );
+
+  const refreshSession = useCallback(async () => {
+    await authQuery.refetch();
+    await tenantsQuery.refetch();
+  }, [authQuery, tenantsQuery]);
+
+  const signOut = useCallback(async () => {
+    await logoutCurrentSession();
+    setSession(null);
+    setCurrentTenantIdState("");
+    setCurrentBranchIdState("");
+    setCurrentUserIdState("");
+  }, []);
 
   const value = useMemo<AppState>(
     () => ({
@@ -191,28 +267,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       datasets,
       isBootstrapping,
       setCurrentTenantId: (tenantId: string) => {
-        const fallbackUser = getPreferredUserForTenant(
-          users,
-          tenantId,
-          currentRole === "admin_saas",
-        );
-        syncSession(fallbackUser);
+        persistSelectedTenantId(tenantId);
+        setCurrentTenantIdState(tenantId);
       },
       setCurrentBranchId: (branchId: string) => {
         setCurrentBranchIdState(branchId);
       },
       setCurrentUserId: (userId: string) => {
-        const matchedUser = users.find((user) => user.id === userId) ?? null;
-        syncSession(matchedUser);
+        setCurrentUserIdState(userId);
       },
-      signIn: (email: string) => {
-        const matchedUser =
-          users.find((user) => user.email.toLowerCase() === email.toLowerCase()) ?? null;
-        syncSession(matchedUser);
-      },
-      signOut: () => {
-        syncSession(null);
-      },
+      refreshSession,
+      signOut,
       can,
       hasModule,
       allowedNav,
@@ -228,8 +293,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       datasets,
       hasModule,
       isBootstrapping,
+      refreshSession,
       session,
-      syncSession,
+      signOut,
       tenantBranches,
       tenantUsers,
       tenants,

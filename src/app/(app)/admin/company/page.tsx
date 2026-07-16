@@ -16,7 +16,7 @@ export default function CompanySettingsPage() {
         }
         metrics={[
           { label: "Dominios conectados", value: "2", detail: "Portal de empleos y acceso corporativo" },
-          { label: "Plantillas activas", value: "14", detail: "Onboarding, firma y comunicacion automatizada" },
+          { label: "Plantillas activas", value: "14", detail: "Incorporacion, firma y comunicacion automatizada" },
           { label: "Integraciones listas", value: "5", detail: "SSO, correo, firma y productividad" },
         ]}
       />
@@ -26,7 +26,7 @@ export default function CompanySettingsPage() {
             <InfoList
               items={[
                 { title: "Identidad visual", description: "Logo, colores secundarios y assets de portal de empleos", badge: "Marca" },
-                { title: "Parametros de proceso", description: "Checklists de onboarding y formularios por cargo", badge: "Flujo" },
+                { title: "Parametros de proceso", description: "Checklists de incorporacion y formularios por cargo", badge: "Flujo" },
                 { title: "Integraciones", description: "SSO, correo, firma y sistemas operativos externos", badge: "Conexion" },
               ]}
             />

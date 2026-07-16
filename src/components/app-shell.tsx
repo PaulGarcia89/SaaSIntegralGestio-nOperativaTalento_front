@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   Building2,
@@ -19,7 +18,6 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { fetchNavigationSchema } from "@/lib/mock-backend";
 import { roleLabels } from "@/lib/ui-labels";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
@@ -40,15 +38,15 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AppBreadcrumb } from "@/components/breadcrumb";
 import { Tooltip } from "@/components/ui/tooltip";
 
-type NavGroup = "General" | "RRHH" | "Operacion" | "Administracion";
+type NavGroup = "General" | "RRHH" | "Operacion" | "Gobierno SaaS" | "Empresa";
 
 const searchableRoutes: Array<{ label: string; href: string; group: string }> = [
   { label: "Panel principal", href: "/dashboard", group: "General" },
   { label: "Vacantes", href: "/ats/vacancies", group: "ATS" },
   { label: "Postulantes", href: "/ats/candidates", group: "ATS" },
   { label: "Entrevistas", href: "/ats/interviews", group: "ATS" },
-  { label: "Documentos", href: "/onboarding/documents", group: "Onboarding" },
-  { label: "Firmas", href: "/onboarding/signatures", group: "Onboarding" },
+  { label: "Documentos", href: "/onboarding/documents", group: "Incorporacion" },
+  { label: "Firmas", href: "/onboarding/signatures", group: "Incorporacion" },
   { label: "Capacitacion", href: "/training", group: "Capacitacion" },
   { label: "Evaluaciones", href: "/training/evaluations", group: "Capacitacion" },
   { label: "Productividad", href: "/productivity", group: "Operacion" },
@@ -56,13 +54,13 @@ const searchableRoutes: Array<{ label: string; href: string; group: string }> = 
   { label: "Inventario", href: "/inventory", group: "Operacion" },
   { label: "Notificaciones", href: "/notifications", group: "General" },
   { label: "Perfil", href: "/profile", group: "General" },
-  { label: "Empresa", href: "/admin/company", group: "Administracion" },
-  { label: "Tenants", href: "/admin/tenants", group: "Administracion" },
-  { label: "Usuarios", href: "/admin/users", group: "Administracion" },
-  { label: "Sucursales", href: "/admin/branches", group: "Administracion" },
-  { label: "Roles", href: "/admin/roles", group: "Administracion" },
-  { label: "Suscripcion", href: "/admin/subscription", group: "Administracion" },
-  { label: "Modulos", href: "/admin/modules", group: "Administracion" },
+  { label: "Configuracion empresa", href: "/admin/company", group: "Empresa" },
+  { label: "Empresas", href: "/admin/tenants", group: "Gobierno SaaS" },
+  { label: "Usuarios", href: "/admin/users", group: "Empresa" },
+  { label: "Sucursales", href: "/admin/branches", group: "Empresa" },
+  { label: "Roles", href: "/admin/roles", group: "Empresa" },
+  { label: "Planes y suscripciones", href: "/admin/subscription", group: "Gobierno SaaS" },
+  { label: "Modulos", href: "/admin/modules", group: "Gobierno SaaS" },
   { label: "Empleos publicos", href: "/jobs", group: "Publico" },
   { label: "Portal de aplicacion", href: "/apply", group: "Publico" },
 ];
@@ -97,7 +95,7 @@ function SidebarContent({
   supportEmail,
 }: SidebarContentProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-    const groups: NavGroup[] = ["General", "RRHH", "Operacion", "Administracion"];
+    const groups: NavGroup[] = ["General", "RRHH", "Operacion", "Empresa", "Gobierno SaaS"];
     const initial = new Set<string>();
     const activeGroup = groups.find((group) =>
       navigationItems?.some(
@@ -249,7 +247,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const {
-    currentRole,
+    allowedNav,
     currentBranch,
     currentTenant,
     currentUser,
@@ -257,22 +255,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     session,
     setCurrentBranchId,
     setCurrentTenantId,
-    setCurrentUserId,
     signOut,
     tenantBranches,
-    users,
     tenants,
+    currentRole,
   } = useAppStore();
 
-  const navigationQuery = useQuery({
-    queryKey: ["navigation", currentTenant.id, currentRole],
-    queryFn: () => fetchNavigationSchema(currentTenant.id, currentRole),
-  });
-
-  const groups = ["General", "RRHH", "Operacion", "Administracion"] as const;
-  const superAdminUser = users.find((user) => user.role === "admin_saas") ?? users[0];
-  const normalUser = users.find((user) => user.role !== "admin_saas") ?? users[0];
-  const accessMode = currentRole === "admin_saas" ? "superadmin" : "normal";
+  const groups = useMemo(
+    () =>
+      (["General", "RRHH", "Operacion", "Empresa", "Gobierno SaaS"] as const).filter((group) =>
+        allowedNav.some((item) => item.group === group),
+      ),
+    [allowedNav],
+  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -466,8 +461,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               currentTenantPlan={currentTenant.plan}
               currentUserName={currentUser.fullName}
               navigationGroups={groups}
-              navigationItems={navigationQuery.data}
-              navigationLoading={navigationQuery.isLoading}
+              navigationItems={allowedNav}
+              navigationLoading={isBootstrapping}
               pathname={pathname}
               supportEmail={currentTenant.branding.supportEmail}
             />
@@ -616,24 +611,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                   Control de superadministrador
                                 </p>
                                 <div className="space-y-2">
-                                  <label className="text-xs font-medium text-muted-foreground">Modo de acceso</label>
-                                  <Select
-                                    value={accessMode}
-                                    onValueChange={(value) => {
-                                      setCurrentUserId(value === "superadmin" ? superAdminUser.id : normalUser.id);
-                                      setUserMenuOpen(false);
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-11">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="superadmin">Superadministrador</SelectItem>
-                                      <SelectItem value="normal">Usuario normal</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
                                   <label className="text-xs font-medium text-muted-foreground">Empresa</label>
                                   <Select
                                     value={currentTenant.id}
@@ -744,8 +721,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               currentTenantPlan={currentTenant.plan}
               currentUserName={currentUser.fullName}
               navigationGroups={groups}
-              navigationItems={navigationQuery.data}
-              navigationLoading={navigationQuery.isLoading}
+              navigationItems={allowedNav}
+              navigationLoading={isBootstrapping}
               onNavigate={() => setMobileSidebarOpen(false)}
               pathname={pathname}
               supportEmail={currentTenant.branding.supportEmail}

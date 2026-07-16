@@ -54,6 +54,9 @@ export default function JobsPortalPage() {
                 </Link>
               </Button>
               <Button asChild variant="secondary" size="lg" className="sm:min-w-44">
+                <Link href="/application-status">Seguir postulacion</Link>
+              </Button>
+              <Button asChild variant="secondary" size="lg" className="sm:min-w-44">
                 <Link href="#vacantes-disponibles">Ver vacantes</Link>
               </Button>
             </div>

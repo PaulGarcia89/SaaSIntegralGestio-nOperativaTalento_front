@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { PlanTier, SubscriptionDto } from "@/lib/contracts";
-import { createSubscription, deleteSubscription, fetchSubscriptions, fetchTenants, updateSubscription } from "@/lib/mock-backend";
+import { createSubscription, deleteSubscription, fetchSubscriptions, fetchTenants, updateSubscription } from "@/lib/backend";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
 import { Button } from "@/components/ui/button";
@@ -101,7 +101,7 @@ export default function SubscriptionPage() {
       <CrudHeader
         title="Gestion de suscripciones"
         description="Consulta, crea, modifica y elimina suscripciones por empresa, incluyendo plan, facturacion y renovacion."
-        badge="Administracion"
+        badge="Gobierno SaaS"
         action={
           <FormDialog
             open={open}

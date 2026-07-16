@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchModuleAssignments, fetchTenants, updateModuleAssignment } from "@/lib/mock-backend";
+import { fetchModuleAssignments, fetchTenants, updateModuleAssignment } from "@/lib/backend";
 import { CrudHeader, CrudPanel } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ export default function ModulesPage() {
       <CrudHeader
         title="Gestion de modulos"
         description="Consulta y modifica los modulos habilitados por empresa, de acuerdo con el plan o activacion manual."
-        badge="Administracion"
+        badge="Gobierno SaaS"
       />
       <FilterToolbar
         searchPlaceholder="Buscar por modulo, origen o estado"

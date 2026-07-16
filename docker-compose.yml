@@ -1,0 +1,14 @@
+services:
+  talento-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api
+    container_name: talento-frontend
+    ports:
+      - "3001:3001"
+    environment:
+      NEXT_PUBLIC_API_URL: /api
+      NODE_ENV: production
+    restart: unless-stopped

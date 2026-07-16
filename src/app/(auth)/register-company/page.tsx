@@ -48,7 +48,7 @@ export default function RegisterCompanyPage() {
             </Badge>
             <div className="space-y-4">
               <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
-                Activa una nueva empresa con un flujo guiado de onboarding SaaS.
+                Activa una nueva empresa con un flujo guiado de incorporacion SaaS.
               </h1>
               <p className="text-base leading-8 text-white/72">
                 Perfil de empresa, administrador principal, suscripcion, modulos habilitados y confirmacion final conviven en un flujo escalable para operaciones enterprise.

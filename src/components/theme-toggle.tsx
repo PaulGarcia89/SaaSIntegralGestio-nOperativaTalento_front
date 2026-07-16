@@ -4,24 +4,32 @@ import { useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-function getInitialTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "light";
-  const stored = localStorage.getItem("theme") as "light" | "dark" | null;
-  if (stored) return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
 export function ThemeToggle({ className }: { className?: string }) {
-  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
-  const mounted = useRef(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [hasMounted, setHasMounted] = useState(false);
+  const persistedRef = useRef(false);
 
   useEffect(() => {
+    const stored = localStorage.getItem("theme") as "light" | "dark" | null;
+    const nextTheme = stored
+      ? stored
+      : window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+
+    setTheme(nextTheme);
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+
     document.documentElement.classList.toggle("dark", theme === "dark");
-    if (mounted.current) {
+    if (persistedRef.current) {
       localStorage.setItem("theme", theme);
     }
-    mounted.current = true;
-  }, [theme]);
+    persistedRef.current = true;
+  }, [hasMounted, theme]);
 
   function toggle() {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
@@ -33,6 +41,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       size="icon"
       onClick={toggle}
       className={className}
+      disabled={!hasMounted}
       aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
       {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}

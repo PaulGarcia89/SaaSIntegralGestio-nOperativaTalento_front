@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { BranchDto } from "@/lib/contracts";
-import { createBranch, deleteBranch, fetchBranches, fetchTenants, updateBranch } from "@/lib/mock-backend";
+import { createBranch, deleteBranch, fetchBranches, fetchTenants, updateBranch } from "@/lib/backend";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,10 @@ type BranchFormValues = z.output<typeof branchSchema>;
 type BranchFormInput = z.input<typeof branchSchema>;
 
 export default function BranchesPage() {
-  const { can } = useAppStore();
+  const { can, currentTenant } = useAppStore();
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({ queryKey: ["admin-tenants"], queryFn: fetchTenants });
-  const branchesQuery = useQuery({ queryKey: ["branches"], queryFn: () => fetchBranches() });
+  const branchesQuery = useQuery({ queryKey: ["branches", currentTenant.id], queryFn: () => fetchBranches(currentTenant.id) });
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BranchDto | null>(null);
@@ -102,7 +102,7 @@ export default function BranchesPage() {
       <CrudHeader
         title="Gestion de sucursales"
         description="Consulta, crea, modifica y elimina sucursales o sedes operativas por empresa."
-        badge="Administracion"
+        badge="Empresa"
         action={
           <FormDialog
             open={open}

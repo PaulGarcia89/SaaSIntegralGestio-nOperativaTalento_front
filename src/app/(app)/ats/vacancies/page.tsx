@@ -8,8 +8,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ClipboardList, ShieldCheck, Users2 } from "lucide-react";
 import type { VacancyDto } from "@/lib/contracts";
-import { createVacancy, deleteVacancy, fetchVacancies, updateVacancy } from "@/lib/mock-backend";
+import { createVacancy, deleteVacancy, fetchVacancies, fetchVacancyHiringPlans, updateVacancy } from "@/lib/mock-backend";
 import { useAppStore } from "@/store/app-store";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
 import { DrawerPreview, DomainTable, FilterToolbar, StateCard } from "@/components/domain";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormSelect } from "@/components/ui/form-select";
+import { Badge } from "@/components/ui/badge";
 
 const vacancySchema = z.object({
   title: z.string().min(2),
@@ -37,6 +39,10 @@ export default function VacanciesPage() {
   const vacanciesQuery = useQuery({
     queryKey: ["vacancies", currentTenant.id],
     queryFn: () => fetchVacancies(currentTenant.id),
+  });
+  const hiringPlansQuery = useQuery({
+    queryKey: ["vacancy-hiring-plans", currentTenant.id],
+    queryFn: () => fetchVacancyHiringPlans(currentTenant.id),
   });
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
@@ -69,6 +75,8 @@ export default function VacanciesPage() {
   );
 
   const selected = filtered.find((job) => job.id === selectedId) ?? filtered[0];
+  const selectedHiringPlan =
+    (hiringPlansQuery.data ?? []).find((plan) => plan.vacancyId === selected?.id) ?? null;
 
   const saveMutation = useMutation({
     mutationFn: (values: VacancyFormValues) =>
@@ -222,7 +230,7 @@ export default function VacanciesPage() {
           <StateCard
             tone="empty"
             title="No hay vacantes para esta vista"
-          description="Prueba con otra empresa, ajusta la busqueda actual o crea una nueva vacante para poblar el pipeline ATS."
+          description="Prueba con otra empresa, ajusta la busqueda actual o crea una nueva vacante para poblar las etapas del proceso ATS."
           action={<Button onClick={() => setOpen(true)}>Crear vacante</Button>}
         />
       ) : (
@@ -320,13 +328,76 @@ export default function VacanciesPage() {
                 <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Estado</span><strong>{selected.status}</strong></div>
                 <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Responsable</span><strong>{selected.owner}</strong></div>
                 <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Postulantes</span><strong>{selected.applicants}</strong></div>
+
+                {selectedHiringPlan ? (
+                  <>
+                    <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
+                          <ClipboardList className="size-4" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">{selectedHiringPlan.scorecardTitle}</p>
+                          <p className="text-sm leading-6 text-muted-foreground">{selectedHiringPlan.advancementRule}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {selectedHiringPlan.interviewKits.map((kit) => (
+                        <div key={kit.id} className="rounded-2xl border border-border/70 bg-card/90 p-4">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="space-y-1">
+                                <p className="font-medium text-foreground">{kit.stage}</p>
+                                <p className="text-sm leading-6 text-muted-foreground">{kit.focus}</p>
+                              </div>
+                              <Badge variant="secondary" className="rounded-full">
+                                {kit.criteria.length} criterios
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {kit.criteria.map((criterion) => (
+                                <span
+                                  key={criterion.id}
+                                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-secondary/25 px-3 py-1.5 text-xs text-foreground"
+                                >
+                                  {criterion.label}
+                                  <strong>{criterion.weight}%</strong>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="rounded-2xl border border-border/70 bg-secondary/20 p-3">
+                                <div className="flex items-center gap-2">
+                                  <Users2 className="size-4 text-primary" />
+                                  <p className="text-sm font-medium text-foreground">Panel</p>
+                                </div>
+                                <p className="mt-2 text-sm leading-6 text-muted-foreground">{kit.interviewers.join(", ")}</p>
+                              </div>
+                              <div className="rounded-2xl border border-border/70 bg-secondary/20 p-3">
+                                <div className="flex items-center gap-2">
+                                  <ShieldCheck className="size-4 text-primary" />
+                                  <p className="text-sm font-medium text-foreground">Regla</p>
+                                </div>
+                                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                  Retroalimentación obligatoria antes de mover la etapa.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </div>
             </DrawerPreview>
           ) : (
             <StateCard
               tone="empty"
               title="Selecciona una vacante"
-              description="El panel lateral esta listo para mostrar vista previa, timeline de actividad y proximos pasos."
+              description="El panel lateral esta listo para mostrar vista previa, línea de tiempo de actividad y proximos pasos."
             />
           )}
         </div>

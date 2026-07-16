@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import type { RoleKey, UserDto } from "@/lib/contracts";
-import { createTenantUser, deleteTenantUser, fetchTenantUsers, updateTenantUser } from "@/lib/mock-backend";
+import { createTenantUser, deleteTenantUser, fetchTenantUsers, updateTenantUser } from "@/lib/backend";
 import { roleLabels, userStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
@@ -101,7 +101,7 @@ export default function UsersPage() {
       <CrudHeader
         title="Gestion de usuarios"
         description="Consulta, crea, modifica y elimina usuarios internos de la empresa, incluyendo rol y estado de acceso."
-        badge="Administracion"
+        badge="Empresa"
         action={
           <FormDialog
             open={open}

@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState } from "react";
 import { Building2, Eye, EyeOff, ShieldCheck } from "lucide-react";
-import { authenticateUser } from "@/lib/mock-backend";
+import { authenticateUser } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,20 +26,24 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn } = useAppStore();
+  const { refreshSession } = useAppStore();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "ava.thompson@talentoscloud.com",
-      password: "secret123",
+      password: "ChangeMe123!",
     },
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (values: LoginFormValues) => authenticateUser(values.email),
-    onSuccess: (_, values) => {
-      signIn(values.email);
+    mutationFn: async (values: LoginFormValues) =>
+      authenticateUser({
+        email: values.email,
+        password: values.password,
+      }),
+    onSuccess: async () => {
+      await refreshSession();
       router.push("/dashboard");
     },
   });
@@ -163,6 +167,11 @@ export default function LoginPage() {
                 Usuarios demo sugeridos: `ava.thompson@talentoscloud.com`, `olivia.carter@sunrisehealthfl.com`,
                 `emma.collins@gulfshorelogistics.com`
               </div>
+              {loginMutation.error ? (
+                <p className="text-sm text-destructive">
+                  {loginMutation.error instanceof Error ? loginMutation.error.message : "No fue posible iniciar sesion"}
+                </p>
+              ) : null}
             </form>
           </CardContent>
         </div>

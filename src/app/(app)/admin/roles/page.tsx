@@ -5,9 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import type { PermissionKey, RoleDefinitionDto } from "@/lib/contracts";
-import { createRoleDefinition, deleteRoleDefinition, fetchRoleDefinitions, updateRoleDefinition } from "@/lib/mock-backend";
-import { rolePermissions } from "@/lib/mock-data";
+import { PERMISSION_KEYS, type PermissionKey, type RoleDefinitionDto } from "@/lib/contracts";
+import { createRoleDefinition, deleteRoleDefinition, fetchRoleDefinitions, updateRoleDefinition } from "@/lib/backend";
 import { scopeLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
@@ -18,9 +17,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/ui/form-select";
 
-const permissionOptions = Array.from(
-  new Set(Object.values(rolePermissions).flat()),
-) as PermissionKey[];
+const permissionOptions = [...PERMISSION_KEYS] as PermissionKey[];
 
 const roleSchema = z.object({
   name: z.string().min(2),
@@ -121,7 +118,7 @@ export default function RolesPage() {
       <CrudHeader
         title="Gestion de roles y permisos"
         description="Consulta, crea, modifica y elimina roles internos con conjuntos de permisos asociados."
-        badge="Administracion"
+        badge="Empresa"
         action={
           <FormDialog
             open={open}

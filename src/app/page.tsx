@@ -25,6 +25,9 @@ export default function Home() {
                 <Link href="/jobs">Empleos publicos</Link>
               </Button>
               <Button asChild variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+                <Link href="/application-status">Seguir postulacion</Link>
+              </Button>
+              <Button asChild variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
                 <Link href="/login">Iniciar sesion</Link>
               </Button>
               <Button asChild variant="secondary" className="border-white/15 bg-white/10 text-white hover:bg-white/15">
@@ -36,7 +39,7 @@ export default function Home() {
           <div className="grid gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
             <div className="space-y-6">
               <Badge className="rounded-full bg-white/10 text-white hover:bg-white/10">
-                Productividad con IA, ATS, onboarding, capacitacion e inventario
+                Productividad con IA, ATS, incorporacion, capacitacion e inventario
               </Badge>
               <div className="space-y-4">
                 <h1 className="max-w-4xl text-4xl font-semibold tracking-tight md:text-6xl">
@@ -44,7 +47,7 @@ export default function Home() {
                 </h1>
                 <p className="max-w-2xl text-base leading-8 text-white/72">
                   Construido para modulos dinamicos, RBAC, autenticacion JWT, navegacion sensible a la empresa
-                  y flujos empresariales de reclutamiento, onboarding, capacitacion, productividad y
+                  y flujos empresariales de reclutamiento, incorporacion, capacitacion, productividad y
                   administracion.
                 </p>
               </div>
@@ -108,7 +111,7 @@ export default function Home() {
                     </div>
                     <div className="space-y-3">
                       {[
-                        "12 procesos de onboarding aun esperan firma en Orlando.",
+                        "12 procesos de incorporacion aun esperan firma en Orlando.",
                         "Inventario bajo detectado para escaneres y tablets clinicas.",
                         "3 certificaciones regulatorias vencen hoy en operaciones.",
                       ].map((item) => (
@@ -164,7 +167,7 @@ export default function Home() {
           </Badge>
           <h2 className="text-3xl font-semibold tracking-tight">Un sistema de diseno, muchos flujos empresariales.</h2>
           <p className="max-w-3xl text-base leading-8 text-muted-foreground">
-            ATS, onboarding, capacitacion, inventario, productividad con IA y administracion empresarial
+            ATS, incorporacion, capacitacion, inventario, productividad con IA y administracion empresarial
             comparten patrones reutilizables, movimiento sutil, contraste accesible y comportamiento mobile first.
           </p>
         </div>

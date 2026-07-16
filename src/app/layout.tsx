@@ -22,7 +22,7 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "TalentOS | SaaS multiempresa de RRHH",
   description:
-    "Frontend SaaS empresarial para reclutamiento, onboarding, capacitacion, productividad con IA, inventario y administracion.",
+    "Frontend SaaS empresarial para reclutamiento, incorporacion, capacitacion, productividad con IA, inventario y administracion.",
 };
 
 export default function RootLayout({

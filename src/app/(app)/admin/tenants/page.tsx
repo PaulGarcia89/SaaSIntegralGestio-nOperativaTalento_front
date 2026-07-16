@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { createTenant, deleteTenant, fetchTenants, updateTenant } from "@/lib/mock-backend";
+import { createTenant, deleteTenant, fetchTenants, updateTenant } from "@/lib/backend";
 import type { ModuleKey, PlanTier, TenantDto } from "@/lib/contracts";
 import { CrudHeader, CrudPanel, FormDialog, ConfirmDeleteDialog } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
@@ -152,7 +152,7 @@ export default function TenantsPage() {
       <CrudHeader
         title="Gestion de empresas"
         description="Crea, consulta, modifica y elimina empresas del SaaS, incluyendo plan, branding, estado y modulos habilitados."
-        badge="Administracion"
+        badge="Gobierno SaaS"
         action={
           <FormDialog
             open={open}

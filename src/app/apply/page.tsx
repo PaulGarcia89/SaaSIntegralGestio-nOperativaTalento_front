@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,6 +127,9 @@ export default function ApplyPage() {
             </div>
 
             <div className="flex flex-col gap-3 border-t border-border/60 pt-2 sm:flex-row sm:justify-end">
+              <Button asChild variant="secondary" className="rounded-full px-6">
+                <Link href="/application-status">Ver seguimiento</Link>
+              </Button>
               <Button variant="secondary" className="rounded-full px-6">
                 Guardar borrador
               </Button>

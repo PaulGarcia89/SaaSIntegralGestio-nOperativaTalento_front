@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { toast } from "sonner";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BrainCircuit, BriefcaseBusiness, CircleDot, FileText, Sparkles } from "lucide-react";
-import { fetchCandidates } from "@/lib/mock-backend";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, BrainCircuit, BriefcaseBusiness, CheckCheck, CircleDot, FileText, Sparkles, Users2 } from "lucide-react";
+import { fetchCandidateStructuredAssessments, fetchCandidates, triggerCandidateHiringAutomation } from "@/lib/mock-backend";
 import { useAppStore } from "@/store/app-store";
 import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
 import { ModuleHeader, SectionCard } from "@/components/ui";
@@ -13,9 +14,14 @@ import { Button } from "@/components/ui/button";
 
 export default function CandidatesPage() {
   const { currentTenant, can, hasModule } = useAppStore();
+  const queryClient = useQueryClient();
   const candidatesQuery = useQuery({
     queryKey: ["candidates", currentTenant.id],
     queryFn: () => fetchCandidates(currentTenant.id),
+  });
+  const assessmentsQuery = useQuery({
+    queryKey: ["candidate-assessments", currentTenant.id],
+    queryFn: () => fetchCandidateStructuredAssessments(currentTenant.id),
   });
   const [query, setQuery] = useState("");
 
@@ -32,27 +38,47 @@ export default function CandidatesPage() {
 
   const [selectedId, setSelectedId] = useState("");
   const selected = filtered.find((candidate) => candidate.id === selectedId) ?? filtered[0];
+  const selectedAssessment =
+    (assessmentsQuery.data ?? []).find((assessment) => assessment.candidateId === selected?.id) ?? null;
+
+  const triggerAutomationMutation = useMutation({
+    mutationFn: (candidateId: string) => triggerCandidateHiringAutomation(candidateId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidates", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-assessments", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-workspace", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-activations", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["training-workspace", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["master-workflow-card", currentTenant.id] });
+      queryClient.invalidateQueries({ queryKey: ["automation-summary", currentTenant.id] });
+      toast.success("Contratacion confirmada y automatizaciones disparadas");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "No se pudo activar el flujo automatizado");
+    },
+  });
 
   if (!hasModule("ats") || !can("ats.view")) {
     return (
       <StateCard
         tone="restricted"
-        title="Pipeline de postulantes no disponible"
+        title="Etapas del proceso de postulantes no disponibles"
         description="Esta empresa o rol no tiene acceso actualmente a la gestion de postulantes del ATS."
       />
     );
   }
 
   if (candidatesQuery.isLoading) {
-    return <SectionCard title="Cargando postulantes" subtitle="ATS">Obteniendo perfiles de postulantes y etapas del pipeline.</SectionCard>;
+    return <SectionCard title="Cargando postulantes" subtitle="ATS">Obteniendo perfiles de postulantes y etapas del proceso.</SectionCard>;
   }
 
   return (
     <>
       <ModuleHeader
         eyebrow="Postulantes"
-        title="Visibilidad del pipeline, busqueda de candidatos y detalle 360º en un solo flujo empresarial."
-        description="Disenado para evolucionar hacia feedback colaborativo, scorecards, notas de entrevista y revision de perfil asistida por IA."
+        title="Visibilidad de las etapas del proceso, busqueda de candidatos y detalle 360º en un solo flujo empresarial."
+        description="Diseñado para evolucionar hacia retroalimentación colaborativa, tarjetas de evaluación, notas de entrevista y revisión de perfil asistida por IA."
         actions={
           <Button asChild>
             <Link href="/ats/interviews">Ver entrevistas</Link>
@@ -108,7 +134,7 @@ export default function CandidatesPage() {
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Perfil seleccionado</p>
                         <h3 className="text-2xl font-semibold tracking-tight text-foreground">{selected.name}</h3>
                         <p className="text-sm leading-6 text-muted-foreground">
-                          Perfil con mayor tracción actual dentro del pipeline visible para esta empresa.
+                          Perfil con mayor tracción actual dentro de las etapas visibles para esta empresa.
                         </p>
                       </div>
                       <Badge className="rounded-full px-3 py-1">{selected.score} pts IA</Badge>
@@ -172,12 +198,158 @@ export default function CandidatesPage() {
                       </div>
                       <div>
                         <p className="font-medium text-foreground">Siguiente accion sugerida</p>
-                        <p className="mt-1 text-sm leading-7 text-muted-foreground">
-                          Revisar scorecard, validar disponibilidad y preparar siguiente contacto desde entrevista o propuesta.
+                            <p className="mt-1 text-sm leading-7 text-muted-foreground">
+                          Revisar tarjeta de evaluación, validar disponibilidad y preparar siguiente contacto desde entrevista o propuesta.
                         </p>
                       </div>
                     </div>
                   </div>
+
+                  {selectedAssessment ? (
+                    <>
+                      <div className="rounded-3xl border border-border/70 bg-card/92 p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Decision colaborativa</p>
+                            <h4 className="text-xl font-semibold tracking-tight text-foreground">
+                              {selectedAssessment.consolidatedRecommendation}
+                            </h4>
+                            <p className="text-sm leading-7 text-muted-foreground">
+                              {selectedAssessment.decisionSummary}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={selectedAssessment.advancementBlocked ? "outline" : "secondary"}
+                            className="rounded-full px-3 py-1"
+                          >
+                            {selectedAssessment.advancementBlocked
+                              ? `Bloqueado: ${selectedAssessment.feedbackPendingCount} retroalimentación pendiente`
+                              : "Panel completo"}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <SectionCard title="Tarjeta de evaluación por vacante" subtitle="Criterios de etapa">
+                        <div className="space-y-3">
+                          {selectedAssessment.stageCriteria.map((criterion) => (
+                            <div key={criterion.id} className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <p className="font-medium text-foreground">{criterion.label}</p>
+                                  <p className="text-sm leading-6 text-muted-foreground">
+                                    {criterion.note ?? "Criterio activo para consolidar decisión."}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="rounded-full">
+                                    Peso {criterion.weight}%
+                                  </Badge>
+                                  {criterion.score ? (
+                                    <Badge className="rounded-full">{criterion.score}/5</Badge>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </SectionCard>
+
+                      <SectionCard title="Retroalimentación por entrevistador" subtitle="Contratación estructurada">
+                        <div className="space-y-3">
+                          {selectedAssessment.reviewerFeedback.map((feedback) => (
+                            <div key={feedback.id} className="rounded-2xl border border-border/70 bg-card/90 p-4">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-foreground">{feedback.reviewer}</p>
+                                    <Badge variant="outline" className="rounded-full">
+                                      {feedback.role}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm leading-6 text-muted-foreground">{feedback.summary}</p>
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    {feedback.criteria.map((criterion) => (
+                                      <span
+                                        key={criterion.id}
+                                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-secondary/30 px-3 py-1.5 text-xs text-foreground"
+                                      >
+                                        {criterion.label}
+                                        {criterion.score ? <strong>{criterion.score}/5</strong> : "Pendiente"}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                  <Badge
+                                    variant={feedback.status === "submitted" ? "secondary" : "outline"}
+                                    className="rounded-full"
+                                  >
+                                    {feedback.status === "submitted" ? "Enviado" : "Pendiente"}
+                                  </Badge>
+                                  <Badge className="rounded-full px-3 py-1">
+                                    {feedback.recommendation === "strong_yes"
+                                      ? "Recomendación fuerte"
+                                      : feedback.recommendation === "yes"
+                                        ? "Sí"
+                                        : feedback.recommendation === "mixed"
+                                          ? "Mixta"
+                                          : "No"}
+                                  </Badge>
+                                  {feedback.submittedAt ? (
+                                    <p className="text-xs text-muted-foreground">{feedback.submittedAt}</p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </SectionCard>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
+                              <Users2 className="size-4" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Panel evaluador</p>
+                              <p className="font-medium text-foreground">{selectedAssessment.reviewerFeedback.length} participantes</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
+                              {selectedAssessment.advancementBlocked ? (
+                                <AlertTriangle className="size-4" />
+                              ) : (
+                                <CheckCheck className="size-4" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Regla de avance</p>
+                              <p className="font-medium text-foreground">
+                                {selectedAssessment.advancementBlocked ? "Retroalimentación obligatoria pendiente" : "Lista para mover etapa"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <Button
+                          className="sm:min-w-48"
+                          disabled={selectedAssessment.advancementBlocked || triggerAutomationMutation.isPending}
+                          onClick={() => triggerAutomationMutation.mutate(selected.id)}
+                        >
+                          {triggerAutomationMutation.isPending ? "Activando..." : "Contratar y disparar flujo"}
+                        </Button>
+                        <Button asChild variant="secondary" className="sm:min-w-48">
+                          <Link href="/dashboard">Ver cola operativa</Link>
+                        </Button>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </SectionCard>
             ) : null}

@@ -16,7 +16,7 @@ export default function ReportsPage() {
           </Button>
         }
         metrics={[
-          { label: "Reportes activos", value: "3", detail: "Entre reclutamiento, onboarding y operaciones" },
+          { label: "Reportes activos", value: "3", detail: "Entre reclutamiento, incorporacion y operaciones" },
           { label: "Cadencias vivas", value: "3", detail: "Semanal, diaria y tiempo real en una sola biblioteca" },
           { label: "Vistas guardadas", value: "12", detail: "Consultas frecuentes listas para ejecutivos y lideres" },
         ]}

@@ -11,7 +11,7 @@ export const roleLabels: Record<RoleKey, string> = {
 export const moduleLabels: Record<ModuleKey, string> = {
   dashboard: "Panel principal",
   ats: "Reclutamiento ATS",
-  onboarding: "Onboarding",
+  onboarding: "Incorporacion",
   training: "Capacitacion",
   productivity: "Productividad IA",
   inventory: "Inventario",
@@ -39,7 +39,7 @@ export const branchStatusLabels = {
 } as const;
 
 export const scopeLabels = {
-  global: "Global",
+  global: "General",
   tenant: "Empresa",
   module: "Modulo",
 } as const;

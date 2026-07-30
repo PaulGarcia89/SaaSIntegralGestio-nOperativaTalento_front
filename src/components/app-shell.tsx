@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   BookOpenCheck,
@@ -58,6 +59,7 @@ import { evaluateRouteAccess, getRoutePolicy } from "@/lib/navigation";
 import type { NavGroup, NavItem } from "@/lib/navigation";
 import { createTenantTheme } from "@/lib/tenant-branding";
 import { ImpersonationBanner } from "@/components/design-system";
+import { fetchNotifications } from "@/lib/backend";
 
 const navigationIcons: Record<NavItem["icon"], LucideIcon> = {
   dashboard: Gauge,
@@ -362,6 +364,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const closeMobileSidebar = () => setMobileSidebarOpen(false);
   const [userMenuPosition, setUserMenuPosition] = useState({ top: 0, left: 0 });
   const canUsePortal = typeof document !== "undefined";
+  const notificationsSummary = useQuery({
+    queryKey: ["notifications", "shell-unread", currentTenant.id, currentUser.id],
+    queryFn: () =>
+      fetchNotifications({ page: 1, pageSize: 1, unreadOnly: true }),
+    enabled: accessContextVerified && can("notifications.view"),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const unreadNotifications = notificationsSummary.data?.unread ?? 0;
   const userInitials = useMemo(
     () =>
       currentUser.fullName
@@ -563,8 +574,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <ThemeToggle />
                       <Tooltip content="Notificaciones">
                         <Button variant="secondary" size="icon" className="relative shrink-0" asChild>
-                          <Link href="/notifications" aria-label="Abrir notificaciones">
+                          <Link
+                            href="/notifications"
+                            aria-label={`Abrir notificaciones${unreadNotifications ? `, ${unreadNotifications} sin leer` : ""}`}
+                          >
                             <Bell className="size-4" />
+                            {unreadNotifications > 0 ? (
+                              <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                                {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                              </span>
+                            ) : null}
                           </Link>
                         </Button>
                       </Tooltip>

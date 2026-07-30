@@ -59,6 +59,16 @@ import type {
   ElectronicSignatureTemplateDto,
   PublicSigningContextDto,
   SignatureProviderDto,
+  NotificationCategory,
+  NotificationDeliveryDto,
+  NotificationListDto,
+  NotificationPreferenceDto,
+  OperationalDashboardDto,
+  ReportsOverviewDto,
+  ReportExportDto,
+  PlanAdminDto,
+  PlanLimitsDto,
+  PlatformModuleDto,
 } from "@/lib/contracts";
 import { PERMISSION_KEYS } from "@/lib/contracts";
 import { authenticateUser as authenticateMockUser } from "@/lib/mock-backend";
@@ -206,6 +216,10 @@ type BackendPlan = {
   name: string;
   priceMonthly?: string | null;
   priceYearly?: string | null;
+  description?: string | null;
+  limits?: Partial<PlanLimitsDto> | null;
+  planModules?: Array<{ module: PlatformModuleDto }>;
+  _count?: { subscriptions?: number };
 };
 
 type BackendSubscription = {
@@ -283,7 +297,8 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "admin.roles": ["roles.read", "roles.create", "roles.update", "roles.delete", "permissions.read"],
   "admin.company": ["tenants.read", "tenants.update", "branches.read", "branches.create", "branches.update", "branches.delete", "modules.read", "modules.update"],
   "admin.subscription": ["subscriptions.read", "subscriptions.create", "subscriptions.update", "subscriptions.delete", "plans.read"],
-  "reports.view": ["plans.read"],
+  "reports.view": ["metrics.read"],
+  "reports.export": ["applications.export"],
   "notifications.view": [],
   "profile.view": [],
   "platform.tenant.switch": ["platform.tenant.switch"],
@@ -935,8 +950,57 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
   return (await response.json()) as T;
 }
 
-async function fetchPlans() {
+async function fetchBackendPlans() {
   return request<BackendPlan[]>("/plans");
+}
+
+function mapAdminPlan(plan: BackendPlan): PlanAdminDto {
+  return {
+    id: plan.id,
+    code: plan.code as PlanAdminDto["code"],
+    name: plan.name,
+    description: plan.description ?? "",
+    priceMonthly: Number(plan.priceMonthly ?? 0),
+    priceYearly: Number(plan.priceYearly ?? 0),
+    limits: {
+      maxUsers: plan.limits?.maxUsers ?? null,
+      maxBranches: plan.limits?.maxBranches ?? null,
+      maxActiveVacancies: plan.limits?.maxActiveVacancies ?? null,
+      maxCourses: plan.limits?.maxCourses ?? null,
+      maxAssets: plan.limits?.maxAssets ?? null,
+      storageGb: plan.limits?.storageGb ?? null,
+    },
+    modules: plan.planModules?.map((entry) => entry.module) ?? [],
+    subscriptions: plan._count?.subscriptions ?? 0,
+  };
+}
+
+export async function fetchPlanCatalog() {
+  return (await fetchBackendPlans()).map(mapAdminPlan);
+}
+
+export function fetchPlatformModulesCatalog() {
+  return request<PlatformModuleDto[]>("/modules");
+}
+
+export async function createPlan(input: Omit<PlanAdminDto, "id" | "subscriptions" | "modules"> & { moduleIds: string[] }) {
+  const result = await request<BackendPlan>("/plans", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return mapAdminPlan(result);
+}
+
+export async function updatePlan(id: string, input: Omit<PlanAdminDto, "id" | "subscriptions" | "modules" | "code"> & { code?: PlanAdminDto["code"]; moduleIds: string[] }) {
+  const result = await request<BackendPlan>(`/plans/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return mapAdminPlan(result);
+}
+
+export function deletePlan(id: string) {
+  return request(`/plans/${id}`, { method: "DELETE" });
 }
 
 async function fetchPermissionsCatalog(tenantId: string) {
@@ -972,7 +1036,7 @@ async function resolvePermissionIdsFromUiPermissions(permissions: PermissionKey[
 }
 
 async function resolvePlanId(plan: PlanTier) {
-  const plans = await fetchPlans();
+  const plans = await fetchBackendPlans();
   const targetCode = planTierToPlanCode(plan);
   const matched = plans.find((entry) => entry.code === targetCode);
 
@@ -2338,6 +2402,119 @@ export function fetchPublicSigningContext(token: string) {
 
 export function submitPublicSignature(token: string, input: { accepted: boolean; typedName: string }) {
   return request<{ signed: boolean; packageId: string; signedAt: string }>(`/public/signatures/${encodeURIComponent(token)}/consent`, { method: "POST", body: JSON.stringify(input) }, { auth: false });
+}
+
+export function fetchNotifications(input?: {
+  page?: number;
+  pageSize?: number;
+  unreadOnly?: boolean;
+  category?: NotificationCategory;
+  status?: "active" | "archived" | "all";
+}) {
+  const query = new URLSearchParams({
+    page: String(input?.page ?? 1),
+    pageSize: String(input?.pageSize ?? 50),
+    status: input?.status ?? "active",
+  });
+  if (input?.unreadOnly) query.set("unreadOnly", "true");
+  if (input?.category) query.set("category", input.category);
+  return request<NotificationListDto>(`/notifications?${query.toString()}`);
+}
+
+export function markNotificationRead(id: string) {
+  return request(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+}
+
+export function markAllNotificationsRead() {
+  return request<{ updated: number }>("/notifications/read-all", { method: "PATCH" });
+}
+
+export function archiveNotification(id: string) {
+  return request(`/notifications/${encodeURIComponent(id)}/archive`, { method: "PATCH" });
+}
+
+export function deleteNotification(id: string) {
+  return request(`/notifications/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function fetchNotificationPreferences() {
+  return request<NotificationPreferenceDto[]>("/notifications/preferences/me");
+}
+
+export function updateNotificationPreference(input: NotificationPreferenceDto) {
+  return request<NotificationPreferenceDto>("/notifications/preferences/me", {
+    method: "PATCH",
+    body: JSON.stringify({
+      category: input.category,
+      internalEnabled: input.internalEnabled,
+      emailEnabled: input.emailEnabled,
+      frequency: input.frequency,
+      quietHoursStart: input.quietHoursStart || undefined,
+      quietHoursEnd: input.quietHoursEnd || undefined,
+      timeZone: input.timeZone,
+    }),
+  });
+}
+
+export function fetchNotificationDeliveries(input?: {
+  status?: NotificationDeliveryDto["status"];
+  channel?: NotificationDeliveryDto["channel"];
+}) {
+  const query = new URLSearchParams({ page: "1", pageSize: "100" });
+  if (input?.status) query.set("status", input.status);
+  if (input?.channel) query.set("channel", input.channel);
+  return request<{ items: NotificationDeliveryDto[]; total: number }>(
+    `/notifications/deliveries?${query.toString()}`,
+  );
+}
+
+export function retryNotificationDelivery(id: string) {
+  return request<NotificationDeliveryDto>(
+    `/notifications/deliveries/${encodeURIComponent(id)}/retry`,
+    { method: "POST" },
+  );
+}
+
+export function fetchOperationalDashboard() {
+  return request<OperationalDashboardDto>("/dashboard/operational");
+}
+
+export type ReportQuery = {
+  from?: string;
+  to?: string;
+  branchId?: string;
+  tenantId?: string;
+  scope?: "context" | "tenant";
+};
+
+function reportQueryString(input: ReportQuery) {
+  const query = new URLSearchParams();
+  if (input.from) query.set("from", input.from);
+  if (input.to) query.set("to", input.to);
+  if (input.branchId) query.set("branchId", input.branchId);
+  if (input.tenantId) query.set("tenantId", input.tenantId);
+  if (input.scope) query.set("scope", input.scope);
+  return query.toString();
+}
+
+export function fetchReportsOverview(input: ReportQuery) {
+  return request<ReportsOverviewDto>(`/reports/overview?${reportQueryString(input)}`);
+}
+
+export function fetchReportsExport(input: ReportQuery) {
+  return request<ReportExportDto>(`/reports/export?${reportQueryString(input)}`);
+}
+
+export function downloadTextFile(file: ReportExportDto) {
+  const blob = new Blob([file.content], { type: file.mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function mapAuthUserToUi(authUser: BackendAuthUser): {

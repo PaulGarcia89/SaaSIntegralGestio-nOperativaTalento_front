@@ -393,6 +393,34 @@ export interface SubscriptionDto {
   renewalDate: string;
 }
 
+export interface PlanLimitsDto {
+  maxUsers: number | null;
+  maxBranches: number | null;
+  maxActiveVacancies: number | null;
+  maxCourses: number | null;
+  maxAssets: number | null;
+  storageGb: number | null;
+}
+
+export interface PlanAdminDto {
+  id: string;
+  code: "BASIC" | "PRO" | "ENTERPRISE";
+  name: string;
+  description: string;
+  priceMonthly: number;
+  priceYearly: number;
+  limits: PlanLimitsDto;
+  modules: Array<{ id: string; code: string; name: string }>;
+  subscriptions: number;
+}
+
+export interface PlatformModuleDto {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
 export interface ModuleAssignmentDto {
   id: string;
   tenantId: string;
@@ -1511,4 +1539,154 @@ export interface AppDatasetsDto {
   vacancies: VacancyDto[];
   candidates: CandidateDto[];
   inventory: InventoryItemDto[];
+}
+
+export type OperationalDashboardTone = "info" | "success" | "warning" | "danger";
+
+export interface OperationalDashboardItemDto {
+  id: string;
+  kind: "task" | "alert";
+  title: string;
+  description: string;
+  tone: OperationalDashboardTone;
+  module: string;
+  href: string;
+  dueAt: string | null;
+  occurredAt: string;
+  recordLabel: string | null;
+}
+
+export interface OperationalDashboardDto {
+  role: string;
+  scope: "GLOBAL" | "TENANT" | "BRANCH";
+  period: { label: string; from: string; to: string };
+  source: string;
+  generatedAt: string;
+  metrics: Array<{
+    key: string;
+    label: string;
+    value: number;
+    tone: OperationalDashboardTone;
+    href: string;
+  }>;
+  tasks: OperationalDashboardItemDto[];
+  alerts: OperationalDashboardItemDto[];
+  nextAction: OperationalDashboardItemDto | null;
+}
+
+export interface ReportsOverviewDto {
+  generatedAt: string;
+  source: string;
+  period: { from: string; to: string; label: string };
+  scope: {
+    type: "GLOBAL" | "TENANT" | "BRANCH";
+    tenantId: string | null;
+    branchId: string | null;
+    branchName: string | null;
+  };
+  ats: {
+    totals: {
+      applications: number;
+      activeVacancies: number;
+      hired: number;
+      rejected: number;
+      conversionRate: number;
+      averageTimeToHireHours: number;
+    };
+    byStatus: Array<{ status: string; count: number }>;
+    timeByStage: Array<{ stage: string; averageHours: number; sampleSize: number }>;
+  };
+  onboarding: {
+    totalFlows: number;
+    completedFlows: number;
+    completionRate: number;
+    overdueTasks: number;
+    blockedTasks: number;
+    averageTaskProgress: number;
+    byStatus: Array<{ status: string; count: number }>;
+  };
+  training: {
+    totalAssignments: number;
+    completed: number;
+    overdue: number;
+    inProgress: number;
+    complianceRate: number;
+    averageProgress: number;
+    byStatus: Array<{ status: string; count: number }>;
+  };
+  inventory: {
+    totalAssets: number;
+    pendingActions: number;
+    available: number;
+    assigned: number;
+    returnPending: number;
+    maintenance: number;
+    lost: number;
+    byStatus: Array<{ status: string; count: number }>;
+  };
+}
+
+export interface ReportExportDto {
+  filename: string;
+  mimeType: string;
+  content: string;
+  generatedAt: string;
+}
+
+export type NotificationCategory =
+  | "GENERAL"
+  | "ATS"
+  | "ONBOARDING"
+  | "TRAINING"
+  | "INVENTORY"
+  | "AUTOMATION"
+  | "SECURITY"
+  | "BILLING";
+
+export interface NotificationDeliveryDto {
+  id: string;
+  channel: "INTERNAL" | "EMAIL";
+  status: "PENDING" | "PROCESSING" | "DELIVERED" | "FAILED" | "DEAD_LETTER" | "SKIPPED";
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: string;
+  deliveredAt?: string | null;
+  lastError?: string | null;
+  correlationId?: string | null;
+  createdAt: string;
+  notification?: { title: string; category: NotificationCategory };
+}
+
+export interface NotificationDto {
+  id: string;
+  type: "INFO" | "SUCCESS" | "WARNING" | "ERROR";
+  category: NotificationCategory;
+  title: string;
+  message: string;
+  sourceModule?: string | null;
+  actionUrl?: string | null;
+  correlationId?: string | null;
+  readAt?: string | null;
+  archivedAt?: string | null;
+  createdAt: string;
+  deliveries: NotificationDeliveryDto[];
+}
+
+export interface NotificationListDto {
+  items: NotificationDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+  unread: number;
+}
+
+export interface NotificationPreferenceDto {
+  id: string | null;
+  category: NotificationCategory;
+  internalEnabled: boolean;
+  emailEnabled: boolean;
+  frequency: "IMMEDIATE" | "DAILY" | "WEEKLY" | "DISABLED";
+  quietHoursStart?: string | null;
+  quietHoursEnd?: string | null;
+  timeZone: string;
 }

@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import type { PlanTier, SubscriptionDto } from "@/lib/contracts";
-import { createSubscription, deleteSubscription, fetchSubscriptions, fetchTenants, updateSubscription } from "@/lib/backend";
+import { createSubscription, deleteSubscription, fetchPlanCatalog, fetchSubscriptions, fetchTenants, updateSubscription } from "@/lib/backend";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ export default function SubscriptionPage() {
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({ queryKey: ["admin-tenants"], queryFn: fetchTenants });
   const subscriptionsQuery = useQuery({ queryKey: ["subscriptions"], queryFn: fetchSubscriptions });
+  const plansQuery = useQuery({ queryKey: ["plan-catalog"], queryFn: fetchPlanCatalog });
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [open, setOpen] = useState(false);
@@ -60,6 +61,14 @@ export default function SubscriptionPage() {
   });
   useUnsavedChanges(open && form.formState.isDirty, "subscription-form");
   const formValues = useWatch({ control: form.control });
+  const selectedPlan = plansQuery.data?.find((plan) =>
+    (formValues.plan === "starter" && plan.code === "BASIC") ||
+    (formValues.plan === "growth" && plan.code === "PRO") ||
+    (formValues.plan === "enterprise" && plan.code === "ENTERPRISE"),
+  );
+  const catalogPrice = formValues.billingCycle === "annual"
+    ? selectedPlan?.priceYearly ?? 0
+    : selectedPlan?.priceMonthly ?? 0;
 
   const filtered = useMemo(
     () =>
@@ -111,8 +120,8 @@ export default function SubscriptionPage() {
     );
   }
 
-  if (subscriptionsQuery.isLoading || tenantsQuery.isLoading) return <AsyncState state="loading" title="Cargando suscripciónes" />;
-  if (subscriptionsQuery.isError || tenantsQuery.isError) return <AsyncState state="error" title="No fue posible cargar las suscripciónes" onRetry={() => { void subscriptionsQuery.refetch(); void tenantsQuery.refetch(); }} />;
+  if (subscriptionsQuery.isLoading || tenantsQuery.isLoading || plansQuery.isLoading) return <AsyncState state="loading" title="Cargando suscripciones" />;
+  if (subscriptionsQuery.isError || tenantsQuery.isError || plansQuery.isError) return <AsyncState state="error" title="No fue posible cargar las suscripciones" onRetry={() => { void subscriptionsQuery.refetch(); void tenantsQuery.refetch(); void plansQuery.refetch(); }} />;
 
   return (
     <div className="space-y-5">
@@ -190,8 +199,9 @@ export default function SubscriptionPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Precio</Label>
-                  <Input type="number" {...form.register("price")} />
+                  <Label>Precio del catálogo</Label>
+                  <Input type="number" value={catalogPrice} readOnly aria-describedby="catalog-price-help" />
+                  <p id="catalog-price-help" className="text-xs text-text-secondary">Se obtiene del plan y ciclo seleccionados.</p>
                 </div>
               </div>
               <DatePicker

@@ -46,7 +46,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
 
 const unavailableRouteHrefs = new Set([
   "/admin", "/admin/company/subscription",
-  "/admin/plans", "/admin/billing", "/admin/global-users", "/admin/audit", "/admin/settings",
+  "/admin/billing", "/admin/global-users", "/admin/audit", "/admin/settings",
 ]);
 
 export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({

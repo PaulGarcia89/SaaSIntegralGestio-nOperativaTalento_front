@@ -19,12 +19,22 @@ type FormSelectProps = {
   value?: string;
   onValueChange?: (value: string) => void;
   className?: string;
+  disabled?: boolean;
+  "aria-label"?: string;
 };
 
-export function FormSelect({ options, placeholder, value, onValueChange, className }: FormSelectProps) {
+export function FormSelect({
+  options,
+  placeholder,
+  value,
+  onValueChange,
+  className,
+  disabled,
+  "aria-label": ariaLabel,
+}: FormSelectProps) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={className}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+      <SelectTrigger className={className} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -1,361 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { toast } from "sonner";
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BrainCircuit, BriefcaseBusiness, CheckCheck, CircleDot, FileText, Sparkles, Users2 } from "lucide-react";
-import { fetchCandidateStructuredAssessments, fetchCandidates, triggerCandidateHiringAutomation } from "@/lib/mock-backend";
-import { useAppStore } from "@/store/app-store";
-import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
-import { ModuleHeader, SectionCard } from "@/components/ui";
+import { Suspense, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Search } from "lucide-react";
+import { AsyncState } from "@/components/async-state";
+import { InlineFeedback, PageHeader, ResponsiveDataView } from "@/components/design-system";
+import { FilterField, RecruitmentWorkspaceNav } from "@/components/recruitment-workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { APPLICATION_STAGES, applicationNextAction, applicationStageLabel, formatApplicationDate } from "@/lib/applications";
+import { fetchApplications } from "@/lib/backend";
+import type { VacancyApplicationDto } from "@/lib/contracts";
+import { trackProductEvent } from "@/lib/product-analytics";
+import { useAppStore } from "@/store/app-store";
+
+const ALL = "ALL";
+
+function CandidatesContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const { currentBranch } = useAppStore();
+  const search = params.get("q") ?? "";
+  const stage = params.get("stage") ?? ALL;
+  const vacancyId = params.get("vacancy") ?? ALL;
+  const applications = useQuery({ queryKey: ["applications", currentBranch?.id], queryFn: () => fetchApplications({ branchId: currentBranch?.id }) });
+  const allItems = useMemo(() => applications.data?.data ?? [], [applications.data]);
+  const vacancies = useMemo(() => Array.from(new Map(allItems.map((item) => [item.vacancy.id, item.vacancy.title])).entries()).sort((a, b) => a[1].localeCompare(b[1], "es")), [allItems]);
+  const items = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("es");
+    return allItems.filter((item) => (!query || `${item.candidate.fullName} ${item.candidate.email} ${item.vacancy.title}`.toLocaleLowerCase("es").includes(query)) && (stage === ALL || item.status === stage) && (vacancyId === ALL || item.vacancy.id === vacancyId));
+  }, [allItems, search, stage, vacancyId]);
+
+  function setFilter(name: string, value: string) {
+    const next = new URLSearchParams(params.toString());
+    if (!value || value === ALL) next.delete(name); else next.set(name, value);
+    router.replace(`${pathname}${next.size ? `?${next.toString()}` : ""}`, { scroll: false });
+  }
+
+  const candidateCard = (item: VacancyApplicationDto) => <div className="space-y-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{item.candidate.fullName}</p><p className="text-sm text-text-secondary">{item.candidate.email}</p></div><Badge variant="secondary">{applicationStageLabel(item.status)}</Badge></div><div className="space-y-1 text-sm"><p>{item.vacancy.title}</p><p className="text-text-secondary">{item.vacancy.branch?.name ?? "Sin sucursal"} · {formatApplicationDate(item.appliedAt)}</p><p><span className="font-medium">Siguiente:</span> {applicationNextAction(item.status)}</p></div><Button asChild variant="secondary"><Link href={`/ats/candidates/${item.id}`} onClick={() => trackProductEvent({ name: "candidate_profile_opened", source: "list" })}>Abrir perfil 360°<ArrowRight className="size-4" /></Link></Button></div>;
+
+  return <div className="space-y-6"><PageHeader eyebrow="Reclutamiento" title="Candidatos" description="Encuentra una postulación y continúa desde su siguiente acción recomendada." /><RecruitmentWorkspaceNav /><section aria-label="Filtros de candidatos" className="grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 md:grid-cols-3"><FilterField label="Buscar"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" /><Input value={search} onChange={(event) => setFilter("q", event.target.value)} placeholder="Nombre, correo o vacante" className="pl-9" /></div></FilterField><FilterField label="Vacante"><Select value={vacancyId} onValueChange={(value) => setFilter("vacancy", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todas las vacantes</SelectItem>{vacancies.map(([id, title]) => <SelectItem key={id} value={id}>{title}</SelectItem>)}</SelectContent></Select></FilterField><FilterField label="Etapa"><Select value={stage} onValueChange={(value) => setFilter("stage", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todas las etapas</SelectItem>{APPLICATION_STAGES.map((item) => <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>)}</SelectContent></Select></FilterField></section><p className="text-sm text-text-secondary" aria-live="polite">{items.length} {items.length === 1 ? "candidato encontrado" : "candidatos encontrados"}</p>{applications.isLoading ? <AsyncState state="loading" title="Cargando candidatos" /> : null}{applications.isError ? <AsyncState state="error" title="No fue posible cargar candidatos" onRetry={() => void applications.refetch()} /> : null}{applications.isSuccess && !items.length ? <InlineFeedback tone="info" title="No hay resultados">Ajusta los filtros para encontrar otras postulaciones.</InlineFeedback> : null}{applications.isSuccess && items.length ? <ResponsiveDataView data={items} getKey={(item) => item.id} mobile={candidateCard} desktop={<div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">{items.map((item) => <Card level={2} key={item.id}><CardContent className="p-5">{candidateCard(item)}</CardContent></Card>)}</div>} /> : null}</div>;
+}
 
 export default function CandidatesPage() {
-  const { currentTenant, can, hasModule } = useAppStore();
-  const queryClient = useQueryClient();
-  const candidatesQuery = useQuery({
-    queryKey: ["candidates", currentTenant.id],
-    queryFn: () => fetchCandidates(currentTenant.id),
-  });
-  const assessmentsQuery = useQuery({
-    queryKey: ["candidate-assessments", currentTenant.id],
-    queryFn: () => fetchCandidateStructuredAssessments(currentTenant.id),
-  });
-  const [query, setQuery] = useState("");
-
-  const filtered = useMemo(
-    () =>
-      (candidatesQuery.data ?? []).filter((candidate) =>
-        [candidate.name, candidate.role, candidate.stage, candidate.summary]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    [candidatesQuery.data, query],
-  );
-
-  const [selectedId, setSelectedId] = useState("");
-  const selected = filtered.find((candidate) => candidate.id === selectedId) ?? filtered[0];
-  const selectedAssessment =
-    (assessmentsQuery.data ?? []).find((assessment) => assessment.candidateId === selected?.id) ?? null;
-
-  const triggerAutomationMutation = useMutation({
-    mutationFn: (candidateId: string) => triggerCandidateHiringAutomation(candidateId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["candidates", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["candidate-assessments", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding-workspace", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["inventory-activations", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["training-workspace", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["master-workflow-card", currentTenant.id] });
-      queryClient.invalidateQueries({ queryKey: ["automation-summary", currentTenant.id] });
-      toast.success("Contratacion confirmada y automatizaciones disparadas");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "No se pudo activar el flujo automatizado");
-    },
-  });
-
-  if (!hasModule("ats") || !can("ats.view")) {
-    return (
-      <StateCard
-        tone="restricted"
-        title="Etapas del proceso de postulantes no disponibles"
-        description="Esta empresa o rol no tiene acceso actualmente a la gestion de postulantes del ATS."
-      />
-    );
-  }
-
-  if (candidatesQuery.isLoading) {
-    return <SectionCard title="Cargando postulantes" subtitle="ATS">Obteniendo perfiles de postulantes y etapas del proceso.</SectionCard>;
-  }
-
-  return (
-    <>
-      <ModuleHeader
-        eyebrow="Postulantes"
-        title="Visibilidad de las etapas del proceso, busqueda de candidatos y detalle 360º en un solo flujo empresarial."
-        description="Diseñado para evolucionar hacia retroalimentación colaborativa, tarjetas de evaluación, notas de entrevista y revisión de perfil asistida por IA."
-        actions={
-          <Button asChild>
-            <Link href="/ats/interviews">Ver entrevistas</Link>
-          </Button>
-        }
-        metrics={[
-          { label: "Postulantes activos", value: `${filtered.length}`, detail: "Perfiles visibles para la empresa y filtros actuales" },
-          { label: "Etapas abiertas", value: "4", detail: "Filtro, entrevista, oferta y cierre en seguimiento" },
-          { label: "Score promedio IA", value: "86", detail: "Promedio ponderado de compatibilidad sobre la muestra" },
-        ]}
-      />
-      <div className="space-y-6 xl:space-y-8">
-        <FilterToolbar
-          searchPlaceholder="Buscar por postulante, cargo o etapa"
-          options={[
-            { label: "Todos", value: "" },
-            { label: "Entrevista", value: "entrevista" },
-            { label: "Oferta", value: "oferta" },
-            { label: "Filtro", value: "filtro" },
-          ]}
-          activeValue={query}
-          onChange={setQuery}
-        />
-
-        {filtered.length === 0 ? (
-          <StateCard
-            tone="empty"
-            title="No hay postulantes disponibles"
-            description="La empresa seleccionada aun no tiene postulantes o el filtro activo no produjo resultados."
-          />
-        ) : (
-          <div className="grid gap-5 xl:grid-cols-[1.18fr_0.82fr]">
-            <SectionCard title="Tabla de postulantes" subtitle="Analitica ATS">
-              <DomainTable
-                data={filtered}
-                getKey={(candidate) => candidate.id}
-                onSelect={(candidate) => setSelectedId(candidate.id)}
-                columns={[
-                  { key: "name", header: "Postulante", render: (candidate) => candidate.name },
-                  { key: "role", header: "Cargo", render: (candidate) => candidate.role },
-                  { key: "stage", header: "Etapa", render: (candidate) => candidate.stage },
-                  { key: "score", header: "Puntaje IA", render: (candidate) => candidate.score },
-                ]}
-              />
-            </SectionCard>
-
-            {selected ? (
-              <SectionCard title={selected.name} subtitle="Vista 360 del postulante" className="h-full">
-                <div className="space-y-6">
-                  <div className="rounded-3xl border border-border/70 bg-secondary/25 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Perfil seleccionado</p>
-                        <h3 className="text-2xl font-semibold tracking-tight text-foreground">{selected.name}</h3>
-                        <p className="text-sm leading-6 text-muted-foreground">
-                          Perfil con mayor tracción actual dentro de las etapas visibles para esta empresa.
-                        </p>
-                      </div>
-                      <Badge className="rounded-full px-3 py-1">{selected.score} pts IA</Badge>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3">
-                    <div className="rounded-2xl border border-border/70 bg-card/90 p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                          <BriefcaseBusiness className="size-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Cargo</p>
-                          <p className="font-medium text-foreground">{selected.role}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-border/70 bg-card/90 p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                          <CircleDot className="size-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Etapa actual</p>
-                          <p className="font-medium text-foreground">{selected.stage}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-border/70 bg-card/90 p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                          <BrainCircuit className="size-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Puntaje IA</p>
-                          <p className="font-medium text-foreground">{selected.score} / 100</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-border/70 bg-secondary/20 p-5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                        <Sparkles className="size-4" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Resumen destacado</p>
-                        <p className="mt-1 text-sm leading-7 text-muted-foreground">{selected.summary}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-dashed border-border/70 bg-secondary/15 p-5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                        <FileText className="size-4" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">Siguiente accion sugerida</p>
-                            <p className="mt-1 text-sm leading-7 text-muted-foreground">
-                          Revisar tarjeta de evaluación, validar disponibilidad y preparar siguiente contacto desde entrevista o propuesta.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {selectedAssessment ? (
-                    <>
-                      <div className="rounded-3xl border border-border/70 bg-card/92 p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Decision colaborativa</p>
-                            <h4 className="text-xl font-semibold tracking-tight text-foreground">
-                              {selectedAssessment.consolidatedRecommendation}
-                            </h4>
-                            <p className="text-sm leading-7 text-muted-foreground">
-                              {selectedAssessment.decisionSummary}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={selectedAssessment.advancementBlocked ? "outline" : "secondary"}
-                            className="rounded-full px-3 py-1"
-                          >
-                            {selectedAssessment.advancementBlocked
-                              ? `Bloqueado: ${selectedAssessment.feedbackPendingCount} retroalimentación pendiente`
-                              : "Panel completo"}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <SectionCard title="Tarjeta de evaluación por vacante" subtitle="Criterios de etapa">
-                        <div className="space-y-3">
-                          {selectedAssessment.stageCriteria.map((criterion) => (
-                            <div key={criterion.id} className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                  <p className="font-medium text-foreground">{criterion.label}</p>
-                                  <p className="text-sm leading-6 text-muted-foreground">
-                                    {criterion.note ?? "Criterio activo para consolidar decisión."}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="rounded-full">
-                                    Peso {criterion.weight}%
-                                  </Badge>
-                                  {criterion.score ? (
-                                    <Badge className="rounded-full">{criterion.score}/5</Badge>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </SectionCard>
-
-                      <SectionCard title="Retroalimentación por entrevistador" subtitle="Contratación estructurada">
-                        <div className="space-y-3">
-                          {selectedAssessment.reviewerFeedback.map((feedback) => (
-                            <div key={feedback.id} className="rounded-2xl border border-border/70 bg-card/90 p-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium text-foreground">{feedback.reviewer}</p>
-                                    <Badge variant="outline" className="rounded-full">
-                                      {feedback.role}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-sm leading-6 text-muted-foreground">{feedback.summary}</p>
-                                  <div className="flex flex-wrap gap-2 pt-1">
-                                    {feedback.criteria.map((criterion) => (
-                                      <span
-                                        key={criterion.id}
-                                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-secondary/30 px-3 py-1.5 text-xs text-foreground"
-                                      >
-                                        {criterion.label}
-                                        {criterion.score ? <strong>{criterion.score}/5</strong> : "Pendiente"}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <Badge
-                                    variant={feedback.status === "submitted" ? "secondary" : "outline"}
-                                    className="rounded-full"
-                                  >
-                                    {feedback.status === "submitted" ? "Enviado" : "Pendiente"}
-                                  </Badge>
-                                  <Badge className="rounded-full px-3 py-1">
-                                    {feedback.recommendation === "strong_yes"
-                                      ? "Recomendación fuerte"
-                                      : feedback.recommendation === "yes"
-                                        ? "Sí"
-                                        : feedback.recommendation === "mixed"
-                                          ? "Mixta"
-                                          : "No"}
-                                  </Badge>
-                                  {feedback.submittedAt ? (
-                                    <p className="text-xs text-muted-foreground">{feedback.submittedAt}</p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </SectionCard>
-
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                              <Users2 className="size-4" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Panel evaluador</p>
-                              <p className="font-medium text-foreground">{selectedAssessment.reviewerFeedback.length} participantes</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                              {selectedAssessment.advancementBlocked ? (
-                                <AlertTriangle className="size-4" />
-                              ) : (
-                                <CheckCheck className="size-4" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">Regla de avance</p>
-                              <p className="font-medium text-foreground">
-                                {selectedAssessment.advancementBlocked ? "Retroalimentación obligatoria pendiente" : "Lista para mover etapa"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        <Button
-                          className="sm:min-w-48"
-                          disabled={selectedAssessment.advancementBlocked || triggerAutomationMutation.isPending}
-                          onClick={() => triggerAutomationMutation.mutate(selected.id)}
-                        >
-                          {triggerAutomationMutation.isPending ? "Activando..." : "Contratar y disparar flujo"}
-                        </Button>
-                        <Button asChild variant="secondary" className="sm:min-w-48">
-                          <Link href="/dashboard">Ver cola operativa</Link>
-                        </Button>
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              </SectionCard>
-            ) : null}
-          </div>
-        )}
-      </div>
-    </>
-  );
+  return <Suspense fallback={<AsyncState state="loading" title="Preparando candidatos" />}><CandidatesContent /></Suspense>;
 }

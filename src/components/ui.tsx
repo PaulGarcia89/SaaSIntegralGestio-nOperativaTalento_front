@@ -1,11 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { type ReactNode, useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { DomainTable } from "@/components/domain";
+import { PageHeader } from "@/components/design-system";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type PageIntroProps = {
@@ -21,32 +20,6 @@ type ModuleMetric = {
   detail: string;
 };
 
-export function PageIntro({ eyebrow, title, description, actions }: PageIntroProps) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28 }}
-      className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"
-    >
-      <div className="space-y-5">
-        <Badge variant="secondary" className="rounded-full px-3 py-1">
-          {eyebrow}
-        </Badge>
-        <div className="space-y-4">
-          <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            {title}
-          </h2>
-          <p className="max-w-3xl text-sm leading-7 text-muted-foreground md:text-base">
-            {description}
-          </p>
-        </div>
-      </div>
-      {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
-    </motion.section>
-  );
-}
-
 export function ModuleHeader({
   eyebrow,
   title,
@@ -56,7 +29,7 @@ export function ModuleHeader({
 }: PageIntroProps & { metrics: ModuleMetric[] }) {
   return (
     <div className="space-y-8 pb-4 xl:space-y-10 xl:pb-6">
-      <PageIntro eyebrow={eyebrow} title={title} description={description} actions={actions} />
+      <PageHeader eyebrow={eyebrow} title={title} description={description} actions={actions} />
       <div className="grid gap-x-8 gap-y-8 md:grid-cols-2 2xl:grid-cols-3">
         {metrics.map((metric) => (
           <MetricCard
@@ -75,15 +48,17 @@ type MetricCardProps = {
   label: string;
   value: string;
   detail: string;
+  period?: string;
 };
 
-export function MetricCard({ label, value, detail }: MetricCardProps) {
+export function MetricCard({ label, value, detail, period }: MetricCardProps) {
   return (
     <Card className="overflow-hidden border-border/70 bg-card/90">
       <CardContent className="space-y-4 p-7">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
         <div className="text-3xl font-semibold tracking-tight">{value}</div>
         <p className="text-sm text-muted-foreground">{detail}</p>
+        <p className="border-t pt-3 text-xs text-muted-foreground">Periodo: {period ?? "no informado"}</p>
       </CardContent>
     </Card>
   );
@@ -150,77 +125,8 @@ type DataTableProps = {
 };
 
 export function DataTable({ columns, rows, pageSize = 10 }: DataTableProps) {
-  const [page, setPage] = useState(0);
-  const totalPages = Math.ceil(rows.length / pageSize);
-  const paginatedRows = useMemo(
-    () => rows.slice(page * pageSize, (page + 1) * pageSize),
-    [rows, page, pageSize],
-  );
-
-  if (rows.length === 0) {
-    return (
-      <div className="overflow-hidden rounded-xl border border-border/70">
-        <div className="p-8 text-center text-sm text-muted-foreground">
-          No hay registros para mostrar
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl border border-border/70">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-secondary/60 text-muted-foreground">
-              <tr>
-                {columns.map((column) => (
-                  <th key={column} className="px-4 py-3 font-medium">
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/70 bg-card">
-              {paginatedRows.map((row) => (
-                <tr key={row.join("-")} className="hover:bg-accent/40">
-                  {row.map((cell) => (
-                    <td key={cell} className="px-4 py-3 text-foreground">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-end gap-1 px-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-          >
-            <ChevronLeft className="size-3" />
-          </Button>
-          <span className="px-2 text-xs text-muted-foreground">
-            {page + 1} / {totalPages}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
-          >
-            <ChevronRight className="size-3" />
-          </Button>
-        </div>
-      )}
-    </div>
-  );
+  const data = rows.map((cells, index) => ({ id: `${index}-${cells.join("-")}`, cells }));
+  return <DomainTable<{ id: string; cells: string[] }> data={data} getKey={(row) => row.id} pageSize={pageSize} columns={columns.map((header, index) => ({ key: `${index}-${header}`, header, render: (row) => row.cells[index] ?? "", exportValue: (row) => row.cells[index] ?? "" }))} />;
 }
 
 type SplitPanelProps = {

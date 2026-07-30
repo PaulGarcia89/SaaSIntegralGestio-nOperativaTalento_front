@@ -2,20 +2,26 @@ import type { ModuleKey, RoleKey, TenantDto, UserDto } from "@/lib/contracts";
 
 export const roleLabels: Record<RoleKey, string> = {
   admin_saas: "Superadministrador",
+  admin_plataforma: "Administrador de plataforma",
   admin_empresa: "Administrador de empresa",
   rrhh: "Gerente de RRHH",
-  lider_area: "Supervisor",
+  reclutador: "Reclutador",
+  entrevistador: "Entrevistador",
+  instructor: "Instructor",
+  supervisor: "Supervisor",
+  encargado_inventario: "Encargado de inventario",
   empleado: "Empleado",
+  candidato: "Candidato",
 };
 
 export const moduleLabels: Record<ModuleKey, string> = {
   dashboard: "Panel principal",
   ats: "Reclutamiento ATS",
-  onboarding: "Incorporacion",
-  training: "Capacitacion",
-  productivity: "Productividad IA",
+  onboarding: "Incorporación",
+  training: "Capacitación",
+  productivity: "Productividad asistida",
   inventory: "Inventario",
-  admin: "Administracion",
+  admin: "Administración",
   reports: "Reportes",
   notifications: "Notificaciones",
   profile: "Perfil",
@@ -41,7 +47,7 @@ export const branchStatusLabels = {
 export const scopeLabels = {
   global: "General",
   tenant: "Empresa",
-  module: "Modulo",
+  module: "Módulo",
 } as const;
 
 export const moduleSourceLabels = {

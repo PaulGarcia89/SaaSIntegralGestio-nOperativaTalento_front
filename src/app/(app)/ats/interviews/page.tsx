@@ -1,119 +1,49 @@
-import Link from "next/link";
-import { AlertTriangle, CheckCheck, ClipboardCheck, Users2 } from "lucide-react";
-import { ModuleHeader, SectionCard, DataTable, SplitPanel, InfoList } from "@/components/ui";
-import { candidateStructuredAssessments, interviews } from "@/lib/mock-data";
-import { Button } from "@/components/ui/button";
+"use client";
+
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarDays, Plus, Star } from "lucide-react";
+import { fetchApplications, fetchRecruitmentInterviews, scheduleRecruitmentInterview, submitInterviewScorecard } from "@/lib/backend";
+import type { ApplicationInterviewType, InterviewRecommendation, ScheduleInterviewInput } from "@/lib/contracts";
+import { useAppStore } from "@/store/app-store";
+import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { AsyncState } from "@/components/async-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export default function InterviewsPage() {
-  const pendingAssessments = candidateStructuredAssessments.filter((assessment) => assessment.feedbackPendingCount > 0);
-  const completedAssessments = candidateStructuredAssessments.filter((assessment) => assessment.feedbackPendingCount === 0);
+  const queryClient = useQueryClient();
+  const { tenantUsers, can } = useAppStore();
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scoreInterviewId, setScoreInterviewId] = useState("");
+  const [form, setForm] = useState<ScheduleInterviewInput>({ applicationId: "", interviewerUserId: "", title: "Entrevista", type: "VIRTUAL", timezone: defaultTimezone, startsAt: "", endsAt: "" });
+  const [rating, setRating] = useState(3);
+  const [recommendation, setRecommendation] = useState<InterviewRecommendation>("YES");
+  const [comments, setComments] = useState("");
+  const interviews = useQuery({ queryKey: ["recruitment-interviews"], queryFn: () => fetchRecruitmentInterviews() });
+  const applications = useQuery({ queryKey: ["applications", "interview-scheduler"], queryFn: () => fetchApplications() });
+  const schedule = useMutation({ mutationFn: scheduleRecruitmentInterview, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["recruitment-interviews"] }); setScheduleOpen(false); } });
+  const score = useMutation({ mutationFn: () => submitInterviewScorecard(scoreInterviewId, { criteria: { overall: rating }, overallRating: rating, recommendation, comments }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["recruitment-interviews"] }); setScoreInterviewId(""); } });
+  const candidates = applications.data?.data ?? [];
+  const sorted = useMemo(() => [...(interviews.data ?? [])].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()), [interviews.data]);
 
-  return (
-    <>
-      <ModuleHeader
-        eyebrow="Entrevistas"
-        title="Agenda, espacios disponibles y retroalimentación estructurada."
-        description="Diseño para coordinar paneles, recordatorios, tarjetas de evaluación y seguimiento de decisiones sin salir del ATS."
-        actions={
-          <Button asChild>
-            <Link href="/ats/candidates">Ver postulantes</Link>
-          </Button>
-        }
-        metrics={[
-          { label: "Entrevistas de hoy", value: "8", detail: "Paneles distribuidos entre Miami, Orlando y Tampa" },
-          { label: "Slots confirmados", value: "92%", detail: "Coordinacion alta entre candidatos y entrevistadores" },
-          { label: "Retroalimentación pendiente", value: "3", detail: "Tarjetas de evaluación por cerrar antes del corte diario" },
-        ]}
-      />
-      <SplitPanel
-        left={
-          <SectionCard title="Agenda de entrevistas" subtitle="Calendario y lista">
-            <div className="space-y-5">
-              <DataTable
-                columns={["Candidato", "Horario", "Panel", "Estado"]}
-                rows={interviews.map((item) => [item.candidate, item.when, item.panel, item.status])}
-              />
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                      <ClipboardCheck className="size-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Kits de entrevista activos</p>
-                      <p className="font-medium text-foreground">3 paneles con criterios definidos por etapa</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                      <Users2 className="size-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Entrevistadores alineados</p>
-                      <p className="font-medium text-foreground">Cada panel comparte tarjeta de evaluación y regla de cierre</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        }
-        right={
-          <SectionCard title="Cierre estructurado del panel" subtitle="Contratación disciplinada">
-            <div className="space-y-5">
-              <InfoList
-                items={[
-                  { title: "Carga balanceada", description: "Los paneles tecnicos concentran la mayor demanda y deben priorizar disponibilidad por sucursal", badge: "Agenda" },
-                  { title: "Retroalimentación obligatoria", description: "Ningun candidato avanza de etapa mientras falte al menos una tarjeta de evaluación requerida del panel.", badge: "Regla" },
-                  { title: "Decision consolidada", description: "La recomendacion final se genera una vez que RRHH y entrevistadores completan sus criterios." },
-                ]}
-              />
-
-              <div className="space-y-3">
-                {pendingAssessments.map((assessment) => (
-                  <div key={assessment.candidateId} className="rounded-2xl border border-border/70 bg-card/90 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">{assessment.currentStage}</p>
-                        <p className="text-sm text-muted-foreground">{assessment.decisionSummary}</p>
-                      </div>
-                      <Badge variant="outline" className="rounded-full">
-                        {assessment.feedbackPendingCount} pendiente
-                      </Badge>
-                    </div>
-                    <div className="mt-4 flex items-center gap-3 text-sm">
-                      <AlertTriangle className="size-4 text-amber-500" />
-                      <span className="text-muted-foreground">Avance bloqueado hasta completar la retroalimentación del panel.</span>
-                    </div>
-                  </div>
-                ))}
-
-                {completedAssessments.map((assessment) => (
-                  <div key={assessment.candidateId} className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">{assessment.consolidatedRecommendation}</p>
-                        <p className="text-sm text-muted-foreground">{assessment.decisionSummary}</p>
-                      </div>
-                      <Badge variant="secondary" className="rounded-full">
-                        Panel completo
-                      </Badge>
-                    </div>
-                    <div className="mt-4 flex items-center gap-3 text-sm">
-                      <CheckCheck className="size-4 text-emerald-500" />
-                      <span className="text-muted-foreground">Listo para mover etapa o emitir decisión final.</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </SectionCard>
-        }
-      />
-    </>
-  );
+  return <div className="space-y-7"><PageHeader eyebrow="Reclutamiento" title="Entrevistas y decisiones" description="Coordina horarios con zona horaria explícita, concentra scorecards y conserva la decisión de cada entrevistador." actions={can("interviews.schedule") ? <Button onClick={() => setScheduleOpen(true)}><Plus className="size-4" />Programar entrevista</Button> : undefined} />
+    {interviews.isLoading ? <AsyncState state="loading" title="Cargando agenda" /> : null}
+    {interviews.isError ? <AsyncState state="error" title="No pudimos cargar la agenda" onRetry={() => void interviews.refetch()} /> : null}
+    {interviews.isSuccess && !sorted.length ? <InlineFeedback tone="info" title="No hay entrevistas programadas">Programa una entrevista desde una candidatura activa.</InlineFeedback> : null}
+    <section className="grid gap-4 xl:grid-cols-2">{sorted.map((interview) => <Card key={interview.id} level={2}><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{interview.title}</CardTitle><Badge>{interview.status}</Badge></div></CardHeader><CardContent className="space-y-4"><div className="flex gap-3"><CalendarDays className="mt-1 size-5 text-primary" /><div><p className="font-medium">{new Date(interview.startsAt).toLocaleString([], { timeZone: interview.timezone })}</p><p className="text-sm text-text-secondary">{interview.timezone} · {interview.type}</p></div></div><dl className="grid gap-2 text-sm sm:grid-cols-2"><Summary label="Candidato" value={interview.application?.candidate.fullName} /><Summary label="Vacante" value={interview.application?.vacancy.title} /><Summary label="Entrevistador" value={interview.interviewer ? `${interview.interviewer.firstName} ${interview.interviewer.lastName}` : undefined} /><Summary label="Etapa" value={interview.stage?.name} /></dl>{interview.scorecards?.length ? <div className="rounded-xl bg-secondary/40 p-3 text-sm">{interview.scorecards.map((item) => <p key={item.id}><strong>{item.overallRating}/5</strong> · {item.recommendation} · {item.reviewer?.firstName} {item.reviewer?.lastName}</p>)}</div> : null}{can("scorecards.complete") ? <Button variant="secondary" onClick={() => setScoreInterviewId(interview.id)}><Star className="size-4" />Completar scorecard</Button> : null}</CardContent></Card>)}</section>
+    <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}><DialogContent><DialogHeader><DialogTitle>Programar entrevista</DialogTitle><DialogDescription>La hora se guardará en UTC junto con la zona horaria elegida.</DialogDescription></DialogHeader><div className="grid gap-4"><SelectField label="Candidatura" value={form.applicationId} onValueChange={(value) => setForm({ ...form, applicationId: value })} options={candidates.map((item) => ({ value: item.id, label: `${item.candidate.fullName} · ${item.vacancy.title}` }))} /><SelectField label="Entrevistador" value={form.interviewerUserId} onValueChange={(value) => setForm({ ...form, interviewerUserId: value })} options={tenantUsers.map((user) => ({ value: user.id, label: `${user.fullName} · ${user.role}` }))} /><Field label="Título" value={form.title} onChange={(value) => setForm({ ...form, title: value })} /><SelectField label="Tipo" value={form.type} onValueChange={(value) => setForm({ ...form, type: value as ApplicationInterviewType })} options={[{ value: "VIRTUAL", label: "Virtual" }, { value: "PRESENTIAL", label: "Presencial" }, { value: "PHONE", label: "Teléfono" }]} /><Field label="Zona horaria IANA" value={form.timezone} onChange={(value) => setForm({ ...form, timezone: value })} /><Field label="Inicio" type="datetime-local" value={form.startsAt} onChange={(value) => setForm({ ...form, startsAt: new Date(value).toISOString() })} /><Field label="Fin" type="datetime-local" value={form.endsAt} onChange={(value) => setForm({ ...form, endsAt: new Date(value).toISOString() })} /><Field label="Enlace de reunión" type="url" value={form.meetingUrl ?? ""} onChange={(value) => setForm({ ...form, meetingUrl: value })} /><Button onClick={() => schedule.mutate(form)} disabled={!form.applicationId || !form.interviewerUserId || !form.startsAt || !form.endsAt || schedule.isPending}>{schedule.isPending ? "Programando…" : "Confirmar entrevista"}</Button>{schedule.isError ? <p className="text-sm text-destructive">No fue posible programar la entrevista.</p> : null}</div></DialogContent></Dialog>
+    <Dialog open={Boolean(scoreInterviewId)} onOpenChange={(open) => !open && setScoreInterviewId("")}><DialogContent><DialogHeader><DialogTitle>Scorecard y recomendación</DialogTitle><DialogDescription>Tu evaluación queda firmada con tu usuario y no reemplaza la decisión humana final.</DialogDescription></DialogHeader><div className="space-y-4"><Label>Calificación general: {rating}/5</Label><input aria-label="Calificación general" type="range" min={1} max={5} value={rating} onChange={(event) => setRating(Number(event.target.value))} className="w-full" /><SelectField label="Recomendación" value={recommendation} onValueChange={(value) => setRecommendation(value as InterviewRecommendation)} options={[{ value: "STRONG_YES", label: "Avanzar con alta confianza" }, { value: "YES", label: "Avanzar" }, { value: "MIXED", label: "Revisar en comité" }, { value: "NO", label: "No avanzar" }]} /><label className="space-y-2 text-sm font-medium">Comentarios<textarea value={comments} onChange={(event) => setComments(event.target.value)} rows={5} className="w-full rounded-xl border bg-background p-3" /></label><Button onClick={() => score.mutate()} disabled={score.isPending}>{score.isPending ? "Guardando…" : "Enviar scorecard"}</Button></div></DialogContent></Dialog>
+  </div>;
 }
+
+function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { const id = label.toLowerCase().replace(/\W+/g, "-"); return <div className="space-y-2"><Label htmlFor={id}>{label}</Label><Input id={id} type={type} value={type === "datetime-local" && value ? value.slice(0, 16) : value} onChange={(event) => onChange(event.target.value)} /></div>; }
+function SelectField({ label, value, onValueChange, options }: { label: string; value: string; onValueChange: (value: string) => void; options: Array<{ value: string; label: string }> }) { return <div className="space-y-2"><Label>{label}</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger><SelectValue placeholder={`Selecciona ${label.toLowerCase()}`} /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>; }
+function Summary({ label, value }: { label: string; value?: string | null }) { return <div><dt className="text-text-secondary">{label}</dt><dd className="font-medium">{value || "Sin definir"}</dd></div>; }

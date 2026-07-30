@@ -10,12 +10,14 @@ import { createRoleDefinition, deleteRoleDefinition, fetchRoleDefinitions, updat
 import { scopeLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
-import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
+import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/ui/form-select";
+import { AsyncState } from "@/components/async-state";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
 const permissionOptions = [...PERMISSION_KEYS] as PermissionKey[];
 
@@ -40,6 +42,7 @@ export default function RolesPage() {
     queryFn: () => fetchRoleDefinitions(currentTenant.id),
   });
   const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RoleDefinitionDto | null>(null);
   const [deleting, setDeleting] = useState<RoleDefinitionDto | null>(null);
@@ -53,21 +56,20 @@ export default function RolesPage() {
       members: 0,
     },
   });
+  useUnsavedChanges(open && form.formState.isDirty, "role-form");
   const selectedPermissions = useWatch({
     control: form.control,
     name: "permissions",
     defaultValue: ["dashboard.view"],
   });
+  const selectedScope = useWatch({ control: form.control, name: "scope" });
 
   const filtered = useMemo(
     () =>
       (rolesQuery.data ?? []).filter((role) =>
-        [role.name, role.scope, Array.isArray(role.permissions) ? role.permissions.join(" ") : ""]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
+        matchesSearchAndFilter([role.name, role.scope, Array.isArray(role.permissions) ? role.permissions.join(" ") : ""], query, activeFilter),
       ),
-    [query, rolesQuery.data],
+    [activeFilter, query, rolesQuery.data],
   );
 
   const saveMutation = useMutation({
@@ -94,7 +96,7 @@ export default function RolesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteRoleDefinition,
+    mutationFn: (role: RoleDefinitionDto) => deleteRoleDefinition(role.id, role.tenantId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["role-definitions", currentTenant.id] });
       toast.success("Rol eliminado");
@@ -112,6 +114,9 @@ export default function RolesPage() {
       />
     );
   }
+
+  if (rolesQuery.isLoading) return <AsyncState state="loading" title="Cargando roles" />;
+  if (rolesQuery.isError) return <AsyncState state="error" title="No fue posible cargar los roles" onRetry={() => { void rolesQuery.refetch(); }} />;
 
   return (
     <div className="space-y-5">
@@ -133,7 +138,7 @@ export default function RolesPage() {
             description="Define alcance, cantidad de miembros y permisos heredados o personalizados."
             trigger={<Button onClick={() => setOpen(true)}>Nuevo rol</Button>}
           >
-            <form className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
+            <form id="role-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nombre</Label>
@@ -143,7 +148,7 @@ export default function RolesPage() {
                   <Label>Alcance</Label>
                   <FormSelect
                     className="h-11 w-full rounded-2xl"
-                    value={form.watch("scope")}
+                    value={selectedScope}
                     onValueChange={(v) => form.setValue("scope", v as "global" | "tenant" | "module")}
                     options={[
                       { label: scopeLabels.global, value: "global" },
@@ -198,10 +203,12 @@ export default function RolesPage() {
         options={[
           { label: "Todos", value: "" },
           { label: "Empresa", value: "tenant" },
-          { label: "Modulo", value: "module" },
+          { label: "Módulo", value: "module" },
         ]}
-        activeValue={query}
-        onChange={setQuery}
+        searchValue={query}
+        onSearchChange={setQuery}
+        filterValue={activeFilter}
+        onFilterChange={setActiveFilter}
       />
       <CrudPanel>
         <DomainTable exportable
@@ -248,7 +255,7 @@ export default function RolesPage() {
         title="Eliminar rol"
         description={`Se eliminara el rol ${deleting?.name ?? ""}.`}
         pending={deleteMutation.isPending}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
       />
     </div>
   );

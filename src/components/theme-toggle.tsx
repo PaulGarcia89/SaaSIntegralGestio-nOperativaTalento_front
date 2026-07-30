@@ -17,8 +17,10 @@ export function ThemeToggle({ className }: { className?: string }) {
         ? "dark"
         : "light";
 
-    setTheme(nextTheme);
-    setHasMounted(true);
+    queueMicrotask(() => {
+      setTheme(nextTheme);
+      setHasMounted(true);
+    });
   }, []);
 
   useEffect(() => {

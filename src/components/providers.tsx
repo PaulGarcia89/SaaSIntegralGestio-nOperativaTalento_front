@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Toaster } from "sonner";
 import { AppStoreProvider } from "@/store/app-store";
+import { DemoModeBanner } from "@/components/integration-state";
+import { UnsavedChangesProvider } from "@/hooks/use-unsaved-changes";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -21,7 +23,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AppStoreProvider>
-        {children}
+        <UnsavedChangesProvider>
+          <DemoModeBanner />
+          {children}
+        </UnsavedChangesProvider>
         <Toaster
           position="bottom-right"
           toastOptions={{

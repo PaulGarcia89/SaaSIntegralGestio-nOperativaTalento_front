@@ -1,9 +1,23 @@
 import Link from "next/link";
 import { ArrowRight, Building2, ChartColumnBig, ShieldCheck, Sparkles } from "lucide-react";
-import { dashboardKpis, marketingModules } from "@/lib/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const illustrativeKpis = [
+  { label: "Vacantes activas", value: "—", detail: "Se obtiene del ATS conectado" },
+  { label: "Incorporaciones", value: "—", detail: "Se obtiene de onboarding" },
+  { label: "Cumplimiento", value: "—", detail: "Se obtiene de capacitación" },
+  { label: "Productividad", value: "—", detail: "Se obtiene del módulo operativo" },
+];
+const productModules = [
+  ["ATS y reclutamiento", "Vacantes, pipeline, entrevistas y scorecards."],
+  ["Incorporación documental", "Firmas, listas de tareas y seguimiento del ingreso."],
+  ["Capacitación y certificación", "Cursos, evaluaciones y progreso por persona."],
+  ["Productividad", "Indicadores y reportes operativos."],
+  ["Inventario y activos", "Stock, movimientos y asignación de equipos."],
+  ["Administración multiempresa", "Empresas, usuarios, permisos y módulos."],
+].map(([title, copy]) => ({ title, copy }));
 
 export default function Home() {
   return (
@@ -25,10 +39,10 @@ export default function Home() {
                 <Link href="/jobs">Empleos publicos</Link>
               </Button>
               <Button asChild variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
-                <Link href="/application-status">Seguir postulacion</Link>
+                <Link href="/application-status">Seguir postulación</Link>
               </Button>
               <Button asChild variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
-                <Link href="/login">Iniciar sesion</Link>
+                <Link href="/login">Iniciar sesión</Link>
               </Button>
               <Button asChild variant="secondary" className="border-white/15 bg-white/10 text-white hover:bg-white/15">
                 <Link href="/register-company">Registrar empresa</Link>
@@ -39,16 +53,14 @@ export default function Home() {
           <div className="grid gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
             <div className="space-y-6">
               <Badge className="rounded-full bg-white/10 text-white hover:bg-white/10">
-                Productividad con IA, ATS, incorporacion, capacitacion e inventario
+                Reclutamiento, incorporación, capacitación e inventario en un solo lugar
               </Badge>
               <div className="space-y-4">
                 <h1 className="max-w-4xl text-4xl font-semibold tracking-tight md:text-6xl">
-                  Un frontend SaaS listo para produccion para operaciones multiempresa de RRHH.
+                  Operacion multiempresa para talento, formacion e inventario.
                 </h1>
                 <p className="max-w-2xl text-base leading-8 text-white/72">
-                  Construido para modulos dinamicos, RBAC, autenticacion JWT, navegacion sensible a la empresa
-                  y flujos empresariales de reclutamiento, incorporacion, capacitacion, productividad y
-                  administracion.
+                  Módulos dinámicos, permisos por rol y flujos integrados para empresas.
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -78,13 +90,13 @@ export default function Home() {
               <CardContent className="space-y-5 p-5">
                 <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-sm text-white/60">Vista previa del panel empresarial</p>
+                    <p className="text-sm text-white/60">Vista ilustrativa del panel · sin datos reales</p>
                     <h2 className="text-2xl font-semibold">Pulso operativo de hoy</h2>
                   </div>
                   <Badge className="rounded-full bg-emerald-400/15 text-emerald-100">Plan empresarial</Badge>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  {dashboardKpis.map((kpi) => (
+                  {illustrativeKpis.map((kpi) => (
                     <div key={kpi.label} className="rounded-3xl border border-white/10 bg-white/6 p-4">
                       <p className="text-sm text-white/65">{kpi.label}</p>
                       <div className="mt-3 text-3xl font-semibold">{kpi.value}</div>
@@ -107,11 +119,12 @@ export default function Home() {
                   <div className="rounded-3xl border border-white/10 bg-white/6 p-4">
                     <div className="mb-4 flex items-center gap-2 text-sm text-white/65">
                       <Sparkles className="size-4 text-cyan-300" />
-                      Senales de IA
+                      Sugerencias generadas por IA
                     </div>
+                    <p className="mb-3 text-xs leading-5 text-white/55">Estas señales orientan la revisión; una persona decide cualquier acción.</p>
                     <div className="space-y-3">
                       {[
-                        "12 procesos de incorporacion aun esperan firma en Orlando.",
+                        "12 procesos de incorporación aun esperan firma en Orlando.",
                         "Inventario bajo detectado para escaneres y tablets clinicas.",
                         "3 certificaciones regulatorias vencen hoy en operaciones.",
                       ].map((item) => (
@@ -132,18 +145,18 @@ export default function Home() {
         {[
           {
             icon: <Building2 className="size-5 text-primary" />,
-            title: "Navegacion dinamica por empresa",
-            copy: "Los menus, vistas y modulos se generan desde capacidades del backend, no desde supuestos estaticos.",
+            title: "Navegación adaptada a cada empresa",
+            copy: "Menus y módulos segun empresa, plan y permisos.",
           },
           {
             icon: <ShieldCheck className="size-5 text-primary" />,
             title: "Experiencias segun rol",
-            copy: "Superadministradores, RRHH, supervisores, reclutadores y candidatos reciben experiencias adaptadas.",
+            copy: "Cada perfil ve solo lo que necesita operar.",
           },
           {
             icon: <Sparkles className="size-5 text-primary" />,
             title: "UX empresarial mobile first",
-            copy: "Tarjetas, tablas, busqueda, dialogos y flujos estan pensados para funcionar desde movil hasta escritorio 4K.",
+            copy: "Tablas, tarjetas y flujos adaptados de movil a escritorio.",
           },
         ].map((item) => (
           <Card key={item.title} className="border-border/70 bg-card/85">
@@ -163,20 +176,19 @@ export default function Home() {
       <section className="space-y-5">
         <div className="space-y-3">
           <Badge variant="outline" className="rounded-full">
-            Modulos habilitados
+            Módulos habilitados
           </Badge>
-          <h2 className="text-3xl font-semibold tracking-tight">Un sistema de diseno, muchos flujos empresariales.</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">Un sistema de diseño para todos tus flujos empresariales.</h2>
           <p className="max-w-3xl text-base leading-8 text-muted-foreground">
-            ATS, incorporacion, capacitacion, inventario, productividad con IA y administracion empresarial
-            comparten patrones reutilizables, movimiento sutil, contraste accesible y comportamiento mobile first.
+            Reclutamiento, incorporación, formacion, inventario y productividad con una base visual comun.
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {marketingModules.map((module) => (
+          {productModules.map((module) => (
             <Card key={module.title} className="border-border/70 bg-card/85">
               <CardHeader>
                 <Badge variant="secondary" className="w-fit rounded-full">
-                  Modulo
+                  Módulo
                 </Badge>
                 <CardTitle>{module.title}</CardTitle>
               </CardHeader>

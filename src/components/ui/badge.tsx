@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
+import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
@@ -24,7 +25,9 @@ const badgeVariants = cva(
 export function Badge({
   className,
   variant,
+  children,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof badgeVariants>) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  const StatusIcon = variant === "success" ? CircleCheck : variant === "warning" ? TriangleAlert : variant === "destructive" ? CircleX : null;
+  return <div className={cn(badgeVariants({ variant }), className)} {...props}>{StatusIcon ? <StatusIcon className="mr-1 size-3.5" aria-hidden="true" /> : null}{children}</div>;
 }

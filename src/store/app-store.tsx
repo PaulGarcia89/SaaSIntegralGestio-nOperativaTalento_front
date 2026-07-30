@@ -11,12 +11,12 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
-  AppDatasetsDto,
   BranchDto,
   ModuleKey,
   PermissionKey,
   RoleKey,
   SessionDto,
+  SubscriptionAccessState,
   TenantDto,
   UserDto,
 } from "@/lib/contracts";
@@ -26,14 +26,18 @@ import {
   fetchCurrentAuthUser,
   fetchTenantUsers,
   fetchTenants,
-  fetchWorkspaceDatasets,
   getStoredSession,
+  getStoredBranchId,
   getStoredTenantId,
   logoutCurrentSession,
   mapAuthUserToUi,
   persistSelectedTenantId,
+  persistSelectedBranchId,
+  updateBranchContext,
+  updateTenantContext,
+  restoreCurrentSession,
 } from "@/lib/backend";
-import { appNavigation } from "@/lib/navigation";
+import { appNavigation, evaluateRouteAccess } from "@/lib/navigation";
 import { getFallbackTenant } from "@/lib/ui-labels";
 
 type AppState = {
@@ -47,15 +51,23 @@ type AppState = {
   currentBranch: BranchDto | null;
   currentUser: UserDto;
   currentRole: RoleKey;
-  datasets: AppDatasetsDto;
+  currentSubscriptionStatus: SubscriptionAccessState;
+  subscriptionGraceEndsAt: string | null;
+  allowedTenantIds: string[];
   isBootstrapping: boolean;
-  setCurrentTenantId: (tenantId: string) => void;
-  setCurrentBranchId: (branchId: string) => void;
+  accessContextVerified: boolean;
+  impersonation: { active: boolean; tenantId?: string | null; startedAt?: string | null } | null;
+  setCurrentTenantId: (tenantId: string) => Promise<void>;
+  setCurrentBranchId: (branchId: string) => Promise<void>;
   setCurrentUserId: (userId: string) => void;
   refreshSession: () => Promise<void>;
   signOut: () => Promise<void>;
   can: (permission: PermissionKey) => boolean;
+  canAny: (permissions: PermissionKey[]) => boolean;
+  canAll: (permissions: PermissionKey[]) => boolean;
   hasModule: (module: ModuleKey) => boolean;
+  hasFeature: (featureFlag: string) => boolean;
+  canAccessBranch: (branchId: string) => boolean;
   allowedNav: typeof appNavigation;
 };
 
@@ -69,13 +81,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [hasHydratedSession, setHasHydratedSession] = useState(false);
 
   useEffect(() => {
-    const storedSession = getStoredSession();
     const storedTenantId = getStoredTenantId();
-
-    setSession(storedSession);
-    setCurrentTenantIdState(storedTenantId || storedSession?.tenantId || "");
-    setCurrentUserIdState(storedSession?.userId || "");
-    setHasHydratedSession(true);
+    const storedBranchId = getStoredBranchId();
+    void restoreCurrentSession().then((restoredSession) => {
+      setSession(restoredSession);
+      setCurrentTenantIdState(storedTenantId || restoredSession?.tenantId || "");
+      setCurrentUserIdState(restoredSession?.userId || "");
+      setCurrentBranchIdState(storedBranchId);
+    }).finally(() => setHasHydratedSession(true));
   }, []);
 
   const authQuery = useQuery({
@@ -88,25 +101,37 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", session?.token],
     queryFn: fetchTenants,
-    enabled: hasHydratedSession && Boolean(session?.token),
+    enabled: Boolean(authQuery.data && (authQuery.data.isSuperAdmin || authQuery.data.permissions.some((permission) => permission.startsWith("tenants.")))),
   });
+
+  const isGlobalSuperAdmin = Boolean(
+    authQuery.data?.isSuperAdmin && authQuery.data.isGlobalContext,
+  );
 
   const branchesQuery = useQuery({
     queryKey: ["branches", currentTenantId],
     queryFn: () => fetchBranches(currentTenantId),
-    enabled: hasHydratedSession && Boolean(session?.token && currentTenantId),
+    enabled: Boolean(
+      authQuery.data &&
+      currentTenantId &&
+      !isGlobalSuperAdmin &&
+      (
+        authQuery.data.permissions.includes("branches.read") ||
+        ["platform_admin", "tenant_admin", "branch_admin"].includes(authQuery.data.roleScope)
+      ),
+    ),
+    retry: false,
   });
 
   const usersQuery = useQuery({
     queryKey: ["tenant-users", currentTenantId],
     queryFn: () => fetchTenantUsers(currentTenantId),
-    enabled: hasHydratedSession && Boolean(session?.token && currentTenantId),
-  });
-
-  const datasetsQuery = useQuery({
-    queryKey: ["workspace-datasets", currentTenantId],
-    queryFn: () => fetchWorkspaceDatasets(currentTenantId),
-    enabled: hasHydratedSession && Boolean(session?.token && currentTenantId),
+    enabled: Boolean(
+      authQuery.data?.permissions.some((permission) => permission.startsWith("users.")) &&
+      currentTenantId &&
+      !isGlobalSuperAdmin,
+    ),
+    retry: false,
   });
 
   const authContext = useMemo(
@@ -115,33 +140,58 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const tenants = useMemo(() => tenantsQuery.data ?? [], [tenantsQuery.data]);
-  const branches = useMemo(() => branchesQuery.data ?? [], [branchesQuery.data]);
+  const branches = useMemo(
+    () =>
+      branchesQuery.data ??
+      authQuery.data?.availableBranches.map((branch) => ({
+        id: branch.id,
+        tenantId: branch.tenantId,
+        name: branch.name,
+        city: branch.location,
+        manager: "Pendiente",
+        employees: 0,
+        status: "active" as const,
+      })) ??
+      [],
+    [authQuery.data?.availableBranches, branchesQuery.data],
+  );
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
 
   useEffect(() => {
     if (!authContext) return;
 
-    setSession({
-      token: getStoredSession()?.token ?? "",
-      tenantId: authContext.user.tenantId,
-      userId: authContext.user.id,
-      role: authContext.role,
+    queueMicrotask(() => {
+      setSession({
+        token: getStoredSession()?.token ?? "",
+        tenantId: authContext.user.tenantId,
+        userId: authContext.user.id,
+        role: authContext.role,
+      });
+      setCurrentUserIdState(authContext.user.id);
+      setCurrentBranchIdState((previous) => previous || authContext.activeBranchId || "");
+      setCurrentTenantIdState((previous) => previous || getStoredTenantId() || authContext.user.tenantId);
     });
-    setCurrentUserIdState(authContext.user.id);
-    setCurrentTenantIdState((previous) => previous || getStoredTenantId() || authContext.user.tenantId);
   }, [authContext]);
 
   useEffect(() => {
     if (!authQuery.error) return;
     clearStoredAuth();
-    setSession(null);
-    setCurrentTenantIdState("");
-    setCurrentBranchIdState("");
-    setCurrentUserIdState("");
+    if (process.env.NEXT_PUBLIC_STATIC_HOSTING !== "true") {
+      void fetch("/api/session", { method: "DELETE" });
+    }
+    queueMicrotask(() => {
+      setSession(null);
+      setCurrentTenantIdState("");
+      setCurrentBranchIdState("");
+      setCurrentUserIdState("");
+    });
   }, [authQuery.error]);
 
   const currentTenant =
     tenants.find((tenant) => tenant.id === currentTenantId) ??
+    (authContext && (authContext.tenant.id === currentTenantId || authContext.tenant.id === session?.tenantId)
+      ? authContext.tenant
+      : null) ??
     getFallbackTenant(tenants) ??
     ({
       id: "",
@@ -157,8 +207,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     } satisfies TenantDto);
 
   const tenantBranches = useMemo(
-    () => branches.filter((branch) => branch.tenantId === currentTenant.id),
-    [branches, currentTenant.id],
+    () => branches.filter(
+      (branch) =>
+        branch.tenantId === currentTenant.id &&
+        (!authContext || authContext.allowedBranchIds.includes(branch.id)),
+    ),
+    [authContext, branches, currentTenant.id],
   );
 
   const tenantUsers = useMemo(
@@ -168,13 +222,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (tenantBranches.length === 0) {
-      setCurrentBranchIdState("");
+      persistSelectedBranchId("");
+      queueMicrotask(() => setCurrentBranchIdState(""));
       return;
     }
 
     const branchStillVisible = tenantBranches.some((branch) => branch.id === currentBranchId);
     if (!branchStillVisible) {
-      setCurrentBranchIdState(tenantBranches[0]?.id ?? "");
+      const fallbackBranchId = tenantBranches[0]?.id ?? "";
+      persistSelectedBranchId(fallbackBranchId);
+      queueMicrotask(() => setCurrentBranchIdState(fallbackBranchId));
     }
   }, [currentBranchId, tenantBranches]);
 
@@ -196,13 +253,21 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     } satisfies UserDto);
 
   const currentRole = authContext?.role ?? currentUser.role;
-  const currentPermissions = authContext?.permissions ?? [];
-  const currentModules = currentTenant.enabledModules.length > 0
-    ? currentTenant.enabledModules
-    : authContext?.enabledModules ?? [];
-  const datasets = useMemo(
-    () => datasetsQuery.data ?? { vacancies: [], candidates: [], inventory: [] },
-    [datasetsQuery.data],
+  const accessContextVerified = Boolean(authContext && session?.token);
+  const currentSubscriptionStatus: SubscriptionAccessState =
+    authContext?.subscriptionStatus ?? currentTenant.status ?? "suspended";
+  const subscriptionGraceEndsAt = authContext?.subscriptionGraceEndsAt ?? null;
+  const allowedTenantIds = useMemo(
+    () => authContext?.allowedTenantIds ?? (session?.tenantId ? [session.tenantId] : []),
+    [authContext?.allowedTenantIds, session],
+  );
+  const currentPermissions = useMemo(() => authContext?.permissions ?? [], [authContext?.permissions]);
+  const currentFeatures = useMemo(() => authContext?.featureFlags ?? [], [authContext?.featureFlags]);
+  const currentModules = useMemo(
+    () => authContext?.tenant.id === currentTenant.id
+      ? authContext.enabledModules
+      : currentTenant.enabledModules,
+    [authContext, currentTenant.enabledModules, currentTenant.id],
   );
   const isBootstrapping =
     !hasHydratedSession ||
@@ -210,33 +275,36 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       (authQuery.isLoading || tenantsQuery.isLoading || branchesQuery.isLoading || usersQuery.isLoading));
 
   const can = useCallback(
-    (permission: PermissionKey) => currentPermissions.includes(permission),
-    [currentPermissions],
+    (permission: PermissionKey) => currentRole === "admin_saas" || currentPermissions.includes(permission),
+    [currentPermissions, currentRole],
   );
+  const canAny = useCallback((permissions: PermissionKey[]) => permissions.some(can), [can]);
+  const canAll = useCallback((permissions: PermissionKey[]) => permissions.every(can), [can]);
 
   const hasModule = useCallback(
     (module: ModuleKey) => currentModules.includes(module),
     [currentModules],
   );
+  const hasFeature = useCallback((featureFlag: string) => currentFeatures.includes(featureFlag), [currentFeatures]);
+  const canAccessBranch = useCallback(
+    (branchId: string) => currentRole === "admin_saas" || Boolean(branchId && authContext?.allowedBranchIds.includes(branchId)),
+    [authContext?.allowedBranchIds, currentRole],
+  );
 
   const allowedNav = useMemo(
     () =>
-      appNavigation.filter((item) => {
-        if (!hasModule(item.module) || !can(item.permission)) {
-          return false;
-        }
-
-        if (item.audience === "saas") {
-          return currentRole === "admin_saas";
-        }
-
-        if (item.audience === "tenant") {
-          return currentRole === "admin_saas" || currentRole === "admin_empresa";
-        }
-
-        return true;
-      }),
-    [can, currentRole, hasModule],
+      appNavigation.filter((item) => item.showInNavigation !== false && evaluateRouteAccess(item, {
+        sessionValid: accessContextVerified,
+        globalContext: isGlobalSuperAdmin,
+        tenantAllowed: accessContextVerified && (currentRole === "admin_saas" || allowedTenantIds.includes(currentTenant.id)),
+        subscriptionStatus: currentRole === "admin_saas" ? "active" : currentSubscriptionStatus,
+        role: currentRole,
+        hasModule,
+        hasFeature,
+        can,
+        branchAvailable: Boolean(currentBranch),
+      }).allowed),
+    [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, isGlobalSuperAdmin],
   );
 
   const refreshSession = useCallback(async () => {
@@ -264,13 +332,24 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       currentBranch,
       currentUser,
       currentRole,
-      datasets,
+      currentSubscriptionStatus,
+      subscriptionGraceEndsAt,
+      allowedTenantIds,
       isBootstrapping,
-      setCurrentTenantId: (tenantId: string) => {
+      accessContextVerified,
+      impersonation: authContext?.impersonation ?? null,
+      setCurrentTenantId: async (tenantId: string) => {
+        if (!accessContextVerified || currentRole !== "admin_plataforma" || !can("platform.tenant.switch") || !allowedTenantIds.includes(tenantId)) return;
+        await updateTenantContext(tenantId);
         persistSelectedTenantId(tenantId);
+        persistSelectedBranchId("");
+        setCurrentBranchIdState("");
         setCurrentTenantIdState(tenantId);
       },
-      setCurrentBranchId: (branchId: string) => {
+      setCurrentBranchId: async (branchId: string) => {
+        if (currentRole === "admin_saas" || !tenantBranches.some((branch) => branch.id === branchId)) return;
+        await updateBranchContext(branchId);
+        persistSelectedBranchId(branchId);
         setCurrentBranchIdState(branchId);
       },
       setCurrentUserId: (userId: string) => {
@@ -279,23 +358,35 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       refreshSession,
       signOut,
       can,
+      canAny,
+      canAll,
       hasModule,
+      hasFeature,
+      canAccessBranch,
       allowedNav,
     }),
     [
+      accessContextVerified,
       allowedNav,
+      allowedTenantIds,
+      authContext?.impersonation,
       branches,
       can,
+      canAny,
+      canAll,
+      canAccessBranch,
       currentBranch,
       currentRole,
+      currentSubscriptionStatus,
       currentTenant,
       currentUser,
-      datasets,
       hasModule,
+      hasFeature,
       isBootstrapping,
       refreshSession,
       session,
       signOut,
+      subscriptionGraceEndsAt,
       tenantBranches,
       tenantUsers,
       tenants,

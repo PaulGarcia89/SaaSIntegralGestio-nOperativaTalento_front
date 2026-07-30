@@ -8,17 +8,17 @@ export default function ProfilePage() {
     <>
       <ModuleHeader
         eyebrow="Perfil del usuario"
-        title="Preferencias, seguridad y sesiones activas."
-        description="Pantalla pensada para autonomia del usuario sin exponer configuraciones criticas de la empresa."
+        title="Preferencias, seguridad y sesiónes activas."
+        description="Control personal de acceso y preferencias."
         actions={
           <Button asChild>
             <Link href="/notifications">Ver notificaciones</Link>
           </Button>
         }
         metrics={[
-          { label: "Sesiones activas", value: "3", detail: "MacBook Pro, iPhone y navegador corporativo" },
+          { label: "Sesiónes activas", value: "3", detail: "Equipos conectados" },
           { label: "Ultimo acceso", value: "09:14", detail: "Miami, Florida · hoy" },
-          { label: "Nivel de seguridad", value: "Alto", detail: "Politica corporativa y alertas habilitadas" },
+          { label: "Nivel de seguridad", value: "Alto", detail: "Politica activa" },
         ]}
       />
       <SplitPanel
@@ -40,9 +40,9 @@ export default function ProfilePage() {
               </div>
               <InfoList
                 items={[
-                  { title: "Autenticacion multifactor", description: "Disponible como siguiente mejora del flujo de acceso", badge: "Roadmap" },
-                  { title: "Zona horaria", description: "America/New_York · horario corporativo de Florida" },
-                  { title: "Preferencias de notificacion", description: "Alertas operativas por email y centro de notificaciones" },
+                  { title: "Autenticacion multifactor", description: "Mejora planificada", badge: "Ruta" },
+                  { title: "Zona horaria", description: "America/New_York" },
+                  { title: "Preferencias de notificacion", description: "Email y centro de alertas" },
                 ]}
               />
             </div>
@@ -52,9 +52,9 @@ export default function ProfilePage() {
           <SectionCard title="Seguridad reciente" subtitle="Actividad">
             <InfoList
               items={[
-                { title: "MacBook Pro", description: "Sesion principal iniciada hace 12 minutos desde Miami", badge: "Actual" },
-                { title: "iPhone corporativo", description: "Acceso consultivo validado con Face ID", badge: "Movil" },
-                { title: "Navegador secundario", description: "Lectura de reportes desde Jacksonville hace 2 horas", badge: "Auditoria" },
+                { title: "MacBook Pro", description: "Sesión principal en Miami", badge: "Actual" },
+                { title: "iPhone corporativo", description: "Acceso movil validado", badge: "Movil" },
+                { title: "Navegador secundario", description: "Consulta de reportes", badge: "Auditoría" },
               ]}
             />
           </SectionCard>

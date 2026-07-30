@@ -24,7 +24,7 @@ export default function Error({
             <AlertTriangle className="size-8 text-destructive" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Algo salio mal</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Algo salió mal</h1>
             <p className="text-sm leading-7 text-muted-foreground">
               Ocurrio un error inesperado al cargar esta vista. Puedes intentar recargar o volver al panel.
             </p>

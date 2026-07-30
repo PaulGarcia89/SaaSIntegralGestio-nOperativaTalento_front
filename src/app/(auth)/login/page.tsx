@@ -1,38 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState } from "react";
-import { Building2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { authenticateUser } from "@/lib/backend";
-import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { FormField } from "@/components/ui/form-field";
+import { DEMO_MODE_ENABLED } from "@/components/integration-state";
+import { FormErrorSummary } from "@/components/form-error-summary";
 
 const loginSchema = z.object({
   email: z.email("Ingresa un correo corporativo valido"),
-  password: z.string().min(6, "La contrasena debe tener al menos 6 caracteres"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { refreshSession } = useAppStore();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "ava.thompson@talentoscloud.com",
-      password: "ChangeMe123!",
+      email: "",
+      password: "",
     },
   });
 
@@ -42,9 +40,17 @@ export default function LoginPage() {
         email: values.email,
         password: values.password,
       }),
-    onSuccess: async () => {
-      await refreshSession();
-      router.push("/dashboard");
+    onSuccess: () => {
+      const requestedPath = new URLSearchParams(window.location.search).get("returnTo");
+      const destination =
+        requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+          ? requestedPath
+          : "/dashboard";
+
+      // Do not block a successful authentication on background workspace
+      // queries. The full navigation bootstraps the verified session and
+      // authorized context from a clean state.
+      window.location.replace(destination);
     },
   });
 
@@ -54,27 +60,27 @@ export default function LoginPage() {
         <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
           <div className="space-y-8 bg-[radial-gradient(circle_at_top_left,rgba(14,165,183,0.22),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.97),rgba(20,33,61,0.95))] p-8 text-white md:p-10">
             <Badge className="w-fit rounded-full bg-white/10 text-white hover:bg-white/10">
-              Iniciar sesion
+              Iniciar sesión
             </Badge>
             <div className="space-y-4">
               <h1 className="max-w-xl text-4xl font-semibold tracking-tight md:text-5xl">
-                Accede a tu espacio de trabajo por empresa con autenticacion segura y sensible al rol.
+                Todo tu trabajo, en el contexto correcto desde el primer momento.
               </h1>
               <p className="max-w-2xl text-base leading-8 text-white/72">
-                Listo para JWT, RBAC, modulos dinamicos y futuras mejoras como SSO, MFA y resolucion de empresa por dominio.
+                Accede de forma segura a las personas, tareas y operaciones que te corresponden.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {[
                 {
                   icon: <Building2 className="size-5 text-cyan-200" />,
-                  title: "Consciente del modelo multiempresa",
-                  copy: "Cada sesion de acceso resuelve la empresa y los modulos habilitados.",
+                  title: "Tu empresa y sucursal correctas",
+                  copy: "Al entrar verás claramente el espacio de trabajo en el que estás operando.",
                 },
                 {
                   icon: <ShieldCheck className="size-5 text-cyan-200" />,
-                  title: "Sensible a permisos",
-                  copy: "La navegacion y las acciones se adaptan al rol autenticado en tiempo real.",
+                  title: "Una experiencia adaptada a ti",
+                  copy: "La navegación muestra únicamente las tareas y herramientas que puedes utilizar.",
                 },
               ].map((item) => (
                 <div key={item.title} className="rounded-3xl border border-white/10 bg-white/6 p-5">
@@ -88,20 +94,24 @@ export default function LoginPage() {
 
           <CardContent className="flex items-center p-6 md:p-10">
             <form
+              method="post"
               className="w-full space-y-5"
               onSubmit={form.handleSubmit((values) => loginMutation.mutate(values))}
             >
+              <FormErrorSummary
+                errors={Object.entries(form.formState.errors).map(([field, issue]) => ({ fieldId: `login-${field}`, label: field === "email" ? "Correo corporativo" : "Contraseña", message: issue?.message ?? "Revisa este campo" }))}
+                serverError={loginMutation.error}
+              />
               <div className="space-y-2">
-                <Badge variant="secondary" className="rounded-full">
-                  Credenciales demo disponibles
-                </Badge>
+                <Badge variant="secondary" className="rounded-full">Acceso seguro</Badge>
                 <h2 className="text-3xl font-semibold tracking-tight">Bienvenido de nuevo</h2>
                 <p className="text-sm leading-7 text-muted-foreground">
-                  Usa un correo corporativo de prueba para entrar con otro rol y otra empresa.
+                  Ingresa con el correo y la contraseña de tu organización.
                 </p>
               </div>
 
               <FormField
+                id="login-email"
                 label="Correo corporativo"
                 error={form.formState.errors.email?.message}
                 required
@@ -117,7 +127,8 @@ export default function LoginPage() {
               </FormField>
 
               <FormField
-                label="Contrasena"
+                id="login-password"
+                label="Contraseña"
                 error={form.formState.errors.password?.message}
                 required
               >
@@ -135,7 +146,7 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
-                      aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                     >
                       {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
@@ -150,28 +161,27 @@ export default function LoginPage() {
                   className="size-4 rounded border-border accent-primary"
                 />
                 <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground">
-                  Recordar mi sesion en este dispositivo
+                  Recordar mi sesión en este dispositivo
                 </Label>
               </div>
 
               <div className="grid gap-3">
                 <Button size="lg" type="submit" disabled={loginMutation.isPending}>
-                  {loginMutation.isPending ? "Ingresando..." : "Iniciar sesion"}
+                  {loginMutation.isPending ? "Ingresando..." : "Iniciar sesión"}
                 </Button>
                 <Button asChild size="lg" variant="secondary">
-                  <Link href="/forgot-password">Olvide mi contrasena</Link>
+                  <Link href="/forgot-password">Olvidé mi contraseña</Link>
                 </Button>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-secondary/50 p-4 text-sm text-muted-foreground">
-                Usuarios demo sugeridos: `ava.thompson@talentoscloud.com`, `olivia.carter@sunrisehealthfl.com`,
-                `emma.collins@gulfshorelogistics.com`
-              </div>
-              {loginMutation.error ? (
-                <p className="text-sm text-destructive">
-                  {loginMutation.error instanceof Error ? loginMutation.error.message : "No fue posible iniciar sesion"}
-                </p>
-              ) : null}
+              {DEMO_MODE_ENABLED ? <Button type="button" variant="secondary" className="w-full" onClick={() => { form.setValue("email", "ava.thompson@talentoscloud.com"); form.setValue("password", "ChangeMe123!"); }}>Entrar al entorno de demostración</Button> : null}
+              <Button asChild type="button" variant="ghost" className="w-full">
+                <Link href="/">
+                  <ArrowLeft className="size-4" aria-hidden="true" />
+                  Volver al sitio público
+                </Link>
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">¿Necesitas ayuda? Contacta al administrador de tu empresa o al equipo de soporte.</p>
             </form>
           </CardContent>
         </div>

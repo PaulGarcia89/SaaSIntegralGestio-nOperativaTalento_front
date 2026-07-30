@@ -24,7 +24,7 @@ export default function AppError({
             <AlertTriangle className="size-8 text-destructive" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight">Error en esta seccion</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Error en esta sección</h2>
             <p className="text-sm leading-7 text-muted-foreground">
               Ocurrio un error al cargar esta vista. Puedes intentar recargar o volver al panel principal.
             </p>

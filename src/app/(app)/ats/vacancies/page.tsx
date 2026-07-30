@@ -1,416 +1,66 @@
 "use client";
 
-import { toast } from "sonner";
-
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { ClipboardList, ShieldCheck, Users2 } from "lucide-react";
-import type { VacancyDto } from "@/lib/contracts";
-import { createVacancy, deleteVacancy, fetchVacancies, fetchVacancyHiringPlans, updateVacancy } from "@/lib/mock-backend";
+import { ImageIcon, Plus, Trash2 } from "lucide-react";
+import { createVacancy, fetchVacancies, replaceVacancyResponsibles, replaceVacancyStages } from "@/lib/backend";
+import type { CreateVacancyInput, VacancyResponsibleDto, VacancyResponsibleRole, VacancyStageDto } from "@/lib/contracts";
+import { loadScopedDraft, purgeExpiredDrafts, removeScopedDraft, saveScopedDraft, type DraftScope } from "@/lib/draft-storage";
 import { useAppStore } from "@/store/app-store";
-import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
-import { DrawerPreview, DomainTable, FilterToolbar, StateCard } from "@/components/domain";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { FormSelect } from "@/components/ui/form-select";
+import { ActionBar, InlineFeedback, PageHeader, Wizard } from "@/components/design-system";
+import { AsyncState } from "@/components/async-state";
+import { FormErrorSummary } from "@/components/form-error-summary";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { FileUpload } from "@/components/ui/file-upload";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const vacancySchema = z.object({
-  title: z.string().min(2),
-  area: z.string().min(2),
-  mode: z.enum(["Remoto", "Hibrido", "Presencial"]),
-  status: z.enum(["Activa", "Borrador", "En entrevistas", "Cerrada"]),
-  location: z.string().min(2),
-  applicants: z.coerce.number().min(0),
-  owner: z.string().min(2),
-});
-
-type VacancyFormValues = z.output<typeof vacancySchema>;
-type VacancyFormInput = z.input<typeof vacancySchema>;
+const steps = ["Información", "Contenido", "Condiciones", "Formulario", "Proceso", "Responsables", "Revisión"];
+const initial = (branchId: string): CreateVacancyInput => ({ branchId, title: "", summary: "", description: "", requirements: "", responsibilities: "", benefits: "", city: "", country: "", department: "", seniority: "", workMode: "HYBRID", employmentType: "FULL_TIME", openings: 1, applicationFormSchema: { version: 1, fields: [] }, status: "DRAFT" });
 
 export default function VacanciesPage() {
-  const { currentTenant, can, hasModule } = useAppStore();
-  const queryClient = useQueryClient();
-  const vacanciesQuery = useQuery({
-    queryKey: ["vacancies", currentTenant.id],
-    queryFn: () => fetchVacancies(currentTenant.id),
-  });
-  const hiringPlansQuery = useQuery({
-    queryKey: ["vacancy-hiring-plans", currentTenant.id],
-    queryFn: () => fetchVacancyHiringPlans(currentTenant.id),
-  });
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState("");
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<VacancyDto | null>(null);
-  const [deleting, setDeleting] = useState<VacancyDto | null>(null);
+  const queryClient = useQueryClient(); const { currentBranch, currentTenant, currentUser, branches, tenantUsers, can } = useAppStore();
+  const draftScope = useMemo<DraftScope>(() => ({ namespace: "vacancy-create", tenantId: currentTenant.id, userId: currentUser.id }), [currentTenant.id, currentUser.id]);
+  const [open, setOpen] = useState(false); const [step, setStep] = useState(0); const [form, setForm] = useState<CreateVacancyInput>(() => initial(currentBranch?.id ?? "")); const [errors, setErrors] = useState<Array<{ fieldId: string; label: string; message: string }>>([]);
+  const [stages, setStages] = useState<VacancyStageDto[]>([{ code: "APPLIED", name: "Postulación", position: 0 }, { code: "SCREENING", name: "Revisión inicial", position: 1 }, { code: "INTERVIEW", name: "Entrevistas", position: 2 }, { code: "DECISION", name: "Decisión", position: 3 }, { code: "HIRED", name: "Contratación", position: 4, isTerminal: true }]);
+  const [responsibles, setResponsibles] = useState<VacancyResponsibleDto[]>([]);
+  useEffect(() => { purgeExpiredDrafts(); }, []);
+  useEffect(() => { if (!open) return; const timer = window.setTimeout(() => saveScopedDraft(draftScope, form), 400); return () => window.clearTimeout(timer); }, [draftScope, form, open]);
+  const vacancies = useQuery({ queryKey: ["vacancies", currentBranch?.id], queryFn: fetchVacancies, enabled: Boolean(currentBranch) });
+  const create = useMutation({ mutationFn: async (input: CreateVacancyInput) => { const vacancy = await createVacancy(input); await replaceVacancyStages(vacancy.id, stages); await replaceVacancyResponsibles(vacancy.id, responsibles); return vacancy; }, onSuccess: async () => { removeScopedDraft(draftScope); await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setOpen(false); setStep(0); setForm(initial(currentBranch?.id ?? "")); } });
+  const update = <K extends keyof CreateVacancyInput>(key: K, value: CreateVacancyInput[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const fields = form.applicationFormSchema?.fields ?? [];
+  const validateAll = () => [...(!form.title.trim() ? [{ fieldId: "vacancy-title", label: "Título", message: "Es obligatorio" }] : []), ...(!form.branchId ? [{ fieldId: "vacancy-branch", label: "Sucursal", message: "Selecciona una sucursal" }] : []), ...(!form.imageUrl ? [{ fieldId: "vacancy-image", label: "Imagen del cargo", message: "Carga una imagen representativa" }] : []), ...(!(form.description ?? "").trim() ? [{ fieldId: "vacancy-description", label: "Descripción", message: "Describe la oportunidad" }] : []), ...((form.openings ?? 0) < 1 ? [{ fieldId: "vacancy-openings", label: "Plazas", message: "Debe existir al menos una plaza" }] : []), ...((form.salaryMin ?? 0) > (form.salaryMax ?? Number.MAX_SAFE_INTEGER) ? [{ fieldId: "vacancy-salary-max", label: "Salario máximo", message: "Debe ser mayor o igual al salario mínimo" }] : []), ...fields.flatMap((field, index) => !field.label.trim() ? [{ fieldId: `question-${index}`, label: `Pregunta ${index + 1}`, message: "Escribe la pregunta" }] : [])];
+  const errorsForStep = (value: number) => validateAll().filter((item) => value === 0 ? ["vacancy-title", "vacancy-branch", "vacancy-image"].includes(item.fieldId) : value === 1 ? item.fieldId === "vacancy-description" : value === 2 ? ["vacancy-openings", "vacancy-salary-max"].includes(item.fieldId) : value === 3 ? item.fieldId.startsWith("question-") : false);
+  const next = () => { const nextErrors = errorsForStep(step); setErrors(nextErrors); if (!nextErrors.length) setStep((value) => Math.min(steps.length - 1, value + 1)); };
+  const submit = (status: "DRAFT" | "PUBLISHED") => { const nextErrors = status === "PUBLISHED" ? validateAll() : []; setErrors(nextErrors); if (!nextErrors.length) create.mutate({ ...form, status }); };
+  const openWizard = () => { const saved = loadScopedDraft<CreateVacancyInput>(draftScope); setForm(saved ? { ...initial(currentBranch?.id ?? ""), ...saved.value } : initial(currentBranch?.id ?? "")); setErrors([]); setOpen(true); };
+  const setFields = (nextFields: typeof fields) => update("applicationFormSchema", { version: 1, fields: nextFields });
+  const addQuestion = () => setFields([...fields, { key: `question_${crypto.randomUUID().slice(0, 8)}`, label: "", type: "TEXT", required: false }]);
+  const items = vacancies.data?.data ?? [];
 
-  const form = useForm<VacancyFormInput, unknown, VacancyFormValues>({
-    resolver: zodResolver(vacancySchema),
-    defaultValues: {
-      title: "",
-      area: "",
-      mode: "Hibrido",
-      status: "Borrador",
-      location: "",
-      applicants: 0,
-      owner: "",
-    },
-  });
-
-  const filtered = useMemo(
-    () =>
-      (vacanciesQuery.data ?? []).filter((job) =>
-        [job.title, job.area, job.mode, job.status, job.location]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    [query, vacanciesQuery.data],
-  );
-
-  const selected = filtered.find((job) => job.id === selectedId) ?? filtered[0];
-  const selectedHiringPlan =
-    (hiringPlansQuery.data ?? []).find((plan) => plan.vacancyId === selected?.id) ?? null;
-
-  const saveMutation = useMutation({
-    mutationFn: (values: VacancyFormValues) =>
-      editing ? updateVacancy(editing.id, values) : createVacancy(values),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vacancies", currentTenant.id] });
-      setOpen(false);
-      setEditing(null);
-      form.reset();
-      toast.success(editing ? "Vacante actualizada" : "Vacante creada");
-    },
-    onError: () => toast.error("Error al guardar la vacante"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteVacancy,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vacancies", currentTenant.id] });
-      setDeleting(null);
-      toast.success("Vacante eliminada");
-    },
-    onError: () => toast.error("Error al eliminar la vacante"),
-  });
-
-  if (!hasModule("ats")) {
-    return (
-      <StateCard
-        tone="restricted"
-        title="El modulo ATS no esta habilitado"
-        description="La suscripcion de esta empresa no incluye actualmente la suite de reclutamiento."
-        action={
-          <Button asChild>
-            <Link href="/admin/subscription">Revisar suscripcion</Link>
-          </Button>
-        }
-      />
-    );
-  }
-
-  if (!can("ats.view")) {
-    return (
-      <StateCard
-        tone="restricted"
-        title="No tienes acceso a vacantes"
-        description="Los permisos actuales bloquean esta vista. Cambia el rol demo o revisa la configuracion RBAC."
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-5">
-      <CrudHeader
-        title="Gestion de vacantes"
-        description="Consulta, crea, modifica y elimina vacantes del ATS con una tabla operativa y vista de detalle."
-        badge="ATS"
-        action={
-          <div className="flex gap-3">
-            <Button asChild variant="secondary">
-              <Link href="/jobs">Portal publico de empleos</Link>
-            </Button>
-            <FormDialog
-              open={open}
-              onOpenChange={(value) => {
-                setOpen(value);
-                if (!value) {
-                  setEditing(null);
-                  form.reset();
-                }
-              }}
-              title={editing ? "Editar vacante" : "Crear vacante"}
-              description="Administra los datos clave de la vacante."
-              trigger={<Button disabled={!can("ats.manage")} onClick={() => setOpen(true)}>Nueva vacante</Button>}
-            >
-              <form className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Cargo</Label>
-                    <Input {...form.register("title")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Area</Label>
-                    <Input {...form.register("area")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Modalidad</Label>
-                    <FormSelect
-                      className="h-11 w-full rounded-2xl"
-                      value={form.watch("mode")}
-                      onValueChange={(v) => form.setValue("mode", v as "Remoto" | "Hibrido" | "Presencial")}
-                      options={[
-                        { label: "Remoto", value: "Remoto" },
-                        { label: "Hibrido", value: "Hibrido" },
-                        { label: "Presencial", value: "Presencial" },
-                      ]}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Estado</Label>
-                    <FormSelect
-                      className="h-11 w-full rounded-2xl"
-                      value={form.watch("status")}
-                      onValueChange={(v) => form.setValue("status", v as "Activa" | "Borrador" | "En entrevistas" | "Cerrada")}
-                      options={[
-                        { label: "Activa", value: "Activa" },
-                        { label: "Borrador", value: "Borrador" },
-                        { label: "En entrevistas", value: "En entrevistas" },
-                        { label: "Cerrada", value: "Cerrada" },
-                      ]}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Ciudad</Label>
-                    <Input {...form.register("location")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Postulantes</Label>
-                    <Input type="number" {...form.register("applicants")} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Responsable</Label>
-                  <Input {...form.register("owner")} />
-                </div>
-                <div className="flex justify-end gap-3">
-                  <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={saveMutation.isPending}>
-                    {saveMutation.isPending ? "Guardando..." : "Guardar"}
-                  </Button>
-                </div>
-              </form>
-            </FormDialog>
-          </div>
-        }
-      />
-
-      <FilterToolbar
-        searchPlaceholder="Buscar por cargo, area, ciudad o estado"
-        options={[
-          { label: "Todas", value: "" },
-          { label: "Activas", value: "activa" },
-          { label: "En entrevistas", value: "entrevistas" },
-          { label: "Borrador", value: "borrador" },
-        ]}
-        activeValue={query}
-        onChange={setQuery}
-      />
-
-      {filtered.length === 0 ? (
-          <StateCard
-            tone="empty"
-            title="No hay vacantes para esta vista"
-          description="Prueba con otra empresa, ajusta la busqueda actual o crea una nueva vacante para poblar las etapas del proceso ATS."
-          action={<Button onClick={() => setOpen(true)}>Crear vacante</Button>}
-        />
-      ) : (
-        <div className="grid gap-5 xl:grid-cols-[1.18fr_0.82fr]">
-          <CrudPanel>
-            <DomainTable exportable
-              data={filtered}
-              getKey={(job) => job.id}
-              onSelect={(job) => setSelectedId(job.id)}
-              tableClassName="min-w-full table-fixed"
-              columns={[
-                {
-                  key: "title",
-                  header: "Cargo",
-                  sortable: true,
-                  headerClassName: "w-[32%]",
-                  cellClassName: "w-[32%]",
-                  render: (job) => job.title,
-                },
-                {
-                  key: "area",
-                  header: "Area",
-                  sortable: true,
-                  headerClassName: "w-[12%] whitespace-nowrap",
-                  cellClassName: "w-[12%] whitespace-nowrap",
-                  render: (job) => job.area,
-                },
-                {
-                  key: "mode",
-                  header: "Modalidad",
-                  sortable: true,
-                  headerClassName: "w-[13%] whitespace-nowrap",
-                  cellClassName: "w-[13%] whitespace-nowrap",
-                  render: (job) => job.mode,
-                },
-                {
-                  key: "status",
-                  header: "Estado",
-                  sortable: true,
-                  headerClassName: "w-[14%] whitespace-nowrap",
-                  cellClassName: "w-[14%] whitespace-nowrap",
-                  render: (job) => job.status,
-                },
-                {
-                  key: "applicants",
-                  header: "Postulantes",
-                  sortable: true,
-                  headerClassName: "w-[10%] whitespace-nowrap",
-                  cellClassName: "w-[10%] whitespace-nowrap",
-                  render: (job) => job.applicants,
-                },
-                {
-                  key: "actions",
-                  header: "Acciones",
-                  headerClassName: "w-[19%] whitespace-nowrap text-right",
-                  cellClassName: "w-[19%] whitespace-nowrap text-right",
-                  render: (job) => (
-                    <div className="flex items-center justify-end gap-3 pr-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="min-w-[96px] shrink-0"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setEditing(job);
-                          form.reset(job);
-                          setOpen(true);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="min-w-[96px] shrink-0"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setDeleting(job);
-                        }}
-                      >
-                        Eliminar
-                      </Button>
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </CrudPanel>
-
-          {selected ? (
-            <DrawerPreview title={selected.title} subtitle="Vista previa de la vacante">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Area</span><strong>{selected.area}</strong></div>
-                <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Ciudad</span><strong>{selected.location}</strong></div>
-                <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Estado</span><strong>{selected.status}</strong></div>
-                <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Responsable</span><strong>{selected.owner}</strong></div>
-                <div className="flex items-center justify-between border-b py-3"><span className="text-sm text-muted-foreground">Postulantes</span><strong>{selected.applicants}</strong></div>
-
-                {selectedHiringPlan ? (
-                  <>
-                    <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/60 text-primary">
-                          <ClipboardList className="size-4" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-medium text-foreground">{selectedHiringPlan.scorecardTitle}</p>
-                          <p className="text-sm leading-6 text-muted-foreground">{selectedHiringPlan.advancementRule}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {selectedHiringPlan.interviewKits.map((kit) => (
-                        <div key={kit.id} className="rounded-2xl border border-border/70 bg-card/90 p-4">
-                          <div className="space-y-3">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="space-y-1">
-                                <p className="font-medium text-foreground">{kit.stage}</p>
-                                <p className="text-sm leading-6 text-muted-foreground">{kit.focus}</p>
-                              </div>
-                              <Badge variant="secondary" className="rounded-full">
-                                {kit.criteria.length} criterios
-                              </Badge>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {kit.criteria.map((criterion) => (
-                                <span
-                                  key={criterion.id}
-                                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-secondary/25 px-3 py-1.5 text-xs text-foreground"
-                                >
-                                  {criterion.label}
-                                  <strong>{criterion.weight}%</strong>
-                                </span>
-                              ))}
-                            </div>
-                            <div className="grid gap-3 md:grid-cols-2">
-                              <div className="rounded-2xl border border-border/70 bg-secondary/20 p-3">
-                                <div className="flex items-center gap-2">
-                                  <Users2 className="size-4 text-primary" />
-                                  <p className="text-sm font-medium text-foreground">Panel</p>
-                                </div>
-                                <p className="mt-2 text-sm leading-6 text-muted-foreground">{kit.interviewers.join(", ")}</p>
-                              </div>
-                              <div className="rounded-2xl border border-border/70 bg-secondary/20 p-3">
-                                <div className="flex items-center gap-2">
-                                  <ShieldCheck className="size-4 text-primary" />
-                                  <p className="text-sm font-medium text-foreground">Regla</p>
-                                </div>
-                                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                  Retroalimentación obligatoria antes de mover la etapa.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            </DrawerPreview>
-          ) : (
-            <StateCard
-              tone="empty"
-              title="Selecciona una vacante"
-              description="El panel lateral esta listo para mostrar vista previa, línea de tiempo de actividad y proximos pasos."
-            />
-          )}
-        </div>
-      )}
-
-      <ConfirmDeleteDialog
-        open={Boolean(deleting)}
-        onOpenChange={(value) => !value && setDeleting(null)}
-        title="Eliminar vacante"
-        description={`Se eliminara la vacante ${deleting?.title ?? ""}.`}
-        pending={deleteMutation.isPending}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
-      />
-    </div>
-  );
+  return <div className="space-y-7"><PageHeader eyebrow="Reclutamiento" title="Vacantes" description="Crea borradores, revisa el contenido y publica únicamente después de validar el resumen." actions={can("jobs.create") ? <Button onClick={openWizard}><Plus className="size-4" />Nueva vacante</Button> : undefined} />
+    {vacancies.isLoading ? <AsyncState state="loading" title="Cargando vacantes" /> : null}{vacancies.isError ? <AsyncState state="error" onRetry={() => void vacancies.refetch()} /> : null}
+    {vacancies.isSuccess && !items.length ? <InlineFeedback tone="info" title="No hay vacantes registradas">Crea un borrador para iniciar el proceso de revisión.</InlineFeedback> : null}
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((vacancy) => <Card level={2} key={vacancy.id} className="overflow-hidden"><VacancyImage imageUrl={vacancy.imageUrl} title={vacancy.title} /><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{vacancy.title}</CardTitle><Badge variant="secondary">{vacancy.workMode ?? "Sin modalidad"}</Badge></div></CardHeader><CardContent className="space-y-2 text-sm text-text-secondary"><p>{vacancy.department || "Sin área"}</p><p>{[vacancy.city, vacancy.country].filter(Boolean).join(", ") || "Sin ubicación"}</p></CardContent></Card>)}</section>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>Crear vacante</DialogTitle><DialogDescription>Completa y revisa la vacante. El borrador local caduca en 24 horas.</DialogDescription></DialogHeader><Wizard steps={steps} current={step} onStepChange={(target) => { if (target <= step) { setErrors([]); setStep(target); } }}><FormErrorSummary errors={errors} serverError={create.error} />
+      {step === 0 ? <div className="grid gap-4 md:grid-cols-2"><label className="space-y-2 text-sm font-medium" htmlFor="vacancy-branch">Sucursal<Select value={form.branchId} onValueChange={(value) => update("branchId", value)}><SelectTrigger id="vacancy-branch"><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger><SelectContent>{branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select></label><Field id="vacancy-title" label="Título" value={form.title} onChange={(value) => update("title", value)} /><Field id="vacancy-department" label="Área" value={form.department ?? ""} onChange={(value) => update("department", value)} /><Field id="vacancy-seniority" label="Nivel de experiencia" value={form.seniority ?? ""} onChange={(value) => update("seniority", value)} /><Field id="vacancy-city" label="Ciudad" value={form.city ?? ""} onChange={(value) => update("city", value)} /><Field id="vacancy-country" label="País" value={form.country ?? ""} onChange={(value) => update("country", value)} /><Field id="vacancy-summary" label="Resumen" value={form.summary ?? ""} maxLength={240} onChange={(value) => update("summary", value)} className="md:col-span-2" /><div id="vacancy-image" className="space-y-3 md:col-span-2"><div><p className="text-sm font-medium">Imagen del cargo <span className="text-status-danger">*</span></p><p className="mt-1 text-xs text-text-secondary">Usa una imagen horizontal JPG, PNG o WebP de hasta 3 MB. Se mostrará en el portal público.</p></div>{form.imageUrl ? <div className="relative aspect-[16/7] overflow-hidden rounded-2xl border border-border-default"><Image src={form.imageUrl} alt={`Vista previa para ${form.title || "la vacante"}`} fill unoptimized className="object-cover" /><Button type="button" size="icon" variant="destructive" className="absolute right-3 top-3" aria-label="Eliminar imagen" onClick={() => update("imageUrl", undefined)}><Trash2 className="size-4" /></Button></div> : <FileUpload accept="image/jpeg,image/png,image/webp" maxFiles={1} onFiles={(selected) => { const file = selected[0]; if (!file) return; if (file.size > 3 * 1024 * 1024) { setErrors([{ fieldId: "vacancy-image", label: "Imagen del cargo", message: "La imagen no puede superar 3 MB" }]); return; } const reader = new FileReader(); reader.onload = () => { if (typeof reader.result === "string") { update("imageUrl", reader.result); setErrors((current) => current.filter((item) => item.fieldId !== "vacancy-image")); } }; reader.readAsDataURL(file); }} />}</div></div> : null}
+      {step === 1 ? <div className="grid gap-4"><TextArea label="Descripción" value={form.description ?? ""} onChange={(value) => update("description", value)} /><TextArea label="Responsabilidades" value={form.responsibilities ?? ""} onChange={(value) => update("responsibilities", value)} /><TextArea label="Requisitos" value={form.requirements ?? ""} onChange={(value) => update("requirements", value)} /></div> : null}
+      {step === 2 ? <div className="grid gap-4 md:grid-cols-2"><label className="space-y-2 text-sm font-medium">Modalidad<Select value={form.workMode} onValueChange={(value) => update("workMode", value as CreateVacancyInput["workMode"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="REMOTE">Remoto</SelectItem><SelectItem value="HYBRID">Híbrido</SelectItem><SelectItem value="ONSITE">Presencial</SelectItem></SelectContent></Select></label><label className="space-y-2 text-sm font-medium">Tipo de empleo<Select value={form.employmentType} onValueChange={(value) => update("employmentType", value as CreateVacancyInput["employmentType"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="FULL_TIME">Tiempo completo</SelectItem><SelectItem value="PART_TIME">Tiempo parcial</SelectItem><SelectItem value="CONTRACT">Contrato</SelectItem><SelectItem value="TEMPORARY">Temporal</SelectItem><SelectItem value="INTERNSHIP">Prácticas</SelectItem></SelectContent></Select></label><Field id="vacancy-openings" label="Número de plazas" type="number" value={String(form.openings ?? 1)} onChange={(value) => update("openings", Math.max(1, Number(value)))} /><Field id="vacancy-currency" label="Moneda" value={form.currency ?? "USD"} maxLength={8} onChange={(value) => update("currency", value.toUpperCase())} /><Field id="vacancy-salary-min" label="Salario mínimo" type="number" value={form.salaryMin == null ? "" : String(form.salaryMin)} onChange={(value) => update("salaryMin", value ? Number(value) : undefined)} /><Field id="vacancy-salary-max" label="Salario máximo" type="number" value={form.salaryMax == null ? "" : String(form.salaryMax)} onChange={(value) => update("salaryMax", value ? Number(value) : undefined)} /><Field id="vacancy-benefits" label="Beneficios" value={form.benefits ?? ""} onChange={(value) => update("benefits", value)} className="md:col-span-2" /></div> : null}
+      {step === 3 ? <div className="space-y-4"><div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold">Preguntas adicionales</h3><p className="text-sm text-text-secondary">Los datos básicos del candidato se solicitan automáticamente.</p></div><Button variant="secondary" onClick={addQuestion} disabled={fields.length >= 20}><Plus className="size-4" />Agregar pregunta</Button></div>{!fields.length ? <InlineFeedback tone="info" title="Sin preguntas adicionales">Puedes continuar con el formulario básico o agregar preguntas específicas.</InlineFeedback> : fields.map((field, index) => <Card level={3} key={field.key}><CardContent className="grid gap-4 p-4 md:grid-cols-[1fr_180px_auto]"><Field id={`question-${index}`} label={`Pregunta ${index + 1}`} value={field.label} onChange={(value) => setFields(fields.map((item, itemIndex) => itemIndex === index ? { ...item, label: value } : item))} /><label className="space-y-2 text-sm font-medium">Tipo<Select value={field.type} onValueChange={(value) => setFields(fields.map((item, itemIndex) => itemIndex === index ? { ...item, type: value as typeof field.type } : item))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TEXT">Texto corto</SelectItem><SelectItem value="TEXTAREA">Texto largo</SelectItem><SelectItem value="NUMBER">Número</SelectItem><SelectItem value="URL">Enlace</SelectItem><SelectItem value="BOOLEAN">Sí / No</SelectItem></SelectContent></Select></label><div className="flex items-end gap-2"><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(field.required)} onChange={(event) => setFields(fields.map((item, itemIndex) => itemIndex === index ? { ...item, required: event.target.checked } : item))} />Obligatoria</label><Button size="icon" variant="ghost" aria-label={`Eliminar pregunta ${index + 1}`} onClick={() => setFields(fields.filter((_, itemIndex) => itemIndex !== index))}><Trash2 /></Button></div></CardContent></Card>)}</div> : null}
+      {step === 4 ? <div className="space-y-4"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Etapas del proceso</h3><p className="text-sm text-text-secondary">Define el recorrido específico de esta vacante.</p></div><Button variant="secondary" onClick={() => setStages((current) => [...current, { code: `STAGE_${current.length + 1}`, name: "Nueva etapa", position: current.length }])}><Plus className="size-4" />Etapa</Button></div>{stages.map((stage, index) => <Card level={3} key={`${stage.code}-${index}`}><CardContent className="grid gap-3 p-4 md:grid-cols-[80px_1fr_1fr_auto]"><Field id={`stage-position-${index}`} label="Orden" type="number" value={String(stage.position + 1)} onChange={(value) => setStages((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, position: Math.max(0, Number(value) - 1) } : item))} /><Field id={`stage-name-${index}`} label="Nombre" value={stage.name} onChange={(value) => setStages((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: value } : item))} /><Field id={`stage-code-${index}`} label="Código" value={stage.code} onChange={(value) => setStages((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, code: value.toUpperCase().replace(/\W+/g, "_") } : item))} /><Button size="icon" variant="ghost" className="self-end" aria-label={`Eliminar ${stage.name}`} disabled={stages.length <= 2} onClick={() => setStages((current) => current.filter((_, itemIndex) => itemIndex !== index).map((item, position) => ({ ...item, position }))) }><Trash2 /></Button></CardContent></Card>)}</div> : null}
+      {step === 5 ? <div className="space-y-4"><div><h3 className="font-semibold">Responsables y función</h3><p className="text-sm text-text-secondary">Solo se muestran usuarios de la empresa activa.</p></div><Select onValueChange={(userId) => { if (!responsibles.some((item) => item.userId === userId)) setResponsibles((current) => [...current, { userId, role: "RECRUITER" }]); }}><SelectTrigger><SelectValue placeholder="Agregar responsable" /></SelectTrigger><SelectContent>{tenantUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select>{responsibles.map((responsible, index) => { const user = tenantUsers.find((item) => item.id === responsible.userId); return <Card level={3} key={`${responsible.userId}-${index}`}><CardContent className="grid items-end gap-3 p-4 md:grid-cols-[1fr_220px_auto]"><div><p className="font-medium">{user?.fullName ?? responsible.userId}</p><p className="text-sm text-text-secondary">{user?.email}</p></div><label className="space-y-2 text-sm font-medium">Función<Select value={responsible.role} onValueChange={(role) => setResponsibles((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, role: role as VacancyResponsibleRole } : item))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="OWNER">Responsable principal</SelectItem><SelectItem value="RECRUITER">Reclutador</SelectItem><SelectItem value="HIRING_MANAGER">Líder contratante</SelectItem><SelectItem value="INTERVIEWER">Entrevistador</SelectItem></SelectContent></Select></label><Button size="icon" variant="ghost" aria-label={`Quitar a ${user?.fullName ?? "responsable"}`} onClick={() => setResponsibles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 /></Button></CardContent></Card>; })}</div> : null}
+      {step === 6 ? <div className="space-y-4"><InlineFeedback tone="warning" title="Revisa antes de publicar">Al publicar, la vacante, sus etapas y responsables quedarán disponibles para operar el proceso.</InlineFeedback>{form.imageUrl ? <div className="relative aspect-[16/6] overflow-hidden rounded-2xl"><Image src={form.imageUrl} alt="" fill unoptimized className="object-cover" /></div> : null}<dl className="grid gap-3 rounded-xl bg-surface-section p-5 md:grid-cols-2"><Summary label="Título" value={form.title} /><Summary label="Área" value={form.department} /><Summary label="Ubicación" value={[form.city, form.country].filter(Boolean).join(", ")} /><Summary label="Modalidad" value={form.workMode} /><Summary label="Plazas" value={String(form.openings)} /><Summary label="Preguntas adicionales" value={String(fields.length)} /><Summary label="Etapas" value={String(stages.length)} /><Summary label="Responsables" value={String(responsibles.length)} /><Summary label="Rango salarial" value={form.salaryMin || form.salaryMax ? `${form.salaryMin ?? "—"} – ${form.salaryMax ?? "—"} ${form.currency ?? "USD"}` : "No informado"} /></dl></div> : null}
+      <ActionBar label="Acciones del asistente" sticky><Button variant="secondary" onClick={() => { setErrors([]); setStep((value) => Math.max(0, value - 1)); }} disabled={step === 0}>Anterior</Button>{step < steps.length - 1 ? <Button onClick={next}>Continuar</Button> : <><Button variant="secondary" onClick={() => submit("DRAFT")} disabled={create.isPending}>Guardar borrador</Button><Button onClick={() => submit("PUBLISHED")} disabled={create.isPending} data-loading={create.isPending}>{create.isPending ? "Publicando…" : "Publicar"}</Button></>}</ActionBar>
+    </Wizard></DialogContent></Dialog>
+  </div>;
 }
+
+function Field({ id, label, value, onChange, type = "text", className, maxLength }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; className?: string; maxLength?: number }) { return <label className={`space-y-2 text-sm font-medium ${className ?? ""}`} htmlFor={id}>{label}<Input id={id} type={type} min={type === "number" ? 0 : undefined} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} /></label>; }
+function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { const id = `vacancy-${label.toLocaleLowerCase("es")}`; return <label className="space-y-2 text-sm font-medium" htmlFor={id}>{label}<textarea id={id} value={value} onChange={(event) => onChange(event.target.value)} rows={4} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label>; }
+function Summary({ label, value }: { label: string; value?: string }) { return <div><dt className="text-xs text-text-secondary">{label}</dt><dd className="mt-1 font-medium">{value || "No informado"}</dd></div>; }
+function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) { return <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-surface-section to-info/15">{imageUrl ? <Image src={imageUrl} alt={`Imagen representativa del cargo ${title}`} fill unoptimized className="object-cover" /> : <div className="flex flex-col items-center gap-2 text-text-secondary"><ImageIcon className="size-9" aria-hidden="true" /><span className="text-xs">Sin imagen</span></div>}</div>; }

@@ -1,177 +1,116 @@
+"use client";
+
 import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Check, ChevronLeft, ChevronRight, Send } from "lucide-react";
+import { authenticateCandidate, fetchPublicVacancy, submitCandidateApplication } from "@/lib/backend";
+import type { PublicApplicationInput } from "@/lib/contracts";
+import type { VacancyApplicationField } from "@/lib/contracts";
+import { getApplicationFields, missingRequiredApplicationFields } from "@/lib/application-form";
+import { AsyncState } from "@/components/async-state";
+import { CandidateNav } from "@/components/candidate-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MetricCard, SectionCard } from "@/components/ui";
+import { Wizard } from "@/components/design-system";
 
-const nextSteps = [
-  {
-    title: "Datos personales",
-    description: "Completa nombre, correo y un breve resumen profesional para iniciar tu postulación.",
-    status: "En curso",
-  },
-  {
-    title: "Documentos requeridos",
-    description: "CV actualizado, identificación y certificaciones si aplican al cargo.",
-    status: "Pendiente",
-  },
-  {
-    title: "Preguntas del cargo",
-    description: "La vacante puede activar preguntas dinámicas según área y modalidad.",
-    status: "Siguiente",
-  },
-];
+const steps = ["Vacante", "Datos personales", "Experiencia", "Preguntas", "Documentos", "Revisión y consentimiento", "Confirmación"];
+const emptyForm: PublicApplicationInput = { fullName: "", email: "", phone: "", city: "", linkedinUrl: "", portfolioUrl: "", resumeUrl: "", coverLetter: "", dynamicResponses: {} };
+const DRAFT_TTL_MS = 30 * 60 * 1000;
 
-export default function ApplyPage() {
+function ApplyWizard() {
+  const vacancyId = useSearchParams().get("vacancyId") ?? "";
+  const draftKey = `talentos.application-draft.${vacancyId}`;
+  const initialDraft = useMemo(() => {
+    if (!vacancyId || typeof window === "undefined") return null;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(draftKey) ?? "null") as { form: PublicApplicationInput; savedAt: string; expiresAt: number } | null;
+      return draft;
+    } catch { sessionStorage.removeItem(draftKey); return null; }
+  }, [draftKey, vacancyId]);
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState<PublicApplicationInput>(() => ({ ...emptyForm, ...initialDraft?.form }));
+  const [consent, setConsent] = useState(false);
+  const [candidatePassword, setCandidatePassword] = useState("");
+  const [accountMode, setAccountMode] = useState<"login" | "register">("login");
+  const [savedAt, setSavedAt] = useState<Date | null>(() => initialDraft?.savedAt ? new Date(initialDraft.savedAt) : null);
+  const [error, setError] = useState("");
+  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", vacancyId], queryFn: () => fetchPublicVacancy(vacancyId), enabled: Boolean(vacancyId), retry: false });
+  const submitMutation = useMutation({ mutationFn: async () => {
+    await authenticateCandidate(form.email, candidatePassword, accountMode);
+    return submitCandidateApplication(vacancyId, form);
+  }, onSuccess: (receipt) => { sessionStorage.removeItem(draftKey); sessionStorage.setItem(`talentos.application-receipt.${receipt.id}`, JSON.stringify(receipt)); setStep(6); }, onError: (cause) => setError(cause instanceof Error ? cause.message : "No fue posible enviar la postulación.") });
+
+  useEffect(() => {
+    if (!initialDraft?.expiresAt) return;
+    const timeout = window.setTimeout(() => { sessionStorage.removeItem(draftKey); setForm(emptyForm); setSavedAt(null); }, Math.max(0, initialDraft.expiresAt - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [draftKey, initialDraft?.expiresAt]);
+
+  useEffect(() => {
+    if (!vacancyId || step === 6) return;
+    const timeout = window.setTimeout(() => {
+      const now = new Date();
+      const minimized = Object.fromEntries(Object.entries(form).filter(([, value]) => value !== "" && value != null && (typeof value !== "object" || Object.keys(value).length > 0)));
+      sessionStorage.setItem(draftKey, JSON.stringify({ form: minimized, savedAt: now.toISOString(), expiresAt: now.getTime() + DRAFT_TTL_MS }));
+      setSavedAt(now);
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [draftKey, form, step, vacancyId]);
+
+  const setField = (field: keyof PublicApplicationInput, value: string) => { setForm((current) => ({ ...current, [field]: value })); setError(""); };
+  const setResponse = (key: string, value: unknown) => { setForm((current) => ({ ...current, dynamicResponses: { ...current.dynamicResponses, [key]: value } })); setError(""); };
+  const validate = () => {
+    if (step === 1 && (!form.fullName.trim() || !/^\S+@\S+\.\S+$/.test(form.email))) return "Ingresa tu nombre completo y un correo válido.";
+    if (step === 3) { const missing = missingRequiredApplicationFields(vacancyQuery.data?.applicationFormSchema, form.dynamicResponses); if (missing.length) return `Responde los campos obligatorios: ${missing.map((field) => field.label).join(", ")}.`; }
+    if (step === 5 && candidatePassword.length < 10) return "La contraseña del portal debe tener al menos 10 caracteres.";
+    if (step === 5 && !consent) return "Debes aceptar la declaración y el tratamiento de datos antes de enviar.";
+    return "";
+  };
+  const next = () => { const message = validate(); if (message) return setError(message); setError(""); setStep((value) => Math.min(value + 1, 5)); };
+  const location = useMemo(() => [vacancyQuery.data?.city, vacancyQuery.data?.country].filter(Boolean).join(", "), [vacancyQuery.data]);
+
+  if (!vacancyId) return <><CandidateNav /><Card className="mx-auto max-w-2xl border-dashed"><CardContent className="space-y-5 py-14 text-center"><h1 className="text-2xl font-semibold">Selecciona una vacante antes de comenzar</h1><p className="text-muted-foreground">Así podremos asociar tu información con la oportunidad correcta.</p><Button asChild><Link href="/jobs">Explorar vacantes</Link></Button></CardContent></Card></>;
+  if (vacancyQuery.isLoading) return <AsyncState state="loading" title="Preparando tu postulación" />;
+  if (vacancyQuery.isError || !vacancyQuery.data) return <AsyncState state="error" description="No pudimos verificar esta vacante. No ingreses datos personales hasta recuperar la conexión." onRetry={() => void vacancyQuery.refetch()} />;
+  const vacancy = vacancyQuery.data;
+  const receipt = submitMutation.data;
+
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 pb-10 pt-2 md:gap-10 md:pb-14">
-      <section className="overflow-hidden rounded-[2rem] border border-border/70 bg-card/92 shadow-[0_18px_60px_-32px_rgba(15,23,42,0.28)]">
-        <div className="grid gap-0 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-6 p-6 md:p-8 xl:p-10">
-            <div className="space-y-4">
-              <Badge variant="secondary" className="rounded-full px-3 py-1">
-                Aplicacion a vacantes
-              </Badge>
-              <div className="space-y-4">
-                <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-                  Postulacion clara, guiada y lista para completarse desde mobile o desktop.
-                </h1>
-                <p className="max-w-2xl text-base leading-8 text-muted-foreground md:text-lg">
-                  Completa tu perfil en pasos simples, guarda avance cuando lo necesites y continua con los documentos y preguntas del cargo.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <MetricCard label="Paso actual" value="1 de 5" detail="Perfil y experiencia base" />
-              <MetricCard label="Tiempo estimado" value="8 min" detail="Con documentos listos y formulario completo" />
-              <MetricCard label="Guardado parcial" value="Activo" detail="La informacion se conserva durante el proceso" />
-            </div>
-          </div>
-
-          <div className="grid gap-4 border-t border-border/60 bg-secondary/20 p-6 md:p-8 xl:border-l xl:border-t-0 xl:p-10">
-            <div className="rounded-3xl border border-border/70 bg-card/95 p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Vacante seleccionada</p>
-                  <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                    Especialista senior de adquisicion de talento
-                  </h2>
-                  <p className="text-sm text-muted-foreground">Miami, FL · Equipo de RRHH · Publicada esta semana</p>
-                </div>
-                <Badge className="rounded-full">Hibrido</Badge>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Postulantes</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">38</p>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Area</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">RRHH</p>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Estado</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">Activa</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-14 pt-2">
+      <CandidateNav />
+      <section className="space-y-4 rounded-[2rem] border bg-card p-6 md:p-8">
+        <Badge variant="secondary">Postulación segura</Badge><h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{vacancy.title}</h1><p className="text-muted-foreground">{vacancy.tenant?.name}{location ? ` · ${location}` : ""}</p>
+        {step < 6 ? <div className="space-y-2"><p className="text-sm text-muted-foreground" aria-live="polite">{savedAt ? `Borrador temporal guardado a las ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}; se eliminará después de 30 minutos o al cerrar el navegador.` : "El borrador permanecerá únicamente durante esta sesión y caducará en 30 minutos."}</p><p className="text-xs text-amber-700">Si compartes este dispositivo, elimina el borrador antes de retirarte.</p>{savedAt ? <Button type="button" size="sm" variant="ghost" onClick={() => { sessionStorage.removeItem(draftKey); setForm(emptyForm); setSavedAt(null); }}>Eliminar borrador</Button> : null}</div> : null}
       </section>
-
-      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-        <SectionCard title="Completa tu perfil" subtitle="Paso 1 · Perfil y experiencia">
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-secondary/35 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-foreground">Vacante seleccionada</p>
-                <p className="text-sm text-muted-foreground">Especialista senior de adquisicion de talento · Miami, FL</p>
-              </div>
-              <Badge variant="secondary" className="rounded-full">
-                Hibrido
-              </Badge>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="candidate-name">Nombre completo</Label>
-                <Input id="candidate-name" className="h-12 rounded-2xl" placeholder="Ingresa tu nombre" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="candidate-email">Email</Label>
-                <Input id="candidate-email" className="h-12 rounded-2xl" placeholder="tu@email.com" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="candidate-phone">Telefono</Label>
-                <Input id="candidate-phone" className="h-12 rounded-2xl" placeholder="+1 (305) 555-0188" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="candidate-summary">Resumen profesional</Label>
-                <textarea
-                  id="candidate-summary"
-                  className="min-h-40 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring/40"
-                  placeholder="Cuéntanos por qué eres un gran match para esta vacante"
-                  rows={6}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-dashed border-border/70 bg-secondary/20 p-4">
-              <p className="text-sm font-medium text-foreground">Sugerencia</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Menciona experiencia en reclutamiento, coordinación con hiring managers y manejo de procesos en empresas de servicios o salud.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-border/60 pt-2 sm:flex-row sm:justify-end">
-              <Button asChild variant="secondary" className="rounded-full px-6">
-                <Link href="/application-status">Ver seguimiento</Link>
-              </Button>
-              <Button variant="secondary" className="rounded-full px-6">
-                Guardar borrador
-              </Button>
-              <Button className="rounded-full px-6">Siguiente paso</Button>
-            </div>
-          </div>
-        </SectionCard>
-
-        <div className="space-y-6">
-          <SectionCard title="Tu progreso" subtitle="Resumen de candidatura">
-            <div className="space-y-3">
-              {nextSteps.map((step) => (
-                <div key={step.title} className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="font-medium text-foreground">{step.title}</p>
-                      <p className="text-sm leading-6 text-muted-foreground">{step.description}</p>
-                    </div>
-                    <Badge variant={step.status === "En curso" ? "default" : "secondary"} className="rounded-full">
-                      {step.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Documentos recomendados" subtitle="Antes de continuar">
-            <div className="space-y-3">
-              {[
-                "CV o resume actualizado en PDF.",
-                "Documento de identidad o permiso de trabajo.",
-                "Certificaciones relevantes para el cargo, si aplican.",
-              ].map((item) => (
-                <div key={item} className="rounded-2xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm leading-6 text-foreground">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        </div>
-      </div>
+      <Wizard steps={steps} current={step} onStepChange={step < 6 ? setStep : undefined}>
+      <Card><CardHeader><CardTitle>{steps[step]}</CardTitle></CardHeader><CardContent className="space-y-6">
+        {step === 0 ? <div className="space-y-4"><p className="leading-7 text-muted-foreground">{vacancy.description || vacancy.summary || "Revisa la información disponible antes de continuar."}</p>{vacancy.requirements ? <div><h2 className="font-semibold">Requisitos</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{vacancy.requirements}</p></div> : null}</div> : null}
+        {step === 1 ? <div className="grid gap-4 md:grid-cols-2"><Field label="Nombre completo" required value={form.fullName} onChange={(value) => setField("fullName", value)} /><Field label="Correo electrónico" type="email" required value={form.email} onChange={(value) => setField("email", value)} /><Field label="Teléfono" value={form.phone || ""} onChange={(value) => setField("phone", value)} /><Field label="Ciudad" value={form.city || ""} onChange={(value) => setField("city", value)} /></div> : null}
+        {step === 2 ? <div className="space-y-4"><Field label="LinkedIn (opcional)" type="url" value={form.linkedinUrl || ""} onChange={(value) => setField("linkedinUrl", value)} /><Field label="Portafolio (opcional)" type="url" value={form.portfolioUrl || ""} onChange={(value) => setField("portfolioUrl", value)} /><div className="space-y-2"><Label htmlFor="coverLetter">Experiencia y motivación</Label><textarea id="coverLetter" maxLength={4000} value={form.coverLetter || ""} onChange={(event) => setField("coverLetter", event.target.value)} className="min-h-40 w-full rounded-xl border bg-background p-3" /></div></div> : null}
+        {step === 3 ? <DynamicQuestions fields={getApplicationFields(vacancy.applicationFormSchema)} responses={form.dynamicResponses ?? {}} onChange={setResponse} /> : null}
+        {step === 4 ? <div className="space-y-3"><Field label="Enlace seguro a tu CV (opcional)" type="url" value={form.resumeUrl || ""} onChange={(value) => setField("resumeUrl", value)} /><p className="text-sm text-muted-foreground">La API actual acepta un enlace; no mostramos una carga de archivo porque todavía no existe un servicio de almacenamiento confirmado.</p></div> : null}
+        {step === 5 ? <div className="space-y-5"><dl className="grid gap-3 rounded-xl bg-secondary/40 p-5 text-sm"><div><dt className="text-muted-foreground">Nombre</dt><dd className="font-medium">{form.fullName}</dd></div><div><dt className="text-muted-foreground">Correo</dt><dd className="font-medium">{form.email}</dd></div><div><dt className="text-muted-foreground">Vacante</dt><dd className="font-medium">{vacancy.title}</dd></div></dl><div className="space-y-3 rounded-xl border p-4"><h2 className="font-semibold">Acceso al seguimiento</h2><p className="text-sm text-muted-foreground">Tu postulación quedará vinculada a un portal autenticado. Usa el mismo correo indicado arriba.</p><div className="flex gap-2"><Button type="button" size="sm" variant={accountMode === "login" ? "default" : "secondary"} onClick={() => setAccountMode("login")}>Ya tengo cuenta</Button><Button type="button" size="sm" variant={accountMode === "register" ? "default" : "secondary"} onClick={() => setAccountMode("register")}>Crear cuenta</Button></div><Field label="Contraseña del portal" type="password" required value={candidatePassword} onChange={setCandidatePassword} /></div><label className="flex items-start gap-3"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 size-4" /><span className="text-sm leading-6">Declaro que la información es correcta y autorizo su tratamiento para este proceso de selección.</span></label></div> : null}
+        {step === 6 && receipt ? <div className="space-y-5 text-center" role="status"><div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check /></div><h2 className="text-2xl font-semibold">Postulación enviada correctamente</h2><p className="text-muted-foreground">Número de postulación: <strong className="text-foreground">{receipt.id}</strong></p><Button asChild variant="secondary"><Link href={`/application-status?reference=${encodeURIComponent(receipt.id)}`}>Ir al seguimiento</Link></Button></div> : null}
+        {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+        {step < 6 ? <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-between"><Button type="button" variant="secondary" onClick={() => setStep((value) => Math.max(0, value - 1))} disabled={step === 0}><ChevronLeft className="size-4" />Anterior</Button>{step < 5 ? <Button type="button" onClick={next}>Siguiente<ChevronRight className="size-4" /></Button> : <Button type="button" onClick={() => submitMutation.mutate()} disabled={!consent || submitMutation.isPending}>{submitMutation.isPending ? "Enviando…" : "Enviar postulación"}<Send className="size-4" /></Button>}</div> : null}
+      </CardContent></Card></Wizard>
     </div>
   );
 }
+
+function Field({ label, value, onChange, type = "text", required = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) {
+  const id = label.toLowerCase().replace(/\W+/g, "-");
+  return <div className="space-y-2"><Label htmlFor={id}>{label}{required ? " *" : ""}</Label><Input id={id} type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="h-12 rounded-xl" /></div>;
+}
+
+function DynamicQuestions({ fields, responses, onChange }: { fields: VacancyApplicationField[]; responses: Record<string, unknown>; onChange: (key: string, value: unknown) => void }) {
+  if (!fields.length) return <div className="rounded-xl border border-dashed p-5"><h2 className="font-medium">Sin preguntas adicionales</h2><p className="mt-2 text-sm text-muted-foreground">Esta vacante no solicita respuestas adicionales.</p></div>;
+  return <div className="space-y-5">{fields.map((field) => { const id = `question-${field.key}`; const value = responses[field.key]; return <div key={field.key} className="space-y-2"><Label htmlFor={id}>{field.label}{field.required ? " *" : ""}</Label>{field.type === "TEXTAREA" ? <textarea id={id} required={field.required} value={String(value ?? "")} placeholder={field.placeholder} onChange={(event) => onChange(field.key, event.target.value)} className="min-h-28 w-full rounded-xl border bg-background p-3" /> : field.type === "SINGLE_SELECT" ? <select id={id} required={field.required} value={String(value ?? "")} onChange={(event) => onChange(field.key, event.target.value)} className="h-12 w-full rounded-xl border bg-background px-3"><option value="">Selecciona una opción</option>{field.options?.map((option) => <option key={option}>{option}</option>)}</select> : field.type === "MULTI_SELECT" ? <fieldset className="space-y-2"><legend className="sr-only">{field.label}</legend>{field.options?.map((option) => <label key={option} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={Array.isArray(value) && value.includes(option)} onChange={(event) => { const current = Array.isArray(value) ? value : []; onChange(field.key, event.target.checked ? [...current, option] : current.filter((entry) => entry !== option)); }} />{option}</label>)}</fieldset> : field.type === "BOOLEAN" ? <label className="flex min-h-11 items-center gap-3"><input id={id} type="checkbox" checked={value === true} onChange={(event) => onChange(field.key, event.target.checked)} />Sí</label> : <Input id={id} required={field.required} type={field.type === "URL" ? "url" : field.type === "NUMBER" ? "number" : "text"} value={String(value ?? "")} placeholder={field.placeholder} onChange={(event) => onChange(field.key, field.type === "NUMBER" && event.target.value !== "" ? Number(event.target.value) : event.target.value)} className="h-12 rounded-xl" />}{field.helperText ? <p className="text-sm text-muted-foreground">{field.helperText}</p> : null}</div>; })}</div>;
+}
+
+export default function ApplyPage() { return <Suspense fallback={<AsyncState state="loading" />}><ApplyWizard /></Suspense>; }

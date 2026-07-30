@@ -6,10 +6,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { createTenant, deleteTenant, fetchTenants, updateTenant } from "@/lib/backend";
+import { createTenant, deleteTenant, fetchSubscriptions, fetchTenants, updateTenant } from "@/lib/backend";
 import type { ModuleKey, PlanTier, TenantDto } from "@/lib/contracts";
 import { CrudHeader, CrudPanel, FormDialog, ConfirmDeleteDialog } from "@/components/admin-crud";
-import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
+import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { FormSelect } from "@/components/ui/form-select";
 import { moduleLabels, tenantStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
+import { InfoList, SectionCard } from "@/components/ui";
+import { AsyncState } from "@/components/async-state";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import { PermissionGate } from "@/components/permission-gate";
 
 const moduleOptions: ModuleKey[] = [
   "dashboard",
@@ -53,10 +57,16 @@ export default function TenantsPage() {
     queryKey: ["admin-tenants"],
     queryFn: fetchTenants,
   });
+  const subscriptionsQuery = useQuery({
+    queryKey: ["subscriptions"],
+    queryFn: fetchSubscriptions,
+  });
   const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TenantDto | null>(null);
   const [deleting, setDeleting] = useState<TenantDto | null>(null);
+  const [selectedTenantId, setSelectedTenantId] = useState("");
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantSchema),
@@ -70,21 +80,27 @@ export default function TenantsPage() {
       enabledModules: ["dashboard", "profile", "notifications"],
     },
   });
+  useUnsavedChanges(open && form.formState.isDirty, "tenant-form");
   const selectedModules = useWatch({
     control: form.control,
     name: "enabledModules",
     defaultValue: ["dashboard", "profile", "notifications"],
   });
+  const selectedPlan = useWatch({ control: form.control, name: "plan" });
+  const selectedStatus = useWatch({ control: form.control, name: "status" });
 
   const filtered = useMemo(
     () =>
       (tenantsQuery.data ?? []).filter((tenant) =>
-        [tenant.name, tenant.slug, tenant.plan, tenant.status ?? ""]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
+        matchesSearchAndFilter([tenant.name, tenant.slug, tenant.plan, tenant.status ?? ""], query, activeFilter),
       ),
-    [query, tenantsQuery.data],
+    [activeFilter, query, tenantsQuery.data],
+  );
+
+  const selectedTenant = filtered.find((tenant) => tenant.id === selectedTenantId) ?? filtered[0] ?? null;
+  const selectedSubscription = useMemo(
+    () => (subscriptionsQuery.data ?? []).find((subscription) => subscription.tenantId === selectedTenant?.id) ?? null,
+    [subscriptionsQuery.data, selectedTenant?.id],
   );
 
   const saveMutation = useMutation({
@@ -137,23 +153,27 @@ export default function TenantsPage() {
     onError: () => toast.error("Error al eliminar la empresa"),
   });
 
-  if (!can("admin.view")) {
+  if (!can("tenants.view")) {
     return (
       <StateCard
         tone="restricted"
         title="Sin acceso a empresas"
-        description="Solo perfiles de administracion superior pueden gestionar empresas suscritas."
+        description="Solo perfiles de administración superior pueden gestionar empresas suscritas."
       />
     );
   }
+
+  if (tenantsQuery.isLoading || subscriptionsQuery.isLoading) return <AsyncState state="loading" title="Cargando empresas" />;
+  if (tenantsQuery.isError || subscriptionsQuery.isError) return <AsyncState state="error" title="No fue posible cargar las empresas" onRetry={() => { void tenantsQuery.refetch(); void subscriptionsQuery.refetch(); }} />;
 
   return (
     <div className="space-y-5">
       <CrudHeader
         title="Gestion de empresas"
-        description="Crea, consulta, modifica y elimina empresas del SaaS, incluyendo plan, branding, estado y modulos habilitados."
+        description="Alta, edicion y control operativo de empresas."
         badge="Gobierno SaaS"
         action={
+          <PermissionGate permission="tenants.create">
           <FormDialog
             open={open}
             onOpenChange={(value) => {
@@ -164,10 +184,9 @@ export default function TenantsPage() {
               }
             }}
             title={editing ? "Editar empresa" : "Crear empresa"}
-            description="Administra el perfil de empresa y su configuracion base."
             trigger={<Button onClick={() => setOpen(true)}>Nueva empresa</Button>}
           >
-            <form className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
+            <form id="tenant-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nombre</Label>
@@ -181,7 +200,7 @@ export default function TenantsPage() {
                   <Label>Plan</Label>
                   <FormSelect
                     className="h-11 rounded-2xl"
-                    value={form.watch("plan")}
+                    value={selectedPlan}
                     onValueChange={(v) => form.setValue("plan", v as "starter" | "growth" | "enterprise")}
                     options={(["starter", "growth", "enterprise"] as PlanTier[]).map((plan) => ({ label: plan, value: plan }))}
                   />
@@ -190,7 +209,7 @@ export default function TenantsPage() {
                   <Label>Estado</Label>
                   <FormSelect
                     className="h-11 rounded-2xl"
-                    value={form.watch("status")}
+                    value={selectedStatus}
                     onValueChange={(v) => form.setValue("status", v as "active" | "trial" | "suspended")}
                     options={[
                       { label: "activo", value: "active" },
@@ -209,7 +228,7 @@ export default function TenantsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Modulos habilitados</Label>
+                <Label>Módulos habilitados</Label>
                 <div className="flex flex-wrap gap-2">
                   {moduleOptions.map((module) => {
                     const enabled = selectedModules.includes(module);
@@ -242,90 +261,175 @@ export default function TenantsPage() {
               </div>
             </form>
           </FormDialog>
+          </PermissionGate>
         }
       />
 
       <FilterToolbar
-        searchPlaceholder="Buscar por empresa, slug, plan o estado"
+        searchPlaceholder="Buscar empresa, plan o estado"
         options={[
           { label: "Todos", value: "" },
           { label: "Activos", value: "active" },
           { label: "Prueba", value: "trial" },
           { label: "Empresarial", value: "enterprise" },
         ]}
-        activeValue={query}
-        onChange={setQuery}
+        searchValue={query}
+        onSearchChange={setQuery}
+        filterValue={activeFilter}
+        onFilterChange={setActiveFilter}
       />
 
-      <CrudPanel>
-        {filtered.length === 0 ? (
+      {filtered.length === 0 ? (
+        <CrudPanel>
           <StateCard
             tone="empty"
             title="No hay empresas visibles"
             description="Ajusta el filtro o crea una nueva empresa para comenzar."
           />
-        ) : (
-          <DomainTable
-            data={filtered}
-            getKey={(tenant) => tenant.id}
-            exportable
-            columns={[
-              { key: "name", header: "Empresa", render: (tenant) => tenant.name, sortable: true },
-              { key: "slug", header: "Slug", render: (tenant) => tenant.slug, sortable: true },
-              { key: "plan", header: "Plan", render: (tenant) => tenant.plan, sortable: true },
-              {
-                key: "status",
-                header: "Estado",
-                render: (tenant) => (
-                  <Badge variant="secondary">{tenantStatusLabels[tenant.status ?? "active"]}</Badge>
-                ),
-                sortable: true,
-              },
-              {
-                key: "modules",
-                header: "Modulos",
-                render: (tenant) => `${tenant.enabledModules.length} activos`,
-              },
-              {
-                key: "actions",
-                header: "Acciones",
-                render: (tenant) => (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setEditing(tenant);
-                        form.reset({
-                          name: tenant.name,
-                          slug: tenant.slug,
-                          plan: tenant.plan,
-                          status: tenant.status ?? "active",
-                          supportEmail: tenant.branding.supportEmail,
-                          accent: tenant.branding.accent,
-                          enabledModules: tenant.enabledModules,
-                        });
-                        setOpen(true);
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => setDeleting(tenant)}>
-                      Eliminar
-                    </Button>
+        </CrudPanel>
+      ) : (
+        <div className="grid gap-x-6 gap-y-8 2xl:gap-x-8 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.72fr)]">
+          <CrudPanel>
+            <DomainTable
+              data={filtered}
+              getKey={(tenant) => tenant.id}
+              exportable
+              tableClassName="table-fixed text-[13px] [&_th]:px-2.5 [&_td]:px-2.5"
+              columns={[
+                {
+                  key: "name",
+                  header: "Empresa",
+                  render: (tenant) => tenant.name,
+                  sortable: true,
+                  headerClassName: "w-[15%]",
+                  cellClassName: "break-words",
+                },
+                {
+                  key: "slug",
+                  header: "Slug",
+                  render: (tenant) => tenant.slug,
+                  sortable: true,
+                  headerClassName: "w-[14%]",
+                  cellClassName: "break-words",
+                },
+                {
+                  key: "plan",
+                  header: "Plan",
+                  render: (tenant) => tenant.plan,
+                  sortable: true,
+                  headerClassName: "w-[9%]",
+                },
+                {
+                  key: "branches",
+                  header: "Sucursales",
+                  sortable: true,
+                  render: (tenant) => tenant.branchCount ?? 0,
+                  headerClassName: "w-[9%]",
+                },
+                {
+                  key: "subscription",
+                  header: "Suscripción",
+                  sortable: true,
+                  render: (tenant) =>
+                    (subscriptionsQuery.data ?? []).find((subscription) => subscription.tenantId === tenant.id)?.status ?? "Sin registro",
+                  headerClassName: "w-[11%]",
+                },
+                {
+                  key: "supportEmail",
+                  header: "Soporte",
+                  render: (tenant) => tenant.branding.supportEmail,
+                  headerClassName: "w-[21%]",
+                  cellClassName: "break-all",
+                },
+                {
+                  key: "actions",
+                  header: "Acciones",
+                  headerClassName: "w-[21%]",
+                  render: (tenant) => (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <PermissionGate permission="tenants.update"><Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditing(tenant);
+                          form.reset({
+                            name: tenant.name,
+                            slug: tenant.slug,
+                            plan: tenant.plan,
+                            status: tenant.status ?? "active",
+                            supportEmail: tenant.branding.supportEmail,
+                            accent: tenant.branding.accent,
+                            enabledModules: tenant.enabledModules,
+                          });
+                          setOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button></PermissionGate>
+                      <PermissionGate permission="tenants.update"><Button size="sm" variant="destructive" onClick={() => setDeleting(tenant)}>
+                        Eliminar
+                      </Button></PermissionGate>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSelectedTenantId(tenant.id)}
+                      >
+                        Ver detalle
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </CrudPanel>
+
+          {selectedTenant ? (
+            <SectionCard title={selectedTenant.name} subtitle="Detalle de empresa" className="self-start">
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Resumen</p>
+                      <h3 className="text-xl font-semibold tracking-tight text-foreground">{selectedTenant.name}</h3>
+                      <p className="text-xs text-muted-foreground">{selectedTenant.slug} · {selectedTenant.branding.supportEmail}</p>
+                    </div>
+                    <Badge variant="secondary">{tenantStatusLabels[selectedTenant.status ?? "active"]}</Badge>
                   </div>
-                ),
-              },
-            ]}
-          />
-        )}
-      </CrudPanel>
+                </div>
+
+                <InfoList
+                  items={[
+                    { title: "Plan", description: selectedSubscription?.plan ?? selectedTenant.plan, badge: selectedSubscription?.billingCycle === "annual" ? "Anual" : "Mensual" },
+                    { title: "Suscripción", description: selectedSubscription?.status ?? "Sin suscripción", badge: selectedSubscription?.renewalDate ?? "Pendiente" },
+                    { title: "Sucursales", description: `${selectedTenant.branchCount ?? 0} registradas`, badge: `${selectedTenant.employeeCount ?? 0} personas` },
+                    { title: "Módulos", description: `${selectedTenant.enabledModules.length} activos`, badge: selectedTenant.plan },
+                  ]}
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  {selectedTenant.enabledModules.slice(0, 6).map((module) => (
+                    <Badge key={module} variant="outline" className="rounded-full">
+                      {moduleLabels[module]}
+                    </Badge>
+                  ))}
+                  {selectedTenant.enabledModules.length > 6 ? (
+                    <Badge variant="outline" className="rounded-full">
+                      +{selectedTenant.enabledModules.length - 6}
+                    </Badge>
+                  ) : null}
+                </div>
+
+              </div>
+            </SectionCard>
+          ) : null}
+        </div>
+      )}
 
       <ConfirmDeleteDialog
         open={Boolean(deleting)}
         onOpenChange={(value) => !value && setDeleting(null)}
         title="Eliminar empresa"
-        description={`Esta accion eliminara ${deleting?.name ?? "la empresa"} y sus datos asociados del entorno local.`}
+        description={`Se eliminara ${deleting?.name ?? "la empresa"}.`}
         pending={deleteMutation.isPending}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
       />

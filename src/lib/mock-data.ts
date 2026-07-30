@@ -35,39 +35,6 @@ import type {
   UserDto,
 } from "@/lib/contracts";
 
-export type NavItem = {
-  href: string;
-  label: string;
-  group: "General" | "RRHH" | "Operacion" | "Gobierno SaaS" | "Empresa";
-  module: ModuleKey;
-  permission: PermissionKey;
-  audience: "shared" | "saas" | "tenant";
-};
-
-export const appNavigation: NavItem[] = [
-  { href: "/dashboard", label: "Panel principal", group: "General", module: "dashboard", permission: "dashboard.view", audience: "shared" },
-  { href: "/notifications", label: "Notificaciones", group: "General", module: "notifications", permission: "notifications.view", audience: "shared" },
-  { href: "/reports", label: "Reportes", group: "General", module: "reports", permission: "reports.view", audience: "shared" },
-  { href: "/profile", label: "Perfil", group: "General", module: "profile", permission: "profile.view", audience: "shared" },
-  { href: "/ats/vacancies", label: "Vacantes", group: "RRHH", module: "ats", permission: "ats.view", audience: "shared" },
-  { href: "/ats/candidates", label: "Postulantes", group: "RRHH", module: "ats", permission: "ats.view", audience: "shared" },
-  { href: "/ats/interviews", label: "Entrevistas", group: "RRHH", module: "ats", permission: "ats.view", audience: "shared" },
-  { href: "/onboarding/documents", label: "Documentos", group: "RRHH", module: "onboarding", permission: "onboarding.view", audience: "shared" },
-  { href: "/onboarding/signatures", label: "Firma electronica", group: "RRHH", module: "onboarding", permission: "onboarding.view", audience: "shared" },
-  { href: "/training", label: "Capacitacion", group: "RRHH", module: "training", permission: "training.view", audience: "shared" },
-  { href: "/training/evaluations", label: "Evaluaciones", group: "RRHH", module: "training", permission: "training.view", audience: "shared" },
-  { href: "/productivity", label: "Productividad IA", group: "Operacion", module: "productivity", permission: "productivity.view", audience: "shared" },
-  { href: "/inventory", label: "Inventario", group: "Operacion", module: "inventory", permission: "inventory.view", audience: "shared" },
-  { href: "/admin", label: "Centro administrativo", group: "Empresa", module: "admin", permission: "admin.view", audience: "shared" },
-  { href: "/admin/users", label: "Usuarios", group: "Empresa", module: "admin", permission: "admin.users", audience: "tenant" },
-  { href: "/admin/branches", label: "Sucursales", group: "Empresa", module: "admin", permission: "admin.company", audience: "tenant" },
-  { href: "/admin/roles", label: "Roles y permisos", group: "Empresa", module: "admin", permission: "admin.roles", audience: "tenant" },
-  { href: "/admin/company", label: "Configuracion empresa", group: "Empresa", module: "admin", permission: "admin.company", audience: "tenant" },
-  { href: "/admin/tenants", label: "Empresas", group: "Gobierno SaaS", module: "admin", permission: "admin.view", audience: "saas" },
-  { href: "/admin/modules", label: "Modulos", group: "Gobierno SaaS", module: "admin", permission: "admin.company", audience: "saas" },
-  { href: "/admin/subscription", label: "Planes y suscripciones", group: "Gobierno SaaS", module: "admin", permission: "admin.subscription", audience: "saas" },
-];
-
 export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
   admin_saas: [
     "dashboard.view",
@@ -88,6 +55,19 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "reports.view",
     "notifications.view",
     "profile.view",
+    "platform.tenant.impersonate",
+  ],
+  admin_plataforma: [
+    "dashboard.view",
+    "admin.view",
+    "admin.users",
+    "admin.roles",
+    "admin.company",
+    "admin.subscription",
+    "reports.view",
+    "notifications.view",
+    "profile.view",
+    "platform.tenant.switch",
   ],
   admin_empresa: [
     "dashboard.view",
@@ -121,7 +101,10 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "notifications.view",
     "profile.view",
   ],
-  lider_area: [
+  reclutador: ["dashboard.view", "ats.view", "ats.manage", "reports.view", "notifications.view", "profile.view"],
+  entrevistador: ["dashboard.view", "ats.view", "notifications.view", "profile.view"],
+  instructor: ["dashboard.view", "training.view", "training.manage", "reports.view", "notifications.view", "profile.view"],
+  supervisor: [
     "dashboard.view",
     "ats.view",
     "training.view",
@@ -131,7 +114,9 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "notifications.view",
     "profile.view",
   ],
-  empleado: ["dashboard.view", "training.view", "notifications.view", "profile.view"],
+  encargado_inventario: ["dashboard.view", "inventory.view", "inventory.manage", "reports.view", "notifications.view", "profile.view"],
+  empleado: ["dashboard.view", "onboarding.view", "training.view", "inventory.view", "notifications.view", "profile.view"],
+  candidato: ["profile.view", "notifications.view"],
 };
 
 export const mockTenants: TenantDto[] = [
@@ -243,7 +228,7 @@ export const mockRoleDefinitions: RoleDefinitionDto[] = [
     tenantId: "tenant-3",
     name: "Supervisor",
     scope: "module",
-    permissions: rolePermissions.lider_area,
+    permissions: rolePermissions.supervisor,
     members: 3,
   },
 ];
@@ -291,6 +276,17 @@ export const mockModuleAssignments: ModuleAssignmentDto[] = mockTenants.flatMap(
 );
 
 export const mockUsers: UserDto[] = [
+  { id: "e2e-superadmin", fullName: "E2E Superadmin", email: "e2e.superadmin@example.test", role: "admin_saas", tenantId: "tenant-1", status: "active" },
+  { id: "e2e-platform-admin", fullName: "E2E Platform Admin", email: "e2e.platform-admin@example.test", role: "admin_plataforma", tenantId: "tenant-1", status: "active" },
+  { id: "e2e-tenant-admin", fullName: "E2E Tenant Admin", email: "e2e.tenant-admin@example.test", role: "admin_empresa", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-hr-manager", fullName: "E2E HR Manager", email: "e2e.hr-manager@example.test", role: "rrhh", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-recruiter", fullName: "E2E Recruiter", email: "e2e.recruiter@example.test", role: "reclutador", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-interviewer", fullName: "E2E Interviewer", email: "e2e.interviewer@example.test", role: "entrevistador", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-instructor", fullName: "E2E Instructor", email: "e2e.instructor@example.test", role: "instructor", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-supervisor", fullName: "E2E Supervisor", email: "e2e.supervisor@example.test", role: "supervisor", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-inventory-manager", fullName: "E2E Inventory Manager", email: "e2e.inventory-manager@example.test", role: "encargado_inventario", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-branch-user", fullName: "E2E Branch User", email: "e2e.branch-user@example.test", role: "empleado", tenantId: "tenant-2", status: "active" },
+  { id: "e2e-candidate", fullName: "E2E Candidate", email: "e2e.candidate@example.test", role: "candidato", tenantId: "tenant-2", status: "active" },
   {
     id: "user-0",
     fullName: "Ava Thompson",
@@ -311,7 +307,7 @@ export const mockUsers: UserDto[] = [
     id: "user-7",
     fullName: "Sophia Patel",
     email: "sophia.patel@talentoscloud.com",
-    role: "lider_area",
+    role: "supervisor",
     tenantId: "tenant-1",
     status: "active",
   },
@@ -351,7 +347,7 @@ export const mockUsers: UserDto[] = [
     id: "user-3",
     fullName: "Jordan Blake",
     email: "jordan.blake@gulfshorelogistics.com",
-    role: "lider_area",
+    role: "supervisor",
     tenantId: "tenant-3",
     status: "invited",
   },
@@ -391,7 +387,7 @@ export const marketingModules = [
   },
   {
     title: "Inventario y activos",
-    copy: "Stock, movimientos, mantenimiento y asignacion de herramientas o equipos a empleados.",
+    copy: "Stock, movimientos, mantenimiento y asignación de herramientas o equipos a empleados.",
   },
   {
     title: "Administracion multiempresa",
@@ -689,7 +685,7 @@ export const candidateApplications: CandidateApplicationDto[] = [
     timeline: [
       {
         id: "application-1-t1",
-        title: "Postulacion enviada",
+        title: "Postulación enviada",
         description: "Tu perfil fue recibido correctamente junto con tu CV.",
         date: "11 jul 2026",
         status: "completed",
@@ -733,7 +729,7 @@ export const candidateApplications: CandidateApplicationDto[] = [
       {
         id: "application-1-m2",
         from: "Equipo TalentOS Cloud USA",
-        title: "Postulacion recibida",
+        title: "Postulación recibida",
         body: "Gracias por aplicar. Tu experiencia ya esta siendo revisada por el equipo de reclutamiento.",
         date: "11 jul 2026 · 9:45 AM ET",
         unread: false,
@@ -756,7 +752,7 @@ export const candidateApplications: CandidateApplicationDto[] = [
     timeline: [
       {
         id: "application-2-t1",
-        title: "Postulacion enviada",
+        title: "Postulación enviada",
         description: "La vacante recibio tu informacion y tus datos de contacto.",
         date: "09 jul 2026",
         status: "completed",
@@ -831,7 +827,7 @@ export const onboardingActorChecklists = {
   ],
   compliance: [
     { title: "Validar antecedentes regulatorios", description: "Confirmar verificacion y politicas obligatorias antes del alta.", badge: "Cumplimiento" },
-    { title: "Revisar constancias OSHA / HIPAA", description: "El expediente debe quedar trazable para auditoria interna.", badge: "Vence 17 jul" },
+    { title: "Revisar constancias OSHA / HIPAA", description: "El expediente debe quedar trazable para auditoría interna.", badge: "Vence 17 jul" },
     { title: "Marcar expediente auditable", description: "Sin esta marca, el colaborador no debe quedar en estado listo.", badge: "Bloquea dia 1" },
   ],
 } as const;
@@ -1046,7 +1042,7 @@ export const onboardingProgressByOwner: OnboardingOwnerProgressDto[] = [
   {
     owner: "Supervisor",
     progress: "88%",
-    blocker: "1 asignacion de equipo pendiente",
+    blocker: "1 asignación de equipo pendiente",
     deadline: "17 jul 2026",
   },
   {
@@ -1120,7 +1116,7 @@ export const inventoryActivations: InventoryActivationDto[] = [
     employeeName: "Lauren Bennett",
     item: "Laptop corporativa + kit de acceso",
     branch: "Miami, FL",
-    status: "Pendiente asignacion",
+    status: "Pendiente de asignación",
     dueLabel: "Antes del dia 1",
   },
   {
@@ -1237,7 +1233,7 @@ export const users = [
 export const notifications = [
   { title: "Firma completada", meta: "Paquete laboral firmado por Natalie Brooks en Orlando", kind: "success" },
   { title: "Alerta de stock bajo", meta: "Los escaneres portatiles estan por debajo del umbral en Jacksonville", kind: "warning" },
-  { title: "Nueva postulacion", meta: "19 nuevas postulaciones para Supervisor de operaciones de almacen", kind: "info" },
+  { title: "Nueva postulación", meta: "19 nuevas postulaciones para Supervisor de operaciones de almacén", kind: "info" },
 ];
 
 export const reports = [
@@ -1249,7 +1245,7 @@ export const reports = [
 export const automationJourneys: AutomationJourneyDto[] = [
   {
     title: "Alta de colaborador",
-    description: "Cuando una vacante pasa a contratado, se dispara la incorporacion documental, la asignacion inicial de activos y la ruta formativa obligatoria.",
+    description: "Cuando una vacante pasa a contratado, comienza la incorporación documental, la asignación inicial de activos y la formación obligatoria.",
     systems: "ATS → Incorporacion → Inventario → Capacitacion",
     status: "Activo",
   },

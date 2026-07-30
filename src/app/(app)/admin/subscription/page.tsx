@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import type { PlanTier, SubscriptionDto } from "@/lib/contracts";
 import { createSubscription, deleteSubscription, fetchSubscriptions, fetchTenants, updateSubscription } from "@/lib/backend";
 import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
-import { DomainTable, FilterToolbar, StateCard } from "@/components/domain";
+import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,11 @@ import { FormSelect } from "@/components/ui/form-select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
 import { useAppStore } from "@/store/app-store";
+import { Badge } from "@/components/ui/badge";
+import { InfoList, SectionCard } from "@/components/ui";
+import { moduleLabels } from "@/lib/ui-labels";
+import { AsyncState } from "@/components/async-state";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
 const subscriptionSchema = z.object({
   tenantId: z.string().min(1),
@@ -36,9 +41,11 @@ export default function SubscriptionPage() {
   const tenantsQuery = useQuery({ queryKey: ["admin-tenants"], queryFn: fetchTenants });
   const subscriptionsQuery = useQuery({ queryKey: ["subscriptions"], queryFn: fetchSubscriptions });
   const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SubscriptionDto | null>(null);
   const [deleting, setDeleting] = useState<SubscriptionDto | null>(null);
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState("");
 
   const form = useForm<SubscriptionFormInput, unknown, SubscriptionFormValues>({
     resolver: zodResolver(subscriptionSchema),
@@ -51,56 +58,67 @@ export default function SubscriptionPage() {
       renewalDate: "2026-08-01",
     },
   });
+  useUnsavedChanges(open && form.formState.isDirty, "subscription-form");
+  const formValues = useWatch({ control: form.control });
 
   const filtered = useMemo(
     () =>
       (subscriptionsQuery.data ?? []).filter((subscription) =>
-        [subscription.plan, subscription.billingCycle, subscription.status]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
+        matchesSearchAndFilter([
+          subscription.plan,
+          subscription.billingCycle,
+          subscription.status,
+          tenantsQuery.data?.find((tenant) => tenant.id === subscription.tenantId)?.name ?? "",
+        ], query, activeFilter),
       ),
-    [query, subscriptionsQuery.data],
+    [activeFilter, query, subscriptionsQuery.data, tenantsQuery.data],
   );
+
+  const selectedSubscription =
+    filtered.find((subscription) => subscription.id === selectedSubscriptionId) ?? filtered[0] ?? null;
+  const selectedTenant = tenantsQuery.data?.find((tenant) => tenant.id === selectedSubscription?.tenantId) ?? null;
 
   const saveMutation = useMutation({
     mutationFn: (values: SubscriptionFormValues) =>
       editing ? updateSubscription(editing.id, values) : createSubscription(values),
     onSuccess: () => {
-      toast.success(editing ? "Suscripcion actualizada" : "Suscripcion creada");
+      toast.success(editing ? "Suscripción actualizada" : "Suscripción creada");
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       setOpen(false);
       setEditing(null);
       form.reset();
     },
-    onError: () => toast.error("Error al guardar la suscripcion"),
+    onError: () => toast.error("Error al guardar la suscripción"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteSubscription,
     onSuccess: () => {
-      toast.success("Suscripcion eliminada");
+      toast.success("Suscripción eliminada");
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       setDeleting(null);
     },
-    onError: () => toast.error("Error al eliminar la suscripcion"),
+    onError: () => toast.error("Error al eliminar la suscripción"),
   });
 
   if (!can("admin.subscription")) {
     return (
       <StateCard
         tone="restricted"
-        title="Sin acceso a suscripciones"
+        title="Sin acceso a suscripciónes"
         description="El rol actual no puede gestionar planes, ciclos ni renovaciones."
       />
     );
   }
 
+  if (subscriptionsQuery.isLoading || tenantsQuery.isLoading) return <AsyncState state="loading" title="Cargando suscripciónes" />;
+  if (subscriptionsQuery.isError || tenantsQuery.isError) return <AsyncState state="error" title="No fue posible cargar las suscripciónes" onRetry={() => { void subscriptionsQuery.refetch(); void tenantsQuery.refetch(); }} />;
+
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de suscripciones"
-        description="Consulta, crea, modifica y elimina suscripciones por empresa, incluyendo plan, facturacion y renovacion."
+        title="Gestion de suscripciónes"
+        description="Control de plan, ciclo, precio y renovacion."
         badge="Gobierno SaaS"
         action={
           <FormDialog
@@ -112,17 +130,26 @@ export default function SubscriptionPage() {
                 form.reset();
               }
             }}
-            title={editing ? "Editar suscripcion" : "Crear suscripcion"}
-            description="Administra el plan contratado y su ciclo comercial."
-            trigger={<Button onClick={() => setOpen(true)}>Nueva suscripcion</Button>}
+            title={editing ? "Editar suscripción" : "Crear suscripción"}
+            trigger={<Button onClick={() => {
+              form.reset({
+                tenantId: tenantsQuery.data?.[0]?.id ?? "",
+                plan: "starter",
+                billingCycle: "monthly",
+                status: "active",
+                price: 0,
+                renewalDate: "2026-08-01",
+              });
+              setOpen(true);
+            }}>Nueva suscripción</Button>}
           >
-            <form className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
+            <form id="subscription-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="space-y-2">
                 <Label>Empresa</Label>
                 <FormSelect
                   className="h-11 w-full rounded-2xl"
                   placeholder="Selecciona empresa"
-                  value={form.watch("tenantId")}
+                  value={formValues.tenantId}
                   onValueChange={(v) => form.setValue("tenantId", v)}
                   options={(tenantsQuery.data ?? []).map((tenant) => ({ label: tenant.name, value: tenant.id }))}
                 />
@@ -132,7 +159,7 @@ export default function SubscriptionPage() {
                   <Label>Plan</Label>
                   <FormSelect
                     className="h-11 w-full rounded-2xl"
-                    value={form.watch("plan")}
+                    value={formValues.plan}
                     onValueChange={(v) => form.setValue("plan", v as "starter" | "growth" | "enterprise")}
                     options={(["starter", "growth", "enterprise"] as PlanTier[]).map((plan) => ({ label: plan, value: plan }))}
                   />
@@ -141,7 +168,7 @@ export default function SubscriptionPage() {
                   <Label>Ciclo</Label>
                   <FormSelect
                     className="h-11 w-full rounded-2xl"
-                    value={form.watch("billingCycle")}
+                    value={formValues.billingCycle}
                     onValueChange={(v) => form.setValue("billingCycle", v as "monthly" | "annual")}
                     options={[
                       { label: "mensual", value: "monthly" },
@@ -153,7 +180,7 @@ export default function SubscriptionPage() {
                   <Label>Estado</Label>
                   <FormSelect
                     className="h-11 w-full rounded-2xl"
-                    value={form.watch("status")}
+                    value={formValues.status}
                     onValueChange={(v) => form.setValue("status", v as "active" | "trial" | "past_due")}
                     options={[
                       { label: "activa", value: "active" },
@@ -169,7 +196,7 @@ export default function SubscriptionPage() {
               </div>
               <DatePicker
                 label="Renovacion"
-                value={form.watch("renewalDate")}
+                value={formValues.renewalDate}
                 onChange={(v) => form.setValue("renewalDate", v)}
               />
               <div className="flex justify-end gap-3">
@@ -185,76 +212,135 @@ export default function SubscriptionPage() {
         }
       />
       <FilterToolbar
-        searchPlaceholder="Buscar por plan, ciclo o estado"
+        searchPlaceholder="Buscar empresa, plan o estado"
         options={[
           { label: "Todas", value: "" },
           { label: "Activas", value: "active" },
           { label: "Prueba", value: "trial" },
           { label: "Anual", value: "annual" },
         ]}
-        activeValue={query}
-        onChange={setQuery}
+        searchValue={query}
+        onSearchChange={setQuery}
+        filterValue={activeFilter}
+        onFilterChange={setActiveFilter}
       />
-      <CrudPanel>
-        <DomainTable exportable
-          data={filtered}
-          getKey={(subscription) => subscription.id}
-          columns={[
-            {
-              key: "tenant",
-              header: "Empresa",
-              sortable: true,
-              render: (subscription) =>
-                tenantsQuery.data?.find((tenant) => tenant.id === subscription.tenantId)?.name ??
-                subscription.tenantId,
-            },
-            { key: "plan", header: "Plan", sortable: true, render: (subscription) => subscription.plan },
-            {
-              key: "cycle",
-              header: "Ciclo",
-              sortable: true,
-              render: (subscription) => (subscription.billingCycle === "monthly" ? "Mensual" : "Anual"),
-            },
-            {
-              key: "status",
-              header: "Estado",
-              sortable: true,
-              render: (subscription) =>
-                subscription.status === "past_due"
-                  ? "Vencida"
-                  : tenantStatusLabels[subscription.status],
-            },
-            { key: "price", header: "Precio", sortable: true, render: (subscription) => `$${subscription.price}` },
-            {
-              key: "actions",
-              header: "Acciones",
-              render: (subscription) => (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setEditing(subscription);
-                      form.reset(subscription);
-                      setOpen(true);
-                    }}
-                  >
-                    Editar
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => setDeleting(subscription)}>
-                    Eliminar
-                  </Button>
+      {filtered.length === 0 ? (
+        <CrudPanel>
+          <StateCard
+            tone="empty"
+            title="No hay suscripciónes visibles"
+            description="Ajusta el filtro o crea una suscripción para comenzar."
+          />
+        </CrudPanel>
+      ) : (
+        <div className="grid gap-x-6 gap-y-8 2xl:gap-x-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.75fr)]">
+          <CrudPanel>
+            <DomainTable exportable
+              data={filtered}
+              getKey={(subscription) => subscription.id}
+              onSelect={(subscription) => setSelectedSubscriptionId(subscription.id)}
+              columns={[
+                {
+                  key: "tenant",
+                  header: "Empresa",
+                  sortable: true,
+                  render: (subscription) =>
+                    tenantsQuery.data?.find((tenant) => tenant.id === subscription.tenantId)?.name ??
+                    subscription.tenantId,
+                },
+                { key: "plan", header: "Plan", sortable: true, render: (subscription) => subscription.plan },
+                {
+                  key: "branches",
+                  header: "Sucursales",
+                  sortable: true,
+                  render: (subscription) =>
+                    tenantsQuery.data?.find((tenant) => tenant.id === subscription.tenantId)?.branchCount ?? 0,
+                },
+                {
+                  key: "cycle",
+                  header: "Ciclo",
+                  sortable: true,
+                  render: (subscription) => (subscription.billingCycle === "monthly" ? "Mensual" : "Anual"),
+                },
+                {
+                  key: "status",
+                  header: "Estado",
+                  sortable: true,
+                  render: (subscription) =>
+                    subscription.status === "past_due"
+                      ? "Vencida"
+                      : tenantStatusLabels[subscription.status],
+                },
+                { key: "price", header: "Precio", sortable: true, render: (subscription) => `$${subscription.price}` },
+                {
+                  key: "actions",
+                  header: "Acciones",
+                  render: (subscription) => (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditing(subscription);
+                          form.reset(subscription);
+                          setOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => setDeleting(subscription)}>
+                        Eliminar
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </CrudPanel>
+
+          {selectedSubscription ? (
+            <SectionCard title={selectedTenant?.name ?? "Suscripción"} subtitle="Detalle de suscripción" className="self-start">
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cobertura</p>
+                    <h3 className="text-xl font-semibold tracking-tight text-foreground">{selectedSubscription.plan}</h3>
+                    <p className="text-xs text-muted-foreground">{selectedTenant?.branding.supportEmail ?? "Sin correo"} · {selectedSubscription.renewalDate}</p>
+                  </div>
                 </div>
-              ),
-            },
-          ]}
-        />
-      </CrudPanel>
+
+                <InfoList
+                  items={[
+                    { title: "Empresa", description: selectedTenant?.name ?? "Sin empresa", badge: selectedTenant?.status ?? "Sin estado" },
+                    { title: "Ciclo", description: selectedSubscription.billingCycle === "monthly" ? "Mensual" : "Anual", badge: `$${selectedSubscription.price}` },
+                    { title: "Cobertura", description: `${selectedTenant?.branchCount ?? 0} sucursales`, badge: `${selectedTenant?.employeeCount ?? 0} personas` },
+                    { title: "Estado", description: selectedSubscription.status === "past_due" ? "Vencida" : tenantStatusLabels[selectedSubscription.status], badge: selectedTenant?.plan ?? selectedSubscription.plan },
+                  ]}
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  {(selectedTenant?.enabledModules ?? []).slice(0, 6).map((module) => (
+                    <Badge key={module} variant="outline" className="rounded-full">
+                      {moduleLabels[module]}
+                    </Badge>
+                  ))}
+                  {(selectedTenant?.enabledModules.length ?? 0) > 6 ? (
+                    <Badge variant="outline" className="rounded-full">
+                      +{(selectedTenant?.enabledModules.length ?? 0) - 6}
+                    </Badge>
+                  ) : null}
+                </div>
+
+              </div>
+            </SectionCard>
+          ) : null}
+        </div>
+      )}
       <ConfirmDeleteDialog
         open={Boolean(deleting)}
         onOpenChange={(value) => !value && setDeleting(null)}
-        title="Eliminar suscripcion"
-        description={`Se eliminara la suscripcion ${deleting?.id ?? ""}.`}
+        title="Eliminar suscripción"
+        description={`Se eliminara la suscripción ${deleting?.id ?? ""}.`}
         pending={deleteMutation.isPending}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
       />

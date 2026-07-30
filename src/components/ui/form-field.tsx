@@ -7,6 +7,7 @@ type FormFieldProps = {
   error?: string;
   required?: boolean;
   className?: string;
+  id?: string;
   children: (props: {
     id: string;
     "aria-describedby"?: string;
@@ -14,8 +15,9 @@ type FormFieldProps = {
   }) => ReactNode;
 };
 
-export function FormField({ label, error, required, className, children }: FormFieldProps) {
-  const id = useId();
+export function FormField({ label, error, required, className, children, id: providedId }: FormFieldProps) {
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
   const errorId = `${id}-error`;
 
   return (

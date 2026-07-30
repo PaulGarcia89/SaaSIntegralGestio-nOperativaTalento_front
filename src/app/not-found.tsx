@@ -12,7 +12,7 @@ export default function NotFound() {
             <FileQuestion className="size-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Pagina no encontrada</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Página no encontrada</h1>
             <p className="text-sm leading-7 text-muted-foreground">
               La ruta que intentas acceder no existe o fue movida. Verifica la URL o regresa al panel principal.
             </p>

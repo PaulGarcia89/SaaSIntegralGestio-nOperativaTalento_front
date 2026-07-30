@@ -41,7 +41,6 @@ import {
   automationJourneys,
   automationRules,
   automationQueue,
-  appNavigation,
   candidates,
   candidateApplications,
   candidateStructuredAssessments,
@@ -72,6 +71,7 @@ import {
   trainingActivations,
   vacancyHiringPlans,
 } from "@/lib/mock-data";
+import { appNavigation } from "@/lib/navigation";
 
 const wait = (ms = 160) => new Promise((resolve) => setTimeout(resolve, ms));
 const makeId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
@@ -294,7 +294,7 @@ function syncHiringMasterFlow(employeeName: string) {
       queueItem.nextAction = "Incorporacion y activo cerrados; ahora debe completar formacion obligatoria.";
     } else if (onboardingReady) {
       queueItem.status = "Incorporacion completa";
-      queueItem.nextAction = "Solo falta confirmar asignacion de activo para cerrar el flujo maestro.";
+      queueItem.nextAction = "Solo falta confirmar la asignación del activo para cerrar el flujo.";
     } else if (assetAssigned) {
       queueItem.status = "Activo asignado";
       queueItem.nextAction = "Solo falta completar la incorporacion para cerrar el flujo maestro.";
@@ -318,7 +318,7 @@ function syncHiringMasterFlow(employeeName: string) {
       eventItem.description = `${employeeName} completó la incorporacion y recibió su activo; la siguiente etapa es la formación obligatoria.`;
     } else if (onboardingReady) {
       eventItem.status = "Incorporacion completa";
-      eventItem.description = `${employeeName} ya completó la incorporacion; queda pendiente la asignacion final de activo.`;
+      eventItem.description = `${employeeName} ya completó la incorporación; queda pendiente la asignación final del activo.`;
     } else if (assetAssigned) {
       eventItem.status = "Activo asignado";
       eventItem.description = `${employeeName} ya tiene activo asignado; queda pendiente el cierre de la incorporacion.`;
@@ -756,7 +756,7 @@ export async function triggerCandidateHiringAutomation(candidateId: string) {
             ? "Escaner portatil + EPP"
             : "Laptop corporativa + accesos",
         branch: vacancy.location,
-        status: "Pendiente asignacion",
+        status: "Pendiente de asignación",
         dueLabel: "Antes del dia 1",
       },
       ...inventoryActivationsDb,
@@ -882,7 +882,7 @@ export async function triggerBranchTransferAutomation(personName: string, target
     {
       id: makeId("invact"),
       employeeName: personName,
-      item: "Reasignacion de activo y credenciales de sede",
+      item: "Reasignación de activo y credenciales de sede",
       branch: targetBranch.city,
       status: "Traslado pendiente",
       dueLabel: "Antes del cambio de turno",
@@ -1094,7 +1094,7 @@ export async function completeOnboardingAutomation(employeeName: string) {
   signaturePackage.nextAction = "Paquete documental completo y listo para cierre operativo.";
 
   readiness.readiness = "92%";
-  readiness.blocker = "Esperando asignacion final de activo";
+  readiness.blocker = "Esperando la asignación final del activo";
   readiness.owner = "Inventario";
   readiness.dueDate = "Hoy";
   readiness.dayOneReady = "En riesgo";
@@ -1132,7 +1132,7 @@ export async function confirmInventoryAssignmentAutomation(employeeName: string)
   const activation = inventoryActivationsDb.find((item) => item.employeeName === employeeName);
 
   if (!activation) {
-    throw new Error("No se pudo confirmar la asignacion del activo");
+    throw new Error("No se pudo confirmar la asignación del activo");
   }
 
   activation.status = "Asignado";

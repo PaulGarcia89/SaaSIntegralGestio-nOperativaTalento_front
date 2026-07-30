@@ -16,6 +16,19 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Backend configuration
+
+Set `NEXT_PUBLIC_API_URL` to the real API base URL. Backend failures are surfaced to
+the interface by default and are not replaced with demonstration data.
+
+Mock fallback is intended only for explicit local demos. Enable it deliberately with:
+
+```bash
+NEXT_PUBLIC_ENABLE_MOCK_BACKEND=true
+```
+
+Do not enable mock fallback in production.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

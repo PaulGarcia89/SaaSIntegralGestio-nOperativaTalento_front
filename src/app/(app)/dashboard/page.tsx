@@ -1,162 +1,43 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchDashboardSummary } from "@/lib/mock-backend";
 import { useAppStore } from "@/store/app-store";
-import { MasterWorkflowCard } from "@/components/master-workflow-card";
-import { Badge } from "@/components/ui/badge";
+import type { RoleKey } from "@/lib/contracts";
+import { fetchApplications, fetchVacancies } from "@/lib/backend";
 import { Button } from "@/components/ui/button";
-import {
-  DataTable,
-  InfoList,
-  LoadingPanel,
-  ModuleHeader,
-  SectionCard,
-  SplitPanel,
-} from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineFeedback, MetricWithProvenance, PageHeader } from "@/components/design-system";
+
+const roleDashboard: Partial<Record<RoleKey, { title: string; items: Array<[string, string]> }>> = {
+  admin_empresa: { title: "Lo que requiere atención en tu empresa", items: [["Estado de la suscripción", "/admin/company/subscription"], ["Incorporaciones en curso", "/onboarding/documents"], ["Vacantes activas", "/ats/vacancies"], ["Inventario pendiente", "/inventory"]] },
+  rrhh: { title: "Lo que requiere atención en reclutamiento", items: [["Candidatos por revisar", "/ats/candidates"], ["Entrevistas próximas", "/ats/interviews"], ["Pipeline", "/ats/pipeline"], ["Documentos pendientes", "/onboarding/documents"]] },
+  reclutador: { title: "Lo que requiere atención en reclutamiento", items: [["Candidatos por revisar", "/ats/candidates"], ["Entrevistas próximas", "/ats/interviews"], ["Vacantes", "/ats/vacancies"], ["Pipeline", "/ats/pipeline"]] },
+  supervisor: { title: "Lo que requiere atención en tu equipo", items: [["Equipo", "/employees"], ["Productividad", "/productivity"], ["Activos asignados", "/inventory"], ["Alertas", "/notifications"]] },
+  empleado: { title: "Lo que requiere tu atención", items: [["Mi incorporación", "/onboarding/documents"], ["Mis cursos", "/training"], ["Mis documentos", "/onboarding/signatures"], ["Mis activos", "/inventory"]] },
+};
 
 export default function DashboardPage() {
-  const { currentTenant } = useAppStore();
-  const summaryQuery = useQuery({
-    queryKey: ["dashboard-summary", currentTenant.id],
-    queryFn: () => fetchDashboardSummary(currentTenant.id),
-  });
-
-  if (summaryQuery.isLoading || !summaryQuery.data) {
-    return <LoadingPanel />;
-  }
-
-  return (
-    <>
-      <ModuleHeader
-        eyebrow="Panel principal"
-        title="Un centro de mando moderno para reclutamiento, incorporacion y operaciones empresariales."
-        description="El espacio principal prioriza lo que requiere accion ahora en las operaciones de Florida, manteniendo consistencia entre movil, escritorio y visibilidad por empresa."
-        actions={
-          <Button asChild>
-            <Link href="/reports">Abrir reportes</Link>
-          </Button>
-        }
-        metrics={summaryQuery.data.kpis}
-      />
-
-      <div className="space-y-12 xl:space-y-14">
-        <MasterWorkflowCard />
-
-        <SplitPanel
-          left={
-            <SectionCard title="Embudo de reclutamiento" subtitle="ATS">
-              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
-                {summaryQuery.data.pipeline.map((stage) => (
-                  <article key={stage.name} className="rounded-3xl border border-border/70 bg-secondary/40 p-5">
-                    <p className="text-sm text-muted-foreground">{stage.name}</p>
-                    <strong className="mt-3 block text-3xl font-semibold">{stage.count}</strong>
-                  </article>
-                ))}
-              </div>
-            </SectionCard>
-          }
-          right={
-            <SectionCard title="Alertas de IA" subtitle="Inteligencia operativa">
-              <InfoList
-                items={summaryQuery.data.alerts.map((alert) => ({
-                  title: alert.title,
-                  description: alert.description,
-                  badge: alert.tone,
-                }))}
-              />
-            </SectionCard>
-          }
-        />
-
-        <SectionCard title="Reportes destacados" subtitle="Analitica">
-          <DataTable
-            columns={["Reporte", "Responsable", "Frecuencia"]}
-            rows={summaryQuery.data.reports.map((report) => [
-              report.name,
-              report.owner,
-              report.cadence,
-            ])}
-          />
-        </SectionCard>
-
-        <SplitPanel
-          left={
-            <SectionCard title="Automatizaciones entre modulos" subtitle="RRHH + Inventario + Capacitacion">
-              <InfoList
-                items={summaryQuery.data.automationJourneys.map((journey) => ({
-                  title: journey.title,
-                  description: `${journey.description} Sistemas: ${journey.systems}.`,
-                  badge: journey.status,
-                }))}
-              />
-            </SectionCard>
-          }
-          right={
-            <SectionCard title="Reglas activas y cola operativa" subtitle="Tareas disparadas">
-              <InfoList
-                items={summaryQuery.data.automationRules.map((rule) => ({
-                  title: rule.name,
-                  description: `${rule.trigger}. ${rule.scope}. ${rule.auditability}.`,
-                  badge: rule.status,
-                }))}
-              />
-
-              <div className="mt-5 space-y-3">
-                {summaryQuery.data.automationQueue.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">{item.name} · {item.trigger}</p>
-                        <p className="text-sm leading-6 text-muted-foreground">{item.nextAction}</p>
-                        <p className="text-sm text-muted-foreground">Responsable: {item.owner}</p>
-                      </div>
-                      <Badge variant={item.status === "Nuevo" ? "default" : "secondary"} className="rounded-full">
-                        {item.status ?? "Flujo"}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          }
-        />
-
-        <SectionCard title="Auditoria reciente de automatizaciones" subtitle="Trazabilidad ejecutada">
-          <div className="grid gap-4 xl:grid-cols-3">
-            {summaryQuery.data.automationAudit.map((entry) => (
-              <article key={entry.id} className="rounded-3xl border border-border/70 bg-secondary/20 p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">{entry.employeeName}</p>
-                    <p className="text-sm text-muted-foreground">{entry.branch}</p>
-                  </div>
-                  <Badge variant={entry.status === "Ejecutada" ? "secondary" : "outline"} className="rounded-full">
-                    {entry.status}
-                  </Badge>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground">{entry.ruleName}</p>
-                  <p className="text-sm leading-6 text-muted-foreground">{entry.summary}</p>
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                    {entry.executedAt} · {entry.actor}
-                  </p>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {entry.consequences.map((consequence) => (
-                    <Badge key={consequence} variant="outline" className="rounded-full">
-                      {consequence}
-                    </Badge>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        </SectionCard>
-      </div>
-    </>
-  );
+  const { currentRole, currentBranch, allowedNav, can, hasModule } = useAppStore();
+  const canReadAts = hasModule("ats") && can("ats.view");
+  const applications = useQuery({ queryKey: ["dashboard-applications", currentBranch?.id], queryFn: () => fetchApplications({ branchId: currentBranch?.id }), enabled: canReadAts && Boolean(currentBranch) });
+  const vacancies = useQuery({ queryKey: ["dashboard-vacancies", currentBranch?.id], queryFn: fetchVacancies, enabled: canReadAts && Boolean(currentBranch) });
+  const configuration = roleDashboard[currentRole] ?? { title: currentRole === "admin_saas" || currentRole === "admin_plataforma" ? "Lo que requiere atención en la plataforma" : "Lo que requiere tu atención", items: allowedNav.filter((item) => item.href !== "/dashboard" && item.href !== "/profile").slice(0, 4).map((item) => [item.label, item.href] as [string, string]) };
+  const visibleItems = configuration.items.filter(([, href]) => allowedNav.some((item) => item.href === href));
+  const applicationItems = applications.data?.data ?? [];
+  const vacancyItems = vacancies.data?.data ?? [];
+  const updatedAt = applications.dataUpdatedAt ? new Date(applications.dataUpdatedAt) : new Date();
+  const atsMetrics = [
+    { label: "Nuevas por revisar", value: applicationItems.filter((item) => item.status === "SUBMITTED").length, href: "/ats/pipeline?stage=SUBMITTED" },
+    { label: "En revisión", value: applicationItems.filter((item) => item.status === "REVIEWING").length, href: "/ats/pipeline?stage=REVIEWING" },
+    { label: "En entrevistas", value: applicationItems.filter((item) => item.status === "INTERVIEW").length, href: "/ats/pipeline?stage=INTERVIEW" },
+    { label: "Vacantes publicadas", value: vacancyItems.filter((item) => String(item.status).toUpperCase() === "OPEN" || String(item.status).toUpperCase() === "PUBLISHED").length, href: "/ats/vacancies" },
+  ];
+  return <div className="space-y-7">
+    <PageHeader eyebrow="Inicio personalizado" title={configuration.title} description="Prioriza tus siguientes acciones. Los contadores aparecerán únicamente cuando el resumen operativo real esté disponible." />
+    {canReadAts && applications.isSuccess && vacancies.isSuccess ? <section aria-label="Resumen real de reclutamiento" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{atsMetrics.map((metric) => <MetricWithProvenance key={metric.label} label={metric.label} value={metric.value} period="Estado actual de la sucursal" updatedAt={updatedAt} action={<Button asChild variant="secondary" className="w-full"><Link href={metric.href}>Revisar<ArrowRight className="size-4" /></Link></Button>} />)}</section> : <InlineFeedback tone="warning" title="Resumen operativo pendiente de integración">No mostramos métricas, alertas ni prioridades simuladas. Puedes entrar directamente a las áreas autorizadas.</InlineFeedback>}
+    {canReadAts && (applications.isError || vacancies.isError) ? <InlineFeedback tone="danger" title="No pudimos actualizar el resumen">Las áreas operativas siguen disponibles. Reintenta desde Candidatos o Vacantes.</InlineFeedback> : null}
+    <section aria-label="Accesos prioritarios" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{visibleItems.map(([label, href]) => <Card level={2} key={href}><CardHeader><CardTitle className="text-lg">{label}</CardTitle></CardHeader><CardContent><Button asChild variant="secondary" className="w-full"><Link href={href}>Abrir <ArrowRight className="size-4" /></Link></Button></CardContent></Card>)}</section>
+  </div>;
 }

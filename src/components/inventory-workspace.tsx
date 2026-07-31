@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRightLeft, Boxes, ClipboardCheck, History, PackageCheck, Plus, RotateCcw, UserRound } from "lucide-react";
 import {
@@ -28,6 +29,9 @@ const statusLabels: Record<InventoryAssetStatus, string> = {
 const conditions: InventoryAssetCondition[] = ["NEW", "GOOD", "FAIR", "DAMAGED"];
 
 export function InventoryWorkspace({ initialStatus = "", title = "Inventario y activos" }: { initialStatus?: InventoryAssetStatus | ""; title?: string }) {
+  const searchParams = useSearchParams();
+  const requestedEmployeeId = searchParams.get("employeeId") ?? "";
+  const requestedFlowId = searchParams.get("flowId") ?? "";
   const queryClient = useQueryClient();
   const { can, currentBranch } = useAppStore();
   const canManage = can("inventory.manage");
@@ -40,6 +44,7 @@ export function InventoryWorkspace({ initialStatus = "", title = "Inventario y a
   const assets = useQuery({ queryKey: ["inventory-assets", status, search, currentBranch?.id], queryFn: () => fetchInventoryAssets({ status: status || undefined, search: search || undefined, branchId: currentBranch?.id }) });
   const detail = useQuery({ queryKey: ["inventory-asset", selectedId], queryFn: () => fetchInventoryAsset(selectedId), enabled: Boolean(selectedId) });
   const selected = detail.data ?? assets.data?.find(asset => asset.id === selectedId) ?? assets.data?.[0] ?? null;
+  const requestedEmployee = context.data?.employees.find(employee => employee.id === requestedEmployeeId);
   const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["inventory-assets"] }), queryClient.invalidateQueries({ queryKey: ["inventory-asset"] }), queryClient.invalidateQueries({ queryKey: ["inventory-catalog"] })]); };
 
   const counts = useMemo(() => ({
@@ -51,6 +56,8 @@ export function InventoryWorkspace({ initialStatus = "", title = "Inventario y a
 
   return <div className="space-y-6">
     <PageHeader eyebrow="Operaciones" title={title} description="Controla catálogo, custodia, evidencia, transferencias y devoluciones con trazabilidad por activo." actions={canManage ? <div className="flex gap-2"><Button variant="secondary" onClick={() => setDialog("catalog")}><Plus className="size-4" />Categoría</Button><Button onClick={() => setDialog("asset")}><Plus className="size-4" />Registrar activo</Button></div> : undefined} />
+    {requestedEmployee ? <InlineFeedback tone="success" title="Empleado preseleccionado">{requestedEmployee.name}. Selecciona un activo disponible y usa “Asignar”; se conservará el vínculo con la incorporación {requestedFlowId}.</InlineFeedback> : null}
+    {requestedEmployeeId && context.isSuccess && !requestedEmployee ? <InlineFeedback tone="warning" title="Empleado fuera de alcance">El empleado solicitado no pertenece a la sucursal activa.</InlineFeedback> : null}
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumen de inventario"><Metric icon={Boxes} label="Activos visibles" value={counts.total} /><Metric icon={PackageCheck} label="Disponibles" value={counts.available} /><Metric icon={UserRound} label="En custodia" value={counts.assigned} /><Metric icon={ClipboardCheck} label="Requieren atención" value={counts.attention} /></section>
     <Card level={2}><CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_240px]"><div><Label htmlFor="asset-search">Buscar</Label><Input id="asset-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Etiqueta, serie o tipo de activo" /></div><div><Label htmlFor="asset-status">Estado</Label><Select value={status || "ALL"} onValueChange={value => setStatus(value === "ALL" ? "" : value)}><SelectTrigger id="asset-status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Todos</SelectItem>{Object.entries(statusLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></CardContent></Card>
     {assets.isLoading ? <AsyncState state="loading" title="Cargando activos" /> : null}
@@ -60,7 +67,7 @@ export function InventoryWorkspace({ initialStatus = "", title = "Inventario y a
       <section className="grid content-start gap-3 sm:grid-cols-2 2xl:grid-cols-3" aria-label="Activos">{assets.data.map(asset => <AssetCard key={asset.id} asset={asset} selected={asset.id === selected?.id} onClick={() => setSelectedId(asset.id)} />)}</section>
       {selected ? <AssetDetail asset={selected} loading={detail.isFetching} canManage={canManage} onAction={setDialog} /> : null}
     </div> : null}
-    <InventoryDialog kind={dialog} asset={selected} catalog={catalog.data ?? []} context={context.data} onClose={() => setDialog(null)} onSuccess={async () => { await refresh(); setDialog(null); }} />
+    <InventoryDialog kind={dialog} asset={selected} catalog={catalog.data ?? []} context={context.data} initialEmployeeId={requestedEmployee?.id} onClose={() => setDialog(null)} onSuccess={async () => { await refresh(); setDialog(null); }} />
   </div>;
 }
 
@@ -74,14 +81,14 @@ function AssetDetail({ asset, loading, canManage, onAction }: { asset: Inventory
     <Card level={2}><CardContent className="p-5"><div className="mb-4 flex items-center gap-2"><History className="size-4 text-primary" /><h3 className="font-semibold">Historial y trazabilidad</h3>{loading ? <span className="text-xs text-text-secondary">Actualizando…</span> : null}</div>{!moves.length ? <p className="text-sm text-text-secondary">Selecciona el activo para cargar su bitácora.</p> : <ol className="space-y-4">{moves.map(move => <li key={move.id} className="border-l-2 border-primary/25 pl-4"><p className="font-medium">{movementLabel(move.type)}</p><p className="text-xs text-text-secondary">{new Date(move.occurredAt).toLocaleString()} · {move.employee?.name || move.toBranch?.name || asset.branch.name}</p>{move.notes ? <p className="mt-1 text-sm text-text-secondary">{move.notes}</p> : null}{move.evidences.map(file => <button type="button" key={file.id} className="mt-2 block text-xs font-medium text-primary underline" onClick={() => void downloadInventoryEvidence(file.id, file.originalName)}>{file.originalName}</button>)}</li>)}</ol>}</CardContent></Card></aside>;
 }
 
-function InventoryDialog({ kind, asset, catalog, context, onClose, onSuccess }: { kind: string | null; asset: InventoryAssetDto | null; catalog: Array<{ id: string; name: string; sku: string }>; context?: Awaited<ReturnType<typeof fetchInventoryContext>>; onClose: () => void; onSuccess: () => Promise<void> }) {
+function InventoryDialog({ kind, asset, catalog, context, initialEmployeeId, onClose, onSuccess }: { kind: string | null; asset: InventoryAssetDto | null; catalog: Array<{ id: string; name: string; sku: string }>; context?: Awaited<ReturnType<typeof fetchInventoryContext>>; initialEmployeeId?: string; onClose: () => void; onSuccess: () => Promise<void> }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File>();
   const mutation = useMutation({ mutationFn: async () => {
     if (kind === "catalog") return createInventoryCatalogItem({ sku: values.sku, name: values.name });
     if (kind === "asset") return createInventoryAsset({ itemId: values.itemId, branchId: values.branchId, assetTag: values.assetTag, serialNumber: values.serialNumber, condition: values.condition });
     if (!asset) throw new Error("Selecciona un activo");
-    if (kind === "assign") { const workflow = context?.workflowAssignments.find(item => item.employeeId === values.employeeId && item.branchId === asset.branchId); return assignInventoryAsset(asset.id, { employeeId: values.employeeId, workflowAssignmentId: workflow?.id, notes: values.notes }); }
+    if (kind === "assign") { const employeeId = values.employeeId || initialEmployeeId || ""; const workflow = context?.workflowAssignments.find(item => item.employeeId === employeeId && item.branchId === asset.branchId); return assignInventoryAsset(asset.id, { employeeId, workflowAssignmentId: workflow?.id, notes: values.notes }); }
     if (kind === "deliver") return deliverInventoryAsset(asset.id, { evidence: file, notes: values.notes, condition: values.condition });
     if (kind === "transfer") return transferInventoryAsset(asset.id, { toBranchId: values.toBranchId, evidence: file, notes: values.notes, condition: values.condition });
     if (kind === "return") { if (asset.status === "ASSIGNED") await requestInventoryReturn(asset.id, values.notes); return receiveInventoryReturn(asset.id, { evidence: file, notes: values.notes, condition: values.condition }); }
@@ -92,7 +99,7 @@ function InventoryDialog({ kind, asset, catalog, context, onClose, onSuccess }: 
   return <Dialog open={Boolean(kind)} onOpenChange={open => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>{dialogTitle(kind)}</DialogTitle><DialogDescription>La operación quedará registrada en la trazabilidad del activo y en la auditoría del sistema.</DialogDescription></DialogHeader><div className="space-y-4">
     {kind === "catalog" ? <><Field label="SKU" value={values.sku} onChange={value => set("sku", value)} /><Field label="Nombre del tipo de activo" value={values.name} onChange={value => set("name", value)} /></> : null}
     {kind === "asset" ? <><Choice label="Tipo de activo" value={values.itemId} onChange={value => set("itemId", value)} options={catalog.map(item => ({ value: item.id, label: `${item.name} · ${item.sku}` }))} /><Choice label="Sucursal" value={values.branchId} onChange={value => set("branchId", value)} options={(context?.branches ?? []).map(branch => ({ value: branch.id, label: branch.name }))} /><Field label="Etiqueta única" value={values.assetTag} onChange={value => set("assetTag", value)} /><Field label="Número de serie" value={values.serialNumber} onChange={value => set("serialNumber", value)} /><Condition value={values.condition} onChange={value => set("condition", value)} /></> : null}
-    {kind === "assign" ? <Choice label="Empleado" value={values.employeeId} onChange={value => set("employeeId", value)} options={(context?.employees.filter(employee => employee.branchAssignments.some(branch => branch.branchId === asset?.branchId)) ?? []).map(employee => ({ value: employee.id, label: `${employee.name} · ${employee.jobTitle || employee.email}` }))} /> : null}
+    {kind === "assign" ? <Choice label="Empleado" value={values.employeeId || initialEmployeeId} onChange={value => set("employeeId", value)} options={(context?.employees.filter(employee => employee.branchAssignments.some(branch => branch.branchId === asset?.branchId)) ?? []).map(employee => ({ value: employee.id, label: `${employee.name} · ${employee.jobTitle || employee.email}` }))} /> : null}
     {kind === "transfer" ? <Choice label="Sucursal de destino" value={values.toBranchId} onChange={value => set("toBranchId", value)} options={(context?.branches.filter(branch => branch.id !== asset?.branchId) ?? []).map(branch => ({ value: branch.id, label: branch.name }))} /> : null}
     {["deliver", "return", "validate"].includes(kind ?? "") ? <Condition value={values.condition} onChange={value => set("condition", value)} /> : null}
     {kind === "validate" ? <Choice label="Resultado de validación" value={values.status} onChange={value => set("status", value)} options={[{ value: "AVAILABLE", label: "Disponible" }, { value: "MAINTENANCE", label: "Enviar a mantenimiento" }, { value: "RETIRED", label: "Retirar definitivamente" }]} /> : null}

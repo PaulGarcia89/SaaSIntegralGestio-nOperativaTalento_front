@@ -9,6 +9,9 @@ type FileUploadProps = {
   accept?: string;
   multiple?: boolean;
   maxFiles?: number;
+  maxSizeBytes?: number;
+  validateFile?: (file: File) => Promise<string | null> | string | null;
+  onValidationError?: (message: string | null) => void;
   onFiles?: (files: File[]) => void;
   className?: string;
 };
@@ -17,18 +20,36 @@ export function FileUpload({
   accept = ".pdf,.doc,.docx,.jpg,.jpeg,.png",
   multiple = false,
   maxFiles = 5,
+  maxSizeBytes,
+  validateFile,
+  onValidationError,
   onFiles,
   className,
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
 
-  function handleSelect(selected: FileList | null) {
+  async function handleSelect(selected: FileList | null) {
     if (!selected) return;
     const incoming = Array.from(selected).slice(0, maxFiles - files.length);
-    const next = [...files, ...incoming].slice(0, maxFiles);
+    const accepted: File[] = [];
+
+    for (const file of incoming) {
+      const sizeError = maxSizeBytes && file.size > maxSizeBytes
+        ? `El archivo ${file.name} supera el tamaño permitido.`
+        : null;
+      const validationError = sizeError ?? await validateFile?.(file);
+      if (validationError) {
+        onValidationError?.(validationError);
+        continue;
+      }
+      accepted.push(file);
+    }
+
+    const next = [...files, ...accepted].slice(0, maxFiles);
     setFiles(next);
     onFiles?.(next);
+    if (accepted.length) onValidationError?.(null);
   }
 
   function removeFile(index: number) {
@@ -52,7 +73,8 @@ export function FileUpload({
             Arrastra archivos o haz clic para seleccionar
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {accept.replace(/\./g, "").toUpperCase().replace(/,/g, ", ")} (max {maxFiles} archivos)
+            {accept.replace(/\./g, "").toUpperCase().replace(/,/g, ", ")} (máx. {maxFiles} archivos
+            {maxSizeBytes ? `, ${Math.round(maxSizeBytes / 1024 / 1024)} MB cada uno` : ""})
           </p>
         </div>
       </button>
@@ -62,7 +84,7 @@ export function FileUpload({
         accept={accept}
         multiple={multiple}
         className="hidden"
-        onChange={(e) => handleSelect(e.target.files)}
+        onChange={(e) => void handleSelect(e.target.files)}
       />
       {files.length > 0 ? (
         <div className="space-y-2">

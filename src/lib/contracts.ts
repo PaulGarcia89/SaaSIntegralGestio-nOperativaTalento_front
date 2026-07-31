@@ -1164,6 +1164,7 @@ export interface OnboardingActorWorkspaceDto {
 }
 
 export type OnboardingTaskStatus = "PENDING" | "IN_PROGRESS" | "BLOCKED" | "COMPLETED" | "CANCELLED";
+export type OnboardingOwnerType = "SYSTEM" | "USER" | "EMPLOYEE" | "CANDIDATE" | "BRANCH" | "INVENTORY" | "TRAINING" | "ACCESS" | "SIGNATURE" | "ONBOARDING" | "PRODUCTIVITY";
 
 export interface OnboardingTemplateTaskConfigDto {
   id?: string;
@@ -1171,7 +1172,7 @@ export interface OnboardingTemplateTaskConfigDto {
   taskType: "DOCUMENT_COLLECTION" | "POLICY_REVIEW" | "MANAGER_CHECKLIST" | "HR_CHECKLIST" | "DAY_ONE_READINESS" | "ASSET_DELIVERY";
   title: string;
   description?: string | null;
-  ownerType?: "SYSTEM" | "USER" | "ROLE" | "TEAM";
+  ownerType?: OnboardingOwnerType;
   ownerId?: string | null;
   dueOffsetDays?: number | null;
   dependsOnKeys?: string[];
@@ -1185,6 +1186,9 @@ export interface OnboardingTemplateDto {
   description?: string | null;
   version: number;
   isDefault: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   tasks: OnboardingTemplateTaskConfigDto[];
 }
 
@@ -1195,7 +1199,14 @@ export interface EmployeeOnboardingDocumentDto {
   mimeType: string;
   sizeBytes: number;
   scanStatus: string;
-  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+  storageVisibility?: "PRIVATE" | "PUBLIC" | null;
+  encryptedAtRest?: boolean | null;
+  scannedAt?: string | null;
+  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "SUPERSEDED" | "DELETED";
+  version?: number;
+  replacesDocumentId?: string | null;
+  rejectionReason?: string | null;
+  expiresAt?: string | null;
   taskId?: string | null;
   createdAt: string;
 }
@@ -1209,13 +1220,36 @@ export interface EmployeeOnboardingTaskDto {
   status: OnboardingTaskStatus;
   progressPercent: number;
   dueDate?: string | null;
-  ownerType: "SYSTEM" | "USER" | "ROLE" | "TEAM";
+  ownerType: OnboardingOwnerType;
   ownerId?: string | null;
+  owner?: { id: string; name: string; email: string } | null;
   blockingReason?: string | null;
   waitingFor: string[];
+  waitingForLabels: string[];
+  dependsOnKeys?: string[];
   blocked: boolean;
   overdue: boolean;
   documents: Array<{ id: string; status: string }>;
+  required?: boolean;
+  sortOrder?: number;
+}
+
+export interface OnboardingTimelineActorDto {
+  id?: string | null;
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  type?: "USER" | "SYSTEM" | string;
+}
+
+export interface OnboardingTimelineEventDto {
+  id: string;
+  type: string;
+  title: string;
+  description?: string | null;
+  occurredAt: string;
+  actor?: OnboardingTimelineActorDto | null;
+  payload?: Record<string, unknown> | null;
 }
 
 export interface EmployeeOnboardingFlowDto {
@@ -1233,7 +1267,26 @@ export interface EmployeeOnboardingFlowDto {
   signaturePackages?: Array<{ id: string; title: string; status: string; dueDate?: string | null; signedAt?: string | null; participants: Array<{ id: string; fullName: string; status: string }> }>;
   nextAction?: EmployeeOnboardingTaskDto | null;
   alerts: Array<{ taskId: string; severity: "warning" | "danger"; message: string }>;
+  timeline: OnboardingTimelineEventDto[];
   workflow?: { operationalEvents?: Array<{ id: string; title: string; description?: string | null; occurredAt: string }> };
+}
+
+export interface EmployeeOnboardingFlowListDto {
+  items: EmployeeOnboardingFlowDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface OnboardingContextDto {
+  assignableUsers: Array<{
+    id: string;
+    email: string;
+    name: string;
+    activeBranchId?: string | null;
+    roles: Array<{ code: string; name: string }>;
+  }>;
 }
 
 export interface SignatureProviderDto {
@@ -1391,6 +1444,7 @@ export interface MasterWorkflowCardDto {
 
 export interface HiringWorkflowResultDto {
   id: string;
+  tenantId: string;
   employeeId: string;
   candidateId: string;
   branchId: string;
@@ -1409,7 +1463,26 @@ export interface HiringWorkflowResultDto {
     id: string;
     status: string;
     startedAt: string;
+    templateId?: string | null;
+    tasks?: Array<{
+      id: string;
+      title: string;
+      taskKey: string;
+      status: string;
+      dueDate?: string | null;
+    }>;
   } | null;
+  hiringFlow?: {
+    id: string;
+    applicationId?: string | null;
+    status: string;
+    hiredAt?: string | null;
+  } | null;
+  inventoryAssignments?: Array<{
+    id: string;
+    status: string;
+    dueDate?: string | null;
+  }>;
   steps: Array<{ id: string; label: string; status: string }>;
 }
 
@@ -1420,8 +1493,56 @@ export interface HireCandidateInput {
   employeeEmail?: string;
   jobTitle: string;
   supervisorUserId?: string;
+  onboardingTemplateId?: string;
+  employmentStartDate?: string;
   sourceModule?: "ATS";
   metadata?: Record<string, unknown>;
+}
+
+export interface HiringContextDto {
+  application: {
+    id: string;
+    status: ApplicationStatusKey;
+    candidate: {
+      id: string;
+      fullName: string;
+      email: string;
+    };
+    vacancy: {
+      id: string;
+      title: string;
+      openings: number;
+      status: string;
+    };
+    branch: {
+      id: string;
+      name: string;
+      location: string;
+    };
+  };
+  supervisors: Array<{
+    id: string;
+    fullName: string;
+    email: string;
+    roles: Array<{
+      code: string;
+      name: string;
+      scope: string;
+    }>;
+  }>;
+  onboardingTemplates: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    version: number;
+    isDefault: boolean;
+    taskCount: number;
+  }>;
+  existingHiring?: {
+    workflowId: string;
+    employeeId?: string | null;
+  } | null;
+  canHire: boolean;
 }
 
 export interface CandidateApplicationTimelineItemDto {

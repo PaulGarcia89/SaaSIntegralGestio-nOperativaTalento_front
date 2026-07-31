@@ -51,8 +51,13 @@ import type {
   InterviewRecommendation,
   CandidateSessionDto,
   HireCandidateInput,
+  HiringContextDto,
   HiringWorkflowResultDto,
+  EmployeeOnboardingDocumentDto,
   EmployeeOnboardingFlowDto,
+  EmployeeOnboardingFlowListDto,
+  OnboardingContextDto,
+  OnboardingOwnerType,
   OnboardingTemplateDto,
   OnboardingTemplateTaskConfigDto,
   ElectronicSignaturePackageDto,
@@ -70,9 +75,20 @@ import type {
   PlanLimitsDto,
   PlatformModuleDto,
 } from "@/lib/contracts";
+import { applicationFormSchemaForApi } from "@/lib/application-form";
+import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
 import { PERMISSION_KEYS } from "@/lib/contracts";
 import { authenticateUser as authenticateMockUser } from "@/lib/mock-backend";
-import { clearStoredAuth, getStoredAuth, getStoredBranchId, getStoredSession, getStoredTenantId, persistAuth, persistSelectedTenantId, type AuthSnapshot } from "@/lib/auth-storage";
+import {
+  clearStoredAuth,
+  getStoredAuth,
+  getStoredBranchId,
+  getStoredSession,
+  getStoredTenantId,
+  persistAuth,
+  persistSelectedTenantId,
+  type AuthSnapshot,
+} from "@/lib/auth-storage";
 export { clearStoredAuth, getStoredBranchId, getStoredSession, getStoredTenantId, persistSelectedBranchId, persistSelectedTenantId } from "@/lib/auth-storage";
 import {
   mockBranches,
@@ -81,10 +97,15 @@ import {
   rolePermissions,
 } from "@/lib/mock-data";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
+const DEFAULT_PRODUCTION_API_URL = "https://saasintegralgestio-noperativatalentoback-production.up.railway.app/api";
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production" ? DEFAULT_PRODUCTION_API_URL : "/api")
+).replace(/\/$/, "");
 const MOCK_BACKEND_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "15000");
 const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
+const AUTH_API_BASE_URL = STATIC_HOSTING ? API_BASE_URL : "/api";
 
 type BackendAuthUser = {
   id: string;
@@ -238,8 +259,10 @@ type BackendSubscription = {
 
 type RequestOptions = {
   auth?: boolean;
+  authBridge?: boolean;
   retryOnUnauthorized?: boolean;
   tenantId?: string;
+  responseType?: "json" | "blob";
 };
 
 export class ApiError extends Error {
@@ -841,29 +864,56 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
 }
 
 async function refreshAccessToken() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({}),
-  });
+  const storedAuth = getStoredAuth();
 
-  if (!response.ok) {
-    clearStoredAuth();
-    return null;
+  try {
+    const response = await fetchWithTimeout(`${AUTH_API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        clearStoredAuth();
+        return null;
+      }
+
+      return storedAuth;
+    }
+
+    const payload = (await response.json()) as LoginResponse;
+    const snapshot = buildSessionSnapshot(payload);
+    persistAuth(snapshot);
+    await establishFrontendSession(snapshot.accessToken);
+    return snapshot;
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      clearStoredAuth();
+      return null;
+    }
+
+    return storedAuth;
   }
-
-  const payload = (await response.json()) as LoginResponse;
-  const snapshot = buildSessionSnapshot(payload);
-  persistAuth(snapshot);
-  await establishFrontendSession(snapshot.accessToken);
-  return snapshot;
 }
 
 async function establishFrontendSession(accessToken: string) {
   if (STATIC_HOSTING) return;
-  const response = await fetchWithTimeout("/api/session", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, ...(MOCK_BACKEND_ENABLED ? { "x-demo-session": "true" } : {}) } });
-  if (!response.ok) throw new ApiError("No fue posible establecer la sesión segura del frontend.", response.status);
+  const response = await fetchWithTimeout("/api/session", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(MOCK_BACKEND_ENABLED ? { "x-demo-session": "true" } : {}),
+    },
+  });
+  if (!response.ok) {
+    throw new ApiError(
+      "No fue posible establecer la sesión segura del frontend.",
+      response.status,
+      "FRONTEND_SESSION_FAILED",
+    );
+  }
 }
 
 export async function restoreCurrentSession() {
@@ -896,7 +946,8 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     headers.set("x-branch-id", branchId);
   }
 
-  let response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+  const requestBaseUrl = options.authBridge ? AUTH_API_BASE_URL : API_BASE_URL;
+  let response = await fetchWithTimeout(`${requestBaseUrl}${path}`, {
     ...init,
     headers,
     credentials: init.credentials ?? "include",
@@ -906,7 +957,7 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       headers.set("Authorization", `Bearer ${refreshed.accessToken}`);
-      response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+      response = await fetchWithTimeout(`${requestBaseUrl}${path}`, {
         ...init,
         headers,
         credentials: init.credentials ?? "include",
@@ -945,6 +996,10 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
 
   if (response.status === 204) {
     return undefined as T;
+  }
+
+  if (options.responseType === "blob") {
+    return (await response.blob()) as T;
   }
 
   return (await response.json()) as T;
@@ -1092,7 +1147,7 @@ export async function authenticateUser(input: {
     const payload = await request<LoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(input),
-    }, { auth: false, retryOnUnauthorized: false });
+    }, { auth: false, authBridge: true, retryOnUnauthorized: false });
 
     const snapshot = buildSessionSnapshot(payload);
     persistAuth(snapshot);
@@ -1174,7 +1229,7 @@ export function updateBranchContext(branchId: string) {
 
 export async function logoutCurrentSession() {
   try {
-    await request("/auth/logout", { method: "POST" });
+    await request("/auth/logout", { method: "POST" }, { authBridge: true });
   } catch (error) {
     // Logout must be idempotent: if the session is already invalid/expired,
     // we still clear local auth state and continue the sign-out flow.
@@ -1599,11 +1654,17 @@ export function submitPublicApplication(vacancyId: string, input: PublicApplicat
   }, { auth: false, retryOnUnauthorized: false });
 }
 
-export function createVacancy(input: CreateVacancyInput): Promise<PublicVacancyDto> {
-  return request<PublicVacancyDto>("/vacancies", {
+export function createVacancy(
+  input: CreateVacancyInput,
+  setup?: { stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] },
+): Promise<VacancySetupDto> {
+  return request<VacancySetupDto>("/vacancies", {
     method: "POST",
     body: JSON.stringify({
       ...input,
+      stages: setup?.stages,
+      responsibles: setup?.responsibles.map(({ userId, role }) => ({ userId, role })),
+      applicationFormSchema: applicationFormSchemaForApi(input.applicationFormSchema),
       workMode: input.workMode === "ONSITE" ? "ON_SITE" : input.workMode,
       status: input.status === "PUBLISHED" ? "OPEN" : "PAUSED",
     }),
@@ -1633,6 +1694,12 @@ export function hireCandidate(input: HireCandidateInput) {
     method: "POST",
     body: JSON.stringify({ ...input, sourceModule: "ATS" }),
   });
+}
+
+export function fetchHiringContext(applicationId: string) {
+  return request<HiringContextDto>(
+    `/workflows/hiring/context/${encodeURIComponent(applicationId)}`,
+  );
 }
 
 export function fetchVacancySetup(vacancyId: string) {
@@ -2241,6 +2308,18 @@ export function fetchOnboardingTemplates() {
   return request<OnboardingTemplateDto[]>("/onboarding/templates");
 }
 
+export function updateOnboardingTemplateStatus(id: string, input: { isActive?: boolean; isDefault?: boolean }) {
+  return request<OnboardingTemplateDto>(`/onboarding/templates/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchOnboardingContext(branchId?: string) {
+  const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : "";
+  return request<OnboardingContextDto>(`/onboarding/context${query}`);
+}
+
 export function createOnboardingTemplate(input: {
   name: string;
   description?: string;
@@ -2250,9 +2329,13 @@ export function createOnboardingTemplate(input: {
   return request<OnboardingTemplateDto>("/onboarding/templates", { method: "POST", body: JSON.stringify(input) });
 }
 
-export function fetchOnboardingFlows(branchId?: string) {
-  const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : "";
-  return request<{ items: EmployeeOnboardingFlowDto[] }>(`/onboarding/flows${query}`);
+export function fetchOnboardingFlows(filters: string | { branchId?: string; search?: string; status?: string; page?: number; pageSize?: number } = {}) {
+  const normalized = typeof filters === "string" ? { branchId: filters } : filters;
+  const query = new URLSearchParams();
+  Object.entries(normalized).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  });
+  return request<EmployeeOnboardingFlowListDto>(`/onboarding/flows${query.size ? `?${query}` : ""}`);
 }
 
 export function applyOnboardingTemplate(flowId: string, templateId: string) {
@@ -2266,9 +2349,15 @@ export function updateOnboardingTask(taskId: string, input: {
   status?: string;
   progressPercent?: number;
   dueDate?: string;
-  ownerType?: string;
-  ownerId?: string;
-  blockingReason?: string;
+  ownerType?: OnboardingOwnerType;
+  ownerId?: string | null;
+  blockingReason?: string | null;
+  title?: string;
+  description?: string;
+  taskType?: OnboardingTemplateTaskConfigDto["taskType"];
+  dependsOnKeys?: string[];
+  required?: boolean;
+  sortOrder?: number;
 }) {
   return request<EmployeeOnboardingFlowDto>(`/onboarding/tasks/${encodeURIComponent(taskId)}`, {
     method: "PATCH",
@@ -2276,7 +2365,28 @@ export function updateOnboardingTask(taskId: string, input: {
   });
 }
 
-export function uploadOnboardingDocument(flowId: string, input: { file: File; taskId?: string; category: string }) {
+export function createOnboardingTask(flowId: string, input: OnboardingTemplateTaskConfigDto) {
+  return request<EmployeeOnboardingFlowDto>(`/onboarding/flows/${encodeURIComponent(flowId)}/tasks`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function reorderOnboardingTasks(flowId: string, items: Array<{ id: string; sortOrder: number }>) {
+  return request<EmployeeOnboardingFlowDto>(`/onboarding/flows/${encodeURIComponent(flowId)}/tasks/reorder`, {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function deleteOnboardingTask(taskId: string) {
+  return request<EmployeeOnboardingFlowDto>(`/onboarding/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+}
+
+export async function uploadOnboardingDocument(flowId: string, input: { file: File; taskId?: string; category: string }) {
+  const validationError = await validateOnboardingDocumentFile(input.file);
+  if (validationError) throw new Error(validationError);
+
   const body = new FormData();
   body.set("file", input.file);
   body.set("category", input.category);
@@ -2284,11 +2394,42 @@ export function uploadOnboardingDocument(flowId: string, input: { file: File; ta
   return request(`/onboarding/flows/${encodeURIComponent(flowId)}/documents`, { method: "POST", body });
 }
 
-export function reviewOnboardingDocument(id: string, status: "APPROVED" | "REJECTED") {
+export function reviewOnboardingDocument(id: string, status: "APPROVED" | "REJECTED", reason?: string) {
   return request(`/onboarding/documents/${encodeURIComponent(id)}/review`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, reason }),
   });
+}
+
+export async function replaceOnboardingDocument(id: string, file: File) {
+  const validationError = await validateOnboardingDocumentFile(file);
+  if (validationError) throw new Error(validationError);
+  const body = new FormData();
+  body.set("file", file);
+  return request<EmployeeOnboardingDocumentDto>(`/onboarding/documents/${encodeURIComponent(id)}/replace`, { method: "POST", body });
+}
+
+export function updateOnboardingDocumentLifecycle(id: string, expiresAt?: string) {
+  return request<EmployeeOnboardingDocumentDto>(`/onboarding/documents/${encodeURIComponent(id)}/lifecycle`, {
+    method: "PATCH",
+    body: JSON.stringify({ expiresAt }),
+  });
+}
+
+export function deleteOnboardingDocument(id: string) {
+  return request<{ deleted: boolean; id: string }>(`/onboarding/documents/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function completeOnboardingFlow(flowId: string) {
+  return request<EmployeeOnboardingFlowDto>(`/onboarding/flows/${encodeURIComponent(flowId)}/complete`, { method: "POST" });
+}
+
+export function downloadOnboardingDocument(id: string) {
+  return request<Blob>(
+    `/onboarding/documents/${encodeURIComponent(id)}/download`,
+    {},
+    { responseType: "blob" },
+  );
 }
 
 export function fetchInventoryCatalog() {

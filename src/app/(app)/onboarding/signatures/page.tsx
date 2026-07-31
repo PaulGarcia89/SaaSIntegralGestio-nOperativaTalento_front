@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BellRing, CheckCircle2, Clipboard, FileSignature, Plus, Send, ShieldCheck } from "lucide-react";
 import {
@@ -14,6 +15,7 @@ import {
   sendSignaturePackage,
 } from "@/lib/backend";
 import type { ElectronicSignaturePackageDto } from "@/lib/contracts";
+import { findSignaturePackageFlowPrefill } from "@/lib/signature-prefill";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
@@ -29,9 +31,13 @@ type SigningLink = { participantId: string; email: string; url: string };
 
 export default function ElectronicSignaturesPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const { currentBranch, can } = useAppStore();
+  const requestedFlowId = searchParams.get("flowId") ?? "";
+  const shouldCreatePackage = searchParams.get("action") === "create";
   const [templateOpen, setTemplateOpen] = useState(false);
   const [packageOpen, setPackageOpen] = useState(false);
+  const [automaticPackageDismissed, setAutomaticPackageDismissed] = useState(false);
   const [links, setLinks] = useState<SigningLink[]>([]);
   const [templateForm, setTemplateForm] = useState({ name: "Documentos de ingreso", title: "Acuerdo y consentimiento de incorporación", content: "Declaro que la información entregada durante mi incorporación es correcta y que he recibido los documentos y políticas aplicables.", consentText: "Acepto utilizar mi nombre escrito como firma electrónica y confirmo mi intención de firmar este documento.", provider: "INTERNAL" });
   const [packageForm, setPackageForm] = useState({ onboardingFlowId: "", templateId: "", dueDate: "", fullName: "", email: "" });
@@ -43,10 +49,25 @@ export default function ElectronicSignaturesPage() {
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["signature-packages"] });
 
   const createTemplate = useMutation({ mutationFn: () => createSignatureTemplate({ ...templateForm, isDefault: true }), onSuccess: async (template) => { await queryClient.invalidateQueries({ queryKey: ["signature-templates"] }); setPackageForm((current) => ({ ...current, templateId: template.id })); setTemplateOpen(false); } });
-  const createPackage = useMutation({ mutationFn: () => createSignaturePackage({ onboardingFlowId: packageForm.onboardingFlowId, templateId: packageForm.templateId, dueDate: packageForm.dueDate ? new Date(packageForm.dueDate).toISOString() : undefined, participants: [{ fullName: packageForm.fullName, email: packageForm.email, roleLabel: "Empleado" }] }), onSuccess: async () => { await refresh(); setPackageOpen(false); } });
   const sendPackage = useMutation({ mutationFn: (id: string) => sendSignaturePackage(id), onSuccess: async (result) => { setLinks(result.signingLinks); await refresh(); } });
   const remind = useMutation({ mutationFn: (id: string) => remindSignaturePackage(id), onSuccess: async (result) => { setLinks(result.signingLinks); await refresh(); } });
   const stats = useMemo(() => ({ pending: packages.data?.filter((item) => item.status === "PENDING" || item.status === "PARTIALLY_SIGNED").length ?? 0, complete: packages.data?.filter((item) => item.status === "COMPLETED").length ?? 0 }), [packages.data]);
+  const requestedFlow = flows.data?.items.find((flow) => flow.id === requestedFlowId);
+  const requestedPrefill = flows.data
+    ? findSignaturePackageFlowPrefill(flows.data.items, requestedFlowId)
+    : null;
+  const effectivePackageForm = packageForm.onboardingFlowId || !requestedPrefill
+    ? packageForm
+    : { ...packageForm, ...requestedPrefill };
+  const automaticPackageOpen = Boolean(
+    requestedPrefill &&
+    shouldCreatePackage &&
+    can("onboarding.manage") &&
+    !automaticPackageDismissed,
+  );
+  const packageDialogOpen = packageOpen || automaticPackageOpen;
+  const invalidRequestedFlow = Boolean(requestedFlowId && flows.isSuccess && !requestedFlow);
+  const createPackage = useMutation({ mutationFn: () => createSignaturePackage({ onboardingFlowId: effectivePackageForm.onboardingFlowId, templateId: effectivePackageForm.templateId, dueDate: effectivePackageForm.dueDate ? new Date(effectivePackageForm.dueDate).toISOString() : undefined, participants: [{ fullName: effectivePackageForm.fullName, email: effectivePackageForm.email, roleLabel: "Empleado" }] }), onSuccess: async () => { await refresh(); setPackageOpen(false); setAutomaticPackageDismissed(true); } });
 
   function chooseFlow(flowId: string) {
     const flow = flows.data?.items.find((item) => item.id === flowId);
@@ -55,6 +76,8 @@ export default function ElectronicSignaturesPage() {
 
   return <div className="space-y-7">
     <PageHeader eyebrow="Personas" title="Firma electrónica" description="Prepara paquetes, recoge consentimiento verificable y conserva evidencias y auditoría dentro de cada incorporación." actions={can("onboarding.manage") ? <div className="flex gap-2"><Button variant="secondary" onClick={() => setTemplateOpen(true)}><Plus className="size-4" />Plantilla</Button><Button onClick={() => setPackageOpen(true)}><FileSignature className="size-4" />Nuevo paquete</Button></div> : undefined} />
+    {requestedFlow ? <InlineFeedback tone="success" title="Incorporación preseleccionada">{requestedFlow.employee.name} · {requestedFlow.branch.name}. El nuevo paquete quedará vinculado a este expediente.</InlineFeedback> : null}
+    {invalidRequestedFlow ? <InlineFeedback tone="warning" title="Incorporación no disponible">El expediente solicitado no existe o no pertenece a la sucursal activa. Puedes seleccionar otra incorporación manualmente.</InlineFeedback> : null}
     <section className="grid gap-4 md:grid-cols-3">
       <Metric icon={ShieldCheck} label="Proveedor activo" value={providers.data?.find((provider) => provider.configured)?.name ?? "Verificando"} />
       <Metric icon={BellRing} label="Pendientes" value={String(stats.pending)} />
@@ -66,7 +89,7 @@ export default function ElectronicSignaturesPage() {
     {packages.isSuccess && !packages.data.length ? <InlineFeedback tone="info" title="No hay paquetes de firma">Crea una plantilla y genera el primer paquete desde una incorporación activa.</InlineFeedback> : null}
     <section className="grid gap-4 xl:grid-cols-2">{packages.data?.map((item) => <PackageCard key={item.id} item={item} canManage={can("onboarding.manage")} sending={sendPackage.isPending || remind.isPending} onSend={() => sendPackage.mutate(item.id)} onRemind={() => remind.mutate(item.id)} />)}</section>
     <Dialog open={templateOpen} onOpenChange={setTemplateOpen}><DialogContent><DialogHeader><DialogTitle>Nueva plantilla de firma</DialogTitle><DialogDescription>La plantilla queda versionada; cada paquete conserva el contenido y consentimiento utilizados.</DialogDescription></DialogHeader><div className="space-y-4"><Field label="Nombre" value={templateForm.name} onChange={(value) => setTemplateForm({ ...templateForm, name: value })} /><Field label="Título del documento" value={templateForm.title} onChange={(value) => setTemplateForm({ ...templateForm, title: value })} /><TextField label="Contenido" value={templateForm.content} onChange={(value) => setTemplateForm({ ...templateForm, content: value })} /><TextField label="Texto de consentimiento" value={templateForm.consentText} onChange={(value) => setTemplateForm({ ...templateForm, consentText: value })} /><div className="space-y-2"><Label>Proveedor</Label><Select value={templateForm.provider} onValueChange={(provider) => setTemplateForm({ ...templateForm, provider })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{providers.data?.map((provider) => <SelectItem key={provider.code} value={provider.code} disabled={!provider.configured}>{provider.name}{provider.configured ? "" : " · no configurado"}</SelectItem>)}</SelectContent></Select></div><Button className="w-full" onClick={() => createTemplate.mutate()} disabled={!templateForm.name || !templateForm.content || createTemplate.isPending}>{createTemplate.isPending ? "Creando…" : "Crear plantilla"}</Button></div></DialogContent></Dialog>
-    <Dialog open={packageOpen} onOpenChange={setPackageOpen}><DialogContent><DialogHeader><DialogTitle>Preparar paquete de firma</DialogTitle><DialogDescription>Asócialo a una incorporación para que el resultado actualice automáticamente su checklist.</DialogDescription></DialogHeader><div className="space-y-4"><SelectField label="Incorporación" value={packageForm.onboardingFlowId} onValueChange={chooseFlow} options={flows.data?.items.map((flow) => ({ value: flow.id, label: `${flow.employee.name} · ${flow.branch.name}` })) ?? []} /><SelectField label="Plantilla" value={packageForm.templateId} onValueChange={(templateId) => setPackageForm({ ...packageForm, templateId })} options={templates.data?.map((template) => ({ value: template.id, label: `${template.name} v${template.version}` })) ?? []} /><Field label="Firmante" value={packageForm.fullName} onChange={(fullName) => setPackageForm({ ...packageForm, fullName })} /><Field label="Correo del firmante" type="email" value={packageForm.email} onChange={(email) => setPackageForm({ ...packageForm, email })} /><Field label="Fecha límite" type="date" value={packageForm.dueDate} onChange={(dueDate) => setPackageForm({ ...packageForm, dueDate })} /><Button className="w-full" onClick={() => createPackage.mutate()} disabled={!packageForm.onboardingFlowId || !packageForm.templateId || !packageForm.fullName || !packageForm.email || createPackage.isPending}>{createPackage.isPending ? "Preparando…" : "Crear paquete"}</Button></div></DialogContent></Dialog>
+    <Dialog open={packageDialogOpen} onOpenChange={(open) => { setPackageOpen(open); if (!open) setAutomaticPackageDismissed(true); }}><DialogContent><DialogHeader><DialogTitle>Preparar paquete de firma</DialogTitle><DialogDescription>Asócialo a una incorporación para que el resultado actualice automáticamente su checklist.</DialogDescription></DialogHeader><div className="space-y-4"><SelectField label="Incorporación" value={effectivePackageForm.onboardingFlowId} onValueChange={chooseFlow} options={flows.data?.items.map((flow) => ({ value: flow.id, label: `${flow.employee.name} · ${flow.branch.name}` })) ?? []} /><SelectField label="Plantilla" value={effectivePackageForm.templateId} onValueChange={(templateId) => setPackageForm({ ...effectivePackageForm, templateId })} options={templates.data?.map((template) => ({ value: template.id, label: `${template.name} v${template.version}` })) ?? []} /><Field label="Firmante" value={effectivePackageForm.fullName} onChange={(fullName) => setPackageForm({ ...effectivePackageForm, fullName })} /><Field label="Correo del firmante" type="email" value={effectivePackageForm.email} onChange={(email) => setPackageForm({ ...effectivePackageForm, email })} /><Field label="Fecha límite" type="date" value={effectivePackageForm.dueDate} onChange={(dueDate) => setPackageForm({ ...effectivePackageForm, dueDate })} /><Button className="w-full" onClick={() => createPackage.mutate()} disabled={!effectivePackageForm.onboardingFlowId || !effectivePackageForm.templateId || !effectivePackageForm.fullName || !effectivePackageForm.email || createPackage.isPending}>{createPackage.isPending ? "Preparando…" : "Crear paquete"}</Button></div></DialogContent></Dialog>
     <Dialog open={Boolean(links.length)} onOpenChange={(open) => !open && setLinks([])}><DialogContent><DialogHeader><DialogTitle>Solicitudes listas para entregar</DialogTitle><DialogDescription>El proveedor interno generó enlaces de un solo uso. Compártelos por un canal verificado; no se simula un correo enviado.</DialogDescription></DialogHeader><div className="space-y-3">{links.map((link) => <div key={link.participantId} className="rounded-xl border p-3"><p className="font-medium">{link.email}</p><p className="truncate text-xs text-text-secondary">{link.url}</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void navigator.clipboard.writeText(link.url)}><Clipboard className="size-4" />Copiar enlace</Button></div>)}</div></DialogContent></Dialog>
   </div>;
 }

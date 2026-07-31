@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
+const DEFAULT_PRODUCTION_API_URL = "https://saasintegralgestio-noperativatalentoback-production.up.railway.app/api";
 const API_BASE_URL = (
   process.env.INTERNAL_API_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  "/api"
+  (process.env.NODE_ENV === "production" ? DEFAULT_PRODUCTION_API_URL : "/api")
 ).replace(/\/$/, "");
 const SESSION_COOKIE = "talentos_frontend_session";
 const SECURE_SESSION_COOKIE =
@@ -26,7 +27,13 @@ export async function POST(request: Request) {
     if (!verification.ok) return NextResponse.json({ error: "INVALID_SESSION" }, { status: 401 });
   }
   const response = NextResponse.json({ authenticated: true });
-  response.cookies.set(SESSION_COOKIE, "verified", { httpOnly: true, secure: SECURE_SESSION_COOKIE, sameSite: "lax", path: "/", maxAge: 60 * 15 });
+  response.cookies.set(SESSION_COOKIE, "verified", {
+    httpOnly: true,
+    secure: SECURE_SESSION_COOKIE,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60,
+  });
   return response;
 }
 

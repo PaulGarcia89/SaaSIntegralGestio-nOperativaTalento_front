@@ -13,3 +13,25 @@ export function missingRequiredApplicationFields(schema: VacancyApplicationFormS
     return typeof value !== "number" && (typeof value !== "string" || !value.trim());
   });
 }
+
+export function applicationFormSchemaForApi(
+  schema?: VacancyApplicationFormSchema | null,
+): { sections: Array<{ id: string; title: string; description?: string; fields: Array<VacancyApplicationField & { required: boolean }> }> } {
+  const sourceSections = schema?.sections?.length
+    ? schema.sections
+    : schema?.fields?.length
+      ? [{ id: "application", title: "Preguntas adicionales", fields: schema.fields }]
+      : [];
+
+  return {
+    sections: sourceSections.map((section, index) => ({
+      id: section.id?.trim() || `section-${index + 1}`,
+      title: section.title?.trim() || `Sección ${index + 1}`,
+      ...(section.description?.trim() ? { description: section.description.trim() } : {}),
+      fields: section.fields.map((field) => ({
+        ...field,
+        required: Boolean(field.required),
+      })),
+    })),
+  };
+}

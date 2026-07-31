@@ -10,6 +10,10 @@ export const APPLICATION_STAGES: Array<{ key: ApplicationStatusKey; label: strin
   { key: "REJECTED", label: "Descartada", tone: "destructive" },
 ];
 
+export const APPLICATION_STAGE_CHANGE_OPTIONS = APPLICATION_STAGES.filter(
+  (stage) => stage.key !== "HIRED",
+);
+
 export const TIMELINE_LABELS: Record<ApplicationTimelineEventType, string> = {
   VACANCY_PUBLISHED: "Vacante publicada",
   APPLIED: "Postulación recibida",

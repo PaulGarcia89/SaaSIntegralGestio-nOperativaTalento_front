@@ -21,7 +21,7 @@ import type {
   UserDto,
 } from "@/lib/contracts";
 import {
-  clearStoredAuth,
+  ApiError,
   fetchBranches,
   fetchCurrentAuthUser,
   fetchTenantUsers,
@@ -95,13 +95,33 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     queryKey: ["auth-me", session?.token],
     queryFn: fetchCurrentAuthUser,
     enabled: hasHydratedSession && Boolean(session?.token),
-    retry: false,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && (error.status === 401 || error.status === 403)) &&
+      failureCount < 2,
   });
+
+  const authSessionInvalidated =
+    authQuery.error instanceof ApiError &&
+    (authQuery.error.status === 401 || authQuery.error.status === 403);
+
+  const authContext = useMemo(
+    () => (authQuery.data ? mapAuthUserToUi(authQuery.data) : null),
+    [authQuery.data],
+  );
+  const roleForAdministrativeQueries =
+    authContext?.role ?? session?.role ?? "empleado";
 
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", session?.token],
     queryFn: fetchTenants,
-    enabled: Boolean(authQuery.data && (authQuery.data.isSuperAdmin || authQuery.data.permissions.some((permission) => permission.startsWith("tenants.")))),
+    enabled: Boolean(
+      session?.token &&
+      (
+        roleForAdministrativeQueries === "admin_saas" ||
+        roleForAdministrativeQueries === "admin_plataforma" ||
+        authQuery.data?.permissions.some((permission) => permission.startsWith("tenants."))
+      ),
+    ),
   });
 
   const isGlobalSuperAdmin = Boolean(
@@ -112,12 +132,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     queryKey: ["branches", currentTenantId],
     queryFn: () => fetchBranches(currentTenantId),
     enabled: Boolean(
-      authQuery.data &&
+      session?.token &&
       currentTenantId &&
       !isGlobalSuperAdmin &&
       (
-        authQuery.data.permissions.includes("branches.read") ||
-        ["platform_admin", "tenant_admin", "branch_admin"].includes(authQuery.data.roleScope)
+        roleForAdministrativeQueries === "admin_saas" ||
+        roleForAdministrativeQueries === "admin_plataforma" ||
+        authQuery.data?.permissions.includes("branches.read")
       ),
     ),
     retry: false,
@@ -127,17 +148,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     queryKey: ["tenant-users", currentTenantId],
     queryFn: () => fetchTenantUsers(currentTenantId),
     enabled: Boolean(
-      authQuery.data?.permissions.some((permission) => permission.startsWith("users.")) &&
+      session?.token &&
       currentTenantId &&
-      !isGlobalSuperAdmin,
+      !isGlobalSuperAdmin &&
+      (
+        roleForAdministrativeQueries === "admin_saas" ||
+        roleForAdministrativeQueries === "admin_plataforma" ||
+        authQuery.data?.permissions.some((permission) => permission.startsWith("users."))
+      ),
     ),
     retry: false,
   });
-
-  const authContext = useMemo(
-    () => (authQuery.data ? mapAuthUserToUi(authQuery.data) : null),
-    [authQuery.data],
-  );
 
   const tenants = useMemo(() => tenantsQuery.data ?? [], [tenantsQuery.data]);
   const branches = useMemo(
@@ -174,23 +195,38 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [authContext]);
 
   useEffect(() => {
-    if (!authQuery.error) return;
-    clearStoredAuth();
-    if (process.env.NEXT_PUBLIC_STATIC_HOSTING !== "true") {
-      void fetch("/api/session", { method: "DELETE" });
-    }
+    if (!authSessionInvalidated) return;
+    void logoutCurrentSession().catch(() => undefined);
     queueMicrotask(() => {
       setSession(null);
       setCurrentTenantIdState("");
       setCurrentBranchIdState("");
       setCurrentUserIdState("");
     });
-  }, [authQuery.error]);
+  }, [authSessionInvalidated]);
+
+  const fallbackTenantId = currentTenantId || session?.tenantId || "";
 
   const currentTenant =
     tenants.find((tenant) => tenant.id === currentTenantId) ??
     (authContext && (authContext.tenant.id === currentTenantId || authContext.tenant.id === session?.tenantId)
       ? authContext.tenant
+      : null) ??
+    (fallbackTenantId
+      ? {
+          id: fallbackTenantId,
+          slug: fallbackTenantId,
+          name: "Contexto actual",
+          plan: "starter",
+          status: "active",
+          enabledModules: [],
+          branchCount: 0,
+          employeeCount: 0,
+          branding: {
+            accent: "#0EA5B7",
+            supportEmail: "",
+          },
+        } satisfies TenantDto
       : null) ??
     getFallbackTenant(tenants) ??
     ({
@@ -252,8 +288,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       status: "suspended",
     } satisfies UserDto);
 
-  const currentRole = authContext?.role ?? currentUser.role;
-  const accessContextVerified = Boolean(authContext && session?.token);
+  const currentRole = authContext?.role ?? session?.role ?? currentUser.role;
+  const accessContextVerified = Boolean(session?.token) && !authSessionInvalidated;
   const currentSubscriptionStatus: SubscriptionAccessState =
     authContext?.subscriptionStatus ?? currentTenant.status ?? "suspended";
   const subscriptionGraceEndsAt = authContext?.subscriptionGraceEndsAt ?? null;
@@ -271,8 +307,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
   const isBootstrapping =
     !hasHydratedSession ||
-    (Boolean(session?.token) &&
-      (authQuery.isLoading || tenantsQuery.isLoading || branchesQuery.isLoading || usersQuery.isLoading));
+    (Boolean(session?.token) && authQuery.isLoading);
 
   const can = useCallback(
     (permission: PermissionKey) => currentRole === "admin_saas" || currentPermissions.includes(permission),

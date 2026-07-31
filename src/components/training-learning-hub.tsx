@@ -7,6 +7,10 @@ import {
   Clock3,
   PlayCircle,
   Plus,
+  FlaskConical,
+  Pause,
+  Rocket,
+  RotateCcw,
   Trash2,
   Users,
 } from "lucide-react";
@@ -37,19 +41,29 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createTrainingAssignments,
+  createTrainingLaunch,
   deleteTrainingAssignment,
+  deployTrainingLaunch,
   fetchBranches,
   fetchLearnerTrainingCourse,
   fetchMyTrainingAssignments,
+  fetchMyTrainingPilots,
   fetchTrainingAdminAssignments,
   fetchTrainingCourses,
+  fetchTrainingLaunches,
   fetchUsers,
   getApiErrorMessage,
+  submitTrainingPilotFeedback,
+  updateTrainingLaunchStatus,
   updateTrainingLessonProgress,
 } from "@/lib/backend";
 import type {
   LearnerTrainingCourseDto,
   TrainingAssignmentDto,
+  TrainingCoursePilotDto,
+  TrainingLaunchAudience,
+  TrainingLaunchDto,
+  TrainingLaunchStatus,
   TrainingProgressStatus,
 } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
@@ -87,13 +101,22 @@ export function TrainingLearningHub() {
           {canManageAssignments ? (
             <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
           ) : null}
+          {canManageAssignments ? (
+            <TabsTrigger value="launches">Lanzamientos</TabsTrigger>
+          ) : null}
         </TabsList>
         <TabsContent value="mine" className="mt-6">
+          <MyPilots onOpen={(id) => setCourseId(id)} />
           <MyCourses onOpen={(id) => setCourseId(id)} />
         </TabsContent>
         {canManageAssignments ? (
           <TabsContent value="assignments" className="mt-6">
             <AssignmentManagement />
+          </TabsContent>
+        ) : null}
+        {canManageAssignments ? (
+          <TabsContent value="launches" className="mt-6">
+            <LaunchManagement />
           </TabsContent>
         ) : null}
       </Tabs>
@@ -103,6 +126,62 @@ export function TrainingLearningHub() {
         onOpenChange={(open) => !open && setCourseId(null)}
       />
     </div>
+  );
+}
+
+function MyPilots({ onOpen }: { onOpen: (courseId: string) => void }) {
+  const queryClient = useQueryClient();
+  const [feedbackPilot, setFeedbackPilot] = useState<TrainingCoursePilotDto | null>(null);
+  const query = useQuery({ queryKey: ["my-training-pilots"], queryFn: fetchMyTrainingPilots });
+  const feedback = useMutation({
+    mutationFn: ({ pilotId, input }: { pilotId: string; input: Parameters<typeof submitTrainingPilotFeedback>[1] }) =>
+      submitTrainingPilotFeedback(pilotId, input),
+    onSuccess: () => {
+      toast.success("Gracias por compartir tu experiencia");
+      setFeedbackPilot(null);
+      queryClient.invalidateQueries({ queryKey: ["my-training-pilots"] });
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible guardar tu feedback.")),
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!feedbackPilot) return;
+    const data = new FormData(event.currentTarget);
+    feedback.mutate({
+      pilotId: feedbackPilot.id,
+      input: {
+        rating: Number(data.get("rating")),
+        clarityRating: Number(data.get("clarityRating")),
+        relevanceRating: Number(data.get("relevanceRating")),
+        comment: String(data.get("comment") || "") || undefined,
+        blockingIssue: data.get("blockingIssue") === "on",
+      },
+    });
+  }
+  if (!query.data?.items.length) return null;
+  return (
+    <section className="mb-6 space-y-3">
+      <div><h2 className="text-lg font-semibold">Pilotos activos</h2><p className="text-sm text-text-secondary">Prueba contenido antes de su publicación y reporta cualquier bloqueo.</p></div>
+      <div className="grid gap-3 md:grid-cols-2">{query.data.items.map((pilot) => (
+        <Card key={pilot.id} className="border-primary/30">
+          <CardContent className="space-y-4 py-5">
+            <div className="flex items-start gap-3"><FlaskConical className="size-6 text-primary" /><div><strong>{pilot.name}</strong><p className="text-sm text-text-secondary">{pilot.course?.title}</p></div></div>
+            <div className="flex gap-2"><Button className="flex-1" onClick={() => pilot.course && onOpen(pilot.course.id)}><PlayCircle />Abrir piloto</Button><Button variant="secondary" onClick={() => setFeedbackPilot(pilot)}>Dar feedback</Button></div>
+          </CardContent>
+        </Card>
+      ))}</div>
+      <Dialog open={Boolean(feedbackPilot)} onOpenChange={(open) => !open && setFeedbackPilot(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Feedback del piloto</DialogTitle><DialogDescription>Tu evaluación define si esta versión puede publicarse.</DialogDescription></DialogHeader>
+          <form className="space-y-4" onSubmit={submit}>
+            <div className="grid gap-3 sm:grid-cols-3">{[["rating", "Valor general"], ["clarityRating", "Claridad"], ["relevanceRating", "Relevancia"]].map(([name, label]) => <div key={name}><Label>{label}</Label><Select name={name} defaultValue="5"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[5, 4, 3, 2, 1].map((value) => <SelectItem key={value} value={String(value)}>{value}/5</SelectItem>)}</SelectContent></Select></div>)}</div>
+            <div><Label htmlFor="pilot-comment">Comentarios</Label><textarea id="pilot-comment" name="comment" className="min-h-28 w-full rounded-xl border border-border-default bg-surface-elevated p-3" /></div>
+            <label className="flex items-center gap-3 rounded-xl bg-status-warning-soft p-3 text-sm"><input type="checkbox" name="blockingIssue" />Encontré un problema que bloquea la publicación</label>
+            <Button className="w-full" disabled={feedback.isPending}>Enviar feedback</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </section>
   );
 }
 
@@ -227,6 +306,255 @@ function AssignmentCard({
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+const launchStatusLabels: Record<TrainingLaunchStatus, string> = {
+  DRAFT: "Borrador",
+  SCHEDULED: "Programado",
+  ACTIVE: "En despliegue",
+  PAUSED: "Pausado",
+  COMPLETED: "Distribuido",
+  CANCELLED: "Cancelado",
+};
+
+function LaunchManagement() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
+  const query = useQuery({
+    queryKey: ["training-launches", page],
+    queryFn: () => fetchTrainingLaunches({ page, pageSize: 12 }),
+  });
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["training-launches"] });
+    await queryClient.invalidateQueries({ queryKey: ["training-admin-assignments"] });
+  };
+  const deploy = useMutation({
+    mutationFn: deployTrainingLaunch,
+    onSuccess: async () => {
+      toast.success("Lote distribuido correctamente");
+      await refresh();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible distribuir el lote.")),
+  });
+  const status = useMutation({
+    mutationFn: ({ id, next }: { id: string; next: TrainingLaunchStatus }) =>
+      updateTrainingLaunchStatus(id, next),
+    onSuccess: async () => {
+      toast.success("Estado del lanzamiento actualizado");
+      await refresh();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el lanzamiento.")),
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold">Lanzamientos controlados</h2>
+          <p className="text-sm text-muted-foreground">
+            Congela una audiencia, distribuye por lotes y mide adopción sin perder trazabilidad.
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}><Rocket className="size-4" />Nueva campaña</Button>
+      </div>
+      {query.isLoading ? <AsyncState state="loading" title="Cargando lanzamientos" /> : null}
+      {query.isError ? <AsyncState state="error" title="No fue posible cargar los lanzamientos" onRetry={() => query.refetch()} /> : null}
+      {query.data?.items.length ? (
+        <>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {query.data.items.map((launch) => (
+              <LaunchCard
+                key={launch.id}
+                launch={launch}
+                pending={deploy.isPending || status.isPending}
+                onDeploy={() => deploy.mutate(launch.id)}
+                onStatus={(next) => status.mutate({ id: launch.id, next })}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            totalPages={query.data.totalPages}
+            totalItems={query.data.total}
+            pageSize={12}
+            onPageChange={setPage}
+          />
+        </>
+      ) : query.isSuccess ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Rocket className="mx-auto size-9 text-muted-foreground" />
+            <p className="mt-3 font-medium">Todavía no hay campañas de lanzamiento</p>
+            <p className="text-sm text-muted-foreground">Crea una para distribuir un curso publicado con control de alcance.</p>
+          </CardContent>
+        </Card>
+      ) : null}
+      <CreateLaunchDialog open={createOpen} onOpenChange={setCreateOpen} />
+    </div>
+  );
+}
+
+function LaunchCard({
+  launch,
+  pending,
+  onDeploy,
+  onStatus,
+}: {
+  launch: TrainingLaunchDto;
+  pending: boolean;
+  onDeploy: () => void;
+  onStatus: (status: TrainingLaunchStatus) => void;
+}) {
+  const rolloutPercent = launch.metrics.audience
+    ? Math.round((launch.metrics.processed / launch.metrics.audience) * 100)
+    : 0;
+  const badgeVariant = launch.status === "CANCELLED"
+    ? "destructive"
+    : launch.status === "COMPLETED"
+      ? "success"
+      : "secondary";
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b bg-muted/30">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>{launch.name}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {launch.course.title} · versión {launch.course.version}
+            </p>
+          </div>
+          <Badge variant={badgeVariant}>{launchStatusLabels[launch.status]}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 py-5">
+        <div>
+          <div className="mb-2 flex justify-between text-sm">
+            <span>Despliegue de audiencia</span>
+            <strong>{launch.metrics.processed}/{launch.metrics.audience}</strong>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${rolloutPercent}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Lotes de {launch.batchSize}{launch.rolloutIntervalHours ? ` cada ${launch.rolloutIntervalHours} h` : " sin espera"}
+            {launch.nextBatchAt ? ` · próximo ${new Date(launch.nextBatchAt).toLocaleString("es")}` : ""}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ["Asignados", launch.metrics.assigned],
+            ["Iniciaron", launch.metrics.started],
+            ["Completaron", launch.metrics.completed],
+            ["Vencidos", launch.metrics.overdue],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl bg-muted/60 p-3">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="mt-1 text-xl font-semibold">{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Progreso promedio: <strong className="text-foreground">{launch.metrics.averageProgress}%</strong></p>
+          <div className="flex flex-wrap gap-2">
+            {launch.status === "DRAFT" || launch.status === "ACTIVE" ? (
+              <Button size="sm" onClick={onDeploy} disabled={pending}>
+                <Rocket className="size-4" />{launch.status === "DRAFT" ? "Iniciar" : "Siguiente lote"}
+              </Button>
+            ) : null}
+            {launch.status === "ACTIVE" || launch.status === "SCHEDULED" ? (
+              <Button size="sm" variant="secondary" onClick={() => onStatus("PAUSED")} disabled={pending}>
+                <Pause className="size-4" />Pausar
+              </Button>
+            ) : null}
+            {launch.status === "PAUSED" ? (
+              <Button size="sm" onClick={() => onStatus("ACTIVE")} disabled={pending}>
+                <RotateCcw className="size-4" />Reanudar
+              </Button>
+            ) : null}
+            {["DRAFT", "SCHEDULED", "ACTIVE", "PAUSED"].includes(launch.status) ? (
+              <Button size="sm" variant="ghost" onClick={() => onStatus("CANCELLED")} disabled={pending}>
+                Cancelar
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateLaunchDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const [courseId, setCourseId] = useState("");
+  const [audience, setAudience] = useState<TrainingLaunchAudience>("USERS");
+  const [targets, setTargets] = useState<string[]>([]);
+  const courses = useQuery({ queryKey: ["launch-courses"], queryFn: () => fetchTrainingCourses({ status: "PUBLISHED", pageSize: 100 }), enabled: open });
+  const users = useQuery({ queryKey: ["launch-users"], queryFn: fetchUsers, enabled: open && audience === "USERS" });
+  const branches = useQuery({ queryKey: ["launch-branches"], queryFn: () => fetchBranches(), enabled: open && audience === "BRANCHES" });
+  const mutation = useMutation({
+    mutationFn: createTrainingLaunch,
+    onSuccess: async (launch) => {
+      toast.success(launch.status === "SCHEDULED" ? "Lanzamiento programado" : "Campaña preparada");
+      onOpenChange(false);
+      setCourseId("");
+      setTargets([]);
+      await queryClient.invalidateQueries({ queryKey: ["training-launches"] });
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible crear la campaña.")),
+  });
+  const options =
+    audience === "USERS" ? (users.data ?? []).map((item) => ({ id: item.id, label: `${item.fullName} · ${item.email}` })) :
+    audience === "BRANCHES" ? (branches.data ?? []).map((item) => ({ id: item.id, label: item.name })) :
+    audience === "ROLES" ? roleTargets : [];
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const startAt = String(data.get("startAt") || "");
+    const dueAt = String(data.get("dueAt") || "");
+    mutation.mutate({
+      name: String(data.get("name")),
+      courseId,
+      audience,
+      targetIds: audience === "TENANT" ? undefined : targets,
+      batchSize: Number(data.get("batchSize")) || 100,
+      rolloutIntervalHours: Number(data.get("rolloutIntervalHours")) || 0,
+      startAt: startAt ? new Date(startAt).toISOString() : undefined,
+      dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+      isRequired: data.get("isRequired") === "on",
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Nueva campaña de lanzamiento</DialogTitle>
+          <DialogDescription>La audiencia se congela al crear la campaña para conservar una trazabilidad exacta.</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-5" onSubmit={submit}>
+          <div><Label htmlFor="launch-name">Nombre de campaña</Label><Input id="launch-name" name="name" maxLength={140} placeholder="Cumplimiento anual 2026" required /></div>
+          <div><Label>Curso publicado</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label>Audiencia</Label><Select value={audience} onValueChange={(value) => { setAudience(value as TrainingLaunchAudience); setTargets([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USERS">Personas específicas</SelectItem><SelectItem value="ROLES">Roles</SelectItem><SelectItem value="BRANCHES">Sucursales</SelectItem><SelectItem value="TENANT">Toda la empresa</SelectItem></SelectContent></Select></div>
+          {audience !== "TENANT" ? (
+            <fieldset className="max-h-48 space-y-1 overflow-y-auto rounded-xl border p-3">
+              <legend className="px-1 text-sm font-medium">Destinatarios</legend>
+              {options.map((option) => <label key={option.id} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-muted"><input type="checkbox" checked={targets.includes(option.id)} onChange={(event) => setTargets(event.target.checked ? [...targets, option.id] : targets.filter((id) => id !== option.id))}/><span>{option.label}</span></label>)}
+            </fieldset>
+          ) : <p className="rounded-xl bg-muted p-4 text-sm">Se congelará la lista actual de personas activas de la empresa.</p>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div><Label htmlFor="launch-batch">Personas por lote</Label><Input id="launch-batch" name="batchSize" type="number" min={1} max={1000} defaultValue={100} /></div>
+            <div><Label htmlFor="launch-interval">Intervalo entre lotes (horas)</Label><Input id="launch-interval" name="rolloutIntervalHours" type="number" min={0} max={720} defaultValue={0} /></div>
+            <div><Label htmlFor="launch-start">Inicio programado</Label><Input id="launch-start" name="startAt" type="datetime-local" /></div>
+            <div><Label htmlFor="launch-due">Fecha límite</Label><Input id="launch-due" name="dueAt" type="datetime-local" /></div>
+          </div>
+          <label className="flex items-center gap-3 rounded-xl border p-4"><input name="isRequired" type="checkbox" defaultChecked /><span><strong className="block text-sm">Formación obligatoria</strong><span className="text-xs text-muted-foreground">Se mostrará como requisito para toda la audiencia.</span></span></label>
+          <div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" disabled={!courseId || (audience !== "TENANT" && !targets.length) || mutation.isPending}>{mutation.isPending ? "Preparando…" : "Crear campaña"}</Button></div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

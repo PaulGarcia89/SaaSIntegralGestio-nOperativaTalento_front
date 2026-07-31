@@ -2,6 +2,8 @@
 
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   CalendarClock,
   CheckCircle2,
@@ -17,8 +19,13 @@ import {
   Send,
   Trash2,
   Video,
+  Award,
+  ClipboardCheck,
+  Rocket,
+  Target,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -32,6 +39,7 @@ import {
   ResponsiveDataView,
 } from "@/components/design-system";
 import { FormErrorSummary } from "@/components/form-error-summary";
+import { TrainingCourseFoundation } from "@/components/training-course-foundation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,22 +58,37 @@ import {
   createTrainingCategory,
   createTrainingContentBlock,
   createTrainingCourse,
+  createTrainingCoursePilot,
   createTrainingCourseModule,
   createTrainingLesson,
   deleteTrainingContentBlock,
   deleteTrainingCourse,
   deleteTrainingCourseModule,
   deleteTrainingLesson,
+  duplicateTrainingContentBlock,
   duplicateTrainingCourse,
+  duplicateTrainingCourseModule,
+  duplicateTrainingLesson,
   fetchTrainingCategories,
   fetchTrainingCourse,
+  fetchTrainingCourseDesign,
   fetchTrainingCoursePreview,
+  fetchTrainingCourseQuality,
+  fetchTrainingCertificationPolicy,
   fetchTrainingCourses,
+  fetchUsers,
   getApiErrorMessage,
+  reorderTrainingContentBlocks,
+  reorderTrainingCourseModules,
+  reorderTrainingLessons,
+  requestTrainingQualityReviews,
+  decideTrainingQualityReview,
   transitionTrainingCourse,
   updateTrainingContentBlock,
   updateTrainingCourse,
   updateTrainingCourseModule,
+  updateTrainingCertificationPolicy,
+  updateTrainingCoursePilotStatus,
   updateTrainingLesson,
 } from "@/lib/backend";
 import type {
@@ -74,8 +97,19 @@ import type {
   TrainingCourseDto,
   TrainingCourseInput,
   TrainingCourseStatus,
+  TrainingQualityReviewDto,
 } from "@/lib/contracts";
+import { REQUIRED_TRAINING_REVIEW_TYPES } from "@/lib/training-quality";
 import { useAppStore } from "@/store/app-store";
+import {
+  getTrainingCourseWizardState,
+  nextTrainingCourseWizardStep,
+  previousTrainingCourseWizardStep,
+  TRAINING_COURSE_WIZARD_STEPS,
+  type TrainingCourseWizardStep,
+} from "@/lib/training-course-wizard";
+import { moveTrainingEntity, trainingBlockSummary } from "@/lib/training-content-editor";
+import { getTrainingAssessmentReadiness } from "@/lib/training-assessment";
 
 const statusLabels: Record<TrainingCourseStatus, string> = {
   DRAFT: "Borrador",
@@ -105,7 +139,7 @@ const blockLabels: Record<TrainingContentBlockType, string> = {
   FILE: "Archivo",
   LINK: "Enlace",
   QUIZ: "Cuestionario",
-  TASK: "Tarea",
+  TASK: "Actividad práctica",
 };
 
 const emptyCourse: TrainingCourseInput = {
@@ -323,11 +357,11 @@ export function TrainingCourseManager() {
           await queryClient.invalidateQueries({ queryKey: ["training-categories"] });
         }}
       />
-      <CourseEditorDialog
+      {editorId ? <CourseEditorDialog
         courseId={editorId}
-        open={Boolean(editorId)}
+        open
         onOpenChange={(open) => !open && setEditorId(null)}
-      />
+      /> : null}
       <CoursePreviewDialog
         courseId={previewId}
         open={Boolean(previewId)}
@@ -566,12 +600,16 @@ function CourseMetadataForm({
   globalAllowed,
   onSaved,
   onCancel,
+  showCancel = true,
+  submitLabel,
 }: {
   course?: TrainingCourseDto;
   categories: Array<{ id: string; name: string }>;
   globalAllowed: boolean;
   onSaved: (course: TrainingCourseDto) => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  showCancel?: boolean;
+  submitLabel?: string;
 }) {
   const [form, setForm] = useState<TrainingCourseInput>(() =>
     course
@@ -658,31 +696,52 @@ function CourseMetadataForm({
         </FormField>
       ) : null}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button>
-        <Button type="submit" disabled={save.isPending || Boolean(errors.length)}>{save.isPending ? "Guardando…" : "Guardar"}</Button>
+        {showCancel ? <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button> : null}
+        <Button type="submit" disabled={save.isPending || Boolean(errors.length)}>{save.isPending ? "Guardando…" : submitLabel ?? "Guardar"}</Button>
       </div>
     </form>
   );
 }
 
-function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient();
   const { can, currentRole } = useAppStore();
-  const [metadataOpen, setMetadataOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [step, setStep] = useState<TrainingCourseWizardStep>(() => {
+    const saved = localStorage.getItem(`training-course-wizard:${courseId}`);
+    return TRAINING_COURSE_WIZARD_STEPS.some((item) => item.id === saved)
+      ? saved as TrainingCourseWizardStep
+      : "GENERAL";
+  });
+  const [previewed, setPreviewed] = useState(
+    () => localStorage.getItem(`training-course-previewed:${courseId}`) === "true",
+  );
   const query = useQuery({
     queryKey: ["training-course", courseId],
-    queryFn: () => fetchTrainingCourse(courseId!),
-    enabled: Boolean(courseId && open),
+    queryFn: () => fetchTrainingCourse(courseId),
+    enabled: open,
+  });
+  const design = useQuery({
+    queryKey: ["training-course-design", courseId],
+    queryFn: () => fetchTrainingCourseDesign(courseId),
+    enabled: open,
   });
   const categories = useQuery({ queryKey: ["training-categories"], queryFn: fetchTrainingCategories, enabled: open });
+
+  function selectStep(next: TrainingCourseWizardStep) {
+    setStep(next);
+    localStorage.setItem(`training-course-wizard:${courseId}`, next);
+  }
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["training-course", courseId] });
+    await queryClient.invalidateQueries({ queryKey: ["training-course-design", courseId] });
     await queryClient.invalidateQueries({ queryKey: ["training-admin-courses"] });
   };
   const transition = useMutation({
     mutationFn: ({ action, input }: { action: Parameters<typeof transitionTrainingCourse>[1]; input?: Parameters<typeof transitionTrainingCourse>[2] }) =>
-      transitionTrainingCourse(courseId!, action, input),
+      transitionTrainingCourse(courseId, action, input),
     onSuccess: async (course) => {
       toast.success(`Curso: ${statusLabels[course.status]}`);
       await refresh();
@@ -690,49 +749,466 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar el estado.")),
   });
+  const wizard = query.data ? getTrainingCourseWizardState(query.data, design.data, previewed) : null;
+  const currentIndex = TRAINING_COURSE_WIZARD_STEPS.findIndex((item) => item.id === step);
+  const currentStep = TRAINING_COURSE_WIZARD_STEPS[currentIndex] ?? TRAINING_COURSE_WIZARD_STEPS[0];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92dvh] max-w-6xl flex-col overflow-hidden p-0">
+      <DialogContent className="flex max-h-[94dvh] max-w-7xl flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b border-border-default p-6 pr-14">
-          <DialogTitle>{query.data?.title ?? "Editor de curso"}</DialogTitle>
-          <DialogDescription>Configura contenido, revisa la estructura y controla la publicación.</DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <DialogTitle>{query.data?.title ?? "Editor de curso"}</DialogTitle>
+              <DialogDescription>Asistente editorial con guardado por etapa y requisitos de publicación.</DialogDescription>
+            </div>
+            {wizard ? (
+              <div className="min-w-48">
+                <div className="mb-2 flex justify-between text-xs font-medium"><span>Avance editorial</span><span>{wizard.progressPercent}%</span></div>
+                <div className="h-2 overflow-hidden rounded-full bg-surface-section"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${wizard.progressPercent}%` }} /></div>
+              </div>
+            ) : null}
+          </div>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+          {query.data && wizard ? <WizardSidebar step={step} wizard={wizard} onSelect={selectStep} /> : null}
+          <div className="min-h-0 overflow-y-auto p-6">
           {query.isLoading ? <AsyncState state="loading" /> : null}
-          {query.isError ? <AsyncState state="error" onRetry={() => void query.refetch()} /> : null}
-          {query.data ? (
+          {query.isError || design.isError ? <AsyncState state="error" onRetry={() => { void query.refetch(); void design.refetch(); }} /> : null}
+          {query.data && design.data && wizard ? (
             <div className="space-y-6">
-              <EditorSummary course={query.data} />
-              <WorkflowActions
-                course={query.data}
-                can={can}
-                pending={transition.isPending}
-                onTransition={(action) => action === "schedule" ? setScheduleOpen(true) : transition.mutate({ action })}
-                onEdit={() => setMetadataOpen(true)}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Paso {currentIndex + 1} de {TRAINING_COURSE_WIZARD_STEPS.length}</p>
+                <h2 className="mt-1 text-2xl font-semibold">{currentStep.label}</h2>
+                <p className="text-sm text-text-secondary">{currentStep.description}</p>
+              </div>
+              {step === "GENERAL" ? (
+                <Card level={2}><CardContent className="p-5"><CourseMetadataForm
+                  course={query.data}
+                  categories={categories.data ?? []}
+                  globalAllowed={currentRole === "admin_saas"}
+                  showCancel={false}
+                  submitLabel="Guardar y continuar"
+                  onSaved={async () => { await refresh(); selectStep("FOUNDATION"); }}
+                /></CardContent></Card>
+              ) : null}
+              {step === "FOUNDATION" ? (
+                <TrainingCourseFoundation
+                  courseId={query.data.id}
+                  courseTenantId={query.data.tenantId}
+                  editable={can("courses.update")}
+                  onChanged={refresh}
+                  onSaved={() => selectStep("STRUCTURE")}
+                />
+              ) : null}
+              {step === "STRUCTURE" ? (
+                <>
+                  <CourseStructure course={query.data} editable={can("courses.update")} onChanged={refresh} />
+                  <WizardContinue onClick={() => selectStep("ASSESSMENT")} label="Continuar a evaluación" />
+                </>
+              ) : null}
+              {step === "ASSESSMENT" ? <AssessmentWizardStep course={query.data} onContinue={() => selectStep("CERTIFICATION")} /> : null}
+              {step === "CERTIFICATION" ? <CertificationWizardStep course={query.data} onChanged={refresh} onContinue={() => selectStep("PREVIEW")} /> : null}
+              {step === "PREVIEW" ? (
+                <PreviewWizardStep
+                  previewed={previewed}
+                  onPreview={() => {
+                    setPreviewOpen(true);
+                    setPreviewed(true);
+                    localStorage.setItem(`training-course-previewed:${query.data.id}`, "true");
+                  }}
+                  onContinue={() => selectStep("PUBLISH")}
+                />
+              ) : null}
+              {step === "PUBLISH" ? (
+                <PublishWizardStep
+                  course={query.data}
+                  wizard={wizard}
+                  can={can}
+                  pending={transition.isPending}
+                  onChanged={refresh}
+                  onTransition={(action) => action === "schedule" ? setScheduleOpen(true) : transition.mutate({ action })}
+                  onGoTo={selectStep}
+                />
+              ) : null}
+              <WizardFooter
+                step={step}
+                onPrevious={() => selectStep(previousTrainingCourseWizardStep(step))}
+                onNext={() => selectStep(nextTrainingCourseWizardStep(step))}
               />
-              <CourseStructure course={query.data} editable={can("courses.update")} onChanged={refresh} />
             </div>
           ) : null}
+          </div>
         </div>
       </DialogContent>
-      {query.data ? (
-        <CourseFormDialog
-          open={metadataOpen}
-          onOpenChange={setMetadataOpen}
-          categories={categories.data ?? []}
-          globalAllowed={currentRole === "admin_saas"}
-          course={query.data}
-          onSaved={async () => { setMetadataOpen(false); await refresh(); }}
-        />
-      ) : null}
       <ScheduleDialog
         open={scheduleOpen}
         onOpenChange={setScheduleOpen}
         pending={transition.isPending}
         onConfirm={(input) => transition.mutate({ action: "schedule", input })}
       />
+      <CoursePreviewDialog courseId={courseId} open={previewOpen} onOpenChange={setPreviewOpen} />
     </Dialog>
+  );
+}
+
+type CourseWizardState = ReturnType<typeof getTrainingCourseWizardState>;
+
+function WizardSidebar({
+  step,
+  wizard,
+  onSelect,
+}: {
+  step: TrainingCourseWizardStep;
+  wizard: CourseWizardState;
+  onSelect: (step: TrainingCourseWizardStep) => void;
+}) {
+  const icons: Record<TrainingCourseWizardStep, ReactNode> = {
+    GENERAL: <FileText className="size-4" />,
+    FOUNDATION: <Target className="size-4" />,
+    STRUCTURE: <BookOpen className="size-4" />,
+    ASSESSMENT: <ClipboardCheck className="size-4" />,
+    CERTIFICATION: <Award className="size-4" />,
+    PREVIEW: <Eye className="size-4" />,
+    PUBLISH: <Rocket className="size-4" />,
+  };
+  return (
+    <aside className="overflow-y-auto border-b border-border-default bg-surface-section p-4 lg:border-b-0 lg:border-r">
+      <nav aria-label="Etapas del curso" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        {TRAINING_COURSE_WIZARD_STEPS.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onSelect(item.id)}
+            aria-current={step === item.id ? "step" : undefined}
+            className={`flex min-h-14 items-start gap-3 rounded-xl border p-3 text-left transition-colors ${step === item.id ? "border-primary bg-surface-elevated shadow-sm" : "border-transparent hover:border-border-default hover:bg-surface-elevated"}`}
+          >
+            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${wizard.completed[item.id] ? "bg-status-success-soft text-status-success" : "bg-surface-elevated text-text-secondary"}`}>
+              {wizard.completed[item.id] ? <CheckCircle2 className="size-4" /> : icons[item.id]}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">{index + 1}. {item.label}</span>
+              <span className="block text-xs text-text-secondary">{item.description}</span>
+              {!item.required ? <span className="mt-1 block text-[11px] text-text-secondary">Recomendado</span> : null}
+            </span>
+          </button>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
+function AssessmentWizardStep({ course, onContinue }: { course: TrainingCourseDto; onContinue: () => void }) {
+  return (
+    <Card level={2}>
+      <CardHeader><CardTitle>Comprobación del aprendizaje</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        {course.quizzes?.length ? (
+          <div className="space-y-2">
+            {course.quizzes.map((quiz) => (
+              <div key={quiz.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default p-4">
+                <div><strong>{quiz.title}</strong><p className="text-sm text-text-secondary">{quiz.questions.length} preguntas · Aprobación {quiz.passingScore}% · {quiz.maxAttempts ?? "∞"} intentos</p></div>
+                <Badge variant={getTrainingAssessmentReadiness(quiz).ready ? "success" : "warning"}>
+                  {getTrainingAssessmentReadiness(quiz).ready ? "Lista" : "Requiere ajustes"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <InlineFeedback tone="info" title="Evaluación recomendada">
+            El curso todavía no tiene una evaluación. Puedes continuar, pero una evaluación permitirá comprobar los objetivos en la fase de medición.
+          </InlineFeedback>
+        )}
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button asChild variant="secondary"><Link href={`/training/evaluations?courseId=${encodeURIComponent(course.id)}`}>Gestionar evaluaciones</Link></Button>
+          <Button type="button" onClick={onContinue}>Continuar</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CertificationWizardStep({ course, onChanged, onContinue }: { course: TrainingCourseDto; onChanged: () => Promise<void>; onContinue: () => void }) {
+  const query = useQuery({
+    queryKey: ["training-certification-policy", course.id],
+    queryFn: () => fetchTrainingCertificationPolicy(course.id),
+  });
+  const save = useMutation({
+    mutationFn: (input: Parameters<typeof updateTrainingCertificationPolicy>[1]) =>
+      updateTrainingCertificationPolicy(course.id, input),
+    onSuccess: async () => {
+      toast.success("Política de certificación guardada");
+      await query.refetch();
+      await onChanged();
+      onContinue();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible guardar la certificación.")),
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    save.mutate({
+      isEnabled: data.get("isEnabled") === "on",
+      autoIssue: data.get("autoIssue") === "on",
+      requireAssessment: data.get("requireAssessment") === "on",
+      requireAllRequiredLessons: data.get("requireAllRequiredLessons") === "on",
+      validityDays: Number(data.get("validityDays")) || undefined,
+      renewalWindowDays: Number(data.get("renewalWindowDays")) || 0,
+      reminderDays: String(data.get("reminderDays") || "").split(",").map(Number).filter((value) => Number.isInteger(value) && value >= 0),
+      certificateTitle: String(data.get("certificateTitle") || "") || undefined,
+      certificateDescription: String(data.get("certificateDescription") || "") || undefined,
+      signatoryName: String(data.get("signatoryName") || "") || undefined,
+      signatoryTitle: String(data.get("signatoryTitle") || "") || undefined,
+      badgeImageUrl: String(data.get("badgeImageUrl") || "") || undefined,
+    });
+  }
+  if (query.isLoading) return <AsyncState state="loading" />;
+  if (query.isError || !query.data) return <AsyncState state="error" onRetry={() => void query.refetch()} />;
+  const policy = query.data.policy;
+  return (
+    <Card level={2}>
+      <CardHeader><CardTitle>Certificación, vigencia y renovación</CardTitle></CardHeader>
+      <CardContent>
+        <form key={policy.version} className="space-y-5" onSubmit={submit}>
+          <FormErrorSummary serverError={save.error} />
+          {!query.data.readiness.ready && policy.isEnabled ? <InlineFeedback tone="warning" title="Configuración incompleta">{query.data.readiness.errors.join(" · ")}</InlineFeedback> : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex items-center gap-3 rounded-xl border border-border-default p-4"><input type="checkbox" name="isEnabled" defaultChecked={policy.isEnabled} /><span><strong>Emitir certificado</strong><span className="block text-sm text-text-secondary">Habilita una credencial verificable para este curso.</span></span></label>
+            <label className="flex items-center gap-3 rounded-xl border border-border-default p-4"><input type="checkbox" name="autoIssue" defaultChecked={policy.autoIssue} /><span><strong>Emisión automática</strong><span className="block text-sm text-text-secondary">Se emite al cumplir toda la evidencia.</span></span></label>
+            <label className="flex items-center gap-3 rounded-xl border border-border-default p-4"><input type="checkbox" name="requireAssessment" defaultChecked={policy.requireAssessment} /><span><strong>Exigir evaluación</strong><span className="block text-sm text-text-secondary">Todas las evaluaciones deben estar aprobadas.</span></span></label>
+            <label className="flex items-center gap-3 rounded-xl border border-border-default p-4"><input type="checkbox" name="requireAllRequiredLessons" defaultChecked={policy.requireAllRequiredLessons} /><span><strong>Exigir lecciones obligatorias</strong><span className="block text-sm text-text-secondary">Valida progreso antes de emitir.</span></span></label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <FormField id="cert-validity" label="Vigencia (días)">{(field) => <Input {...field} name="validityDays" type="number" min={1} max={3650} defaultValue={policy.validityDays ?? ""} placeholder="Sin vencimiento" />}</FormField>
+            <FormField id="cert-renewal-window" label="Ventana de renovación">{(field) => <Input {...field} name="renewalWindowDays" type="number" min={0} max={365} defaultValue={policy.renewalWindowDays} />}</FormField>
+            <FormField id="cert-reminders" label="Avisos antes de vencer">{(field) => <Input {...field} name="reminderDays" defaultValue={policy.reminderDays.join(",")} placeholder="30,7,1" />}</FormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField id="cert-title" label="Título de la credencial">{(field) => <Input {...field} name="certificateTitle" defaultValue={policy.certificateTitle ?? course.title} />}</FormField>
+            <FormField id="cert-badge" label="URL de insignia">{(field) => <Input {...field} name="badgeImageUrl" type="url" defaultValue={policy.badgeImageUrl ?? ""} />}</FormField>
+            <FormField id="cert-signatory" label="Nombre del firmante">{(field) => <Input {...field} name="signatoryName" defaultValue={policy.signatoryName ?? ""} />}</FormField>
+            <FormField id="cert-signatory-title" label="Cargo del firmante">{(field) => <Input {...field} name="signatoryTitle" defaultValue={policy.signatoryTitle ?? ""} />}</FormField>
+          </div>
+          <FormField id="cert-description" label="Descripción de la credencial">{(field) => <textarea {...field} name="certificateDescription" className="min-h-24 w-full rounded-xl border border-border-default bg-surface-elevated p-3" defaultValue={policy.certificateDescription ?? ""} />}</FormField>
+          <div className="flex flex-wrap justify-end gap-2"><Button asChild variant="secondary"><Link href={`/training/certificates?courseId=${encodeURIComponent(course.id)}`}>Ver certificados</Link></Button><Button type="submit" disabled={save.isPending}>{save.isPending ? "Guardando…" : "Guardar y continuar"}</Button></div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PreviewWizardStep({ previewed, onPreview, onContinue }: { previewed: boolean; onPreview: () => void; onContinue: () => void }) {
+  return (
+    <Card level={2}>
+      <CardHeader><CardTitle>Experiencia del participante</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-text-secondary">Revisa portada, secuencia, títulos y recursos antes de solicitar aprobación.</p>
+        {previewed ? <InlineFeedback tone="success" title="Vista previa revisada">Esta sesión ya abrió la experiencia del participante.</InlineFeedback> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onPreview}><Eye className="size-4" />Abrir vista previa</Button>
+          <Button type="button" onClick={onContinue}>Continuar a revisión</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PublishWizardStep({
+  course,
+  wizard,
+  can,
+  pending,
+  onChanged,
+  onTransition,
+  onGoTo,
+}: {
+  course: TrainingCourseDto;
+  wizard: CourseWizardState;
+  can: (permission: Parameters<ReturnType<typeof useAppStore>["can"]>[0]) => boolean;
+  pending: boolean;
+  onChanged: () => Promise<void>;
+  onTransition: (action: Parameters<typeof transitionTrainingCourse>[1]) => void;
+  onGoTo: (step: TrainingCourseWizardStep) => void;
+}) {
+  const missing = TRAINING_COURSE_WIZARD_STEPS.filter((item) => item.required && item.id !== "PUBLISH" && !wizard.completed[item.id]);
+  return (
+    <div className="space-y-5">
+      <EditorSummary course={course} />
+      {missing.length ? (
+        <InlineFeedback tone="warning" title="El curso todavía no puede enviarse a revisión">
+          <div className="mt-2 flex flex-wrap gap-2">{missing.map((item) => <Button key={item.id} type="button" size="sm" variant="secondary" onClick={() => onGoTo(item.id)}>Completar {item.label}</Button>)}</div>
+        </InlineFeedback>
+      ) : (
+        <InlineFeedback tone="success" title="Requisitos editoriales completos">
+          Información, fundamento pedagógico y estructura están preparados para revisión.
+        </InlineFeedback>
+      )}
+      {!wizard.completed.ASSESSMENT ? <InlineFeedback tone="info" title="Recomendación">Añade una evaluación antes de publicar para medir el aprendizaje.</InlineFeedback> : null}
+      <CourseQualityGate course={course} canApprove={can("courses.approve")} onChanged={onChanged} />
+      <WorkflowActions
+        course={course}
+        can={can}
+        pending={pending}
+        reviewReady={wizard.requiredReady}
+        onTransition={onTransition}
+        onEdit={() => onGoTo("GENERAL")}
+      />
+    </div>
+  );
+}
+
+const qualityReviewLabels = {
+  CONTENT: "Contenido",
+  PEDAGOGY: "Pedagogía",
+  ACCESSIBILITY: "Accesibilidad",
+  COMPLIANCE: "Cumplimiento",
+} as const;
+
+function CourseQualityGate({ course, canApprove, onChanged }: { course: TrainingCourseDto; canApprove: boolean; onChanged: () => Promise<void> }) {
+  const [decisionReview, setDecisionReview] = useState<TrainingQualityReviewDto | null>(null);
+  const [pilotOpen, setPilotOpen] = useState(false);
+  const query = useQuery({
+    queryKey: ["training-course-quality", course.id, course.version],
+    queryFn: () => fetchTrainingCourseQuality(course.id),
+  });
+  const refresh = async () => {
+    await query.refetch();
+    await onChanged();
+  };
+  const requestReviews = useMutation({
+    mutationFn: () => requestTrainingQualityReviews(course.id, REQUIRED_TRAINING_REVIEW_TYPES),
+    onSuccess: async () => { toast.success("Revisiones solicitadas"); await refresh(); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible solicitar las revisiones.")),
+  });
+  const pilotStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "ACTIVE" | "COMPLETED" | "CANCELLED" }) =>
+      updateTrainingCoursePilotStatus(id, status),
+    onSuccess: async () => { toast.success("Estado del piloto actualizado"); await refresh(); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el piloto.")),
+  });
+  if (query.isLoading) return <AsyncState state="loading" />;
+  if (query.isError || !query.data) return <AsyncState state="error" onRetry={() => void query.refetch()} />;
+  const quality = query.data;
+  return (
+    <Card level={2}>
+      <CardHeader className="flex-row items-start justify-between gap-4">
+        <div><CardTitle>Control de calidad · versión {quality.courseVersion}</CardTitle><p className="mt-1 text-sm text-text-secondary">Las aprobaciones anteriores no se reutilizan cuando cambia la versión.</p></div>
+        <Badge variant={quality.readiness.ready ? "success" : "warning"}>{quality.readiness.ready ? "Go" : "Gates pendientes"}</Badge>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {REQUIRED_TRAINING_REVIEW_TYPES.map((type) => {
+            const review = quality.reviews.find((item) => item.reviewType === type);
+            return (
+              <div key={type} className="rounded-xl border border-border-default p-4">
+                <div className="flex items-center justify-between gap-3"><strong>{qualityReviewLabels[type]}</strong><Badge variant={review?.status === "APPROVED" ? "success" : review?.status === "CHANGES_REQUESTED" ? "destructive" : "secondary"}>{review?.status === "APPROVED" ? "Aprobada" : review?.status === "CHANGES_REQUESTED" ? "Cambios" : review ? "Pendiente" : "No solicitada"}</Badge></div>
+                {review?.summary ? <p className="mt-2 text-sm text-text-secondary">{review.summary}</p> : null}
+                {review && canApprove && review.status === "PENDING" ? <Button className="mt-3 w-full" size="sm" variant="secondary" onClick={() => setDecisionReview(review)}>Revisar gate</Button> : null}
+              </div>
+            );
+          })}
+        </div>
+        {!quality.reviews.length && course.status === "IN_REVIEW" ? <Button type="button" variant="secondary" onClick={() => requestReviews.mutate()} disabled={requestReviews.isPending}>Solicitar las cuatro revisiones</Button> : null}
+        {!quality.reviews.length && course.status === "DRAFT" ? <InlineFeedback tone="info" title="Primero envía el curso a revisión">El envío abrirá una nueva versión editorial y creará automáticamente los cuatro gates.</InlineFeedback> : null}
+        <div className="border-t border-border-default pt-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">Piloto de la versión</h3><p className="text-sm text-text-secondary">Opcional; si se crea, debe cumplir sus criterios antes del go-live.</p></div>{course.status === "IN_REVIEW" ? <Button type="button" variant="secondary" onClick={() => setPilotOpen(true)}><Plus className="size-4" />Crear piloto</Button> : null}</div>
+          {quality.pilots.length ? <div className="space-y-3">{quality.pilots.map((pilot) => (
+            <div key={pilot.id} className="rounded-xl border border-border-default p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3"><div><strong>{pilot.name}</strong><p className="text-sm text-text-secondary">{pilot.metrics?.responses ?? 0}/{pilot.metrics?.participants ?? pilot.participantIds.length} respuestas · promedio {pilot.metrics?.averageRating ?? 0}/5 · {pilot.metrics?.blockingIssues ?? 0} bloqueos</p></div><Badge>{pilot.status}</Badge></div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {pilot.status === "DRAFT" ? <Button size="sm" onClick={() => pilotStatus.mutate({ id: pilot.id, status: "ACTIVE" })}>Activar piloto</Button> : null}
+                {pilot.status === "ACTIVE" ? <><Button size="sm" onClick={() => pilotStatus.mutate({ id: pilot.id, status: "COMPLETED" })}>Cerrar con éxito</Button><Button size="sm" variant="secondary" onClick={() => pilotStatus.mutate({ id: pilot.id, status: "CANCELLED" })}>Cancelar</Button></> : null}
+              </div>
+            </div>
+          ))}</div> : <p className="text-sm text-text-secondary">No se creó un piloto para esta versión.</p>}
+        </div>
+        {!quality.readiness.ready ? <InlineFeedback tone="warning" title="Pendiente para aprobar">{quality.readiness.errors.join(" · ")}</InlineFeedback> : <InlineFeedback tone="success" title="Go-live autorizado">Todos los gates de calidad están aprobados.</InlineFeedback>}
+      </CardContent>
+      <QualityDecisionDialog review={decisionReview} onClose={() => setDecisionReview(null)} onSaved={refresh} />
+      <PilotDialog courseId={course.id} open={pilotOpen} onOpenChange={setPilotOpen} onSaved={refresh} />
+    </Card>
+  );
+}
+
+function QualityDecisionDialog({ review, onClose, onSaved }: { review: TrainingQualityReviewDto | null; onClose: () => void; onSaved: () => Promise<void> }) {
+  const mutation = useMutation({
+    mutationFn: ({ status, checklist, summary }: { status: "APPROVED" | "CHANGES_REQUESTED"; checklist: Record<string, boolean>; summary: string }) =>
+      decideTrainingQualityReview(review!.id, { status, checklist, summary }),
+    onSuccess: async () => { toast.success("Decisión registrada"); onClose(); await onSaved(); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible registrar la decisión.")),
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const status = String(data.get("decision")) as "APPROVED" | "CHANGES_REQUESTED";
+    const summary = String(data.get("summary") || "");
+    mutation.mutate({
+      status,
+      summary,
+      checklist: {
+        accurate: data.get("accurate") === "on",
+        complete: data.get("complete") === "on",
+        usable: data.get("usable") === "on",
+        traceable: data.get("traceable") === "on",
+      },
+    });
+  }
+  return (
+    <FormDialog open={Boolean(review)} onOpenChange={(open) => !open && onClose()} title={`Revisión de ${review ? qualityReviewLabels[review.reviewType] : ""}`} description="Registra evidencia y una decisión explícita para esta versión.">
+      <form className="space-y-4" onSubmit={submit}>
+        {["accurate:Información correcta", "complete:Cobertura completa", "usable:Experiencia utilizable", "traceable:Evidencia trazable"].map((item) => { const [name, label] = item.split(":"); return <label key={name} className="flex items-center gap-3 rounded-xl border border-border-default p-3"><input type="checkbox" name={name} />{label}</label>; })}
+        <div><Label>Decisión</Label><Select name="decision" defaultValue="APPROVED"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="APPROVED">Aprobar</SelectItem><SelectItem value="CHANGES_REQUESTED">Solicitar cambios</SelectItem></SelectContent></Select></div>
+        <div><Label htmlFor="quality-summary">Observaciones</Label><textarea id="quality-summary" name="summary" className="min-h-28 w-full rounded-xl border border-border-default bg-surface-elevated p-3" required /></div>
+        <Button className="w-full" disabled={mutation.isPending}>Registrar decisión</Button>
+      </form>
+    </FormDialog>
+  );
+}
+
+function PilotDialog({ courseId, open, onOpenChange, onSaved }: { courseId: string; open: boolean; onOpenChange: (open: boolean) => void; onSaved: () => Promise<void> }) {
+  const users = useQuery({ queryKey: ["training-pilot-users"], queryFn: fetchUsers, enabled: open });
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
+  const mutation = useMutation({
+    mutationFn: (input: Parameters<typeof createTrainingCoursePilot>[1]) => createTrainingCoursePilot(courseId, input),
+    onSuccess: async () => { toast.success("Piloto creado"); setParticipantIds([]); onOpenChange(false); await onSaved(); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible crear el piloto.")),
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    mutation.mutate({
+      name: String(data.get("name")),
+      participantIds,
+      successCriteria: {
+        minResponses: Number(data.get("minResponses")) || 1,
+        minAverageRating: Number(data.get("minAverageRating")) || 4,
+      },
+    });
+  }
+  return (
+    <FormDialog open={open} onOpenChange={onOpenChange} title="Crear piloto" description="Selecciona participantes y define la evidencia mínima para autorizar el go-live.">
+      <form className="space-y-4" onSubmit={submit}>
+        <div><Label htmlFor="pilot-name">Nombre</Label><Input id="pilot-name" name="name" required placeholder="Piloto operaciones · cohorte 1" /></div>
+        <div className="grid gap-3 sm:grid-cols-2"><div><Label>Respuestas mínimas</Label><Input name="minResponses" type="number" min={1} defaultValue={3} /></div><div><Label>Promedio mínimo</Label><Input name="minAverageRating" type="number" min={1} max={5} step="0.1" defaultValue={4} /></div></div>
+        <div><Label>Participantes</Label><div className="mt-2 max-h-56 space-y-2 overflow-y-auto">{users.data?.map((user) => <label key={user.id} className="flex items-center gap-3 rounded-xl border border-border-default p-3"><input type="checkbox" checked={participantIds.includes(user.id)} onChange={(event) => setParticipantIds(event.target.checked ? [...participantIds, user.id] : participantIds.filter((id) => id !== user.id))} /><span>{user.fullName}<span className="block text-xs text-text-secondary">{user.email}</span></span></label>)}</div></div>
+        <Button className="w-full" disabled={!participantIds.length || mutation.isPending}>Crear piloto</Button>
+      </form>
+    </FormDialog>
+  );
+}
+
+function WizardContinue({ onClick, label }: { onClick: () => void; label: string }) {
+  return <div className="flex justify-end"><Button type="button" onClick={onClick}>{label}<ChevronRight className="size-4" /></Button></div>;
+}
+
+function WizardFooter({ step, onPrevious, onNext }: { step: TrainingCourseWizardStep; onPrevious: () => void; onNext: () => void }) {
+  const first = step === TRAINING_COURSE_WIZARD_STEPS[0].id;
+  const last = step === TRAINING_COURSE_WIZARD_STEPS[TRAINING_COURSE_WIZARD_STEPS.length - 1].id;
+  return (
+    <div className="flex justify-between border-t border-border-default pt-4">
+      <Button type="button" variant="ghost" disabled={first} onClick={onPrevious}>Anterior</Button>
+      <Button type="button" variant="ghost" disabled={last} onClick={onNext}>Siguiente</Button>
+    </div>
   );
 }
 
@@ -762,12 +1238,14 @@ function WorkflowActions({
   pending,
   onTransition,
   onEdit,
+  reviewReady = true,
 }: {
   course: TrainingCourseDto;
   can: (permission: Parameters<ReturnType<typeof useAppStore>["can"]>[0]) => boolean;
   pending: boolean;
   onTransition: (action: Parameters<typeof transitionTrainingCourse>[1]) => void;
   onEdit: () => void;
+  reviewReady?: boolean;
 }) {
   const actions: Array<{ status: TrainingCourseStatus[]; permission: Parameters<typeof can>[0]; action: Parameters<typeof onTransition>[0]; label: string; icon: ReactNode }> = [
     { status: ["DRAFT"], permission: "courses.review", action: "submit-review", label: "Enviar a revisión", icon: <Send className="size-4" /> },
@@ -785,7 +1263,7 @@ function WorkflowActions({
         <Button type="button" variant="secondary" onClick={onEdit}><Pencil className="size-4" />Información</Button>
       ) : null}
       {actions.filter((item) => item.status.includes(course.status) && can(item.permission)).map((item) => (
-        <Button key={item.action} type="button" variant={item.action === "archive" || item.action === "retire" ? "secondary" : "default"} disabled={pending} onClick={() => onTransition(item.action)}>
+        <Button key={item.action} type="button" variant={item.action === "archive" || item.action === "retire" ? "secondary" : "default"} disabled={pending || (item.action === "submit-review" && !reviewReady)} onClick={() => onTransition(item.action)}>
           {item.icon}{item.label}
         </Button>
       ))}
@@ -800,14 +1278,22 @@ function CourseStructure({ course, editable, onChanged }: { course: TrainingCour
     onSuccess: async () => { setModuleTitle(""); toast.success("Módulo añadido"); await onChanged(); },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible añadir el módulo.")),
   });
+  const reorder = useMutation({
+    mutationFn: (entityIds: string[]) => reorderTrainingCourseModules(course.id, entityIds),
+    onSuccess: onChanged,
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible reordenar los módulos.")),
+  });
+  const moveModule = (moduleId: string, direction: -1 | 1) => {
+    reorder.mutate(moveTrainingEntity(course.modules.map((item) => item.id), moduleId, direction));
+  };
   return (
     <section className="space-y-4" aria-labelledby="course-structure-title">
       <div>
         <h2 id="course-structure-title" className="text-xl font-semibold">Estructura del curso</h2>
-        <p className="text-sm text-text-secondary">Organiza el aprendizaje en módulos, lecciones y bloques.</p>
+        <p className="text-sm text-text-secondary">Construye módulos, lecciones, recursos y práctica en el orden exacto que seguirá el participante.</p>
       </div>
-      {course.modules.length ? course.modules.map((module) => (
-        <ModuleEditor key={module.id} module={module} editable={editable} onChanged={onChanged} />
+      {course.modules.length ? course.modules.map((module, index) => (
+        <ModuleEditor key={module.id} module={module} index={index} total={course.modules.length} editable={editable} moving={reorder.isPending} onMove={moveModule} onChanged={onChanged} />
       )) : <InlineFeedback tone="info" title="Sin módulos">Añade un módulo para comenzar a estructurar el curso.</InlineFeedback>}
       {editable ? (
         <form className="flex flex-col gap-2 rounded-2xl border border-dashed border-border-strong p-4 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (moduleTitle.trim()) createModule.mutate(); }}>
@@ -819,63 +1305,97 @@ function CourseStructure({ course, editable, onChanged }: { course: TrainingCour
   );
 }
 
-function ModuleEditor({ module, editable, onChanged }: { module: TrainingCourseDto["modules"][number]; editable: boolean; onChanged: () => Promise<void> }) {
+function OrderButtons({ label, index, total, pending, onMove }: { label: string; index: number; total: number; pending: boolean; onMove: (direction: -1 | 1) => void }) {
+  return (
+    <div className="flex gap-1">
+      <Button type="button" size="icon" variant="ghost" aria-label={`Subir ${label}`} disabled={index === 0 || pending} onClick={() => onMove(-1)}><ArrowUp className="size-4" /></Button>
+      <Button type="button" size="icon" variant="ghost" aria-label={`Bajar ${label}`} disabled={index === total - 1 || pending} onClick={() => onMove(1)}><ArrowDown className="size-4" /></Button>
+    </div>
+  );
+}
+
+function ModuleEditor({ module, index, total, editable, moving, onMove, onChanged }: { module: TrainingCourseDto["modules"][number]; index: number; total: number; editable: boolean; moving: boolean; onMove: (moduleId: string, direction: -1 | 1) => void; onChanged: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(module.title);
+  const [description, setDescription] = useState(module.description ?? "");
+  const [isRequired, setIsRequired] = useState(module.isRequired);
   const [lessonTitle, setLessonTitle] = useState("");
-  const update = useMutation({ mutationFn: () => updateTrainingCourseModule(module.id, { title }), onSuccess: async () => { setEditing(false); await onChanged(); } });
+  const update = useMutation({ mutationFn: () => updateTrainingCourseModule(module.id, { title, description: description || undefined, isRequired }), onSuccess: async () => { setEditing(false); await onChanged(); } });
   const remove = useMutation({ mutationFn: () => deleteTrainingCourseModule(module.id), onSuccess: onChanged });
+  const duplicate = useMutation({ mutationFn: () => duplicateTrainingCourseModule(module.id), onSuccess: async () => { toast.success("Módulo duplicado"); await onChanged(); } });
   const createLesson = useMutation({
     mutationFn: () => createTrainingLesson(module.id, { title: lessonTitle, sortOrder: module.lessons.length }),
     onSuccess: async () => { setLessonTitle(""); await onChanged(); },
   });
+  const reorder = useMutation({
+    mutationFn: (entityIds: string[]) => reorderTrainingLessons(module.id, entityIds),
+    onSuccess: onChanged,
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible reordenar las lecciones.")),
+  });
+  const moveLesson = (lessonId: string, direction: -1 | 1) => {
+    reorder.mutate(moveTrainingEntity(module.lessons.map((item) => item.id), lessonId, direction));
+  };
   return (
     <Card level={2}>
-      <CardHeader className="flex-row items-center gap-3">
+      <CardHeader className="flex-row items-start gap-3">
         <Button type="button" size="icon" variant="ghost" aria-label={expanded ? "Contraer módulo" : "Expandir módulo"} onClick={() => setExpanded(!expanded)}>
           {expanded ? <ChevronDown /> : <ChevronRight />}
         </Button>
         <div className="min-w-0 flex-1">
-          {editing ? <Input aria-label="Título del módulo" value={title} onChange={(event) => setTitle(event.target.value)} /> : <CardTitle>{module.title}</CardTitle>}
-          <p className="mt-1 text-sm text-text-secondary">{module.lessons.length} lecciones</p>
+          {editing ? <div className="space-y-2"><Input aria-label="Título del módulo" value={title} onChange={(event) => setTitle(event.target.value)} /><textarea aria-label="Descripción del módulo" className="min-h-20 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm" placeholder="Qué logrará el participante en este módulo" value={description} onChange={(event) => setDescription(event.target.value)} /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />Módulo obligatorio</label></div> : <><CardTitle>{module.title}</CardTitle>{module.description ? <p className="mt-1 text-sm text-text-secondary">{module.description}</p> : null}</>}
+          <p className="mt-1 text-xs text-text-secondary">{module.lessons.length} lecciones · {module.isRequired ? "Obligatorio" : "Opcional"}</p>
         </div>
-        {editable ? <div className="flex gap-1">{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim()}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${module.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${module.title}`} onClick={() => remove.mutate()} disabled={remove.isPending}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
+        {editable ? <div className="flex flex-wrap justify-end gap-1"><OrderButtons label={module.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(module.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${module.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${module.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${module.title}`} onClick={() => remove.mutate()} disabled={remove.isPending}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       </CardHeader>
-      {expanded ? <CardContent className="space-y-3">{module.lessons.map((lesson) => <LessonEditor key={lesson.id} lesson={lesson} editable={editable} onChanged={onChanged} />)}{editable ? <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (lessonTitle.trim()) createLesson.mutate(); }}><Input aria-label="Título de la nueva lección" placeholder="Nueva lección" value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} /><Button type="submit" variant="secondary" disabled={!lessonTitle.trim()}><Plus className="size-4" />Lección</Button></form> : null}</CardContent> : null}
+      {expanded ? <CardContent className="space-y-3">{module.lessons.map((lesson, lessonIndex) => <LessonEditor key={lesson.id} lesson={lesson} index={lessonIndex} total={module.lessons.length} editable={editable} moving={reorder.isPending} onMove={moveLesson} onChanged={onChanged} />)}{editable ? <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (lessonTitle.trim()) createLesson.mutate(); }}><Input aria-label="Título de la nueva lección" placeholder="Nueva lección" value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} /><Button type="submit" variant="secondary" disabled={!lessonTitle.trim() || createLesson.isPending}><Plus className="size-4" />Lección</Button></form> : null}</CardContent> : null}
     </Card>
   );
 }
 
-function LessonEditor({ lesson, editable, onChanged }: { lesson: TrainingCourseDto["modules"][number]["lessons"][number]; editable: boolean; onChanged: () => Promise<void> }) {
+function LessonEditor({ lesson, index, total, editable, moving, onMove, onChanged }: { lesson: TrainingCourseDto["modules"][number]["lessons"][number]; index: number; total: number; editable: boolean; moving: boolean; onMove: (lessonId: string, direction: -1 | 1) => void; onChanged: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(lesson.title);
+  const [description, setDescription] = useState(lesson.description ?? "");
+  const [estimatedMinutes, setEstimatedMinutes] = useState(lesson.estimatedMinutes ?? 0);
+  const [isRequired, setIsRequired] = useState(lesson.isRequired);
   const [blockOpen, setBlockOpen] = useState(false);
-  const update = useMutation({ mutationFn: () => updateTrainingLesson(lesson.id, { title }), onSuccess: async () => { setEditing(false); await onChanged(); } });
+  const update = useMutation({ mutationFn: () => updateTrainingLesson(lesson.id, { title, description: description || undefined, estimatedMinutes, isRequired }), onSuccess: async () => { setEditing(false); await onChanged(); } });
   const remove = useMutation({ mutationFn: () => deleteTrainingLesson(lesson.id), onSuccess: onChanged });
+  const duplicate = useMutation({ mutationFn: () => duplicateTrainingLesson(lesson.id), onSuccess: async () => { toast.success("Lección duplicada"); await onChanged(); } });
+  const reorder = useMutation({
+    mutationFn: (entityIds: string[]) => reorderTrainingContentBlocks(lesson.id, entityIds),
+    onSuccess: onChanged,
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible reordenar los bloques.")),
+  });
+  const moveBlock = (blockId: string, direction: -1 | 1) => {
+    reorder.mutate(moveTrainingEntity(lesson.blocks.map((item) => item.id), blockId, direction));
+  };
   return (
     <div className="rounded-xl border border-border-default bg-surface-section p-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         <Button type="button" size="icon" variant="ghost" aria-label={expanded ? "Contraer lección" : "Expandir lección"} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronDown /> : <ChevronRight />}</Button>
-        <div className="min-w-0 flex-1">{editing ? <Input aria-label="Título de la lección" value={title} onChange={(event) => setTitle(event.target.value)} /> : <p className="font-medium">{lesson.title}</p>}</div>
-        {editable ? <div className="flex gap-1">{editing ? <Button type="button" size="sm" onClick={() => update.mutate()}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
+        <div className="min-w-0 flex-1">{editing ? <div className="grid gap-2 sm:grid-cols-[1fr_9rem]"><Input aria-label="Título de la lección" value={title} onChange={(event) => setTitle(event.target.value)} /><Input aria-label="Duración estimada en minutos" type="number" min={0} value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} /><textarea aria-label="Descripción de la lección" className="min-h-20 rounded-xl border border-border-default bg-surface-elevated p-3 text-sm sm:col-span-2" placeholder="Objetivo y contexto de la lección" value={description} onChange={(event) => setDescription(event.target.value)} /><label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />Lección obligatoria</label></div> : <><p className="font-medium">{lesson.title}</p>{lesson.description ? <p className="text-sm text-text-secondary">{lesson.description}</p> : null}<p className="text-xs text-text-secondary">{lesson.estimatedMinutes || 0} min · {lesson.isRequired ? "Obligatoria" : "Opcional"} · {lesson.blocks.length} bloques</p></>}</div>
+        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       </div>
-      {expanded ? <div className="mt-3 space-y-2 pl-0 sm:pl-12">{lesson.blocks.map((block) => <BlockEditor key={block.id} block={block} editable={editable} onChanged={onChanged} />)}{editable ? <Button type="button" size="sm" variant="secondary" onClick={() => setBlockOpen(true)}><Plus className="size-4" />Bloque</Button> : null}</div> : null}
+      {expanded ? <div className="mt-3 space-y-2 pl-0 sm:pl-12">{lesson.blocks.map((block, blockIndex) => <BlockEditor key={block.id} block={block} index={blockIndex} total={lesson.blocks.length} editable={editable} moving={reorder.isPending} onMove={moveBlock} onChanged={onChanged} />)}{editable ? <Button type="button" size="sm" variant="secondary" onClick={() => setBlockOpen(true)}><Plus className="size-4" />Agregar contenido</Button> : null}</div> : null}
       <BlockFormDialog lessonId={lesson.id} open={blockOpen} onOpenChange={setBlockOpen} onSaved={onChanged} />
     </div>
   );
 }
 
-function BlockEditor({ block, editable, onChanged }: { block: TrainingContentBlockDto; editable: boolean; onChanged: () => Promise<void> }) {
+function BlockEditor({ block, index, total, editable, moving, onMove, onChanged }: { block: TrainingContentBlockDto; index: number; total: number; editable: boolean; moving: boolean; onMove: (blockId: string, direction: -1 | 1) => void; onChanged: () => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const remove = useMutation({ mutationFn: () => deleteTrainingContentBlock(block.id), onSuccess: onChanged });
+  const duplicate = useMutation({ mutationFn: () => duplicateTrainingContentBlock(block.id), onSuccess: async () => { toast.success("Bloque duplicado"); await onChanged(); } });
   const Icon = block.type === "VIDEO" ? Video : block.type === "LINK" ? Link2 : FileText;
+  const summary = trainingBlockSummary(block.type, block.content);
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border-default bg-surface-elevated p-3">
       <Icon className="size-5 text-primary" />
-      <div className="min-w-0 flex-1"><p className="font-medium">{block.title || blockLabels[block.type]}</p><p className="text-xs text-text-secondary">{blockLabels[block.type]}</p></div>
-      {editable ? <><Button type="button" size="icon" variant="ghost" aria-label="Editar bloque" onClick={() => setEditing(true)}><Pencil className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label="Eliminar bloque" onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></> : null}
+      <div className="min-w-0 flex-1"><p className="font-medium">{block.title || blockLabels[block.type]}</p><p className="text-xs text-text-secondary">{blockLabels[block.type]} · {block.isRequired ? "Obligatorio" : "Opcional"}{summary ? ` · ${summary}` : ""}</p></div>
+      {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={block.title || blockLabels[block.type]} index={index} total={total} pending={moving} onMove={(direction) => onMove(block.id, direction)} /><Button type="button" size="icon" variant="ghost" aria-label="Editar bloque" onClick={() => setEditing(true)}><Pencil className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label="Duplicar bloque" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label="Eliminar bloque" onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       <BlockFormDialog lessonId={block.lessonId} block={block} open={editing} onOpenChange={setEditing} onSaved={onChanged} />
     </div>
   );
@@ -884,22 +1404,41 @@ function BlockEditor({ block, editable, onChanged }: { block: TrainingContentBlo
 function BlockFormDialog({ lessonId, block, open, onOpenChange, onSaved }: { lessonId: string; block?: TrainingContentBlockDto; open: boolean; onOpenChange: (open: boolean) => void; onSaved: () => Promise<void> }) {
   const [type, setType] = useState<TrainingContentBlockType>(block?.type ?? "RICH_TEXT");
   const [title, setTitle] = useState(block?.title ?? "");
-  const [value, setValue] = useState(block?.resourceUrl ?? String(block?.content?.text ?? ""));
+  const initialContent = block?.content ?? {};
+  const [value, setValue] = useState(block?.resourceUrl ?? String(initialContent.text ?? initialContent.instructions ?? initialContent.quizId ?? ""));
+  const [transcriptUrl, setTranscriptUrl] = useState(String(initialContent.transcriptUrl ?? ""));
+  const [captionsUrl, setCaptionsUrl] = useState(String(initialContent.captionsUrl ?? ""));
+  const [accessibilityNote, setAccessibilityNote] = useState(String(initialContent.accessibilityNote ?? ""));
+  const [evidenceType, setEvidenceType] = useState(String(initialContent.evidenceType ?? "Archivo entregable"));
+  const [rubric, setRubric] = useState(String(initialContent.rubric ?? ""));
+  const [isRequired, setIsRequired] = useState(block?.isRequired ?? true);
   const resource = ["VIDEO", "FILE", "LINK"].includes(type);
   const save = useMutation({
     mutationFn: () => {
-      const input = { type, title: title || undefined, ...(resource ? { resourceUrl: value } : { content: { text: value } }) };
+      const content = type === "TASK"
+        ? { instructions: value, evidenceType, rubric }
+        : type === "QUIZ"
+          ? { quizId: value }
+          : resource
+            ? { transcriptUrl, captionsUrl, accessibilityNote }
+            : { text: value };
+      const input = { type, title: title || undefined, isRequired, content, ...(resource ? { resourceUrl: value } : {}) };
       return block ? updateTrainingContentBlock(block.id, input) : createTrainingContentBlock(lessonId, input);
     },
     onSuccess: async () => { toast.success(block ? "Bloque actualizado" : "Bloque añadido"); onOpenChange(false); await onSaved(); },
   });
+  const valueLabel = resource ? "URL del recurso" : type === "TASK" ? "Instrucciones para el participante" : type === "QUIZ" ? "ID de la evaluación" : "Contenido";
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title={block ? "Editar bloque" : "Añadir bloque"} description="Selecciona el formato y agrega el contenido correspondiente.">
+    <FormDialog open={open} onOpenChange={onOpenChange} title={block ? "Editar contenido" : "Añadir contenido"} description="Configura el recurso, la actividad o la evaluación con criterios claros para el participante.">
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (value.trim()) save.mutate(); }}>
         <FormErrorSummary serverError={save.error} />
         <FormField id="block-type" label="Tipo">{(field) => <Select value={type} onValueChange={(next) => { setType(next as TrainingContentBlockType); setValue(""); }}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent>{Object.entries(blockLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>}</FormField>
         <FormField id="block-title" label="Título">{(field) => <Input {...field} value={title} onChange={(event) => setTitle(event.target.value)} />}</FormField>
-        <FormField id="block-value" label={resource ? "URL del recurso" : "Contenido"} required>{(field) => resource ? <Input {...field} type="url" value={value} onChange={(event) => setValue(event.target.value)} /> : <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={value} onChange={(event) => setValue(event.target.value)} />}</FormField>
+        <FormField id="block-value" label={valueLabel} required>{(field) => resource || type === "QUIZ" ? <Input {...field} type={resource ? "url" : "text"} value={value} onChange={(event) => setValue(event.target.value)} /> : <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={value} onChange={(event) => setValue(event.target.value)} />}</FormField>
+        {type === "VIDEO" ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="block-transcript" label="URL de transcripción">{(field) => <Input {...field} type="url" value={transcriptUrl} onChange={(event) => setTranscriptUrl(event.target.value)} />}</FormField><FormField id="block-captions" label="URL de subtítulos">{(field) => <Input {...field} type="url" value={captionsUrl} onChange={(event) => setCaptionsUrl(event.target.value)} />}</FormField></div> : null}
+        {type === "FILE" || type === "LINK" ? <FormField id="block-accessibility" label="Nota de accesibilidad">{(field) => <Input {...field} placeholder="Ej. PDF etiquetado y apto para lector de pantalla" value={accessibilityNote} onChange={(event) => setAccessibilityNote(event.target.value)} />}</FormField> : null}
+        {type === "TASK" ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="block-evidence" label="Evidencia esperada" required>{(field) => <Select value={evidenceType} onValueChange={setEvidenceType}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Archivo entregable">Archivo entregable</SelectItem><SelectItem value="Respuesta escrita">Respuesta escrita</SelectItem><SelectItem value="Enlace externo">Enlace externo</SelectItem><SelectItem value="Validación del supervisor">Validación del supervisor</SelectItem></SelectContent></Select>}</FormField><FormField id="block-rubric" label="Criterios de aceptación">{(field) => <Input {...field} placeholder="Qué debe demostrar para aprobar" value={rubric} onChange={(event) => setRubric(event.target.value)} />}</FormField></div> : null}
+        <label className="flex items-center gap-2 rounded-xl bg-surface-section p-3 text-sm"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />Este contenido es obligatorio para completar la lección</label>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" disabled={!value.trim() || save.isPending}>Guardar</Button></div>
       </form>
     </FormDialog>

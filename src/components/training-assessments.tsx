@@ -1,7 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, CheckCircle2, ClipboardCheck, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Award, CheckCircle2, ClipboardCheck, Library, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
@@ -28,6 +30,8 @@ import {
 import {
   createTrainingAssessment,
   createTrainingAssessmentQuestion,
+  createTrainingQuestionBankItem,
+  deleteTrainingAssessmentQuestion,
   deleteTrainingAssessment,
   fetchLearnerTrainingCourse,
   fetchMyTrainingAssignments,
@@ -35,17 +39,23 @@ import {
   fetchTrainingAdminCertificates,
   fetchTrainingAssessmentResults,
   fetchTrainingAssessments,
+  fetchTrainingQuestionBank,
   fetchTrainingCourses,
   getApiErrorMessage,
   gradeTrainingAssessment,
+  importTrainingQuestionBankItems,
+  reorderTrainingAssessmentQuestions,
+  renewTrainingCertificate,
   revokeTrainingCertificate,
   saveTrainingAssessmentAnswer,
   startTrainingAssessment,
   submitTrainingAssessment,
+  updateTrainingAssessment,
 } from "@/lib/backend";
 import type {
   TrainingCertificateDto,
   TrainingQuestionType,
+  TrainingQuestionDifficulty,
   TrainingQuizAttemptDto,
   TrainingQuizDto,
 } from "@/lib/contracts";
@@ -58,8 +68,11 @@ export function TrainingEvaluations() {
 
 function AssessmentBuilder() {
   const queryClient = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
+  const courseId = useSearchParams().get("courseId") ?? undefined;
+  const [createOpen, setCreateOpen] = useState(Boolean(courseId));
   const [questionQuiz, setQuestionQuiz] = useState<TrainingQuizDto | null>(null);
+  const [configureQuiz, setConfigureQuiz] = useState<TrainingQuizDto | null>(null);
+  const [bankQuiz, setBankQuiz] = useState<TrainingQuizDto | null>(null);
   const query = useQuery({ queryKey: ["training-assessments"], queryFn: fetchTrainingAssessments });
   const remove = useMutation({
     mutationFn: deleteTrainingAssessment,
@@ -69,6 +82,24 @@ function AssessmentBuilder() {
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo eliminar la evaluación")),
   });
+  const removeQuestion = useMutation({
+    mutationFn: deleteTrainingAssessmentQuestion,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["training-assessments"] }),
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo eliminar la pregunta")),
+  });
+  const reorder = useMutation({
+    mutationFn: ({ quizId, entityIds }: { quizId: string; entityIds: string[] }) =>
+      reorderTrainingAssessmentQuestions(quizId, entityIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["training-assessments"] }),
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo reordenar la evaluación")),
+  });
+  const moveQuestion = (quiz: TrainingQuizDto, index: number, direction: -1 | 1) => {
+    const next = [...quiz.questions];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    reorder.mutate({ quizId: quiz.id, entityIds: next.map((question) => question.id) });
+  };
 
   return (
     <div className="space-y-6">
@@ -98,11 +129,25 @@ function AssessmentBuilder() {
                   <Badge variant="secondary">{quiz.questions.length} preguntas</Badge>
                   <Badge variant="secondary">{quiz.maxAttempts ?? "∞"} intentos</Badge>
                   <Badge variant="secondary">{quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} min` : "Sin límite"}</Badge>
+                  <Badge variant={quiz.readiness?.ready ? "success" : "destructive"}>{quiz.readiness?.ready ? "Lista" : "Incompleta"}</Badge>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="secondary" className="flex-1" onClick={() => setQuestionQuiz(quiz)}>
+                {!quiz.readiness?.ready && quiz.readiness?.errors.length ? <p className="rounded-xl bg-status-warning-soft p-3 text-sm text-status-warning">{quiz.readiness.errors.join(" · ")}</p> : null}
+                <div className="space-y-2">
+                  {quiz.questions.map((question, index) => (
+                    <div key={question.id} className="flex items-center gap-2 rounded-xl border border-border-default p-3">
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{index + 1}. {question.prompt}</p><p className="text-xs text-text-secondary">{question.points} pts · {question.difficulty ?? "MEDIUM"}{question.category ? ` · ${question.category}` : ""}</p></div>
+                      <Button size="icon" variant="ghost" aria-label="Subir pregunta" disabled={index === 0 || reorder.isPending} onClick={() => moveQuestion(quiz, index, -1)}><ArrowUp className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label="Bajar pregunta" disabled={index === quiz.questions.length - 1 || reorder.isPending} onClick={() => moveQuestion(quiz, index, 1)}><ArrowDown className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label="Eliminar pregunta" disabled={removeQuestion.isPending} onClick={() => removeQuestion.mutate(question.id)}><Trash2 className="size-4 text-status-danger" /></Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={() => setQuestionQuiz(quiz)}>
                     <Plus />Agregar pregunta
                   </Button>
+                  <Button variant="secondary" onClick={() => setBankQuiz(quiz)}><Library />Banco</Button>
+                  <Button variant="secondary" onClick={() => setConfigureQuiz(quiz)}><Settings2 />Reglas</Button>
                   <Button variant="destructive" size="icon" aria-label={`Eliminar ${quiz.title}`} onClick={() => remove.mutate(quiz.id)}>
                     <Trash2 />
                   </Button>
@@ -112,13 +157,15 @@ function AssessmentBuilder() {
           ))}
         </div>
       ) : query.isSuccess ? <EmptyCard title="Aún no hay evaluaciones" description="Crea la primera evaluación y vincúlala con un curso." /> : null}
-      <CreateAssessmentDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateAssessmentDialog open={createOpen} onOpenChange={setCreateOpen} initialCourseId={courseId} />
+      <ConfigureAssessmentDialog quiz={configureQuiz} onClose={() => setConfigureQuiz(null)} />
       <CreateQuestionDialog quiz={questionQuiz} onClose={() => setQuestionQuiz(null)} />
+      <QuestionBankDialog quiz={bankQuiz} onClose={() => setBankQuiz(null)} />
     </div>
   );
 }
 
-function CreateAssessmentDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function CreateAssessmentDialog({ open, onOpenChange, initialCourseId }: { open: boolean; onOpenChange: (open: boolean) => void; initialCourseId?: string }) {
   const queryClient = useQueryClient();
   const courses = useQuery({ queryKey: ["training-courses-for-assessment"], queryFn: () => fetchTrainingCourses({ pageSize: 100 }) });
   const mutation = useMutation({
@@ -143,6 +190,10 @@ function CreateAssessmentDialog({ open, onOpenChange }: { open: boolean; onOpenC
         maxAttempts: Number(data.get("maxAttempts")) || undefined,
         timeLimitMinutes: Number(data.get("timeLimitMinutes")) || undefined,
         shuffleQuestions: data.get("shuffleQuestions") === "on",
+        shuffleOptions: data.get("shuffleOptions") === "on",
+        cooldownMinutes: Number(data.get("cooldownMinutes")) || undefined,
+        requireAllQuestions: data.get("requireAllQuestions") === "on",
+        feedbackMode: "AFTER_SUBMISSION",
       },
     });
   }
@@ -151,7 +202,7 @@ function CreateAssessmentDialog({ open, onOpenChange }: { open: boolean; onOpenC
       <DialogContent>
         <DialogHeader><DialogTitle>Nueva evaluación</DialogTitle><DialogDescription>Define las reglas generales. Después podrás agregar preguntas.</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
-          <div><Label>Curso</Label><Select name="courseId" required><SelectTrigger><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label>Curso</Label><Select name="courseId" defaultValue={initialCourseId} required><SelectTrigger><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
           <div><Label htmlFor="assessment-title">Título</Label><Input id="assessment-title" name="title" required /></div>
           <div><Label htmlFor="assessment-description">Descripción</Label><Input id="assessment-description" name="description" /></div>
           <div className="grid grid-cols-3 gap-3">
@@ -159,9 +210,81 @@ function CreateAssessmentDialog({ open, onOpenChange }: { open: boolean; onOpenC
             <div><Label htmlFor="maxAttempts">Intentos</Label><Input id="maxAttempts" name="maxAttempts" type="number" min="1" defaultValue="3" /></div>
             <div><Label htmlFor="timeLimitMinutes">Minutos</Label><Input id="timeLimitMinutes" name="timeLimitMinutes" type="number" min="1" /></div>
           </div>
-          <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleQuestions" /> Mezclar preguntas</label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleQuestions" /> Mezclar preguntas</label>
+            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleOptions" /> Mezclar opciones</label>
+            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="requireAllQuestions" defaultChecked /> Exigir todas</label>
+          </div>
+          <div><Label htmlFor="cooldownMinutes">Espera entre intentos (minutos)</Label><Input id="cooldownMinutes" name="cooldownMinutes" type="number" min="0" /></div>
           <Button className="w-full" disabled={mutation.isPending}>{mutation.isPending ? "Creando…" : "Crear evaluación"}</Button>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConfigureAssessmentDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (input: Parameters<typeof updateTrainingAssessment>[1]) =>
+      updateTrainingAssessment(quiz!.id, input),
+    onSuccess: () => {
+      toast.success("Reglas de evaluación actualizadas");
+      queryClient.invalidateQueries({ queryKey: ["training-assessments"] });
+      onClose();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudieron actualizar las reglas")),
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const availableFrom = String(data.get("availableFrom") || "");
+    const availableUntil = String(data.get("availableUntil") || "");
+    const rubric = String(data.get("rubric") || "");
+    mutation.mutate({
+      title: String(data.get("title")),
+      description: String(data.get("description") || ""),
+      passingScore: Number(data.get("passingScore")),
+      maxAttempts: Number(data.get("maxAttempts")) || undefined,
+      timeLimitMinutes: Number(data.get("timeLimitMinutes")) || undefined,
+      randomQuestionCount: Number(data.get("randomQuestionCount")) || undefined,
+      cooldownMinutes: Number(data.get("cooldownMinutes")) || undefined,
+      shuffleQuestions: data.get("shuffleQuestions") === "on",
+      shuffleOptions: data.get("shuffleOptions") === "on",
+      requireAllQuestions: data.get("requireAllQuestions") === "on",
+      feedbackMode: String(data.get("feedbackMode")) as TrainingQuizDto["feedbackMode"],
+      availableFrom: availableFrom ? new Date(availableFrom).toISOString() : undefined,
+      availableUntil: availableUntil ? new Date(availableUntil).toISOString() : undefined,
+      rubric: rubric ? { criteria: rubric } : undefined,
+    });
+  }
+  return (
+    <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Reglas de evaluación</DialogTitle><DialogDescription>Controla disponibilidad, selección, intentos y retroalimentación.</DialogDescription></DialogHeader>
+        {quiz ? <form className="space-y-4" onSubmit={submit}>
+          <div><Label htmlFor="config-title">Título</Label><Input id="config-title" name="title" defaultValue={quiz.title} required /></div>
+          <div><Label htmlFor="config-description">Descripción</Label><Input id="config-description" name="description" defaultValue={quiz.description ?? ""} /></div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div><Label>Aprobación %</Label><Input name="passingScore" type="number" min="1" max="100" defaultValue={quiz.passingScore} /></div>
+            <div><Label>Intentos</Label><Input name="maxAttempts" type="number" min="1" defaultValue={quiz.maxAttempts ?? ""} /></div>
+            <div><Label>Tiempo (min)</Label><Input name="timeLimitMinutes" type="number" min="1" defaultValue={quiz.timeLimitMinutes ?? ""} /></div>
+            <div><Label>Preguntas aleatorias</Label><Input name="randomQuestionCount" type="number" min="1" max={quiz.questions.length} defaultValue={quiz.randomQuestionCount ?? ""} /></div>
+            <div><Label>Espera (min)</Label><Input name="cooldownMinutes" type="number" min="0" defaultValue={quiz.cooldownMinutes ?? ""} /></div>
+            <div><Label>Retroalimentación</Label><Select name="feedbackMode" defaultValue={quiz.feedbackMode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AFTER_SUBMISSION">Al enviar</SelectItem><SelectItem value="AFTER_PASSING">Al aprobar</SelectItem><SelectItem value="NEVER">Nunca</SelectItem></SelectContent></Select></div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><Label>Disponible desde</Label><Input name="availableFrom" type="datetime-local" /></div>
+            <div><Label>Disponible hasta</Label><Input name="availableUntil" type="datetime-local" /></div>
+          </div>
+          <div><Label>Rúbrica general</Label><Input name="rubric" defaultValue={String(quiz.rubric?.criteria ?? "")} placeholder="Criterios generales de calidad" /></div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex items-center gap-2"><input type="checkbox" name="shuffleQuestions" defaultChecked={quiz.shuffleQuestions} />Mezclar preguntas</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="shuffleOptions" defaultChecked={quiz.shuffleOptions} />Mezclar opciones</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="requireAllQuestions" defaultChecked={quiz.requireAllQuestions} />Exigir todas</label>
+          </div>
+          <Button className="w-full" disabled={mutation.isPending}>Guardar reglas</Button>
+        </form> : null}
       </DialogContent>
     </Dialog>
   );
@@ -170,8 +293,13 @@ function CreateAssessmentDialog({ open, onOpenChange }: { open: boolean; onOpenC
 function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [type, setType] = useState<TrainingQuestionType>("SINGLE_CHOICE");
+  const [difficulty, setDifficulty] = useState<TrainingQuestionDifficulty>("MEDIUM");
   const mutation = useMutation({
-    mutationFn: (input: Parameters<typeof createTrainingAssessmentQuestion>[1]) => createTrainingAssessmentQuestion(quiz!.id, input),
+    mutationFn: async ({ input, saveToBank }: { input: Parameters<typeof createTrainingAssessmentQuestion>[1]; saveToBank: boolean }) => {
+      const question = await createTrainingAssessmentQuestion(quiz!.id, input);
+      if (saveToBank) await createTrainingQuestionBankItem(input);
+      return question;
+    },
     onSuccess: () => {
       toast.success("Pregunta agregada");
       queryClient.invalidateQueries({ queryKey: ["training-assessments"] });
@@ -182,15 +310,26 @@ function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null;
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const labels = [String(data.get("option1") || ""), String(data.get("option2") || ""), String(data.get("option3") || ""), String(data.get("option4") || "")].filter(Boolean);
+    const labels = type === "TRUE_FALSE"
+      ? ["Verdadero", "Falso"]
+      : [String(data.get("option1") || ""), String(data.get("option2") || ""), String(data.get("option3") || ""), String(data.get("option4") || "")].filter(Boolean);
     const correct = Number(data.get("correct") || 0);
+    const multipleCorrect = data.getAll("correctMultiple").map(Number);
+    const rubric = String(data.get("rubric") || "");
     mutation.mutate({
-      prompt: String(data.get("prompt")),
-      questionType: type,
-      explanation: String(data.get("explanation") || ""),
-      points: Number(data.get("points") || 1),
-      requiresManualGrading: type === "TEXT",
-      options: type === "TEXT" ? [] : labels.map((label, index) => ({ label, isCorrect: index === correct })),
+      input: {
+        prompt: String(data.get("prompt")),
+        questionType: type,
+        explanation: String(data.get("explanation") || ""),
+        points: Number(data.get("points") || 1),
+        requiresManualGrading: type === "TEXT",
+        category: String(data.get("category") || "") || undefined,
+        difficulty,
+        tags: String(data.get("tags") || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+        rubric: rubric ? { criteria: rubric } : undefined,
+        options: type === "TEXT" ? [] : labels.map((label, index) => ({ label, isCorrect: type === "MULTIPLE_CHOICE" ? multipleCorrect.includes(index) : index === correct })),
+      },
+      saveToBank: data.get("saveToBank") === "on",
     });
   }
   return (
@@ -203,15 +342,65 @@ function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null;
             <div><Label>Tipo</Label><Select value={type} onValueChange={(value) => setType(value as TrainingQuestionType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SINGLE_CHOICE">Selección única</SelectItem><SelectItem value="MULTIPLE_CHOICE">Selección múltiple</SelectItem><SelectItem value="TRUE_FALSE">Verdadero/Falso</SelectItem><SelectItem value="TEXT">Respuesta corta</SelectItem></SelectContent></Select></div>
             <div><Label htmlFor="question-points">Puntos</Label><Input id="question-points" name="points" type="number" min="1" defaultValue="1" required /></div>
           </div>
-          {type !== "TEXT" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><Label>Categoría</Label><Input name="category" placeholder="Ej. Seguridad" /></div>
+            <div><Label>Dificultad</Label><Select value={difficulty} onValueChange={(value) => setDifficulty(value as TrainingQuestionDifficulty)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Básica</SelectItem><SelectItem value="MEDIUM">Intermedia</SelectItem><SelectItem value="HARD">Avanzada</SelectItem></SelectContent></Select></div>
+          </div>
+          {type !== "TEXT" && type !== "TRUE_FALSE" ? (
             <div className="space-y-2">
               {[0, 1, 2, 3].map((index) => <Input key={index} name={`option${index + 1}`} placeholder={`Opción ${index + 1}${index < 2 ? " (obligatoria)" : ""}`} required={index < 2} />)}
-              <div><Label>Opción correcta</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[0, 1, 2, 3].map((index) => <SelectItem key={index} value={String(index)}>Opción {index + 1}</SelectItem>)}</SelectContent></Select></div>
+              {type === "MULTIPLE_CHOICE" ? <div className="flex flex-wrap gap-4">{[0, 1, 2, 3].map((index) => <label key={index} className="flex items-center gap-2 text-sm"><input type="checkbox" name="correctMultiple" value={index} defaultChecked={index === 0} />Opción {index + 1}</label>)}</div> : <div><Label>Opción correcta</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[0, 1, 2, 3].map((index) => <SelectItem key={index} value={String(index)}>Opción {index + 1}</SelectItem>)}</SelectContent></Select></div>}
             </div>
           ) : null}
+          {type === "TRUE_FALSE" ? <div><Label>Respuesta correcta</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="0">Verdadero</SelectItem><SelectItem value="1">Falso</SelectItem></SelectContent></Select></div> : null}
           <div><Label htmlFor="question-explanation">Explicación posterior</Label><Input id="question-explanation" name="explanation" /></div>
+          <div><Label>Etiquetas</Label><Input name="tags" placeholder="procedimiento, prevención" /></div>
+          {type === "TEXT" ? <div><Label>Rúbrica de calificación</Label><Input name="rubric" required placeholder="Criterios observables y puntaje esperado" /></div> : null}
+          <label className="flex items-center gap-2 rounded-xl bg-surface-section p-3 text-sm"><input type="checkbox" name="saveToBank" />Guardar también en el banco de preguntas</label>
           <Button className="w-full" disabled={mutation.isPending}>Guardar pregunta</Button>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<string[]>([]);
+  const query = useQuery({
+    queryKey: ["training-question-bank"],
+    queryFn: () => fetchTrainingQuestionBank(),
+    enabled: Boolean(quiz),
+  });
+  const mutation = useMutation({
+    mutationFn: () => importTrainingQuestionBankItems(quiz!.id, selected),
+    onSuccess: () => {
+      toast.success(`${selected.length} preguntas importadas`);
+      setSelected([]);
+      queryClient.invalidateQueries({ queryKey: ["training-assessments"] });
+      onClose();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudieron importar las preguntas")),
+  });
+  return (
+    <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Banco de preguntas</DialogTitle><DialogDescription>Selecciona preguntas validadas para copiarlas a {quiz?.title}.</DialogDescription></DialogHeader>
+        {query.isLoading ? <AsyncState state="loading" /> : null}
+        {query.data?.items.length ? <div className="space-y-2">
+          {query.data.items.map((item) => (
+            <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-default p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={selected.includes(item.id)}
+                onChange={(event) => setSelected(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
+              />
+              <span className="min-w-0"><span className="block font-medium">{item.prompt}</span><span className="text-xs text-text-secondary">{item.category || "Sin categoría"} · {item.difficulty} · {item.points} pts</span></span>
+            </label>
+          ))}
+        </div> : query.isSuccess ? <EmptyCard title="Banco vacío" description="Marca “Guardar también en el banco” al crear una pregunta." /> : null}
+        <Button disabled={!selected.length || mutation.isPending} onClick={() => mutation.mutate()}>Importar {selected.length || ""} preguntas</Button>
       </DialogContent>
     </Dialog>
   );
@@ -308,7 +497,49 @@ export function TrainingCertificates() {
     onSuccess: () => { toast.success("Certificado revocado"); queryClient.invalidateQueries({ queryKey: ["training-certificates"] }); },
     onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo revocar el certificado")),
   });
-  return <div className="space-y-6"><PageHeader eyebrow="Aprendizaje" title="Certificados" description="Consulta credenciales verificables, su vigencia y su trazabilidad." />{query.isLoading ? <AsyncState state="loading" title="Cargando certificados" /> : null}{query.data?.items.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.items.map((certificate) => { const status = certificate.status ?? (certificate.revokedAt ? "REVOKED" : "VALID"); return <Card key={certificate.id}><CardHeader><div className="flex justify-between gap-3"><Award className="size-8 text-primary" /><Badge variant={status === "VALID" ? "success" : "destructive"}>{status === "VALID" ? "Vigente" : status === "EXPIRED" ? "Vencido" : "Revocado"}</Badge></div><CardTitle>{certificate.course?.title ?? certificate.curriculum?.title}</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">{certificate.user ? `${certificate.user.firstName} ${certificate.user.lastName}` : `Emitido ${new Date(certificate.issuedAt).toLocaleDateString("es")}`}</p><div className="flex items-center gap-2 rounded-lg bg-muted p-3 font-mono text-sm"><ShieldCheck className="size-4" />{certificate.verificationCode}</div>{admin && status === "VALID" ? <Button variant="destructive" className="w-full" onClick={() => revoke.mutate(certificate)}>Revocar certificado</Button> : <Button variant="secondary" className="w-full"><CheckCircle2 />Verificar credencial</Button>}</CardContent></Card>; })}</div> : query.isSuccess ? <EmptyCard title="Aún no hay certificados" /> : null}</div>;
+  const renew = useMutation({
+    mutationFn: (certificate: TrainingCertificateDto) => renewTrainingCertificate(certificate.id, "Renovación administrativa"),
+    onSuccess: () => { toast.success("Certificado renovado"); queryClient.invalidateQueries({ queryKey: ["training-certificates"] }); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo renovar el certificado")),
+  });
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Aprendizaje" title="Certificados" description="Consulta credenciales verificables, evidencia, vigencia y cadena de renovación." />
+      {query.isLoading ? <AsyncState state="loading" title="Cargando certificados" /> : null}
+      {query.data?.items.length ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {query.data.items.map((certificate) => {
+            const status = certificate.status ?? (certificate.revokedAt ? "REVOKED" : "VALID");
+            const statusLabel = status === "VALID" ? "Vigente" : status === "EXPIRED" ? "Vencido" : status === "RENEWED" ? "Renovado" : "Revocado";
+            return (
+              <Card key={certificate.id}>
+                <CardHeader>
+                  <div className="flex justify-between gap-3">
+                    <Award className="size-8 text-primary" />
+                    <Badge variant={status === "VALID" ? "success" : status === "RENEWED" ? "secondary" : "destructive"}>{statusLabel}</Badge>
+                  </div>
+                  <CardTitle>{certificate.course?.title ?? certificate.curriculum?.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{certificate.user ? `${certificate.user.firstName} ${certificate.user.lastName}` : `Emitido ${new Date(certificate.issuedAt).toLocaleDateString("es")}`}</p>
+                  <div className="grid gap-2 rounded-xl bg-surface-section p-3 text-sm">
+                    <span><strong>Número:</strong> {certificate.certificateNumber}</span>
+                    <span><strong>Emisión:</strong> {new Date(certificate.issuedAt).toLocaleDateString("es")}</span>
+                    <span><strong>Vigencia:</strong> {certificate.expiresAt ? new Date(certificate.expiresAt).toLocaleDateString("es") : "Sin vencimiento"}</span>
+                    {certificate.renewedFrom ? <span><strong>Renueva:</strong> {certificate.renewedFrom.certificateNumber}</span> : null}
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg bg-muted p-3 font-mono text-sm"><ShieldCheck className="size-4" />{certificate.verificationCode}</div>
+                  {admin && certificate.renewalEligible ? <Button className="w-full" onClick={() => renew.mutate(certificate)} disabled={renew.isPending}><Award />Renovar certificado</Button> : null}
+                  <Button asChild variant="secondary" className="w-full"><Link href={`/certificates/verify/${encodeURIComponent(certificate.verificationCode)}`}><CheckCircle2 />Verificar credencial</Link></Button>
+                  {admin && status === "VALID" ? <Button variant="destructive" className="w-full" onClick={() => revoke.mutate(certificate)}>Revocar certificado</Button> : null}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : query.isSuccess ? <EmptyCard title="Aún no hay certificados" /> : null}
+    </div>
+  );
 }
 
 function EmptyCard({ title, description }: { title: string; description?: string }) {

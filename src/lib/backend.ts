@@ -15,6 +15,7 @@ import type {
   PlanTier,
   PublicApplicationInput,
   PublicApplicationReceipt,
+  PublicTrainingCertificateVerificationDto,
   PublicVacancyDto,
   PublicVacancyListDto,
   CreateVacancyInput,
@@ -33,15 +34,40 @@ import type {
   TrainingCourseListDto,
   TrainingCourseModuleDto,
   TrainingCourseTransitionInput,
+  TrainingCourseQualityDto,
+  TrainingCoursePilotDto,
+  TrainingPilotFeedbackDto,
+  TrainingPilotStatus,
+  TrainingQualityReviewStatus,
+  TrainingQualityReviewType,
+  TrainingCompetencyDto,
+  TrainingCourseDesignDto,
+  TrainingCourseDesignInput,
   TrainingLessonDto,
   TrainingAssignmentsListDto,
+  TrainingLaunchAudience,
+  TrainingLaunchDto,
+  TrainingLaunchListDto,
+  TrainingLaunchStatus,
   LearnerTrainingCourseDto,
   TrainingCertificateDto,
+  TrainingCertificationPolicyInput,
+  TrainingCertificationPolicyResponse,
   TrainingQuestionType,
+  TrainingQuestionDifficulty,
+  TrainingQuestionBankItemDto,
+  TrainingQuizFeedbackMode,
   TrainingQuizAttemptDto,
   TrainingQuizDto,
   TrainingQuizQuestionDto,
   TrainingAnalyticsDto,
+  TrainingCourseImprovementDto,
+  TrainingEffectivenessDto,
+  TrainingImprovementPriority,
+  TrainingImprovementSource,
+  TrainingImprovementStatus,
+  TrainingOperationKind,
+  TrainingOperationsDto,
   TrainingCompliancePolicyDto,
   VacancySetupDto,
   VacancyStageDto,
@@ -1830,6 +1856,110 @@ export function fetchTrainingCoursePreview(courseId: string) {
   );
 }
 
+export function fetchTrainingCourseQuality(courseId: string) {
+  return request<TrainingCourseQualityDto>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/quality`,
+  );
+}
+
+export function requestTrainingQualityReviews(
+  courseId: string,
+  reviewTypes: TrainingQualityReviewType[],
+  reviewerId?: string,
+) {
+  return request<TrainingCourseQualityDto>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/quality/reviews`,
+    { method: "POST", body: JSON.stringify({ reviewTypes, reviewerId }) },
+  );
+}
+
+export function decideTrainingQualityReview(
+  reviewId: string,
+  input: {
+    status: TrainingQualityReviewStatus;
+    checklist: Record<string, unknown>;
+    summary?: string;
+  },
+) {
+  return request<TrainingCourseQualityDto>(
+    `/training/admin/quality-reviews/${encodeURIComponent(reviewId)}/decision`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export function createTrainingCoursePilot(
+  courseId: string,
+  input: {
+    name: string;
+    participantIds: string[];
+    successCriteria: { minResponses: number; minAverageRating: number };
+    startsAt?: string;
+    endsAt?: string;
+  },
+) {
+  return request<TrainingCoursePilotDto>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/pilots`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function updateTrainingCoursePilotStatus(pilotId: string, status: TrainingPilotStatus) {
+  return request<TrainingCoursePilotDto>(
+    `/training/admin/course-pilots/${encodeURIComponent(pilotId)}/status`,
+    { method: "PATCH", body: JSON.stringify({ status }) },
+  );
+}
+
+export function fetchMyTrainingPilots() {
+  return request<{ items: TrainingCoursePilotDto[] }>("/training/pilots");
+}
+
+export function submitTrainingPilotFeedback(
+  pilotId: string,
+  input: {
+    rating: number;
+    clarityRating: number;
+    relevanceRating: number;
+    comment?: string;
+    blockingIssue?: boolean;
+  },
+) {
+  return request<TrainingPilotFeedbackDto>(
+    `/training/pilots/${encodeURIComponent(pilotId)}/feedback`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function fetchTrainingCourseDesign(courseId: string) {
+  return request<TrainingCourseDesignDto>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/design`,
+  );
+}
+
+export function updateTrainingCourseDesign(courseId: string, input: TrainingCourseDesignInput) {
+  return request<TrainingCourseDesignDto>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/design`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+}
+
+export function fetchTrainingCompetencies() {
+  return request<TrainingCompetencyDto[]>("/training/admin/competencies");
+}
+
+export function createTrainingCompetency(input: {
+  code: string;
+  name: string;
+  description?: string;
+  framework?: string;
+  scope?: "TENANT" | "GLOBAL";
+}) {
+  return request<TrainingCompetencyDto>("/training/admin/competencies", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function createTrainingCourse(input: TrainingCourseInput) {
   return request<TrainingCourseDto>("/training/admin/courses", {
     method: "POST",
@@ -1895,7 +2025,7 @@ export function createTrainingCategory(input: {
 
 export function createTrainingCourseModule(
   courseId: string,
-  input: { title: string; description?: string; sortOrder?: number },
+  input: { title: string; description?: string; sortOrder?: number; isRequired?: boolean },
 ) {
   return request<TrainingCourseModuleDto>(
     `/training/admin/courses/${encodeURIComponent(courseId)}/modules`,
@@ -1905,7 +2035,7 @@ export function createTrainingCourseModule(
 
 export function updateTrainingCourseModule(
   moduleId: string,
-  input: { title?: string; description?: string; sortOrder?: number },
+  input: { title?: string; description?: string; sortOrder?: number; isRequired?: boolean },
 ) {
   return request<TrainingCourseModuleDto>(
     `/training/admin/modules/${encodeURIComponent(moduleId)}`,
@@ -1920,9 +2050,23 @@ export function deleteTrainingCourseModule(moduleId: string) {
   );
 }
 
+export function duplicateTrainingCourseModule(moduleId: string) {
+  return request<TrainingCourseModuleDto>(
+    `/training/admin/modules/${encodeURIComponent(moduleId)}/duplicate`,
+    { method: "POST" },
+  );
+}
+
+export function reorderTrainingCourseModules(courseId: string, entityIds: string[]) {
+  return request<{ ordered: boolean; entityIds: string[] }>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/modules/order`,
+    { method: "PUT", body: JSON.stringify({ entityIds }) },
+  );
+}
+
 export function createTrainingLesson(
   moduleId: string,
-  input: { title: string; description?: string; estimatedMinutes?: number; sortOrder?: number },
+  input: { title: string; description?: string; estimatedMinutes?: number; sortOrder?: number; isRequired?: boolean },
 ) {
   return request<TrainingLessonDto>(
     `/training/admin/modules/${encodeURIComponent(moduleId)}/lessons`,
@@ -1932,7 +2076,7 @@ export function createTrainingLesson(
 
 export function updateTrainingLesson(
   lessonId: string,
-  input: { title?: string; description?: string; estimatedMinutes?: number; sortOrder?: number },
+  input: { title?: string; description?: string; estimatedMinutes?: number; sortOrder?: number; isRequired?: boolean },
 ) {
   return request<TrainingLessonDto>(
     `/training/admin/lessons/${encodeURIComponent(lessonId)}`,
@@ -1947,6 +2091,20 @@ export function deleteTrainingLesson(lessonId: string) {
   );
 }
 
+export function duplicateTrainingLesson(lessonId: string) {
+  return request<TrainingLessonDto>(
+    `/training/admin/lessons/${encodeURIComponent(lessonId)}/duplicate`,
+    { method: "POST" },
+  );
+}
+
+export function reorderTrainingLessons(moduleId: string, entityIds: string[]) {
+  return request<{ ordered: boolean; entityIds: string[] }>(
+    `/training/admin/modules/${encodeURIComponent(moduleId)}/lessons/order`,
+    { method: "PUT", body: JSON.stringify({ entityIds }) },
+  );
+}
+
 export function createTrainingContentBlock(
   lessonId: string,
   input: {
@@ -1955,6 +2113,7 @@ export function createTrainingContentBlock(
     content?: Record<string, unknown>;
     resourceUrl?: string;
     sortOrder?: number;
+    isRequired?: boolean;
   },
 ) {
   return request<TrainingContentBlockDto>(
@@ -1971,6 +2130,7 @@ export function updateTrainingContentBlock(
     content?: Record<string, unknown>;
     resourceUrl?: string;
     sortOrder?: number;
+    isRequired?: boolean;
   },
 ) {
   return request<TrainingContentBlockDto>(
@@ -1983,6 +2143,20 @@ export function deleteTrainingContentBlock(blockId: string) {
   return request<{ deleted: boolean; id: string }>(
     `/training/admin/blocks/${encodeURIComponent(blockId)}`,
     { method: "DELETE" },
+  );
+}
+
+export function duplicateTrainingContentBlock(blockId: string) {
+  return request<TrainingContentBlockDto>(
+    `/training/admin/blocks/${encodeURIComponent(blockId)}/duplicate`,
+    { method: "POST" },
+  );
+}
+
+export function reorderTrainingContentBlocks(lessonId: string, entityIds: string[]) {
+  return request<{ ordered: boolean; entityIds: string[] }>(
+    `/training/admin/lessons/${encodeURIComponent(lessonId)}/blocks/order`,
+    { method: "PUT", body: JSON.stringify({ entityIds }) },
   );
 }
 
@@ -2068,6 +2242,59 @@ export function deleteTrainingAssignment(assignmentId: string) {
   );
 }
 
+export function fetchTrainingLaunches(filters: {
+  page?: number;
+  pageSize?: number;
+  status?: TrainingLaunchStatus;
+  courseId?: string;
+  search?: string;
+} = {}) {
+  const query = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    pageSize: String(filters.pageSize ?? 20),
+  });
+  if (filters.status) query.set("status", filters.status);
+  if (filters.courseId) query.set("courseId", filters.courseId);
+  if (filters.search) query.set("search", filters.search);
+  return request<TrainingLaunchListDto>(
+    `/training/admin/launches?${query.toString()}`,
+  );
+}
+
+export function createTrainingLaunch(input: {
+  courseId: string;
+  name: string;
+  audience: TrainingLaunchAudience;
+  targetIds?: string[];
+  batchSize?: number;
+  rolloutIntervalHours?: number;
+  startAt?: string;
+  dueAt?: string;
+  isRequired?: boolean;
+}) {
+  return request<TrainingLaunchDto>("/training/admin/launches", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deployTrainingLaunch(launchId: string) {
+  return request<TrainingLaunchDto>(
+    `/training/admin/launches/${encodeURIComponent(launchId)}/deploy`,
+    { method: "POST" },
+  );
+}
+
+export function updateTrainingLaunchStatus(
+  launchId: string,
+  status: TrainingLaunchStatus,
+) {
+  return request<TrainingLaunchDto>(
+    `/training/admin/launches/${encodeURIComponent(launchId)}/status`,
+    { method: "PATCH", body: JSON.stringify({ status }) },
+  );
+}
+
 export function fetchTrainingLearningPaths() {
   return request<import("./contracts").TrainingLearningPathDto[]>("/training/admin/learning-paths");
 }
@@ -2094,16 +2321,26 @@ export function fetchTrainingAssessments() {
   return request<{ items: TrainingQuizDto[] }>("/training/admin/assessments");
 }
 
+export interface TrainingAssessmentInput {
+  title: string;
+  description?: string;
+  passingScore: number;
+  maxAttempts?: number;
+  timeLimitMinutes?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  randomQuestionCount?: number;
+  cooldownMinutes?: number;
+  availableFrom?: string;
+  availableUntil?: string;
+  requireAllQuestions?: boolean;
+  feedbackMode?: TrainingQuizFeedbackMode;
+  rubric?: Record<string, unknown>;
+}
+
 export function createTrainingAssessment(
   courseId: string,
-  input: {
-    title: string;
-    description?: string;
-    passingScore: number;
-    maxAttempts?: number;
-    timeLimitMinutes?: number;
-    shuffleQuestions?: boolean;
-  },
+  input: TrainingAssessmentInput,
 ) {
   return request<TrainingQuizDto>(
     `/training/admin/courses/${encodeURIComponent(courseId)}/assessments`,
@@ -2111,20 +2348,79 @@ export function createTrainingAssessment(
   );
 }
 
+export function updateTrainingAssessment(quizId: string, input: Partial<TrainingAssessmentInput>) {
+  return request<TrainingQuizDto>(
+    `/training/admin/assessments/${encodeURIComponent(quizId)}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export interface TrainingAssessmentQuestionInput {
+  prompt: string;
+  questionType: TrainingQuestionType;
+  explanation?: string;
+  points: number;
+  requiresManualGrading?: boolean;
+  category?: string;
+  difficulty?: TrainingQuestionDifficulty;
+  tags?: string[];
+  rubric?: Record<string, unknown>;
+  options: Array<{ label: string; isCorrect: boolean }>;
+}
+
 export function createTrainingAssessmentQuestion(
   quizId: string,
-  input: {
-    prompt: string;
-    questionType: TrainingQuestionType;
-    explanation?: string;
-    points: number;
-    requiresManualGrading?: boolean;
-    options: Array<{ label: string; isCorrect: boolean }>;
-  },
+  input: TrainingAssessmentQuestionInput,
 ) {
   return request<TrainingQuizQuestionDto>(
     `/training/admin/assessments/${encodeURIComponent(quizId)}/questions`,
     { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function updateTrainingAssessmentQuestion(
+  questionId: string,
+  input: TrainingAssessmentQuestionInput,
+) {
+  return request<TrainingQuizQuestionDto>(
+    `/training/admin/assessment-questions/${encodeURIComponent(questionId)}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export function deleteTrainingAssessmentQuestion(questionId: string) {
+  return request<{ deleted: boolean }>(
+    `/training/admin/assessment-questions/${encodeURIComponent(questionId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function reorderTrainingAssessmentQuestions(quizId: string, entityIds: string[]) {
+  return request<{ ordered: boolean; entityIds: string[] }>(
+    `/training/admin/assessments/${encodeURIComponent(quizId)}/questions/order`,
+    { method: "PUT", body: JSON.stringify({ entityIds }) },
+  );
+}
+
+export function fetchTrainingQuestionBank(search = "") {
+  const query = new URLSearchParams({ page: "1", pageSize: "100" });
+  if (search) query.set("search", search);
+  return request<{ items: TrainingQuestionBankItemDto[]; total: number }>(
+    `/training/admin/assessment-question-bank?${query.toString()}`,
+  );
+}
+
+export function createTrainingQuestionBankItem(input: TrainingAssessmentQuestionInput) {
+  return request<TrainingQuestionBankItemDto>("/training/admin/assessment-question-bank", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function importTrainingQuestionBankItems(quizId: string, itemIds: string[]) {
+  return request<TrainingQuizDto>(
+    `/training/admin/assessments/${encodeURIComponent(quizId)}/questions/import`,
+    { method: "POST", body: JSON.stringify({ itemIds }) },
   );
 }
 
@@ -2187,6 +2483,37 @@ export function fetchTrainingAdminCertificates() {
   return request<{ items: TrainingCertificateDto[] }>("/training/admin/certificates");
 }
 
+export function fetchTrainingCertificationPolicy(courseId: string) {
+  return request<TrainingCertificationPolicyResponse>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/certification-policy`,
+  );
+}
+
+export function updateTrainingCertificationPolicy(
+  courseId: string,
+  input: TrainingCertificationPolicyInput,
+) {
+  return request<TrainingCertificationPolicyResponse>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/certification-policy`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+}
+
+export function renewTrainingCertificate(certificateId: string, reason?: string) {
+  return request<TrainingCertificateDto>(
+    `/training/admin/certificates/${encodeURIComponent(certificateId)}/renew`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+}
+
+export function verifyPublicTrainingCertificate(code: string) {
+  return request<PublicTrainingCertificateVerificationDto>(
+    `/public/training-certificates/${encodeURIComponent(code)}`,
+    {},
+    { auth: false, retryOnUnauthorized: false },
+  );
+}
+
 export function revokeTrainingCertificate(certificateId: string, reason: string) {
   return request<TrainingCertificateDto>(
     `/training/admin/certificates/${encodeURIComponent(certificateId)}/revoke`,
@@ -2213,6 +2540,67 @@ export function fetchTrainingAnalytics(filters: {
 export function fetchTrainingCompliancePolicies() {
   return request<{ items: TrainingCompliancePolicyDto[] }>(
     "/training/admin/analytics/compliance-policies",
+  );
+}
+
+export function fetchTrainingEffectiveness(filters: {
+  courseId?: string;
+  branchId?: string;
+  from?: string;
+  to?: string;
+} = {}) {
+  const query = new URLSearchParams();
+  if (filters.courseId) query.set("courseId", filters.courseId);
+  if (filters.branchId) query.set("branchId", filters.branchId);
+  if (filters.from) query.set("from", filters.from);
+  if (filters.to) query.set("to", filters.to);
+  return request<TrainingEffectivenessDto>(
+    `/training/admin/analytics/effectiveness${query.size ? `?${query}` : ""}`,
+  );
+}
+
+export function fetchTrainingImprovements(filters: {
+  courseId?: string;
+  status?: TrainingImprovementStatus;
+} = {}) {
+  const query = new URLSearchParams();
+  if (filters.courseId) query.set("courseId", filters.courseId);
+  if (filters.status) query.set("status", filters.status);
+  return request<{ items: TrainingCourseImprovementDto[] }>(
+    `/training/admin/analytics/improvements${query.size ? `?${query}` : ""}`,
+  );
+}
+
+export function createTrainingImprovement(input: {
+  courseId: string;
+  title: string;
+  description?: string;
+  ownerId?: string;
+  priority?: TrainingImprovementPriority;
+  source?: TrainingImprovementSource;
+  signalCode?: string;
+  evidence?: Record<string, unknown>;
+  dueAt?: string;
+}) {
+  return request<TrainingCourseImprovementDto>(
+    "/training/admin/analytics/improvements",
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function updateTrainingImprovement(
+  improvementId: string,
+  input: {
+    status?: TrainingImprovementStatus;
+    priority?: TrainingImprovementPriority;
+    ownerId?: string;
+    dueAt?: string;
+    outcomeNotes?: string;
+  },
+) {
+  return request<TrainingCourseImprovementDto>(
+    `/training/admin/analytics/improvements/${encodeURIComponent(improvementId)}`,
+    { method: "PATCH", body: JSON.stringify(input) },
   );
 }
 
@@ -2246,6 +2634,17 @@ export function fetchTrainingIntegrations() {
       webhooks: { failedDeliveries: number };
     };
   }>("/training/integrations");
+}
+
+export function fetchTrainingOperations() {
+  return request<TrainingOperationsDto>("/training/admin/operations");
+}
+
+export function executeTrainingOperation(kind: TrainingOperationKind) {
+  return request<TrainingOperationsDto["runs"][number]>(
+    "/training/admin/operations/execute",
+    { method: "POST", body: JSON.stringify({ kind }) },
+  );
 }
 
 export function createTrainingWebhook(input: { name: string; endpointUrl: string; eventTypes: string[]; secret: string }) {

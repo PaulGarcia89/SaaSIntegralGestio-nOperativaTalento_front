@@ -495,6 +495,80 @@ export interface TrainingCourseModuleDto {
   lessons: TrainingLessonDto[];
 }
 
+export type TrainingCompetencyLevel = "AWARENESS" | "WORKING" | "PROFICIENT" | "EXPERT";
+export type TrainingAudienceRuleType = "ROLE" | "JOB_TITLE" | "BRANCH" | "GROUP";
+export type TrainingAudienceOperator = "EQUALS" | "CONTAINS";
+
+export interface TrainingCompetencyDto {
+  id: string;
+  tenantId?: string | null;
+  code: string;
+  name: string;
+  description?: string | null;
+  framework?: string | null;
+  isActive: boolean;
+}
+
+export interface TrainingCourseBriefDto {
+  id?: string;
+  courseId?: string;
+  businessNeed: string;
+  targetOutcome: string;
+  successKpi: string;
+  audienceDescription?: string | null;
+  baselineMetric?: string | null;
+  targetMetric?: string | null;
+  riskIfNotCompleted?: string | null;
+  contentOwnerId?: string | null;
+  subjectMatterExpertId?: string | null;
+  targetDate?: string | null;
+}
+
+export interface TrainingCourseCompetencyDto {
+  id?: string;
+  competencyId: string;
+  targetLevel: TrainingCompetencyLevel;
+  isRequired: boolean;
+  sortOrder: number;
+  competency?: TrainingCompetencyDto;
+}
+
+export interface TrainingLearningObjectiveDto {
+  id?: string;
+  competencyId?: string | null;
+  statement: string;
+  successCriteria: string;
+  assessmentMethod: string;
+  targetLevel: TrainingCompetencyLevel;
+  isRequired: boolean;
+  sortOrder: number;
+  competency?: TrainingCompetencyDto | null;
+}
+
+export interface TrainingAudienceRuleDto {
+  id?: string;
+  ruleType: TrainingAudienceRuleType;
+  operator: TrainingAudienceOperator;
+  value: string;
+  description?: string | null;
+  sortOrder: number;
+}
+
+export interface TrainingCourseDesignDto {
+  brief?: TrainingCourseBriefDto | null;
+  competencies: TrainingCourseCompetencyDto[];
+  objectives: TrainingLearningObjectiveDto[];
+  audienceRules: TrainingAudienceRuleDto[];
+  readiness: { ready: boolean; errors: string[] };
+}
+
+export interface TrainingCourseDesignInput {
+  brief: TrainingCourseBriefDto;
+  competencies: Array<Omit<TrainingCourseCompetencyDto, "id" | "competency">>;
+  objectives: Array<Omit<TrainingLearningObjectiveDto, "id" | "competency">>;
+  audienceRules: Array<Omit<TrainingAudienceRuleDto, "id">>;
+}
+
 export interface TrainingCategoryDto {
   id: string;
   tenantId?: string | null;
@@ -532,7 +606,70 @@ export interface TrainingCourseDto {
   createdAt: string;
   updatedAt: string;
   modules: TrainingCourseModuleDto[];
+  quizzes?: TrainingQuizDto[];
+  certificationPolicy?: TrainingCertificationPolicyDto | null;
+  qualityReviews?: TrainingQualityReviewDto[];
+  pilots?: TrainingCoursePilotDto[];
   _count?: { modules: number; assignments: number };
+}
+
+export type TrainingQualityReviewType = "CONTENT" | "PEDAGOGY" | "ACCESSIBILITY" | "COMPLIANCE";
+export type TrainingQualityReviewStatus = "PENDING" | "APPROVED" | "CHANGES_REQUESTED";
+export type TrainingPilotStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+
+export interface TrainingQualityReviewDto {
+  id: string;
+  courseId: string;
+  courseVersion: number;
+  reviewType: TrainingQualityReviewType;
+  status: TrainingQualityReviewStatus;
+  reviewerId?: string | null;
+  checklist: Record<string, unknown>;
+  summary?: string | null;
+  decidedAt?: string | null;
+}
+
+export interface TrainingPilotFeedbackDto {
+  id: string;
+  pilotId: string;
+  userId: string;
+  rating: number;
+  clarityRating: number;
+  relevanceRating: number;
+  comment?: string | null;
+  blockingIssue: boolean;
+}
+
+export interface TrainingCoursePilotDto {
+  id: string;
+  courseId: string;
+  courseVersion: number;
+  name: string;
+  status: TrainingPilotStatus;
+  participantIds: string[];
+  successCriteria: { minResponses?: number; minAverageRating?: number };
+  startsAt?: string | null;
+  endsAt?: string | null;
+  activatedAt?: string | null;
+  completedAt?: string | null;
+  feedback: TrainingPilotFeedbackDto[];
+  metrics?: {
+    participants: number;
+    responses: number;
+    averageRating: number;
+    averageClarity: number;
+    averageRelevance: number;
+    blockingIssues: number;
+  };
+  course?: { id: string; title: string; summary?: string | null; coverImageUrl?: string | null };
+}
+
+export interface TrainingCourseQualityDto {
+  courseId: string;
+  courseVersion: number;
+  reviews: TrainingQualityReviewDto[];
+  pilots: TrainingCoursePilotDto[];
+  readiness: { ready: boolean; errors: string[] };
 }
 
 export interface TrainingCourseListDto {
@@ -612,6 +749,57 @@ export interface TrainingAssignmentsListDto {
   };
 }
 
+export type TrainingLaunchStatus =
+  | "DRAFT"
+  | "SCHEDULED"
+  | "ACTIVE"
+  | "PAUSED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type TrainingLaunchAudience = "USERS" | "ROLES" | "BRANCHES" | "TENANT";
+
+export interface TrainingLaunchDto {
+  id: string;
+  tenantId: string;
+  courseId: string;
+  name: string;
+  status: TrainingLaunchStatus;
+  audience: TrainingLaunchAudience;
+  targetIds: string[];
+  resolvedUserIds: string[];
+  nextAudienceIndex: number;
+  batchSize: number;
+  rolloutIntervalHours: number;
+  isRequired: boolean;
+  startAt?: string | null;
+  dueAt?: string | null;
+  nextBatchAt?: string | null;
+  launchedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  course: { id: string; title: string; coverImageUrl?: string | null; version: number };
+  createdBy?: { id: string; firstName: string; lastName: string } | null;
+  metrics: {
+    audience: number;
+    processed: number;
+    assigned: number;
+    started: number;
+    completed: number;
+    overdue: number;
+    averageProgress: number;
+  };
+}
+
+export interface TrainingLaunchListDto {
+  items: TrainingLaunchDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface TrainingLearningPathDto {
   id: string;
   title: string;
@@ -680,6 +868,8 @@ export type TrainingQuestionType =
   | "MULTIPLE_CHOICE"
   | "TRUE_FALSE"
   | "TEXT";
+export type TrainingQuestionDifficulty = "EASY" | "MEDIUM" | "HARD";
+export type TrainingQuizFeedbackMode = "AFTER_SUBMISSION" | "AFTER_PASSING" | "NEVER";
 
 export interface TrainingQuizOptionDto {
   id: string;
@@ -694,6 +884,11 @@ export interface TrainingQuizQuestionDto {
   explanation?: string | null;
   points: number;
   requiresManualGrading: boolean;
+  category?: string | null;
+  difficulty: TrainingQuestionDifficulty;
+  tags: string[];
+  rubric?: Record<string, unknown> | null;
+  sortOrder: number;
   options: TrainingQuizOptionDto[];
 }
 
@@ -706,9 +901,33 @@ export interface TrainingQuizDto {
   maxAttempts?: number | null;
   timeLimitMinutes?: number | null;
   shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+  randomQuestionCount?: number | null;
+  cooldownMinutes?: number | null;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  requireAllQuestions: boolean;
+  feedbackMode: TrainingQuizFeedbackMode;
+  rubric?: Record<string, unknown> | null;
   course?: { id: string; title: string; status?: string };
   questions: TrainingQuizQuestionDto[];
   _count?: { attempts: number };
+  readiness?: { ready: boolean; errors: string[] };
+}
+
+export interface TrainingQuestionBankItemDto {
+  id: string;
+  prompt: string;
+  questionType: TrainingQuestionType;
+  explanation?: string | null;
+  points: number;
+  requiresManualGrading: boolean;
+  category?: string | null;
+  difficulty: TrainingQuestionDifficulty;
+  tags: string[];
+  rubric?: Record<string, unknown> | null;
+  options: Array<{ label: string; isCorrect: boolean }>;
+  updatedAt: string;
 }
 
 export interface TrainingQuizAttemptDto {
@@ -721,6 +940,7 @@ export interface TrainingQuizAttemptDto {
   passed?: boolean | null;
   status: "IN_PROGRESS" | "SUBMITTED" | "PENDING_REVIEW" | "GRADED";
   feedback?: string | null;
+  questionIds: string[];
   quiz?: TrainingQuizDto;
   user?: { id: string; firstName: string; lastName: string; email: string };
   answers?: Array<{
@@ -737,16 +957,74 @@ export interface TrainingQuizAttemptDto {
 
 export interface TrainingCertificateDto {
   id: string;
+  certificateNumber: string;
   verificationCode: string;
   certificateUrl: string;
   issuedAt: string;
   expiresAt?: string | null;
   revokedAt?: string | null;
   revocationReason?: string | null;
-  status?: "VALID" | "EXPIRED" | "REVOKED";
+  supersededAt?: string | null;
+  issuedReason?: "COMPLETION" | "MANUAL" | "RENEWAL";
+  policyVersion?: number | null;
+  evidenceSnapshot?: Record<string, unknown> | null;
+  renewalEligible?: boolean;
+  renewedFrom?: { id: string; certificateNumber: string } | null;
+  status?: "VALID" | "EXPIRED" | "REVOKED" | "RENEWED";
   user?: { id: string; firstName: string; lastName: string; email: string };
   course?: { id: string; title: string } | null;
   curriculum?: { id: string; title: string } | null;
+}
+
+export interface TrainingCertificationPolicyDto {
+  id?: string;
+  tenantId: string;
+  courseId: string;
+  isEnabled: boolean;
+  autoIssue: boolean;
+  requireAssessment: boolean;
+  requireAllRequiredLessons: boolean;
+  validityDays?: number | null;
+  renewalWindowDays: number;
+  reminderDays: number[];
+  certificateTitle?: string | null;
+  certificateDescription?: string | null;
+  signatoryName?: string | null;
+  signatoryTitle?: string | null;
+  badgeImageUrl?: string | null;
+  version: number;
+}
+
+export interface TrainingCertificationPolicyResponse {
+  policy: TrainingCertificationPolicyDto;
+  readiness: { ready: boolean; errors: string[] };
+}
+
+export interface TrainingCertificationPolicyInput {
+  isEnabled: boolean;
+  autoIssue: boolean;
+  requireAssessment: boolean;
+  requireAllRequiredLessons: boolean;
+  validityDays?: number;
+  renewalWindowDays: number;
+  reminderDays: number[];
+  certificateTitle?: string;
+  certificateDescription?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  badgeImageUrl?: string;
+}
+
+export interface PublicTrainingCertificateVerificationDto {
+  verificationCode: string;
+  certificateNumber: string;
+  learnerName: string;
+  title?: string | null;
+  organization: string;
+  issuedAt: string;
+  expiresAt?: string | null;
+  status: "VALID" | "EXPIRED" | "REVOKED" | "RENEWED";
+  revocationReason?: string | null;
 }
 
 export interface TrainingAnalyticsDto {
@@ -783,6 +1061,142 @@ export interface TrainingAnalyticsDto {
     progressPercent: number;
     dueAt?: string | null;
     completedAt?: string | null;
+  }>;
+}
+
+export type TrainingImprovementStatus =
+  | "OPEN"
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "VALIDATING"
+  | "COMPLETED"
+  | "DISMISSED";
+
+export type TrainingImprovementPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type TrainingImprovementSource = "ANALYTICS" | "PILOT" | "QUALITY" | "MANUAL";
+
+export interface TrainingEffectivenessSignalDto {
+  code: string;
+  severity: "MEDIUM" | "HIGH" | "CRITICAL";
+  title: string;
+  detail: string;
+  recommendation: string;
+  evidence: Record<string, number | string>;
+}
+
+export interface TrainingEffectivenessDto {
+  generatedAt: string;
+  period: { from?: string | null; to?: string | null };
+  summary: {
+    courses: number;
+    averageHealthScore: number;
+    criticalSignals: number;
+    openSignals: number;
+  };
+  courses: Array<{
+    courseId: string;
+    title: string;
+    version: number;
+    healthScore: number;
+    confidence: "LOW" | "MEDIUM" | "HIGH";
+    metrics: {
+      assigned: number;
+      started: number;
+      completed: number;
+      overdue: number;
+      startRate: number;
+      completionRate: number;
+      overdueRate: number;
+      attempts: number;
+      passRate: number;
+      averageScore?: number | null;
+      averageCompletionDays?: number | null;
+      averagePilotRating?: number | null;
+      blockingIssues: number;
+      launchAudience: number;
+      launchProcessed: number;
+    };
+    lessonJourney: Array<{
+      lessonId: string;
+      title: string;
+      completed: number;
+      completionRate: number;
+      dropOffRate: number;
+    }>;
+    signals: TrainingEffectivenessSignalDto[];
+  }>;
+}
+
+export interface TrainingCourseImprovementDto {
+  id: string;
+  tenantId: string;
+  courseId: string;
+  title: string;
+  description?: string | null;
+  status: TrainingImprovementStatus;
+  priority: TrainingImprovementPriority;
+  source: TrainingImprovementSource;
+  signalCode?: string | null;
+  evidence?: Record<string, unknown> | null;
+  dueAt?: string | null;
+  outcomeNotes?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  course: { id: string; title: string; version: number };
+  owner?: { id: string; firstName: string; lastName: string; email: string } | null;
+  createdBy?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export type TrainingOperationKind =
+  | "PROCESS_DUE_COURSES"
+  | "PROCESS_DUE_LAUNCHES"
+  | "RECOVER_WEBHOOKS"
+  | "RETRY_FAILED_WEBHOOKS"
+  | "CLEAR_STALE_LAUNCH_LOCKS";
+
+export interface TrainingOperationsDto {
+  generatedAt: string;
+  health: {
+    score: number;
+    status: "HEALTHY" | "WARNING" | "CRITICAL";
+    critical: number;
+    warning: number;
+  };
+  checks: Array<{
+    code: string;
+    label: string;
+    status: "HEALTHY" | "WARNING" | "CRITICAL";
+    count: number;
+    ageMinutes: number;
+    targetMinutes: number;
+  }>;
+  counters: {
+    dueCourses: number;
+    dueLaunches: number;
+    staleLaunchLocks: number;
+    failedWebhooks: number;
+    pendingWebhooks: number;
+  };
+  runs: Array<{
+    id: string;
+    kind: TrainingOperationKind;
+    status: "RUNNING" | "SUCCEEDED" | "FAILED";
+    result?: Record<string, unknown> | null;
+    error?: string | null;
+    startedAt: string;
+    completedAt?: string | null;
+    durationMs?: number | null;
+    actor?: { id: string; firstName: string; lastName: string; email: string } | null;
+  }>;
+  audit: Array<{
+    id: string;
+    action?: string | null;
+    route: string;
+    method: string;
+    statusCode: number;
+    email?: string | null;
+    correlationId?: string | null;
+    createdAt: string;
   }>;
 }
 

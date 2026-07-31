@@ -1,4 +1,9 @@
-import type { ApplicationStatusKey, ApplicationTimelineEventType } from "./contracts";
+import type {
+  ApplicationStatusKey,
+  ApplicationTimelineEventType,
+  VacancyApplicationDto,
+  VacancyStageDto,
+} from "./contracts";
 
 export const APPLICATION_STAGES: Array<{ key: ApplicationStatusKey; label: string; tone: "secondary" | "default" | "destructive" }> = [
   { key: "SUBMITTED", label: "Recibida", tone: "secondary" },
@@ -19,12 +24,28 @@ export const TIMELINE_LABELS: Record<ApplicationTimelineEventType, string> = {
   APPLIED: "Postulación recibida",
   CONTACTED: "Candidato contactado",
   INTERVIEW_SCHEDULED: "Entrevista programada",
+  INTERVIEW_RESCHEDULED: "Entrevista reprogramada",
+  INTERVIEW_CANCELLED: "Entrevista cancelada",
   INTERVIEW_COMPLETED: "Entrevista completada",
+  STAGE_CHANGE_REQUESTED: "Cambio de etapa solicitado",
+  STAGE_CHANGE_APPROVED: "Aprobación de etapa registrada",
+  STAGE_CHANGE_REJECTED: "Cambio de etapa rechazado",
+  STAGE_CHANGED: "Etapa actualizada",
   HIRED: "Contratación formalizada",
 };
 
 export function applicationStageLabel(status: ApplicationStatusKey) {
   return APPLICATION_STAGES.find((stage) => stage.key === status)?.label ?? status;
+}
+
+export function currentApplicationStage(
+  application: Pick<VacancyApplicationDto, "currentStageId" | "currentStage" | "status" | "vacancy">,
+  stages: VacancyStageDto[] = application.vacancy.stages ?? [],
+) {
+  return application.currentStage
+    ?? stages.find((stage) => stage.id === application.currentStageId)
+    ?? stages.find((stage) => stage.applicationStatus === application.status)
+    ?? null;
 }
 
 export function formatApplicationDate(value?: string | null) {

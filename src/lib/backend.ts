@@ -73,8 +73,22 @@ import type {
   VacancyStageDto,
   VacancyResponsibleDto,
   RecruitmentInterviewDto,
+  InterviewScorecardRecordDto,
+  HiringDecisionCommitteeDto,
   ScheduleInterviewInput,
   InterviewRecommendation,
+  CalendarConnectionDto,
+  CalendarProvider,
+  InterviewerAvailabilityDto,
+  AvailabilitySettingsDto,
+  CreateScorecardTemplateInput,
+  ScorecardComparisonDto,
+  ScorecardContextDto,
+  ScorecardResponseDto,
+  ScorecardTemplateDto,
+  AtsCommunicationTemplateDto,
+  AtsMessageDto,
+  CreateAtsCommunicationTemplateInput,
   CandidateSessionDto,
   HireCandidateInput,
   HiringContextDto,
@@ -1684,10 +1698,12 @@ export function createVacancy(
   input: CreateVacancyInput,
   setup?: { stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] },
 ): Promise<VacancySetupDto> {
+  const safeInput = { ...input };
+  delete safeInput.imageUrl;
   return request<VacancySetupDto>("/vacancies", {
     method: "POST",
     body: JSON.stringify({
-      ...input,
+      ...safeInput,
       stages: setup?.stages,
       responsibles: setup?.responsibles.map(({ userId, role }) => ({ userId, role })),
       applicationFormSchema: applicationFormSchemaForApi(input.applicationFormSchema),
@@ -1697,11 +1713,20 @@ export function createVacancy(
   });
 }
 
+export function uploadVacancyImage(vacancyId: string, image: File) {
+  const body = new FormData();
+  body.append("image", image);
+  return request<{ id: string; version: number; url: string; expiresAt: string }>(
+    `/vacancies/${encodeURIComponent(vacancyId)}/image`,
+    { method: "POST", body },
+  );
+}
+
 export function fetchVacancies(): Promise<PublicVacancyListDto> {
   return request<PublicVacancyListDto>("/vacancies?page=1&pageSize=100");
 }
 
-export function fetchApplications(filters: { search?: string; status?: string; vacancyId?: string; branchId?: string } = {}): Promise<VacancyApplicationListDto> {
+export function fetchApplications(filters: { search?: string; status?: string; currentStageId?: string; vacancyId?: string; branchId?: string } = {}): Promise<VacancyApplicationListDto> {
   const query = new URLSearchParams({ page: "1", pageSize: "100" });
   Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
   return request<VacancyApplicationListDto>(`/applications?${query.toString()}`);
@@ -1711,8 +1736,33 @@ export function fetchApplication(applicationId: string): Promise<VacancyApplicat
   return request<VacancyApplicationDto>(`/applications/${encodeURIComponent(applicationId)}`);
 }
 
+export function fetchResumeAccess(applicationId: string) {
+  return request<{
+    fileId: string;
+    version: number;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    url: string;
+    expiresAt: string;
+  }>(`/applications/${encodeURIComponent(applicationId)}/files/resume`);
+}
+
 export function updateApplication(applicationId: string, input: UpdateApplicationInput): Promise<VacancyApplicationDto> {
   return request<VacancyApplicationDto>(`/applications/${encodeURIComponent(applicationId)}/status`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function decideApplicationTransition(
+  applicationId: string,
+  requestId: string,
+  approved: boolean,
+  note?: string,
+): Promise<VacancyApplicationDto> {
+  const decision = approved ? "approve" : "reject";
+  return request<VacancyApplicationDto>(
+    `/applications/${encodeURIComponent(applicationId)}/transitions/${encodeURIComponent(requestId)}/${decision}`,
+    { method: "POST", body: JSON.stringify({ note }) },
+  );
 }
 
 export function hireCandidate(input: HireCandidateInput) {
@@ -1760,25 +1810,192 @@ export function scheduleRecruitmentInterview(input: ScheduleInterviewInput) {
   });
 }
 
-export function updateRecruitmentInterview(id: string, input: Partial<Pick<RecruitmentInterviewDto, "status" | "timezone" | "startsAt" | "endsAt" | "location" | "meetingUrl" | "notes">>) {
+export function updateRecruitmentInterview(id: string, input: Partial<Pick<RecruitmentInterviewDto, "status" | "timezone" | "startsAt" | "endsAt" | "location" | "meetingUrl" | "notes" | "calendarProvider" | "videoProvider">> & { allowConflict?: boolean }) {
   return request<RecruitmentInterviewDto>(`/recruitment/interviews/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
 }
 
+export function fetchCalendarConnections() {
+  return request<CalendarConnectionDto[]>("/recruitment/calendar-connections");
+}
+
+export function fetchCalendarAuthorizationUrl(
+  provider: CalendarProvider,
+  redirectUri: string,
+) {
+  return request<{ authorizationUrl: string; state: string }>(
+    `/recruitment/calendar-connections/${provider}/authorize?redirectUri=${encodeURIComponent(redirectUri)}`,
+  );
+}
+
+export function completeCalendarOAuth(
+  provider: CalendarProvider,
+  input: { code: string; state: string; redirectUri: string },
+) {
+  return request<CalendarConnectionDto>(
+    `/recruitment/calendar-connections/${provider}/oauth`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function disconnectCalendar(provider: CalendarProvider) {
+  return request<{ disconnected: boolean }>(
+    `/recruitment/calendar-connections/${provider}`,
+    { method: "DELETE" },
+  );
+}
+
+export function fetchInterviewerAvailability(
+  interviewerUserId: string,
+  input: { startsAt: string; endsAt: string; durationMinutes?: number },
+) {
+  const query = new URLSearchParams({
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    ...(input.durationMinutes ? { durationMinutes: String(input.durationMinutes) } : {}),
+  });
+  return request<InterviewerAvailabilityDto>(
+    `/recruitment/interviewers/${encodeURIComponent(interviewerUserId)}/availability?${query}`,
+  );
+}
+
+export function fetchAvailabilitySettings() {
+  return request<AvailabilitySettingsDto | null>("/recruitment/availability/settings");
+}
+
+export function updateAvailabilitySettings(input: AvailabilitySettingsDto) {
+  return request<AvailabilitySettingsDto>("/recruitment/availability/settings", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function retryInterviewCalendarSync(id: string) {
+  return request<RecruitmentInterviewDto>(
+    `/recruitment/interviews/${encodeURIComponent(id)}/calendar/retry`,
+    { method: "POST" },
+  );
+}
+
+export function downloadInterviewInvitation(id: string) {
+  return request<Blob>(
+    `/recruitment/interviews/${encodeURIComponent(id)}/invitation.ics`,
+    {},
+    { responseType: "blob" },
+  );
+}
+
+export function fetchAtsCommunicationTemplates(vacancyId?: string) {
+  const query = vacancyId ? `?vacancyId=${encodeURIComponent(vacancyId)}` : "";
+  return request<AtsCommunicationTemplateDto[]>(`/ats/communications/templates${query}`);
+}
+
+export function createAtsCommunicationTemplate(input: CreateAtsCommunicationTemplateInput) {
+  return request<AtsCommunicationTemplateDto>("/ats/communications/templates", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchAtsCommunicationHistory(applicationId: string) {
+  return request<AtsMessageDto[]>(
+    `/ats/communications/applications/${encodeURIComponent(applicationId)}/history`,
+  );
+}
+
+export function retryAtsCommunication(messageId: string) {
+  return request(`/ats/communications/messages/${encodeURIComponent(messageId)}/retry`, {
+    method: "POST",
+  });
+}
+
+export function sendAtsOffer(applicationId: string, message?: string) {
+  return request<AtsMessageDto[]>(
+    `/ats/communications/applications/${encodeURIComponent(applicationId)}/offer`,
+    { method: "POST", body: JSON.stringify({ message: message?.trim() || undefined }) },
+  );
+}
+
 export function submitInterviewScorecard(id: string, input: {
-  criteria: Record<string, unknown>;
-  overallRating: number;
+  criteria?: Record<string, unknown>;
+  responses?: ScorecardResponseDto[];
+  overallRating?: number;
   recommendation: InterviewRecommendation;
   strengths?: string;
   concerns?: string;
   comments?: string;
+  sign?: boolean;
 }) {
-  return request(`/recruitment/interviews/${encodeURIComponent(id)}/scorecard`, {
+  return request<InterviewScorecardRecordDto>(`/recruitment/interviews/${encodeURIComponent(id)}/scorecard`, {
     method: "PUT",
     body: JSON.stringify(input),
   });
+}
+
+export function fetchScorecardTemplates(vacancyId: string, stageId?: string) {
+  const query = new URLSearchParams({ vacancyId });
+  if (stageId) query.set("stageId", stageId);
+  return request<ScorecardTemplateDto[]>(`/recruitment/scorecard-templates?${query}`);
+}
+
+export function createScorecardTemplate(input: CreateScorecardTemplateInput) {
+  return request<ScorecardTemplateDto>("/recruitment/scorecard-templates", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchInterviewScorecardContext(id: string) {
+  return request<ScorecardContextDto>(
+    `/recruitment/interviews/${encodeURIComponent(id)}/scorecard-context`,
+  );
+}
+
+export function fetchInterviewScorecardComparison(id: string) {
+  return request<ScorecardComparisonDto>(
+    `/recruitment/interviews/${encodeURIComponent(id)}/scorecard-comparison`,
+  );
+}
+
+export function fetchDecisionCommittee(applicationId: string) {
+  return request<HiringDecisionCommitteeDto | null>(
+    `/recruitment/applications/${encodeURIComponent(applicationId)}/decision-committee`,
+  );
+}
+
+export function createDecisionCommittee(input: {
+  applicationId: string;
+  quorum: number;
+  members: Array<{ userId: string; role: "CHAIR" | "MEMBER" | "OBSERVER"; isRequired?: boolean }>;
+}) {
+  return request<HiringDecisionCommitteeDto>("/recruitment/decision-committees", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function voteDecisionCommittee(id: string, input: {
+  vote: InterviewRecommendation;
+  rationale: string;
+  conflictOfInterestDeclared: boolean;
+  recuse?: boolean;
+}) {
+  return request(`/recruitment/decision-committees/${encodeURIComponent(id)}/vote`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function finalizeDecisionCommittee(id: string, input: {
+  decision: InterviewRecommendation;
+  rationale: string;
+}) {
+  return request<HiringDecisionCommitteeDto>(
+    `/recruitment/decision-committees/${encodeURIComponent(id)}/finalize`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
 }
 
 const CANDIDATE_SESSION_KEY = "talentos.candidate-session";
@@ -1794,7 +2011,7 @@ function getCandidateAccessToken() {
 
 async function candidateRequest<T>(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
-  if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
+  if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const token = getCandidateAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...init, headers });
@@ -1819,10 +2036,23 @@ export function fetchCandidateApplications() {
   return candidateRequest<VacancyApplicationDto[]>("/candidate/applications");
 }
 
-export function submitCandidateApplication(vacancyId: string, input: PublicApplicationInput) {
+export function submitCandidateApplication(
+  vacancyId: string,
+  input: PublicApplicationInput,
+  resume: File | null,
+  consent: boolean,
+) {
+  const body = new FormData();
+  Object.entries(input).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    body.append(key, key === "dynamicResponses" ? JSON.stringify(value) : String(value));
+  });
+  body.append("resumeConsent", String(consent));
+  body.append("resumeConsentVersion", "candidate-privacy-v1");
+  if (resume) body.append("resume", resume);
   return candidateRequest<PublicApplicationReceipt>(`/public/vacancies/${encodeURIComponent(vacancyId)}/applications`, {
     method: "POST",
-    body: JSON.stringify(input),
+    body,
   });
 }
 

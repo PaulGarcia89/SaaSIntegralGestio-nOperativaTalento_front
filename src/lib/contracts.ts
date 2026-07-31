@@ -1262,7 +1262,6 @@ export interface PublicApplicationInput {
   city?: string;
   linkedinUrl?: string;
   portfolioUrl?: string;
-  resumeUrl?: string;
   coverLetter?: string;
   dynamicResponses?: Record<string, unknown>;
 }
@@ -1310,7 +1309,7 @@ export interface CandidateDto {
 
 export type ApplicationStatusKey = "SUBMITTED" | "REVIEWING" | "INTERVIEW" | "APPROVED" | "REJECTED" | "TRAINING" | "HIRED";
 export type ApplicationInterviewType = "PRESENTIAL" | "VIRTUAL" | "PHONE";
-export type ApplicationTimelineEventType = "VACANCY_PUBLISHED" | "APPLIED" | "CONTACTED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_COMPLETED" | "HIRED";
+export type ApplicationTimelineEventType = "VACANCY_PUBLISHED" | "APPLIED" | "CONTACTED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "INTERVIEW_COMPLETED" | "STAGE_CHANGE_REQUESTED" | "STAGE_CHANGE_APPROVED" | "STAGE_CHANGE_REJECTED" | "STAGE_CHANGED" | "HIRED";
 
 export interface ApplicationCandidateDto {
   id: string;
@@ -1321,6 +1320,8 @@ export interface ApplicationCandidateDto {
   linkedinUrl?: string | null;
   portfolioUrl?: string | null;
   resumeUrl?: string | null;
+  resumeAvailable?: boolean;
+  resumeFile?: { id: string; version: number; originalName: string; mimeType: string; sizeBytes: number } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1329,12 +1330,23 @@ export interface ApplicationVacancyDto extends PublicVacancyDto {
   id: string;
   branchId: string;
   branch?: { id: string; name: string; location?: string | null } | null;
+  stages: VacancyStageDto[];
 }
 
 export interface ApplicationTimelineEventDto {
+  id?: string;
   type: ApplicationTimelineEventType;
   at?: string | null;
   note?: string | null;
+  actorType?: string;
+  actorId?: string | null;
+  actorDisplayName?: string | null;
+  previousValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+  reason?: string | null;
+  source?: string;
+  immutable?: boolean;
 }
 
 export interface VacancyApplicationDto {
@@ -1342,7 +1354,14 @@ export interface VacancyApplicationDto {
   tenantId: string;
   vacancyId: string;
   candidateId: string;
+  currentStageId?: string | null;
   status: ApplicationStatusKey;
+  currentStage?: VacancyStageDto | null;
+  stageEnteredAt?: string;
+  stageDueAt?: string | null;
+  isStageOverdue?: boolean;
+  rejectionReason?: string | null;
+  pendingTransitions?: ApplicationStageTransitionRequestDto[];
   coverLetter?: string | null;
   dynamicResponses?: Record<string, unknown> | null;
   notes?: string | null;
@@ -1360,6 +1379,9 @@ export interface VacancyApplicationDto {
 export type VacancyResponsibleRole = "OWNER" | "RECRUITER" | "HIRING_MANAGER" | "INTERVIEWER";
 export type RecruitmentInterviewStatus = "SCHEDULED" | "CONFIRMED" | "COMPLETED" | "CANCELED" | "NO_SHOW";
 export type InterviewRecommendation = "STRONG_YES" | "YES" | "MIXED" | "NO";
+export type CalendarProvider = "GOOGLE" | "MICROSOFT" | "ZOOM";
+export type VideoConferenceProvider = "NONE" | "GOOGLE_MEET" | "MICROSOFT_TEAMS" | "ZOOM" | "MANUAL";
+export type CalendarSyncStatus = "NOT_CONNECTED" | "PENDING" | "SYNCED" | "FAILED" | "CANCELLED";
 
 export interface VacancyStageDto {
   id?: string;
@@ -1367,7 +1389,32 @@ export interface VacancyStageDto {
   name: string;
   position: number;
   color?: string | null;
+  applicationStatus: ApplicationStatusKey;
   isTerminal?: boolean;
+  allowedNextStageCodes?: string[];
+  requiredFields?: string[];
+  requiresApproval?: boolean;
+  requiredApprovals?: number;
+  allowReopen?: boolean;
+  slaHours?: number | null;
+}
+
+export interface ApplicationStageTransitionRequestDto {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+  requestedByUserId: string;
+  requiredApprovals: number;
+  reason?: string | null;
+  requestedAt: string;
+  fromStage?: VacancyStageDto | null;
+  toStage: VacancyStageDto;
+  approvals: Array<{
+    id: string;
+    reviewerUserId: string;
+    approved: boolean;
+    note?: string | null;
+    decidedAt: string;
+  }>;
 }
 
 export interface VacancyResponsibleDto {
@@ -1385,13 +1432,142 @@ export interface VacancySetupDto extends PublicVacancyDto {
 export interface InterviewScorecardRecordDto {
   id: string;
   overallRating: number;
+  weightedScore?: number | string | null;
   recommendation: InterviewRecommendation;
   criteria: Record<string, unknown>;
+  status?: "DRAFT" | "SIGNED";
+  signedAt?: string | null;
+  signatureHash?: string | null;
   strengths?: string | null;
   concerns?: string | null;
   comments?: string | null;
   submittedAt: string;
   reviewer?: { id: string; firstName: string; lastName: string };
+  signedBy?: { id: string; firstName: string; lastName: string } | null;
+  template?: { id: string; name: string; version: number } | null;
+  responses?: ScorecardResponseDto[];
+}
+
+export type ScorecardCriterionType = "RATING" | "TEXT" | "BOOLEAN";
+
+export interface ScorecardCriterionDto {
+  id: string;
+  key: string;
+  label: string;
+  description?: string | null;
+  competencyCode?: string | null;
+  competencyName?: string | null;
+  type: ScorecardCriterionType;
+  weight: number;
+  isRequired: boolean;
+  requiresEvidence: boolean;
+  ratingAnchors?: Record<string, string> | null;
+  sortOrder: number;
+}
+
+export interface ScorecardTemplateDto {
+  id: string;
+  vacancyId: string;
+  stageId?: string | null;
+  name: string;
+  instructions?: string | null;
+  version: number;
+  isActive: boolean;
+  stage?: VacancyStageDto | null;
+  criteria: ScorecardCriterionDto[];
+}
+
+export interface ScorecardResponseDto {
+  id?: string;
+  criterionId: string;
+  criterionKey?: string;
+  criterionLabel?: string;
+  competencyCode?: string | null;
+  competencyName?: string | null;
+  criterionType?: ScorecardCriterionType;
+  weight?: number;
+  rating?: number | null;
+  textValue?: string | null;
+  booleanValue?: boolean | null;
+  evidence?: string | null;
+}
+
+export interface ScorecardComparisonDto {
+  evaluatorCount: number;
+  evaluatorScores: Array<{
+    reviewer: { id: string; firstName: string; lastName: string };
+    weightedScore: number;
+    overallRating: number;
+    recommendation: InterviewRecommendation;
+    signedAt?: string | null;
+  }>;
+  criteria: Array<{
+    key: string;
+    label?: string | null;
+    competencyName?: string | null;
+    ratings: number[];
+    mean?: number | null;
+    min?: number | null;
+    max?: number | null;
+    spread?: number | null;
+  }>;
+  biasSignals: Array<{
+    code: string;
+    severity: "LOW" | "MEDIUM" | "HIGH";
+    message: string;
+    reviewerUserId?: string;
+    criterionKey?: string;
+  }>;
+  disclaimer: string;
+}
+
+export interface ScorecardContextDto {
+  template?: ScorecardTemplateDto | null;
+  scorecard?: InterviewScorecardRecordDto | null;
+  canEdit: boolean;
+  comparisons: ScorecardComparisonDto;
+}
+
+export interface HiringDecisionCommitteeDto {
+  id: string;
+  applicationId: string;
+  status: "OPEN" | "DECIDED" | "CANCELLED";
+  quorum: number;
+  finalDecision?: InterviewRecommendation | null;
+  rationale?: string | null;
+  decidedAt?: string | null;
+  members: Array<{
+    id: string;
+    userId: string;
+    role: "CHAIR" | "MEMBER" | "OBSERVER";
+    isRequired: boolean;
+    vote?: InterviewRecommendation | null;
+    voteRationale?: string | null;
+    conflictOfInterestDeclared?: boolean | null;
+    recusedAt?: string | null;
+    votedAt?: string | null;
+    user: { id: string; firstName: string; lastName: string; email: string };
+  }>;
+  comparisons: ScorecardComparisonDto[];
+}
+
+export interface CreateScorecardTemplateInput {
+  vacancyId: string;
+  stageId?: string;
+  name: string;
+  instructions?: string;
+  criteria: Array<{
+    key: string;
+    label: string;
+    description?: string;
+    competencyCode?: string;
+    competencyName?: string;
+    type: ScorecardCriterionType;
+    weight: number;
+    isRequired?: boolean;
+    requiresEvidence?: boolean;
+    ratingAnchors?: Record<string, string>;
+  }>;
 }
 
 export interface RecruitmentInterviewDto {
@@ -1404,6 +1580,13 @@ export interface RecruitmentInterviewDto {
   endsAt: string;
   location?: string | null;
   meetingUrl?: string | null;
+  calendarProvider?: CalendarProvider | null;
+  videoProvider: VideoConferenceProvider;
+  externalEventId?: string | null;
+  externalMeetingId?: string | null;
+  calendarSyncStatus: CalendarSyncStatus;
+  calendarSyncError?: string | null;
+  calendarSyncedAt?: string | null;
   notes?: string | null;
   status: RecruitmentInterviewStatus;
   stage?: VacancyStageDto | null;
@@ -1423,7 +1606,92 @@ export interface ScheduleInterviewInput {
   endsAt: string;
   location?: string;
   meetingUrl?: string;
+  calendarProvider?: CalendarProvider;
+  videoProvider?: VideoConferenceProvider;
+  allowConflict?: boolean;
   notes?: string;
+}
+
+export interface CalendarConnectionDto {
+  id: string;
+  provider: CalendarProvider;
+  status: "ACTIVE" | "EXPIRED" | "REVOKED" | "ERROR";
+  externalEmail?: string | null;
+  scopes: string[];
+  tokenExpiresAt?: string | null;
+  lastSyncedAt?: string | null;
+  lastError?: string | null;
+}
+
+export interface InterviewerAvailabilityDto {
+  interviewerUserId: string;
+  timezone: string;
+  busy: Array<{ startsAt: string; endsAt: string; source: "ATS" | "GOOGLE" | "MICROSOFT" }>;
+  slots: Array<{ startsAt: string; endsAt: string }>;
+}
+
+export interface AvailabilitySettingsDto {
+  id?: string;
+  timezone: string;
+  weeklySchedule: Record<string, Array<{ start: string; end: string }>>;
+  bufferMinutes: number;
+  minNoticeHours: number;
+}
+
+export type AtsCommunicationType = "APPLICATION_CONFIRMATION" | "STAGE_UPDATE" | "REJECTION" | "INTERVIEW_SCHEDULED" | "INTERVIEW_REMINDER" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "OFFER" | "APPROVAL_REQUEST" | "MANUAL";
+export type AtsCommunicationAudience = "CANDIDATE" | "RESPONSIBLE";
+export type AtsMessageStatus = "PENDING" | "PROCESSING" | "DELIVERED" | "FAILED" | "DEAD_LETTER" | "CANCELLED" | "SKIPPED";
+
+export interface AtsCommunicationTemplateDto {
+  id: string;
+  vacancyId?: string | null;
+  stageCode?: string | null;
+  type: AtsCommunicationType;
+  audience: AtsCommunicationAudience;
+  name: string;
+  subject: string;
+  body: string;
+  version: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AtsMessageDto {
+  id: string;
+  type: AtsCommunicationType;
+  audience: AtsCommunicationAudience;
+  recipientEmail: string;
+  recipientName?: string | null;
+  subject: string;
+  body: string;
+  status: AtsMessageStatus;
+  scheduledAt: string;
+  createdAt: string;
+  template?: { id: string; name: string; version: number } | null;
+  notification?: {
+    deliveries: Array<{
+      id: string;
+      channel: "INTERNAL" | "EMAIL";
+      status: AtsMessageStatus;
+      attempts: number;
+      maxAttempts: number;
+      nextAttemptAt?: string | null;
+      deliveredAt?: string | null;
+      lastError?: string | null;
+      providerMessageId?: string | null;
+    }>;
+  } | null;
+}
+
+export interface CreateAtsCommunicationTemplateInput {
+  vacancyId?: string;
+  stageCode?: string;
+  type: AtsCommunicationType;
+  audience: AtsCommunicationAudience;
+  name: string;
+  subject: string;
+  body: string;
+  isActive?: boolean;
 }
 
 export interface CandidateSessionDto {
@@ -1438,7 +1706,9 @@ export interface VacancyApplicationListDto {
 }
 
 export interface UpdateApplicationInput {
-  status: ApplicationStatusKey;
+  status?: ApplicationStatusKey;
+  currentStageId?: string;
+  reason?: string;
   notes?: string;
   interview?: { type: ApplicationInterviewType; scheduledAt?: string | null; followUpAt?: string | null; observations?: string | null } | null;
 }

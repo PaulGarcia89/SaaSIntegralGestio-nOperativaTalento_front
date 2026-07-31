@@ -24,6 +24,8 @@ const routeLabels: Record<string, string> = {
   vacancies: "Vacantes",
   candidates: "Postulantes",
   interviews: "Entrevistas",
+  communications: "Comunicaciones",
+  scorecards: "Scorecards",
   onboarding: "Incorporación",
   documents: "Documentos",
   signatures: "Firmas",

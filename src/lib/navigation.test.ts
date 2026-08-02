@@ -42,7 +42,7 @@ describe("navigation policy", () => {
   });
 
   it("centralizes the candidate portal navigation", () => {
-    expect(candidateNavigation.filter((item) => item.available).map((item) => item.href)).toEqual(["/", "/jobs", "/apply", "/application-status"]);
+    expect(candidateNavigation.filter((item) => item.available).map((item) => item.href)).toEqual(["/", "/jobs", "/apply", "/application-status", "/candidate/portal", "/candidate/profile"]);
   });
 
   it("evaluates access criteria in the required order", () => {

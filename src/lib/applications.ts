@@ -13,10 +13,11 @@ export const APPLICATION_STAGES: Array<{ key: ApplicationStatusKey; label: strin
   { key: "TRAINING", label: "Formación", tone: "default" },
   { key: "HIRED", label: "Contratada", tone: "default" },
   { key: "REJECTED", label: "Descartada", tone: "destructive" },
+  { key: "WITHDRAWN", label: "Retirada", tone: "secondary" },
 ];
 
 export const APPLICATION_STAGE_CHANGE_OPTIONS = APPLICATION_STAGES.filter(
-  (stage) => stage.key !== "HIRED",
+  (stage) => stage.key !== "HIRED" && stage.key !== "WITHDRAWN",
 );
 
 export const TIMELINE_LABELS: Record<ApplicationTimelineEventType, string> = {
@@ -32,6 +33,11 @@ export const TIMELINE_LABELS: Record<ApplicationTimelineEventType, string> = {
   STAGE_CHANGE_REJECTED: "Cambio de etapa rechazado",
   STAGE_CHANGED: "Etapa actualizada",
   HIRED: "Contratación formalizada",
+  APPLICATION_WITHDRAWN: "Postulación retirada por el candidato",
+  SLA_WARNING: "Aviso preventivo de SLA",
+  SLA_ESCALATED: "SLA escalado",
+  SLA_REASSIGNED: "Reasignación automática por SLA",
+  RECRUITER_ASSIGNED: "Responsable de reclutamiento asignado",
 };
 
 export function applicationStageLabel(status: ApplicationStatusKey) {
@@ -62,6 +68,7 @@ export function applicationNextAction(status: ApplicationStatusKey) {
     TRAINING: "Revisar formación requerida",
     HIRED: "Iniciar incorporación",
     REJECTED: "Proceso cerrado",
+    WITHDRAWN: "Retirada por el candidato",
   };
   return actions[status];
 }

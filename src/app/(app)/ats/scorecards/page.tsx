@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Plus, Scale, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Plus, Power, Scale, Trash2 } from "lucide-react";
 import {
   createScorecardTemplate,
+  duplicateScorecardTemplate,
   fetchScorecardTemplates,
   fetchVacancies,
   fetchVacancySetup,
+  updateScorecardTemplateAdmin,
 } from "@/lib/backend";
 import type {
   CreateScorecardTemplateInput,
   ScorecardCriterionType,
 } from "@/lib/contracts";
 import { RecruitmentWorkspaceNav } from "@/components/recruitment-workspace";
+import { ScorecardGovernanceConsole } from "@/components/scorecard-governance-console";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +46,8 @@ export default function ScorecardsPage() {
   const queryClient = useQueryClient();
   const [vacancyId, setVacancyId] = useState("");
   const [stageId, setStageId] = useState("ALL");
+  const [scope, setScope] = useState<"VACANCY" | "TENANT">("VACANCY");
+  const [feedbackVisibility, setFeedbackVisibility] = useState<"IMMEDIATE" | "AFTER_OWN_SUBMISSION" | "AFTER_ALL_SUBMITTED" | "HIRING_MANAGER_ONLY">("AFTER_ALL_SUBMITTED");
   const [name, setName] = useState("Evaluación estructurada");
   const [instructions, setInstructions] = useState("");
   const [criteria, setCriteria] = useState<CriterionDraft[]>([
@@ -57,15 +62,16 @@ export default function ScorecardsPage() {
   });
   const templates = useQuery({
     queryKey: ["scorecard-templates", vacancyId],
-    queryFn: () => fetchScorecardTemplates(vacancyId),
-    enabled: Boolean(vacancyId),
+    queryFn: () => fetchScorecardTemplates(vacancyId || undefined),
   });
   const totalWeight = criteria
     .filter((criterion) => criterion.type === "RATING")
     .reduce((sum, criterion) => sum + criterion.weight, 0);
   const save = useMutation({
     mutationFn: () => createScorecardTemplate({
-      vacancyId,
+      vacancyId: scope === "VACANCY" ? vacancyId : undefined,
+      scope,
+      feedbackVisibility,
       stageId: stageId === "ALL" ? undefined : stageId,
       name,
       instructions: instructions || undefined,
@@ -80,6 +86,8 @@ export default function ScorecardsPage() {
       await queryClient.invalidateQueries({ queryKey: ["scorecard-templates", vacancyId] });
     },
   });
+  const templateAdmin = useMutation({ mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => updateScorecardTemplateAdmin(id, { isActive }), onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["scorecard-templates"] }) });
+  const duplicate = useMutation({ mutationFn: (id: string) => duplicateScorecardTemplate(id, { vacancyId: scope === "VACANCY" ? vacancyId : undefined, scope }), onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["scorecard-templates"] }) });
 
   function updateCriterion(localId: string, patch: Partial<CriterionDraft>) {
     setCriteria((current) => current.map((item) => item.localId === localId ? { ...item, ...patch } : item));
@@ -97,7 +105,7 @@ export default function ScorecardsPage() {
   }
 
   const canSave = Boolean(
-    vacancyId
+    (scope === "TENANT" || vacancyId)
     && name.trim()
     && criteria.length
     && criteria.every((criterion) => criterion.key.trim() && criterion.label.trim())
@@ -110,6 +118,8 @@ export default function ScorecardsPage() {
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,.7fr)]">
       <Card level={1}><CardHeader><CardTitle>Nueva versión</CardTitle></CardHeader><CardContent className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField label="Alcance" value={scope} onChange={(value) => { setScope(value as "VACANCY" | "TENANT"); if (value === "TENANT") setStageId("ALL"); }} options={[{ value: "VACANCY", label: "Vacante específica" }, { value: "TENANT", label: "Compartida entre vacantes" }]} />
+          <SelectField label="Visibilidad del feedback" value={feedbackVisibility} onChange={(value) => setFeedbackVisibility(value as typeof feedbackVisibility)} options={[{ value: "IMMEDIATE", label: "Inmediata" }, { value: "AFTER_OWN_SUBMISSION", label: "Después de enviar la propia" }, { value: "AFTER_ALL_SUBMITTED", label: "Cuando todos terminen" }, { value: "HIRING_MANAGER_ONLY", label: "Solo hiring manager" }]} />
           <SelectField label="Vacante" value={vacancyId} onChange={(value) => { setVacancyId(value); setStageId("ALL"); }} options={(vacancies.data?.data ?? []).map((item) => ({ value: item.id, label: item.title }))} />
           <SelectField label="Etapa" value={stageId} onChange={setStageId} options={[{ value: "ALL", label: "Toda la vacante" }, ...(setup.data?.stages ?? []).map((item) => ({ value: item.id!, label: item.name }))]} />
         </div>
@@ -129,8 +139,9 @@ export default function ScorecardsPage() {
         {save.isSuccess ? <InlineFeedback tone="success" title="Versión publicada">La versión {save.data.version} quedó activa; las versiones anteriores permanecen como historial.</InlineFeedback> : null}
         <Button className="w-full" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Publicando…" : "Publicar nueva versión"}</Button>
       </CardContent></Card>
-      <aside><Card level={2}><CardHeader><CardTitle>Versiones publicadas</CardTitle></CardHeader><CardContent>{!vacancyId ? <p className="text-sm text-text-secondary">Selecciona una vacante para consultar su historial.</p> : templates.isLoading ? <p className="text-sm text-text-secondary">Cargando versiones…</p> : templates.data?.length ? <ol className="space-y-3">{templates.data.map((template) => <li key={template.id} className="rounded-xl border border-border-default p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{template.name}</p><p className="text-xs text-text-secondary">{template.stage?.name ?? "Toda la vacante"} · {template.criteria.length} criterios</p></div><span className="rounded-full bg-secondary px-2 py-1 text-xs">v{template.version}{template.isActive ? " · Activa" : ""}</span></div></li>)}</ol> : <p className="text-sm text-text-secondary">No hay plantillas para esta vacante.</p>}</CardContent></Card></aside>
+      <aside><Card level={2}><CardHeader><CardTitle>Versiones publicadas</CardTitle></CardHeader><CardContent>{templates.isLoading ? <p className="text-sm text-text-secondary">Cargando versiones…</p> : templates.data?.length ? <ol className="space-y-3">{templates.data.map((template) => <li key={template.id} className="rounded-xl border border-border-default p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{template.name}</p><p className="text-xs text-text-secondary">{template.scope === "TENANT" ? "Compartida" : template.stage?.name ?? "Toda la vacante"} · {template.criteria.length} criterios</p><p className="mt-1 text-xs text-text-secondary">Feedback: {template.feedbackVisibility}</p></div><span className="rounded-full bg-secondary px-2 py-1 text-xs">v{template.version}{template.isActive ? " · Activa" : ""}</span></div><div className="mt-3 flex gap-2"><Button size="sm" variant="ghost" onClick={() => duplicate.mutate(template.id)}><Copy className="size-3.5" />Duplicar</Button><Button size="sm" variant="ghost" onClick={() => templateAdmin.mutate({ id: template.id, isActive: !template.isActive })}><Power className="size-3.5" />{template.isActive ? "Desactivar" : "Activar"}</Button><Button size="sm" variant="ghost" onClick={() => { setName(template.name); setInstructions(template.instructions ?? ""); setFeedbackVisibility(template.feedbackVisibility ?? "AFTER_ALL_SUBMITTED"); setCriteria(template.criteria.map((item) => ({ ...item, localId: crypto.randomUUID(), lowAnchor: item.ratingAnchors?.["1"] ?? "", highAnchor: item.ratingAnchors?.["5"] ?? "" }))); }}>Editar como nueva versión</Button></div></li>)}</ol> : <p className="text-sm text-text-secondary">No hay plantillas disponibles.</p>}</CardContent></Card></aside>
     </section>
+    <ScorecardGovernanceConsole />
   </div>;
 }
 

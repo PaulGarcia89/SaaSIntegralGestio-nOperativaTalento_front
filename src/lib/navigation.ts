@@ -87,9 +87,8 @@ export const candidateNavigation = [
   { href: "/jobs", label: "Vacantes", available: true },
   { href: "/apply", label: "Iniciar postulación", available: true },
   { href: "/application-status", label: "Mis postulaciones", available: true },
-  { href: "/candidate/interviews", label: "Entrevistas", available: false },
-  { href: "/candidate/documents", label: "Documentos", available: false },
+  { href: "/candidate/portal", label: "Centro del candidato", available: true },
   { href: "/candidate/training", label: "Aprendizaje", available: false },
   { href: "/candidate/evaluations", label: "Evaluaciones", available: false },
-  { href: "/candidate/profile", label: "Perfil", available: false },
+  { href: "/candidate/profile", label: "Perfil y privacidad", available: true },
 ] as const;

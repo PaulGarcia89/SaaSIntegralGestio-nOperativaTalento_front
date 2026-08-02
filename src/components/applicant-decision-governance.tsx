@@ -1,0 +1,32 @@
+"use client";
+
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ClipboardCheck, UserCheck } from "lucide-react";
+import { assignHiringManager, createExternalAssessment, decideHiringManagerApproval, fetchExternalAssessments, fetchHiringManagerApproval } from "@/lib/backend";
+import type { HiringManagerApprovalDto, InterviewRecommendation } from "@/lib/contracts";
+import { useAppStore } from "@/store/app-store";
+import { InlineFeedback } from "@/components/design-system";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export function ApplicantDecisionGovernance({ applicationId }: { applicationId: string }) {
+  const queryClient = useQueryClient();
+  const { tenantUsers, currentUser, can } = useAppStore();
+  const [managerId, setManagerId] = useState("");
+  const [assessment, setAssessment] = useState({ provider: "", assessmentType: "", launchUrl: "" });
+  const [decision, setDecision] = useState<{ status: HiringManagerApprovalDto["status"]; recommendation: InterviewRecommendation; rationale: string }>({ status: "APPROVED", recommendation: "YES", rationale: "" });
+  const approval = useQuery({ queryKey: ["hiring-manager-approval", applicationId], queryFn: () => fetchHiringManagerApproval(applicationId) });
+  const assessments = useQuery({ queryKey: ["external-assessments", applicationId], queryFn: () => fetchExternalAssessments(applicationId) });
+  const refreshApproval = () => queryClient.invalidateQueries({ queryKey: ["hiring-manager-approval", applicationId] });
+  const assign = useMutation({ mutationFn: () => assignHiringManager(applicationId, managerId), onSuccess: refreshApproval });
+  const decide = useMutation({ mutationFn: () => decideHiringManagerApproval(applicationId, decision), onSuccess: refreshApproval });
+  const invite = useMutation({ mutationFn: () => createExternalAssessment({ applicationId, ...assessment, consentRecorded: true }), onSuccess: async () => { setAssessment({ provider: "", assessmentType: "", launchUrl: "" }); await queryClient.invalidateQueries({ queryKey: ["external-assessments", applicationId] }); } });
+  const canDecide = approval.data?.managerUserId === currentUser.id;
+
+  return <div className="grid gap-5 xl:grid-cols-2"><Card level={2}><CardHeader><CardTitle><span className="inline-flex items-center gap-2"><ClipboardCheck className="size-5" />Assessments externos</span></CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-text-secondary">Registra evaluaciones técnicas o psicométricas con consentimiento. El resultado complementa, pero no reemplaza, la decisión humana.</p>{can("applications.change_stage") ? <div className="grid gap-2"><Input placeholder="Proveedor (SHL, HackerRank, TestGorilla…)" value={assessment.provider} onChange={(event) => setAssessment({ ...assessment, provider: event.target.value })} /><Input placeholder="Tipo de assessment" value={assessment.assessmentType} onChange={(event) => setAssessment({ ...assessment, assessmentType: event.target.value })} /><Input type="url" placeholder="Enlace seguro de invitación" value={assessment.launchUrl} onChange={(event) => setAssessment({ ...assessment, launchUrl: event.target.value })} /><Button onClick={() => invite.mutate()} disabled={!assessment.provider || !assessment.assessmentType || invite.isPending}>Registrar e invitar</Button></div> : null}<div className="space-y-2">{assessments.data?.map((item) => <div key={item.id} className="rounded-xl bg-surface-section p-3 text-sm"><div className="flex justify-between"><strong>{item.provider} · {item.assessmentType}</strong><Badge>{item.status}</Badge></div>{item.score != null ? <p className="text-text-secondary">Puntuación {Number(item.score).toFixed(1)} · percentil {Number(item.percentile ?? 0).toFixed(1)}</p> : null}</div>)}</div></CardContent></Card>
+    <Card level={2}><CardHeader><CardTitle><span className="inline-flex items-center gap-2"><UserCheck className="size-5" />Aprobación del hiring manager</span></CardTitle></CardHeader><CardContent className="space-y-4">{approval.data ? <><div className="flex items-center justify-between rounded-xl bg-surface-section p-3"><div><p className="font-medium">{approval.data.manager.firstName} {approval.data.manager.lastName}</p><p className="text-xs text-text-secondary">Decisión independiente del comité</p></div><Badge>{approval.data.status}</Badge></div>{approval.data.rationale ? <InlineFeedback tone={approval.data.status === "APPROVED" ? "success" : "warning"} title={approval.data.recommendation ?? approval.data.status}>{approval.data.rationale}</InlineFeedback> : null}{canDecide && approval.data.status === "PENDING" ? <div className="space-y-3"><Select value={decision.status} onValueChange={(status) => setDecision({ ...decision, status: status as HiringManagerApprovalDto["status"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="APPROVED">Aprobar</SelectItem><SelectItem value="REJECTED">Rechazar</SelectItem><SelectItem value="CHANGES_REQUESTED">Solicitar revisión</SelectItem></SelectContent></Select><textarea className="w-full rounded-xl border bg-background p-3 text-sm" rows={3} value={decision.rationale} onChange={(event) => setDecision({ ...decision, rationale: event.target.value })} placeholder="Justificación basada en evidencia" /><Button onClick={() => decide.mutate()} disabled={decision.rationale.trim().length < 5 || decide.isPending}>Registrar decisión gerencial</Button></div> : null}</> : can("applications.change_stage") ? <div className="space-y-3"><Select value={managerId || undefined} onValueChange={setManagerId}><SelectTrigger><SelectValue placeholder="Selecciona hiring manager" /></SelectTrigger><SelectContent>{tenantUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select><Button onClick={() => assign.mutate()} disabled={!managerId || assign.isPending}>Solicitar aprobación</Button></div> : <p className="text-sm text-text-secondary">Aún no se ha solicitado aprobación gerencial.</p>}</CardContent></Card></div>;
+}

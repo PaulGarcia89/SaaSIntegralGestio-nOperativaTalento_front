@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Clock3, Eye, Search, X } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { InlineFeedback, PageHeader, Pagination } from "@/components/design-system";
 import {
   CandidatePreviewDialog,
   FilterField,
@@ -23,6 +23,7 @@ import {
   fetchVacancies,
   fetchVacancySetup,
   decideApplicationTransition,
+  fetchRejectionReasons,
   updateApplication,
 } from "@/lib/backend";
 import type { VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
@@ -41,6 +42,7 @@ function PipelineContent() {
   const requestedVacancyId = params.get("vacancy") ?? ALL;
   const stageFilter = params.get("stage") ?? ALL;
   const age = params.get("age") ?? ALL;
+  const page = Math.max(1, Number(params.get("page") ?? 1));
   const [stageChange, setStageChange] = useState<{
     application: VacancyApplicationDto;
     target: VacancyStageDto;
@@ -62,44 +64,33 @@ function PipelineContent() {
     enabled: Boolean(effectiveVacancyId),
   });
   const applications = useQuery({
-    queryKey: ["applications", currentBranch?.id, effectiveVacancyId],
+    queryKey: ["applications", currentBranch?.id, effectiveVacancyId, search, stageFilter, age, page],
     queryFn: () =>
       fetchApplications({
         branchId: currentBranch?.id,
         vacancyId: effectiveVacancyId,
+        search: search || undefined,
+        currentStageId: stageFilter === ALL ? undefined : stageFilter,
+        appliedFrom: age === ALL ? undefined : new Date(Date.now() - Number(age) * 86_400_000).toISOString().slice(0, 10),
+        page,
+        pageSize: 100,
       }),
     enabled: Boolean(effectiveVacancyId),
   });
+  const rejectionReasons = useQuery({ queryKey: ["application-rejection-reasons"], queryFn: fetchRejectionReasons });
 
   const stages = useMemo(
     () => [...(setup.data?.stages ?? [])].sort((a, b) => a.position - b.position),
     [setup.data?.stages],
   );
-  const filtered = useMemo(() => {
-    const normalized = search.trim().toLocaleLowerCase("es");
-    const maximumDays = age === ALL ? null : Number(age);
-    const now = applications.dataUpdatedAt;
-    return (applications.data?.data ?? []).filter((item) => {
-      const matchesText =
-        !normalized
-        || `${item.candidate.fullName} ${item.candidate.email} ${item.vacancy.title}`
-          .toLocaleLowerCase("es")
-          .includes(normalized);
-      const matchesStage =
-        stageFilter === ALL
-        || currentApplicationStage(item, stages)?.id === stageFilter;
-      const matchesAge =
-        maximumDays === null
-        || now - new Date(item.appliedAt).getTime() <= maximumDays * 86_400_000;
-      return matchesText && matchesStage && matchesAge;
-    });
-  }, [age, applications.data?.data, applications.dataUpdatedAt, search, stageFilter, stages]);
+  const filtered = applications.data?.data ?? [];
 
   const move = useMutation({
-    mutationFn: ({ application, stage, reason }: { application: VacancyApplicationDto; stage: VacancyStageDto; reason?: string }) =>
+    mutationFn: ({ application, stage, reason, rejectionReasonId }: { application: VacancyApplicationDto; stage: VacancyStageDto; reason?: string; rejectionReasonId?: string }) =>
       updateApplication(application.id, {
         currentStageId: stage.id,
         reason,
+        rejectionReasonId,
         notes: application.notes ?? undefined,
       }),
     onSuccess: async (_, variables) => {
@@ -251,7 +242,7 @@ function PipelineContent() {
 
       {stages.length ? (
         <>
-          <p className="text-sm text-text-secondary" aria-live="polite">{filtered.length} {filtered.length === 1 ? "postulación encontrada" : "postulaciones encontradas"}</p>
+          <p className="text-sm text-text-secondary" aria-live="polite">{applications.data?.meta.total ?? 0} {(applications.data?.meta.total ?? 0) === 1 ? "postulación encontrada" : "postulaciones encontradas"}</p>
           <div className="space-y-5 lg:hidden">
             {stages.map((stage) => {
               const items = filtered.filter((item) => currentApplicationStage(item, stages)?.id === stage.id);
@@ -295,17 +286,19 @@ function PipelineContent() {
               })}
             </div>
           </div>
+          {applications.data?.meta && applications.data.meta.totalPages > 1 ? <Pagination page={applications.data.meta.page - 1} totalPages={applications.data.meta.totalPages} totalItems={applications.data.meta.total} pageSize={applications.data.meta.pageSize} onPageChange={(next) => setFilter("page", String(next + 1))} /> : null}
         </>
       ) : null}
 
       <StageChangeDialog
         application={stageChange?.application ?? null}
         targetStage={stageChange?.target ?? null}
+        rejectionReasons={rejectionReasons.data}
         open={Boolean(stageChange)}
         pending={move.isPending}
         onOpenChange={(open) => { if (!open) setStageChange(null); }}
-        onConfirm={(reason) => {
-          if (stageChange) move.mutate({ application: stageChange.application, stage: stageChange.target, reason });
+        onConfirm={(reason, rejectionReasonId) => {
+          if (stageChange) move.mutate({ application: stageChange.application, stage: stageChange.target, reason, rejectionReasonId });
         }}
       />
       <CandidatePreviewDialog application={preview} open={Boolean(preview)} onOpenChange={(open) => { if (!open) setPreview(null); }} />

@@ -63,6 +63,7 @@ export type PermissionKey =
   | "jobs.update"
   | "jobs.publish"
   | "jobs.approve"
+  | "vacancies.update"
   | "candidates.view"
   | "candidates.update"
   | "applications.view"
@@ -1225,9 +1226,12 @@ export interface VacancyDto {
 
 export interface PublicVacancyDto {
   id: string;
+  branchId?: string;
+  requisitionId?: string | null;
+  clonedFromVacancyId?: string | null;
   title: string;
   imageUrl?: string | null;
-  status?: "DRAFT" | "OPEN" | "PUBLISHED" | "PAUSED" | "CLOSED" | string | null;
+  status?: "DRAFT" | "OPEN" | "PUBLISHED" | "PAUSED" | "CLOSED" | "FILLED" | "ARCHIVED" | string | null;
   summary?: string | null;
   description?: string | null;
   requirements?: string | null;
@@ -1240,9 +1244,16 @@ export interface PublicVacancyDto {
   workMode?: string | null;
   employmentType?: string | null;
   openings?: number | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  currency?: string | null;
   applicationFormSchema?: VacancyApplicationFormSchema | null;
   tenant?: { id: string; name: string; slug: string } | null;
   branch?: { id: string; name: string; location?: string | null } | null;
+  locations?: Array<{ id: string; branchId: string; city?: string | null; country?: string | null; isPrimary: boolean; branch: { id: string; name: string; location?: string | null } }>;
+  requisition?: { id: string; title: string; status: PersonnelRequisitionStatus } | null;
+  stages?: VacancyStageDto[];
+  responsibles?: VacancyResponsibleDto[];
 }
 
 export type VacancyApplicationFieldType = "TEXT" | "TEXTAREA" | "URL" | "NUMBER" | "SINGLE_SELECT" | "MULTI_SELECT" | "BOOLEAN";
@@ -1276,6 +1287,8 @@ export interface PublicApplicationReceipt {
 
 export interface CreateVacancyInput {
   branchId: string;
+  locationBranchIds?: string[];
+  requisitionId?: string;
   title: string;
   imageUrl?: string;
   summary?: string;
@@ -1294,7 +1307,43 @@ export interface CreateVacancyInput {
   salaryMax?: number;
   currency?: string;
   applicationFormSchema?: VacancyApplicationFormSchema;
-  status?: "DRAFT" | "PUBLISHED";
+  status?: "DRAFT" | "PUBLISHED" | "OPEN" | "PAUSED" | "CLOSED" | "FILLED" | "ARCHIVED";
+}
+
+export type PersonnelRequisitionStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "CANCELLED";
+export interface PersonnelRequisitionInput {
+  title: string;
+  department?: string;
+  justification: string;
+  openings: number;
+  budgetMin?: number;
+  budgetMax?: number;
+  currency: string;
+  targetStartDate?: string;
+  branchIds: string[];
+  approverUserIds: string[];
+  status: "DRAFT" | "PENDING_APPROVAL";
+}
+export interface PersonnelRequisitionDto extends Omit<PersonnelRequisitionInput, "status"> {
+  id: string;
+  status: PersonnelRequisitionStatus;
+  submittedAt?: string | null;
+  decidedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  requestedBy: { id: string; firstName: string; lastName: string; email: string };
+  locations: Array<{ id: string; branchId: string; isPrimary: boolean; branch: { id: string; name: string; location?: string } }>;
+  approvals: Array<{ id: string; approverUserId: string; status: "PENDING" | "APPROVED" | "REJECTED"; note?: string | null; approver: { id: string; firstName: string; lastName: string; email: string } }>;
+  vacancies: Array<{ id: string; title: string; status: string }>;
+}
+export interface VacancyChangeEventDto {
+  id: string;
+  type: "CREATED" | "UPDATED" | "STATUS_CHANGED" | "CLONED" | "REQUISITION_LINKED" | "LOCATION_CHANGED";
+  reason?: string | null;
+  previousValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
+  createdAt: string;
+  actor?: { id: string; firstName: string; lastName: string; email: string } | null;
 }
 
 export interface CandidateDto {
@@ -1307,9 +1356,9 @@ export interface CandidateDto {
   summary: string;
 }
 
-export type ApplicationStatusKey = "SUBMITTED" | "REVIEWING" | "INTERVIEW" | "APPROVED" | "REJECTED" | "TRAINING" | "HIRED";
+export type ApplicationStatusKey = "SUBMITTED" | "REVIEWING" | "INTERVIEW" | "APPROVED" | "REJECTED" | "TRAINING" | "HIRED" | "WITHDRAWN";
 export type ApplicationInterviewType = "PRESENTIAL" | "VIRTUAL" | "PHONE";
-export type ApplicationTimelineEventType = "VACANCY_PUBLISHED" | "APPLIED" | "CONTACTED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "INTERVIEW_COMPLETED" | "STAGE_CHANGE_REQUESTED" | "STAGE_CHANGE_APPROVED" | "STAGE_CHANGE_REJECTED" | "STAGE_CHANGED" | "HIRED";
+export type ApplicationTimelineEventType = "VACANCY_PUBLISHED" | "APPLIED" | "CONTACTED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "INTERVIEW_COMPLETED" | "STAGE_CHANGE_REQUESTED" | "STAGE_CHANGE_APPROVED" | "STAGE_CHANGE_REJECTED" | "STAGE_CHANGED" | "HIRED" | "APPLICATION_WITHDRAWN" | "SLA_WARNING" | "SLA_ESCALATED" | "SLA_REASSIGNED" | "RECRUITER_ASSIGNED";
 
 export interface ApplicationCandidateDto {
   id: string;
@@ -1361,6 +1410,9 @@ export interface VacancyApplicationDto {
   stageDueAt?: string | null;
   isStageOverdue?: boolean;
   rejectionReason?: string | null;
+  structuredRejectionReason?: RejectionReasonDto | null;
+  assignedRecruiter?: { id: string; firstName: string; lastName: string; email: string } | null;
+  sla?: { warningSentAt?: string | null; escalatedAt?: string | null; reassignedAt?: string | null };
   pendingTransitions?: ApplicationStageTransitionRequestDto[];
   coverLetter?: string | null;
   dynamicResponses?: Record<string, unknown> | null;
@@ -1397,6 +1449,9 @@ export interface VacancyStageDto {
   requiredApprovals?: number;
   allowReopen?: boolean;
   slaHours?: number | null;
+  slaWarningHoursBefore?: number;
+  slaEscalationHours?: number;
+  autoReassignAfterHours?: number | null;
 }
 
 export interface ApplicationStageTransitionRequestDto {
@@ -1467,10 +1522,12 @@ export interface ScorecardCriterionDto {
 
 export interface ScorecardTemplateDto {
   id: string;
-  vacancyId: string;
+  vacancyId?: string | null;
   stageId?: string | null;
   name: string;
   instructions?: string | null;
+  scope?: "VACANCY" | "TENANT";
+  feedbackVisibility?: "IMMEDIATE" | "AFTER_OWN_SUBMISSION" | "AFTER_ALL_SUBMITTED" | "HIRING_MANAGER_ONLY";
   version: number;
   isActive: boolean;
   stage?: VacancyStageDto | null;
@@ -1494,6 +1551,8 @@ export interface ScorecardResponseDto {
 
 export interface ScorecardComparisonDto {
   evaluatorCount: number;
+  feedbackLocked?: boolean;
+  visibility?: ScorecardTemplateDto["feedbackVisibility"];
   evaluatorScores: Array<{
     reviewer: { id: string; firstName: string; lastName: string };
     weightedScore: number;
@@ -1526,6 +1585,78 @@ export interface ScorecardContextDto {
   scorecard?: InterviewScorecardRecordDto | null;
   canEdit: boolean;
   comparisons: ScorecardComparisonDto;
+  assignment?: ScorecardEvaluatorAssignmentDto | null;
+}
+
+export interface ScorecardCompetencyDto {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  behavioralAnchors?: Record<string, string> | null;
+  isActive: boolean;
+}
+
+export interface ScorecardEvaluatorAssignmentDto {
+  id: string;
+  interviewId: string;
+  evaluatorUserId: string;
+  criterionIds: string[];
+  anonymousReview: boolean;
+  evaluator?: { id: string; firstName: string; lastName: string };
+}
+
+export interface ExternalAssessmentDto {
+  id: string;
+  applicationId: string;
+  provider: string;
+  assessmentType: string;
+  status: "DRAFT" | "INVITED" | "IN_PROGRESS" | "COMPLETED" | "EXPIRED" | "CANCELLED" | "ERROR";
+  launchUrl?: string | null;
+  reportUrl?: string | null;
+  score?: number | string | null;
+  percentile?: number | string | null;
+  consentRecordedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface HiringManagerApprovalDto {
+  id: string;
+  applicationId: string;
+  managerUserId: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CHANGES_REQUESTED";
+  recommendation?: InterviewRecommendation | null;
+  rationale?: string | null;
+  decidedAt?: string | null;
+  manager: { id: string; firstName: string; lastName: string };
+}
+
+export interface EvaluatorCalibrationDto {
+  id: string;
+  evaluatorUserId: string;
+  sampleSize: number;
+  meanScore: number | string;
+  panelMeanScore: number | string;
+  meanDeviation: number | string;
+  strictnessIndex: number | string;
+  agreementRate: number | string;
+  evidenceRate: number | string;
+  calculatedAt: string;
+  evaluator: { id: string; firstName: string; lastName: string };
+}
+
+export interface BiasValidationRunDto {
+  id: string;
+  methodologyVersion: string;
+  populationField: string;
+  sampleSize: number;
+  selectionRateRatio?: number | string | null;
+  effectSize?: number | string | null;
+  pValue?: number | string | null;
+  status: "INSUFFICIENT_DATA" | "EXPLORATORY" | "VALIDATED" | "REQUIRES_REVIEW";
+  limitations: string;
+  createdAt: string;
 }
 
 export interface HiringDecisionCommitteeDto {
@@ -1552,21 +1683,24 @@ export interface HiringDecisionCommitteeDto {
 }
 
 export interface CreateScorecardTemplateInput {
-  vacancyId: string;
+  vacancyId?: string;
   stageId?: string;
+  scope?: "VACANCY" | "TENANT";
+  feedbackVisibility?: ScorecardTemplateDto["feedbackVisibility"];
   name: string;
   instructions?: string;
   criteria: Array<{
     key: string;
     label: string;
-    description?: string;
-    competencyCode?: string;
-    competencyName?: string;
+    description?: string | null;
+    competencyCode?: string | null;
+    competencyName?: string | null;
+    competencyId?: string;
     type: ScorecardCriterionType;
     weight: number;
     isRequired?: boolean;
     requiresEvidence?: boolean;
-    ratingAnchors?: Record<string, string>;
+    ratingAnchors?: Record<string, string> | null;
   }>;
 }
 
@@ -1593,6 +1727,51 @@ export interface RecruitmentInterviewDto {
   interviewer?: { id: string; firstName: string; lastName: string; email?: string };
   application?: VacancyApplicationDto;
   scorecards?: InterviewScorecardRecordDto[];
+  sequenceId?: string | null;
+  sequenceOrder?: number | null;
+  sequence?: { id: string; title: string; status: string } | null;
+  participants?: InterviewParticipantDto[];
+  resourceBookings?: Array<{ id: string; resource: InterviewResourceDto }>;
+}
+
+export type InterviewParticipantRole = "LEAD" | "PANELIST" | "SHADOW";
+export type InterviewParticipantStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "SUBSTITUTED";
+export interface InterviewParticipantDto {
+  id: string;
+  userId: string;
+  role: InterviewParticipantRole;
+  status: InterviewParticipantStatus;
+  user: { id: string; firstName: string; lastName: string; email?: string };
+}
+
+export interface InterviewResourceDto {
+  id: string;
+  branchId: string;
+  name: string;
+  type: "ROOM" | "VIDEO_ROOM" | "EQUIPMENT" | "ACCESSIBILITY";
+  capacity: number;
+  location?: string | null;
+}
+
+export interface InterviewPoolDto {
+  id: string;
+  branchId?: string | null;
+  name: string;
+  description?: string | null;
+  members: Array<{ id: string; userId: string; defaultRole: InterviewParticipantRole; priority: number; user: { id: string; firstName: string; lastName: string; email: string } }>;
+}
+
+export interface InterviewerProfileDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  interviewerProfile?: { trainingStatus: "NOT_STARTED" | "IN_TRAINING" | "SHADOWING" | "CERTIFIED" | "SUSPENDED"; shadowSessionsRequired: number; shadowSessionsCompleted: number; maxInterviewsPerDay: number; maxInterviewsPerWeek: number; autoSubstitutionEnabled: boolean } | null;
+}
+
+export interface RecruitmentInterviewListDto {
+  data: RecruitmentInterviewDto[];
+  meta: { total: number; page: number; pageSize: number; totalPages: number };
 }
 
 export interface ScheduleInterviewInput {
@@ -1610,6 +1789,23 @@ export interface ScheduleInterviewInput {
   videoProvider?: VideoConferenceProvider;
   allowConflict?: boolean;
   notes?: string;
+  participantUserIds?: string[];
+  shadowUserIds?: string[];
+  poolId?: string;
+  resourceIds?: string[];
+  sequenceId?: string;
+  sequenceOrder?: number;
+}
+
+export interface InterviewSchedulingPublicDto {
+  title: string;
+  type: ApplicationInterviewType;
+  timezone: string;
+  durationMinutes: number;
+  expiresAt: string;
+  candidate: { fullName: string };
+  vacancy: { title: string };
+  slots: Array<{ startsAt: string; endsAt: string }>;
 }
 
 export interface CalendarConnectionDto {
@@ -1660,6 +1856,9 @@ export interface AtsMessageDto {
   id: string;
   type: AtsCommunicationType;
   audience: AtsCommunicationAudience;
+  direction?: "OUTBOUND" | "INBOUND";
+  channel?: "EMAIL";
+  senderEmail?: string | null;
   recipientEmail: string;
   recipientName?: string | null;
   subject: string;
@@ -1677,10 +1876,34 @@ export interface AtsMessageDto {
       maxAttempts: number;
       nextAttemptAt?: string | null;
       deliveredAt?: string | null;
+      openedAt?: string | null;
+      clickedAt?: string | null;
+      bouncedAt?: string | null;
+      complainedAt?: string | null;
+      unsubscribedAt?: string | null;
       lastError?: string | null;
       providerMessageId?: string | null;
     }>;
   } | null;
+  application?: VacancyApplicationDto;
+}
+
+export interface CommunicationDomainDto {
+  id: string;
+  domain: string;
+  fromName: string;
+  fromEmail: string;
+  replyToEmail?: string | null;
+  dkimSelector: string;
+  status: "PENDING" | "VERIFIED" | "FAILED";
+  spfVerified: boolean;
+  dkimVerified: boolean;
+  dmarcVerified: boolean;
+  reputationScore?: number | string | null;
+  deliveryRate?: number | string | null;
+  bounceRate?: number | string | null;
+  complaintRate?: number | string | null;
+  lastCheckedAt?: string | null;
 }
 
 export interface CreateAtsCommunicationTemplateInput {
@@ -1697,7 +1920,40 @@ export interface CreateAtsCommunicationTemplateInput {
 export interface CandidateSessionDto {
   accessToken: string;
   expiresIn: number;
-  candidate: { id: string; email: string };
+  candidate: CandidatePortalProfileDto;
+}
+
+export interface CandidatePortalProfileDto {
+  id: string;
+  email: string;
+  fullName?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  linkedinUrl?: string | null;
+  portfolioUrl?: string | null;
+  locale: "es" | "en";
+  timezone: string;
+  statusUpdates: boolean;
+  interviewReminders: boolean;
+  offerNotifications: boolean;
+  marketingConsent: boolean;
+  profileSource: string;
+  externalIdentities?: Array<{ provider: string }>;
+}
+
+export interface CandidatePortalOverviewDto {
+  communications: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; createdAt: string }>;
+  offers: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; createdAt: string }>;
+  resumes: Array<{ id: string; applicationId?: string | null; version: number; status: string; originalName: string; mimeType: string; sizeBytes: number; createdAt: string }>;
+  signatureDocuments: Array<{ id: string; status: string; signedAt?: string | null; tokenExpiresAt?: string | null; createdAt: string; signaturePackage: { id: string; title: string; status: string; dueDate?: string | null; sentAt?: string | null } }>;
+  privacyRequests: Array<{ id: string; type: "EXPORT" | "ANONYMIZE" | "DELETE"; status: "PENDING" | "PROCESSING" | "COMPLETED" | "REJECTED" | "CANCELLED"; reason?: string | null; response?: string | null; requestedAt: string }>;
+}
+
+export interface ParsedResumeDto {
+  fields: { fullName?: string; email?: string; phone?: string; linkedinUrl?: string };
+  textPreview: string;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  requiresReview: boolean;
 }
 
 export interface VacancyApplicationListDto {
@@ -1705,10 +1961,42 @@ export interface VacancyApplicationListDto {
   meta: { total: number; page: number; pageSize: number; totalPages: number };
 }
 
+export interface ApplicationFilters {
+  search?: string;
+  status?: string;
+  currentStageId?: string;
+  vacancyId?: string;
+  branchId?: string;
+  assignedRecruiterId?: string;
+  rejectionReasonId?: string;
+  appliedFrom?: string;
+  appliedTo?: string;
+  overdueOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ApplicationSavedViewDto {
+  id: string;
+  name: string;
+  filters: ApplicationFilters;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RejectionReasonDto {
+  id: string;
+  code: string;
+  label: string;
+  category: "QUALIFICATIONS" | "EXPERIENCE" | "COMPENSATION" | "AVAILABILITY" | "LOCATION" | "CULTURE" | "CANDIDATE_DECISION" | "POSITION_CLOSED" | "DUPLICATE" | "OTHER";
+}
+
 export interface UpdateApplicationInput {
   status?: ApplicationStatusKey;
   currentStageId?: string;
   reason?: string;
+  rejectionReasonId?: string;
   notes?: string;
   interview?: { type: ApplicationInterviewType; scheduledAt?: string | null; followUpAt?: string | null; observations?: string | null } | null;
 }

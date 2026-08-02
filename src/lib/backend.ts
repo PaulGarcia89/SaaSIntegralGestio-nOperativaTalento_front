@@ -72,7 +72,11 @@ import type {
   VacancySetupDto,
   VacancyStageDto,
   VacancyResponsibleDto,
+  PersonnelRequisitionDto,
+  PersonnelRequisitionInput,
+  VacancyChangeEventDto,
   RecruitmentInterviewDto,
+  ApplicationInterviewType,
   InterviewScorecardRecordDto,
   HiringDecisionCommitteeDto,
   ScheduleInterviewInput,
@@ -86,10 +90,19 @@ import type {
   ScorecardContextDto,
   ScorecardResponseDto,
   ScorecardTemplateDto,
+  ScorecardCompetencyDto,
+  ScorecardEvaluatorAssignmentDto,
+  ExternalAssessmentDto,
+  HiringManagerApprovalDto,
+  EvaluatorCalibrationDto,
+  BiasValidationRunDto,
   AtsCommunicationTemplateDto,
   AtsMessageDto,
   CreateAtsCommunicationTemplateInput,
   CandidateSessionDto,
+  CandidatePortalProfileDto,
+  CandidatePortalOverviewDto,
+  ParsedResumeDto,
   HireCandidateInput,
   HiringContextDto,
   HiringWorkflowResultDto,
@@ -1708,8 +1721,63 @@ export function createVacancy(
       responsibles: setup?.responsibles.map(({ userId, role }) => ({ userId, role })),
       applicationFormSchema: applicationFormSchemaForApi(input.applicationFormSchema),
       workMode: input.workMode === "ONSITE" ? "ON_SITE" : input.workMode,
-      status: input.status === "PUBLISHED" ? "OPEN" : "PAUSED",
+      status: input.status === "PUBLISHED" ? "OPEN" : input.status === "DRAFT" ? "PAUSED" : input.status,
     }),
+  });
+}
+
+export function updateVacancy(
+  vacancyId: string,
+  input: CreateVacancyInput,
+  setup: { stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] },
+): Promise<VacancySetupDto> {
+  return request<VacancySetupDto>(`/vacancies/${encodeURIComponent(vacancyId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...input,
+      imageUrl: undefined,
+      stages: setup.stages,
+      responsibles: setup.responsibles.map(({ userId, role }) => ({ userId, role })),
+      applicationFormSchema: applicationFormSchemaForApi(input.applicationFormSchema),
+      workMode: input.workMode === "ONSITE" ? "ON_SITE" : input.workMode,
+      status: input.status === "PUBLISHED" ? "OPEN" : input.status === "DRAFT" ? "PAUSED" : input.status,
+    }),
+  });
+}
+
+export function cloneVacancy(vacancyId: string, reason?: string) {
+  return request<PublicVacancyDto>(`/vacancies/${encodeURIComponent(vacancyId)}/clone`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function archiveVacancy(vacancyId: string, reason: string) {
+  return request<PublicVacancyDto>(`/vacancies/${encodeURIComponent(vacancyId)}/archive`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function fetchVacancyHistory(vacancyId: string): Promise<VacancyChangeEventDto[]> {
+  return request<VacancyChangeEventDto[]>(`/vacancies/${encodeURIComponent(vacancyId)}/history`);
+}
+
+export function fetchPersonnelRequisitions(): Promise<PersonnelRequisitionDto[]> {
+  return request<PersonnelRequisitionDto[]>("/vacancies/requisitions/list");
+}
+
+export function createPersonnelRequisition(input: PersonnelRequisitionInput): Promise<PersonnelRequisitionDto> {
+  return request<PersonnelRequisitionDto>("/vacancies/requisitions", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function decidePersonnelRequisition(id: string, approved: boolean, note?: string): Promise<PersonnelRequisitionDto> {
+  return request<PersonnelRequisitionDto>(`/vacancies/requisitions/${encodeURIComponent(id)}/${approved ? "approve" : "reject"}`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
   });
 }
 
@@ -1726,10 +1794,36 @@ export function fetchVacancies(): Promise<PublicVacancyListDto> {
   return request<PublicVacancyListDto>("/vacancies?page=1&pageSize=100");
 }
 
-export function fetchApplications(filters: { search?: string; status?: string; currentStageId?: string; vacancyId?: string; branchId?: string } = {}): Promise<VacancyApplicationListDto> {
-  const query = new URLSearchParams({ page: "1", pageSize: "100" });
-  Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
+export function fetchApplications(filters: import("./contracts").ApplicationFilters = {}): Promise<VacancyApplicationListDto> {
+  const query = new URLSearchParams({ page: String(filters.page ?? 1), pageSize: String(filters.pageSize ?? 20) });
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
   return request<VacancyApplicationListDto>(`/applications?${query.toString()}`);
+}
+
+export function exportApplications(filters: import("./contracts").ApplicationFilters = {}) {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "" && key !== "page" && key !== "pageSize") query.set(key, String(value)); });
+  return request<{ generatedAt: string; count: number; data: VacancyApplicationDto[] }>(`/applications/export?${query.toString()}`);
+}
+
+export function bulkUpdateApplications(input: { ids: string[]; status?: string; currentStageId?: string; assignedRecruiterId?: string; rejectionReasonId?: string; reason?: string }) {
+  return request<{ updated: number }>("/applications/bulk/status", { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function fetchApplicationSavedViews(): Promise<import("./contracts").ApplicationSavedViewDto[]> {
+  return request("/applications/saved-views/list");
+}
+
+export function createApplicationSavedView(input: { name: string; filters: import("./contracts").ApplicationFilters; isDefault?: boolean }): Promise<import("./contracts").ApplicationSavedViewDto> {
+  return request("/applications/saved-views", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function deleteApplicationSavedView(id: string) {
+  return request<{ deleted: boolean }>(`/applications/saved-views/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function fetchRejectionReasons(): Promise<import("./contracts").RejectionReasonDto[]> {
+  return request("/applications/rejection-reasons/list");
 }
 
 export function fetchApplication(applicationId: string): Promise<VacancyApplicationDto> {
@@ -1796,11 +1890,12 @@ export function replaceVacancyResponsibles(vacancyId: string, responsibles: Vaca
   });
 }
 
-export function fetchRecruitmentInterviews(filters: { status?: string; applicationId?: string } = {}) {
+export function fetchRecruitmentInterviews(filters: { status?: string; applicationId?: string; vacancyId?: string; interviewerUserId?: string; branchId?: string; resourceId?: string; startsFrom?: string; startsTo?: string; search?: string; page?: number; pageSize?: number } = {}) {
   const query = new URLSearchParams();
-  if (filters.status) query.set("status", filters.status);
-  if (filters.applicationId) query.set("applicationId", filters.applicationId);
-  return request<RecruitmentInterviewDto[]>(`/recruitment/interviews?${query.toString()}`);
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  if (!query.has("page")) query.set("page", "1");
+  if (!query.has("pageSize")) query.set("pageSize", "20");
+  return request<import("./contracts").RecruitmentInterviewListDto>(`/recruitment/interviews?${query.toString()}`);
 }
 
 export function scheduleRecruitmentInterview(input: ScheduleInterviewInput) {
@@ -1809,6 +1904,22 @@ export function scheduleRecruitmentInterview(input: ScheduleInterviewInput) {
     body: JSON.stringify(input),
   });
 }
+
+export function scheduleInterviewSequence(input: { applicationId: string; title: string; rounds: ScheduleInterviewInput[] }) {
+  return request<{ id: string; status: string; interviews: RecruitmentInterviewDto[] }>("/recruitment/interview-sequences", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchInterviewPools() { return request<import("./contracts").InterviewPoolDto[]>("/recruitment/interview-pools"); }
+export function createInterviewPool(input: { name: string; description?: string; branchId?: string; members: Array<{ userId: string; defaultRole: string; priority?: number }> }) { return request<import("./contracts").InterviewPoolDto>("/recruitment/interview-pools", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchInterviewResources(branchId?: string) { return request<import("./contracts").InterviewResourceDto[]>(`/recruitment/interview-resources${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
+export function createInterviewResource(input: { branchId: string; name: string; type: string; capacity?: number; location?: string }) { return request<import("./contracts").InterviewResourceDto>("/recruitment/interview-resources", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchInterviewerProfiles() { return request<import("./contracts").InterviewerProfileDto[]>("/recruitment/interviewer-profiles"); }
+export function updateInterviewerProfile(userId: string, input: { trainingStatus: string; shadowSessionsRequired?: number; maxInterviewsPerDay?: number; maxInterviewsPerWeek?: number; autoSubstitutionEnabled?: boolean }) { return request(`/recruitment/interviewer-profiles/${encodeURIComponent(userId)}`, { method: "PUT", body: JSON.stringify(input) }); }
+export function createInterviewSchedulingRequest(input: { applicationId: string; title: string; type: ApplicationInterviewType; timezone: string; durationMinutes: number; windowStartsAt: string; windowEndsAt: string; poolId?: string; interviewerUserIds?: string[]; shadowUserIds?: string[]; resourceIds?: string[] }) { return request<{ id: string; url: string; status: string }>("/recruitment/interview-scheduling-requests", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchInterviewCoordinationQueue(page = 1, pageSize = 20) { return request<{ interviews: RecruitmentInterviewDto[]; schedulingRequests: Array<{ id: string; title: string; status: string; expiresAt: string; application: VacancyApplicationDto }>; meta: { interviewCount: number; requestCount: number; page: number; pageSize: number } }>(`/recruitment/coordination-queue?page=${page}&pageSize=${pageSize}`); }
+export function respondInterviewInvitation(id: string, accepted: boolean) { return request(`/recruitment/interviews/${encodeURIComponent(id)}/participants/me`, { method: "PATCH", body: JSON.stringify({ accepted }) }); }
+export function fetchPublicInterviewScheduling(token: string) { return request<import("./contracts").InterviewSchedulingPublicDto>(`/public/interview-scheduling/${encodeURIComponent(token)}`, {}, { auth: false }); }
+export function bookPublicInterviewScheduling(token: string, startsAt: string) { return request<{ booked: boolean; interviewId: string; startsAt: string; endsAt: string; timezone: string }>(`/public/interview-scheduling/${encodeURIComponent(token)}/book`, { method: "POST", body: JSON.stringify({ startsAt }) }, { auth: false }); }
 
 export function updateRecruitmentInterview(id: string, input: Partial<Pick<RecruitmentInterviewDto, "status" | "timezone" | "startsAt" | "endsAt" | "location" | "meetingUrl" | "notes" | "calendarProvider" | "videoProvider">> & { allowConflict?: boolean }) {
   return request<RecruitmentInterviewDto>(`/recruitment/interviews/${encodeURIComponent(id)}`, {
@@ -1918,6 +2029,12 @@ export function sendAtsOffer(applicationId: string, message?: string) {
   );
 }
 
+export function fetchCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto | null>("/ats/communications/domain"); }
+export function configureCommunicationDomain(input: { domain: string; fromName: string; fromEmail: string; replyToEmail?: string; dkimSelector?: string }) { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain", { method: "PUT", body: JSON.stringify(input) }); }
+export function verifyCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain/verify", { method: "POST" }); }
+export function fetchCommunicationInbox(filters: { page?: number; pageSize?: number; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value != null && value !== "" && query.set(key, String(value))); return request<{ data: AtsMessageDto[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/ats/communications/inbox?${query}`); }
+export function replyCandidateEmail(messageId: string, input: { subject: string; body: string }) { return request<AtsMessageDto[]>(`/ats/communications/messages/${encodeURIComponent(messageId)}/reply`, { method: "POST", body: JSON.stringify(input) }); }
+
 export function submitInterviewScorecard(id: string, input: {
   criteria?: Record<string, unknown>;
   responses?: ScorecardResponseDto[];
@@ -1934,8 +2051,9 @@ export function submitInterviewScorecard(id: string, input: {
   });
 }
 
-export function fetchScorecardTemplates(vacancyId: string, stageId?: string) {
-  const query = new URLSearchParams({ vacancyId });
+export function fetchScorecardTemplates(vacancyId?: string, stageId?: string) {
+  const query = new URLSearchParams();
+  if (vacancyId) query.set("vacancyId", vacancyId);
   if (stageId) query.set("stageId", stageId);
   return request<ScorecardTemplateDto[]>(`/recruitment/scorecard-templates?${query}`);
 }
@@ -1946,6 +2064,23 @@ export function createScorecardTemplate(input: CreateScorecardTemplateInput) {
     body: JSON.stringify(input),
   });
 }
+
+export function updateScorecardTemplateAdmin(id: string, input: { isActive?: boolean; feedbackVisibility?: ScorecardTemplateDto["feedbackVisibility"] }) { return request<ScorecardTemplateDto>(`/recruitment/scorecard-templates/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function duplicateScorecardTemplate(id: string, input: { vacancyId?: string; scope?: "VACANCY" | "TENANT"; name?: string }) { return request<ScorecardTemplateDto>(`/recruitment/scorecard-templates/${encodeURIComponent(id)}/duplicate`, { method: "POST", body: JSON.stringify(input) }); }
+export function fetchScorecardCompetencies(includeInactive = false) { return request<ScorecardCompetencyDto[]>(`/recruitment/scorecard-competencies?includeInactive=${includeInactive}`); }
+export function createScorecardCompetency(input: Omit<ScorecardCompetencyDto, "id" | "isActive"> & { isActive?: boolean }) { return request<ScorecardCompetencyDto>("/recruitment/scorecard-competencies", { method: "POST", body: JSON.stringify(input) }); }
+export function updateScorecardCompetency(id: string, input: Omit<ScorecardCompetencyDto, "id">) { return request<ScorecardCompetencyDto>(`/recruitment/scorecard-competencies/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function replaceScorecardAssignments(interviewId: string, assignments: Array<{ evaluatorUserId: string; criterionIds: string[]; anonymousReview?: boolean }>) { return request<ScorecardEvaluatorAssignmentDto[]>(`/recruitment/interviews/${encodeURIComponent(interviewId)}/scorecard-assignments`, { method: "PUT", body: JSON.stringify({ assignments }) }); }
+export function fetchExternalAssessments(applicationId: string) { return request<ExternalAssessmentDto[]>(`/recruitment/applications/${encodeURIComponent(applicationId)}/external-assessments`); }
+export function createExternalAssessment(input: { applicationId: string; provider: string; assessmentType: string; externalAssessmentId?: string; launchUrl?: string; expiresAt?: string; consentRecorded: boolean }) { return request<ExternalAssessmentDto>("/recruitment/external-assessments", { method: "POST", body: JSON.stringify(input) }); }
+export function updateExternalAssessmentResult(id: string, input: { status: ExternalAssessmentDto["status"]; score?: number; percentile?: number; reportUrl?: string; result?: Record<string, unknown> }) { return request<ExternalAssessmentDto>(`/recruitment/external-assessments/${encodeURIComponent(id)}/result`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function fetchHiringManagerApproval(applicationId: string) { return request<HiringManagerApprovalDto | null>(`/recruitment/applications/${encodeURIComponent(applicationId)}/hiring-manager-approval`); }
+export function assignHiringManager(applicationId: string, managerUserId: string) { return request<HiringManagerApprovalDto>(`/recruitment/applications/${encodeURIComponent(applicationId)}/hiring-manager-approval`, { method: "PUT", body: JSON.stringify({ managerUserId }) }); }
+export function decideHiringManagerApproval(applicationId: string, input: { status: HiringManagerApprovalDto["status"]; recommendation: InterviewRecommendation; rationale: string }) { return request<HiringManagerApprovalDto>(`/recruitment/applications/${encodeURIComponent(applicationId)}/hiring-manager-approval/decision`, { method: "POST", body: JSON.stringify(input) }); }
+export function fetchEvaluatorCalibration() { return request<EvaluatorCalibrationDto[]>("/recruitment/scorecard-calibration"); }
+export function runEvaluatorCalibration() { return request<EvaluatorCalibrationDto[]>("/recruitment/scorecard-calibration/run", { method: "POST" }); }
+export function fetchBiasValidations() { return request<BiasValidationRunDto[]>("/recruitment/scorecard-bias-validations"); }
+export function runBiasValidation(input: { populationField: string; referenceGroup: { name: string; total: number; selected: number }; comparisonGroup: { name: string; total: number; selected: number } }) { return request<BiasValidationRunDto>("/recruitment/scorecard-bias-validations", { method: "POST", body: JSON.stringify(input) }); }
 
 export function fetchInterviewScorecardContext(id: string) {
   return request<ScorecardContextDto>(
@@ -2009,6 +2144,16 @@ function getCandidateAccessToken() {
   }
 }
 
+export function getCandidateSession(): CandidateSessionDto | null {
+  if (typeof window === "undefined") return null;
+  try { return JSON.parse(sessionStorage.getItem(CANDIDATE_SESSION_KEY) ?? "null") as CandidateSessionDto | null; }
+  catch { return null; }
+}
+
+export function clearCandidateSession() {
+  if (typeof window !== "undefined") sessionStorage.removeItem(CANDIDATE_SESSION_KEY);
+}
+
 async function candidateRequest<T>(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -2034,6 +2179,75 @@ export async function authenticateCandidate(email: string, password: string, mod
 
 export function fetchCandidateApplications() {
   return candidateRequest<VacancyApplicationDto[]>("/candidate/applications");
+}
+
+export function requestCandidatePasswordReset(email: string): Promise<{ accepted: boolean; developmentToken?: string }> {
+  return candidateRequest("/candidate-auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+export async function resetCandidatePassword(token: string, password: string) {
+  const session = await candidateRequest<CandidateSessionDto>("/candidate-auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+  sessionStorage.setItem(CANDIDATE_SESSION_KEY, JSON.stringify(session));
+  return session;
+}
+
+export function fetchCandidateProfile() {
+  return candidateRequest<CandidatePortalProfileDto>("/candidate-auth/profile");
+}
+
+export function updateCandidateProfile(input: Partial<CandidatePortalProfileDto>) {
+  return candidateRequest<CandidatePortalProfileDto>("/candidate-auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchCandidatePortalOverview() {
+  return candidateRequest<CandidatePortalOverviewDto>("/candidate/applications/portal");
+}
+
+export function withdrawCandidateApplication(applicationId: string, reason?: string) {
+  return candidateRequest<{ withdrawn: boolean }>(`/candidate/applications/${encodeURIComponent(applicationId)}/withdraw`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function createCandidatePrivacyRequest(type: "EXPORT" | "ANONYMIZE" | "DELETE", reason?: string) {
+  return candidateRequest<CandidatePortalOverviewDto["privacyRequests"][number]>("/candidate/applications/privacy-requests", {
+    method: "POST",
+    body: JSON.stringify({ type, reason }),
+  });
+}
+
+export function cancelCandidatePrivacyRequest(id: string) {
+  return candidateRequest<CandidatePortalOverviewDto["privacyRequests"][number]>(`/candidate/applications/privacy-requests/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+}
+
+export function parseCandidateResume(resume: File) {
+  const body = new FormData();
+  body.append("resume", resume);
+  return candidateRequest<ParsedResumeDto>("/candidate/applications/resume/parse", { method: "POST", body });
+}
+
+export function fetchCandidateResumeAccess(id: string) {
+  return candidateRequest<{ id: string; originalName: string; mimeType: string; sizeBytes: number; url: string; expiresAt: string }>(`/candidate/applications/resume/${encodeURIComponent(id)}/access`);
+}
+
+export function startCandidateSocialLogin(provider: "linkedin" | "indeed", returnUrl: string) {
+  return candidateRequest<{ provider: string; authorizationUrl: string }>(`/candidate-auth/social/${provider}/start?returnUrl=${encodeURIComponent(returnUrl)}`);
+}
+
+export async function exchangeCandidateSocialCode(token: string) {
+  const session = await candidateRequest<CandidateSessionDto>("/candidate-auth/social/exchange", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+  sessionStorage.setItem(CANDIDATE_SESSION_KEY, JSON.stringify(session));
+  return session;
 }
 
 export function submitCandidateApplication(

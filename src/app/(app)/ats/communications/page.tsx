@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2 } from "lucide-react";
 import { RecruitmentWorkspaceNav } from "@/components/recruitment-workspace";
+import { CommunicationOperationsConsole } from "@/components/communication-operations-console";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +77,8 @@ export default function AtsCommunicationsPage() {
   return <div className="space-y-7">
     <PageHeader eyebrow="Reclutamiento" title="Comunicaciones ATS" description="Versiona mensajes por vacante y etapa, y controla qué contenido recibe cada audiencia." />
     <RecruitmentWorkspaceNav />
-    <InlineFeedback tone="warning" title="Envío a candidatos protegido">Las plantillas y mensajes quedan listos y auditados. El correo externo al candidato requiere autorizar un proveedor concreto antes de transmitir datos personales.</InlineFeedback>
+    <InlineFeedback tone="success" title="Correo transaccional conectado">Confirmaciones, rechazos, recordatorios, ofertas y respuestas usan la cola persistente de Resend con reintentos y tracking.</InlineFeedback>
+    <CommunicationOperationsConsole />
     <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
       <Card level={1}>
         <CardHeader><CardTitle>Nueva versión de plantilla</CardTitle></CardHeader>

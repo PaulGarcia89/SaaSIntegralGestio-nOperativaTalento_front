@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Inbox, MailCheck, RefreshCw, Reply } from "lucide-react";
 import { configureCommunicationDomain, fetchCommunicationDomain, fetchCommunicationInbox, replyCandidateEmail, verifyCommunicationDomain } from "@/lib/backend";
@@ -17,11 +17,11 @@ export function CommunicationOperationsConsole() {
   const [search, setSearch] = useState("");
   const [replying, setReplying] = useState<AtsMessageDto | null>(null);
   const [replyBody, setReplyBody] = useState("");
-  const [domainForm, setDomainForm] = useState({ domain: "", fromName: "Talentos", fromEmail: "", replyToEmail: "", dkimSelector: "resend" });
+  const [domainFormOverride, setDomainForm] = useState<{ domain: string; fromName: string; fromEmail: string; replyToEmail: string; dkimSelector: string } | null>(null);
   const domain = useQuery({ queryKey: ["communication-domain"], queryFn: fetchCommunicationDomain });
   const inbox = useQuery({ queryKey: ["communication-inbox", page, search], queryFn: () => fetchCommunicationInbox({ page, pageSize: 20, search: search || undefined }) });
-  useEffect(() => { if (domain.data) setDomainForm({ domain: domain.data.domain, fromName: domain.data.fromName, fromEmail: domain.data.fromEmail, replyToEmail: domain.data.replyToEmail ?? "", dkimSelector: domain.data.dkimSelector }); }, [domain.data]);
-  const saveDomain = useMutation({ mutationFn: () => configureCommunicationDomain({ ...domainForm, replyToEmail: domainForm.replyToEmail || undefined }), onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["communication-domain"] }) });
+  const domainForm = domainFormOverride ?? (domain.data ? { domain: domain.data.domain, fromName: domain.data.fromName, fromEmail: domain.data.fromEmail, replyToEmail: domain.data.replyToEmail ?? "", dkimSelector: domain.data.dkimSelector } : { domain: "", fromName: "Talentos", fromEmail: "", replyToEmail: "", dkimSelector: "resend" });
+  const saveDomain = useMutation({ mutationFn: () => configureCommunicationDomain({ ...domainForm, replyToEmail: domainForm.replyToEmail || undefined }), onSuccess: async () => { setDomainForm(null); await queryClient.invalidateQueries({ queryKey: ["communication-domain"] }); } });
   const verify = useMutation({ mutationFn: verifyCommunicationDomain, onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["communication-domain"] }) });
   const sendReply = useMutation({ mutationFn: () => replyCandidateEmail(replying!.id, { subject: `Re: ${replying!.subject}`, body: replyBody }), onSuccess: async () => { setReplying(null); setReplyBody(""); await queryClient.invalidateQueries({ queryKey: ["communication-inbox"] }); } });
   const metrics = inbox.data?.data.flatMap((message) => message.notification?.deliveries ?? []) ?? [];

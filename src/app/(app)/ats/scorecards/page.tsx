@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { technicalLabel } from "@/lib/ui-labels";
 
 type CriterionDraft = CreateScorecardTemplateInput["criteria"][number] & {
   localId: string;
@@ -75,12 +76,15 @@ export default function ScorecardsPage() {
       stageId: stageId === "ALL" ? undefined : stageId,
       name,
       instructions: instructions || undefined,
-      criteria: criteria.map(({ localId: _localId, lowAnchor, highAnchor, ...criterion }) => ({
-        ...criterion,
-        ratingAnchors: criterion.type === "RATING" && (lowAnchor || highAnchor)
-          ? { "1": lowAnchor || "Evidencia insuficiente", "5": highAnchor || "Evidencia sobresaliente" }
-          : undefined,
-      })),
+      criteria: criteria.map(({ localId, lowAnchor, highAnchor, ...criterion }) => {
+        void localId;
+        return {
+          ...criterion,
+          ratingAnchors: criterion.type === "RATING" && (lowAnchor || highAnchor)
+            ? { "1": lowAnchor || "Evidencia insuficiente", "5": highAnchor || "Evidencia sobresaliente" }
+            : undefined,
+        };
+      }),
     }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["scorecard-templates", vacancyId] });
@@ -113,13 +117,13 @@ export default function ScorecardsPage() {
   );
 
   return <div className="space-y-7">
-    <PageHeader eyebrow="Reclutamiento estructurado" title="Diseñador de scorecards" description="Crea una rúbrica por vacante y etapa. Cada publicación genera una versión nueva y conserva intactas las evaluaciones firmadas." />
+    <PageHeader eyebrow="Reclutamiento estructurado" title="Diseñador de fichas de evaluación" description="Crea una rúbrica por vacante y etapa. Cada publicación genera una versión nueva y conserva intactas las evaluaciones firmadas." />
     <RecruitmentWorkspaceNav />
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,.7fr)]">
       <Card level={1}><CardHeader><CardTitle>Nueva versión</CardTitle></CardHeader><CardContent className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField label="Alcance" value={scope} onChange={(value) => { setScope(value as "VACANCY" | "TENANT"); if (value === "TENANT") setStageId("ALL"); }} options={[{ value: "VACANCY", label: "Vacante específica" }, { value: "TENANT", label: "Compartida entre vacantes" }]} />
-          <SelectField label="Visibilidad del feedback" value={feedbackVisibility} onChange={(value) => setFeedbackVisibility(value as typeof feedbackVisibility)} options={[{ value: "IMMEDIATE", label: "Inmediata" }, { value: "AFTER_OWN_SUBMISSION", label: "Después de enviar la propia" }, { value: "AFTER_ALL_SUBMITTED", label: "Cuando todos terminen" }, { value: "HIRING_MANAGER_ONLY", label: "Solo hiring manager" }]} />
+          <SelectField label="Visibilidad de la retroalimentación" value={feedbackVisibility} onChange={(value) => setFeedbackVisibility(value as typeof feedbackVisibility)} options={[{ value: "IMMEDIATE", label: "Inmediata" }, { value: "AFTER_OWN_SUBMISSION", label: "Después de enviar la propia" }, { value: "AFTER_ALL_SUBMITTED", label: "Cuando todos terminen" }, { value: "HIRING_MANAGER_ONLY", label: "Solo gerente de contratación" }]} />
           <SelectField label="Vacante" value={vacancyId} onChange={(value) => { setVacancyId(value); setStageId("ALL"); }} options={(vacancies.data?.data ?? []).map((item) => ({ value: item.id, label: item.title }))} />
           <SelectField label="Etapa" value={stageId} onChange={setStageId} options={[{ value: "ALL", label: "Toda la vacante" }, ...(setup.data?.stages ?? []).map((item) => ({ value: item.id!, label: item.name }))]} />
         </div>
@@ -139,7 +143,7 @@ export default function ScorecardsPage() {
         {save.isSuccess ? <InlineFeedback tone="success" title="Versión publicada">La versión {save.data.version} quedó activa; las versiones anteriores permanecen como historial.</InlineFeedback> : null}
         <Button className="w-full" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Publicando…" : "Publicar nueva versión"}</Button>
       </CardContent></Card>
-      <aside><Card level={2}><CardHeader><CardTitle>Versiones publicadas</CardTitle></CardHeader><CardContent>{templates.isLoading ? <p className="text-sm text-text-secondary">Cargando versiones…</p> : templates.data?.length ? <ol className="space-y-3">{templates.data.map((template) => <li key={template.id} className="rounded-xl border border-border-default p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{template.name}</p><p className="text-xs text-text-secondary">{template.scope === "TENANT" ? "Compartida" : template.stage?.name ?? "Toda la vacante"} · {template.criteria.length} criterios</p><p className="mt-1 text-xs text-text-secondary">Feedback: {template.feedbackVisibility}</p></div><span className="rounded-full bg-secondary px-2 py-1 text-xs">v{template.version}{template.isActive ? " · Activa" : ""}</span></div><div className="mt-3 flex gap-2"><Button size="sm" variant="ghost" onClick={() => duplicate.mutate(template.id)}><Copy className="size-3.5" />Duplicar</Button><Button size="sm" variant="ghost" onClick={() => templateAdmin.mutate({ id: template.id, isActive: !template.isActive })}><Power className="size-3.5" />{template.isActive ? "Desactivar" : "Activar"}</Button><Button size="sm" variant="ghost" onClick={() => { setName(template.name); setInstructions(template.instructions ?? ""); setFeedbackVisibility(template.feedbackVisibility ?? "AFTER_ALL_SUBMITTED"); setCriteria(template.criteria.map((item) => ({ ...item, localId: crypto.randomUUID(), lowAnchor: item.ratingAnchors?.["1"] ?? "", highAnchor: item.ratingAnchors?.["5"] ?? "" }))); }}>Editar como nueva versión</Button></div></li>)}</ol> : <p className="text-sm text-text-secondary">No hay plantillas disponibles.</p>}</CardContent></Card></aside>
+      <aside><Card level={2}><CardHeader><CardTitle>Versiones publicadas</CardTitle></CardHeader><CardContent>{templates.isLoading ? <p className="text-sm text-text-secondary">Cargando versiones…</p> : templates.data?.length ? <ol className="space-y-3">{templates.data.map((template) => <li key={template.id} className="rounded-xl border border-border-default p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{template.name}</p><p className="text-xs text-text-secondary">{template.scope === "TENANT" ? "Compartida" : template.stage?.name ?? "Toda la vacante"} · {template.criteria.length} criterios</p><p className="mt-1 text-xs text-text-secondary">Visibilidad de la retroalimentación: {technicalLabel(template.feedbackVisibility)}</p></div><span className="rounded-full bg-secondary px-2 py-1 text-xs">v{template.version}{template.isActive ? " · Activa" : ""}</span></div><div className="mt-3 flex gap-2"><Button size="sm" variant="ghost" onClick={() => duplicate.mutate(template.id)}><Copy className="size-3.5" />Duplicar</Button><Button size="sm" variant="ghost" onClick={() => templateAdmin.mutate({ id: template.id, isActive: !template.isActive })}><Power className="size-3.5" />{template.isActive ? "Desactivar" : "Activar"}</Button><Button size="sm" variant="ghost" onClick={() => { setName(template.name); setInstructions(template.instructions ?? ""); setFeedbackVisibility(template.feedbackVisibility ?? "AFTER_ALL_SUBMITTED"); setCriteria(template.criteria.map((item) => ({ ...item, localId: crypto.randomUUID(), lowAnchor: item.ratingAnchors?.["1"] ?? "", highAnchor: item.ratingAnchors?.["5"] ?? "" }))); }}>Editar como nueva versión</Button></div></li>)}</ol> : <p className="text-sm text-text-secondary">No hay plantillas disponibles.</p>}</CardContent></Card></aside>
     </section>
     <ScorecardGovernanceConsole />
   </div>;

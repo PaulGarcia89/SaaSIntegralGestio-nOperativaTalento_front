@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const illustrativeKpis = [
   { label: "Vacantes activas", value: "—", detail: "Se obtiene del ATS conectado" },
-  { label: "Incorporaciones", value: "—", detail: "Se obtiene de onboarding" },
+  { label: "Incorporaciones", value: "—", detail: "Se obtiene del módulo de incorporación" },
   { label: "Cumplimiento", value: "—", detail: "Se obtiene de capacitación" },
   { label: "Productividad", value: "—", detail: "Se obtiene del módulo operativo" },
 ];
 const productModules = [
-  ["ATS y reclutamiento", "Vacantes, pipeline, entrevistas y scorecards."],
+  ["ATS y reclutamiento", "Vacantes, flujo de selección, entrevistas y fichas de evaluación."],
   ["Incorporación documental", "Firmas, listas de tareas y seguimiento del ingreso."],
   ["Capacitación y certificación", "Cursos, evaluaciones y progreso por persona."],
   ["Productividad", "Indicadores y reportes operativos."],

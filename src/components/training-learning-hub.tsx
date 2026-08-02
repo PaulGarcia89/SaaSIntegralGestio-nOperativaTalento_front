@@ -141,7 +141,7 @@ function MyPilots({ onOpen }: { onOpen: (courseId: string) => void }) {
       setFeedbackPilot(null);
       queryClient.invalidateQueries({ queryKey: ["my-training-pilots"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible guardar tu feedback.")),
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible guardar tu retroalimentación.")),
   });
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,18 +166,18 @@ function MyPilots({ onOpen }: { onOpen: (courseId: string) => void }) {
         <Card key={pilot.id} className="border-primary/30">
           <CardContent className="space-y-4 py-5">
             <div className="flex items-start gap-3"><FlaskConical className="size-6 text-primary" /><div><strong>{pilot.name}</strong><p className="text-sm text-text-secondary">{pilot.course?.title}</p></div></div>
-            <div className="flex gap-2"><Button className="flex-1" onClick={() => pilot.course && onOpen(pilot.course.id)}><PlayCircle />Abrir piloto</Button><Button variant="secondary" onClick={() => setFeedbackPilot(pilot)}>Dar feedback</Button></div>
+            <div className="flex gap-2"><Button className="flex-1" onClick={() => pilot.course && onOpen(pilot.course.id)}><PlayCircle />Abrir piloto</Button><Button variant="secondary" onClick={() => setFeedbackPilot(pilot)}>Dar retroalimentación</Button></div>
           </CardContent>
         </Card>
       ))}</div>
       <Dialog open={Boolean(feedbackPilot)} onOpenChange={(open) => !open && setFeedbackPilot(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Feedback del piloto</DialogTitle><DialogDescription>Tu evaluación define si esta versión puede publicarse.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Retroalimentación del piloto</DialogTitle><DialogDescription>Tu evaluación define si esta versión puede publicarse.</DialogDescription></DialogHeader>
           <form className="space-y-4" onSubmit={submit}>
             <div className="grid gap-3 sm:grid-cols-3">{[["rating", "Valor general"], ["clarityRating", "Claridad"], ["relevanceRating", "Relevancia"]].map(([name, label]) => <div key={name}><Label>{label}</Label><Select name={name} defaultValue="5"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[5, 4, 3, 2, 1].map((value) => <SelectItem key={value} value={String(value)}>{value}/5</SelectItem>)}</SelectContent></Select></div>)}</div>
             <div><Label htmlFor="pilot-comment">Comentarios</Label><textarea id="pilot-comment" name="comment" className="min-h-28 w-full rounded-xl border border-border-default bg-surface-elevated p-3" /></div>
             <label className="flex items-center gap-3 rounded-xl bg-status-warning-soft p-3 text-sm"><input type="checkbox" name="blockingIssue" />Encontré un problema que bloquea la publicación</label>
-            <Button className="w-full" disabled={feedback.isPending}>Enviar feedback</Button>
+            <Button className="w-full" disabled={feedback.isPending}>Enviar retroalimentación</Button>
           </form>
         </DialogContent>
       </Dialog>

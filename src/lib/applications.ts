@@ -38,6 +38,13 @@ export const TIMELINE_LABELS: Record<ApplicationTimelineEventType, string> = {
   SLA_ESCALATED: "SLA escalado",
   SLA_REASSIGNED: "Reasignación automática por SLA",
   RECRUITER_ASSIGNED: "Responsable de reclutamiento asignado",
+  OFFER_CREATED: "Oferta laboral creada",
+  OFFER_APPROVED: "Oferta laboral aprobada",
+  OFFER_SENT: "Oferta laboral enviada",
+  OFFER_COUNTERED: "Contrapropuesta recibida",
+  OFFER_ACCEPTED: "Oferta laboral aceptada",
+  OFFER_REJECTED: "Oferta laboral rechazada",
+  OFFER_EXPIRED: "Oferta laboral vencida",
 };
 
 export function applicationStageLabel(status: ApplicationStatusKey) {

@@ -1358,7 +1358,7 @@ export interface CandidateDto {
 
 export type ApplicationStatusKey = "SUBMITTED" | "REVIEWING" | "INTERVIEW" | "APPROVED" | "REJECTED" | "TRAINING" | "HIRED" | "WITHDRAWN";
 export type ApplicationInterviewType = "PRESENTIAL" | "VIRTUAL" | "PHONE";
-export type ApplicationTimelineEventType = "VACANCY_PUBLISHED" | "APPLIED" | "CONTACTED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "INTERVIEW_COMPLETED" | "STAGE_CHANGE_REQUESTED" | "STAGE_CHANGE_APPROVED" | "STAGE_CHANGE_REJECTED" | "STAGE_CHANGED" | "HIRED" | "APPLICATION_WITHDRAWN" | "SLA_WARNING" | "SLA_ESCALATED" | "SLA_REASSIGNED" | "RECRUITER_ASSIGNED";
+export type ApplicationTimelineEventType = "VACANCY_PUBLISHED" | "APPLIED" | "CONTACTED" | "INTERVIEW_SCHEDULED" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "INTERVIEW_COMPLETED" | "STAGE_CHANGE_REQUESTED" | "STAGE_CHANGE_APPROVED" | "STAGE_CHANGE_REJECTED" | "STAGE_CHANGED" | "HIRED" | "APPLICATION_WITHDRAWN" | "SLA_WARNING" | "SLA_ESCALATED" | "SLA_REASSIGNED" | "RECRUITER_ASSIGNED" | "OFFER_CREATED" | "OFFER_APPROVED" | "OFFER_SENT" | "OFFER_COUNTERED" | "OFFER_ACCEPTED" | "OFFER_REJECTED" | "OFFER_EXPIRED";
 
 export interface ApplicationCandidateDto {
   id: string;
@@ -1837,6 +1837,78 @@ export interface AvailabilitySettingsDto {
 export type AtsCommunicationType = "APPLICATION_CONFIRMATION" | "STAGE_UPDATE" | "REJECTION" | "INTERVIEW_SCHEDULED" | "INTERVIEW_REMINDER" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED" | "OFFER" | "APPROVAL_REQUEST" | "MANUAL";
 export type AtsCommunicationAudience = "CANDIDATE" | "RESPONSIBLE";
 export type AtsMessageStatus = "PENDING" | "PROCESSING" | "DELIVERED" | "FAILED" | "DEAD_LETTER" | "CANCELLED" | "SKIPPED";
+
+export type JobOfferStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "SENT" | "COUNTERED" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CANCELLED";
+export type CompensationPeriodicity = "HOURLY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "ANNUAL";
+export type JobOfferApprovalType = "FINANCIAL" | "MANAGERIAL";
+
+export interface JobOfferVersionDto {
+  id: string;
+  version: number;
+  source: "EMPLOYER" | "CANDIDATE";
+  salaryAmount: string | number;
+  currency: string;
+  periodicity: CompensationPeriodicity;
+  benefits?: string[] | null;
+  jobTitle: string;
+  employmentStartDate: string;
+  validUntil: string;
+  message?: string | null;
+  counterproposalReason?: string | null;
+  pdfSha256?: string | null;
+  pdfGeneratedAt?: string | null;
+  createdAt: string;
+  signaturePackage?: {
+    id: string;
+    status: string;
+    signedAt?: string | null;
+    participants: Array<{ id: string; status: string; signedAt?: string | null }>;
+  } | null;
+}
+
+export interface JobOfferDto {
+  id: string;
+  applicationId: string;
+  branchId: string;
+  status: JobOfferStatus;
+  currentVersion: number;
+  financialApproverId?: string | null;
+  managerialApproverId?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  expiredAt?: string | null;
+  conversionWorkflowId?: string | null;
+  conversionError?: string | null;
+  createdAt: string;
+  application: {
+    candidate: { id: string; fullName: string; email: string };
+    vacancy: { id: string; title: string; branchId: string; tenant?: { name: string } };
+  };
+  versions: JobOfferVersionDto[];
+  approvals: Array<{
+    id: string;
+    version: number;
+    type: JobOfferApprovalType;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    approverId?: string | null;
+    decidedById?: string | null;
+    notes?: string | null;
+    decidedAt?: string | null;
+  }>;
+}
+
+export interface CreateJobOfferInput {
+  salaryAmount: number;
+  currency: string;
+  periodicity: CompensationPeriodicity;
+  benefits?: string[];
+  jobTitle: string;
+  employmentStartDate: string;
+  validUntil: string;
+  message?: string;
+  financialApproverId?: string;
+  managerialApproverId?: string;
+}
 
 export interface AtsCommunicationTemplateDto {
   id: string;

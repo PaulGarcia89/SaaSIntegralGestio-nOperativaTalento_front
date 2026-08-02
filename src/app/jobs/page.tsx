@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { technicalLabel } from "@/lib/ui-labels";
 
 export default function JobsPortalPage() {
   const [search, setSearch] = useState("");
@@ -54,7 +55,7 @@ export default function JobsPortalPage() {
                 <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{vacancy.summary || vacancy.description || "Consulta el detalle y los requisitos antes de postularte."}</p>
                 <div className="mt-auto flex flex-wrap gap-2 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5"><MapPin className="size-4" />{[vacancy.city, vacancy.country].filter(Boolean).join(", ") || vacancy.branch?.location || "Ubicación por confirmar"}</span>
-                  {vacancy.workMode ? <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5"><BriefcaseBusiness className="size-4" />{vacancy.workMode}</span> : null}
+                  {vacancy.workMode ? <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5"><BriefcaseBusiness className="size-4" />{technicalLabel(vacancy.workMode)}</span> : null}
                 </div>
                 <Button asChild className="w-full"><Link href={`/apply?vacancyId=${encodeURIComponent(vacancy.id)}`}>Ver y postularme <ArrowRight className="size-4" /></Link></Button>
               </CardContent>

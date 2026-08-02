@@ -345,7 +345,7 @@ function ImprovementBacklog({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-3"><div><CardTitle>Backlog de mejoras</CardTitle><p className="text-sm text-muted-foreground">Convierte evidencia en acciones con dueño y criterio de cierre.</p></div><Button size="sm" onClick={onCreate}><Lightbulb className="size-4" />Nueva mejora</Button></div>
+        <div className="flex items-center justify-between gap-3"><div><CardTitle>Pendientes de mejora</CardTitle><p className="text-sm text-muted-foreground">Convierte evidencia en acciones con responsable y criterio de cierre.</p></div><Button size="sm" onClick={onCreate}><Lightbulb className="size-4" />Nueva mejora</Button></div>
       </CardHeader>
       <CardContent>
         {loading ? <AsyncState state="loading" /> : items.length ? (
@@ -386,7 +386,7 @@ function CreateImprovementDialog({
   const mutation = useMutation({
     mutationFn: createTrainingImprovement,
     onSuccess: async () => {
-      toast.success("Mejora añadida al backlog");
+      toast.success("Mejora añadida a los pendientes");
       onOpenChange(false);
       await queryClient.invalidateQueries({ queryKey: ["training-improvements"] });
     },
@@ -421,7 +421,7 @@ function CreateImprovementDialog({
             <div><Label>Responsable</Label><Select name="ownerId"><SelectTrigger><SelectValue placeholder="Asignar después" /></SelectTrigger><SelectContent>{users.data?.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label htmlFor="improvement-due">Fecha objetivo</Label><Input id="improvement-due" name="dueAt" type="date" /></div>
-          <Button className="w-full" disabled={mutation.isPending}>{mutation.isPending ? "Creando…" : "Añadir al backlog"}</Button>
+          <Button className="w-full" disabled={mutation.isPending}>{mutation.isPending ? "Creando…" : "Añadir a pendientes"}</Button>
         </form>
       </DialogContent>
     </Dialog>

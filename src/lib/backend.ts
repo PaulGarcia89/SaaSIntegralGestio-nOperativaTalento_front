@@ -2029,6 +2029,60 @@ export function sendAtsOffer(applicationId: string, message?: string) {
   );
 }
 
+export function fetchJobOffers(applicationId: string) {
+  return request<import("./contracts").JobOfferDto[]>(`/ats/offers/applications/${encodeURIComponent(applicationId)}`);
+}
+
+export function createJobOffer(applicationId: string, input: import("./contracts").CreateJobOfferInput) {
+  return request<import("./contracts").JobOfferDto>(`/ats/offers/applications/${encodeURIComponent(applicationId)}`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function reviseJobOffer(offerId: string, input: import("./contracts").CreateJobOfferInput) {
+  return request<import("./contracts").JobOfferDto>(`/ats/offers/${encodeURIComponent(offerId)}/versions`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function decideJobOfferApproval(offerId: string, input: { type: import("./contracts").JobOfferApprovalType; approved: boolean; notes?: string }) {
+  return request<import("./contracts").JobOfferDto>(`/ats/offers/${encodeURIComponent(offerId)}/approvals`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function sendStructuredJobOffer(offerId: string) {
+  return request<import("./contracts").JobOfferDto>(`/ats/offers/${encodeURIComponent(offerId)}/send`, { method: "POST" });
+}
+
+export function retryJobOfferConversion(offerId: string) {
+  return request<import("./contracts").JobOfferDto>(`/ats/offers/${encodeURIComponent(offerId)}/retry-conversion`, { method: "POST" });
+}
+
+export function cancelJobOffer(offerId: string, reason?: string) {
+  return request<{ cancelled: boolean }>(`/ats/offers/${encodeURIComponent(offerId)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+export function downloadJobOfferPdf(offerId: string, version?: number) {
+  const query = version ? `?version=${version}` : "";
+  return request<Blob>(`/ats/offers/${encodeURIComponent(offerId)}/pdf${query}`, {}, { responseType: "blob" });
+}
+
+export function fetchCandidateJobOffers() {
+  return candidateRequest<import("./contracts").JobOfferDto[]>("/candidate/offers");
+}
+
+export function downloadCandidateJobOfferPdf(offerId: string, version?: number) {
+  const query = version ? `?version=${version}` : "";
+  return candidateRequest<Blob>(`/candidate/offers/${encodeURIComponent(offerId)}/pdf${query}`, { responseType: "blob" });
+}
+
+export function createCandidateOfferSigningLink(offerId: string) {
+  return candidateRequest<{ url: string; expiresAt: string }>(`/candidate/offers/${encodeURIComponent(offerId)}/signing-link`, { method: "POST" });
+}
+
+export function respondCandidateJobOffer(offerId: string, input: { decision: "REJECT"; reason?: string }) {
+  return candidateRequest<{ rejected: boolean }>(`/candidate/offers/${encodeURIComponent(offerId)}/respond`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function counterCandidateJobOffer(offerId: string, input: { salaryAmount?: number; periodicity?: import("./contracts").CompensationPeriodicity; employmentStartDate?: string; reason: string }) {
+  return candidateRequest<import("./contracts").JobOfferDto>(`/candidate/offers/${encodeURIComponent(offerId)}/counter`, { method: "POST", body: JSON.stringify(input) });
+}
+
 export function fetchCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto | null>("/ats/communications/domain"); }
 export function configureCommunicationDomain(input: { domain: string; fromName: string; fromEmail: string; replyToEmail?: string; dkimSelector?: string }) { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain", { method: "PUT", body: JSON.stringify(input) }); }
 export function verifyCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain/verify", { method: "POST" }); }
@@ -2154,18 +2208,19 @@ export function clearCandidateSession() {
   if (typeof window !== "undefined") sessionStorage.removeItem(CANDIDATE_SESSION_KEY);
 }
 
-async function candidateRequest<T>(path: string, init: RequestInit = {}) {
+async function candidateRequest<T>(path: string, init: RequestInit & { responseType?: "json" | "blob" } = {}) {
+  const { responseType = "json", ...fetchInit } = init;
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const token = getCandidateAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...init, headers });
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...fetchInit, headers });
   if (!response.ok) {
     const payload = await readJsonSafe(response);
     const message = typeof payload === "object" && payload && "message" in payload ? String(payload.message) : `Error ${response.status}`;
     throw new ApiError(message, response.status);
   }
-  return response.json() as Promise<T>;
+  return (responseType === "blob" ? response.blob() : response.json()) as Promise<T>;
 }
 
 export async function authenticateCandidate(email: string, password: string, mode: "login" | "register" = "login") {

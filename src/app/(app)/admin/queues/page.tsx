@@ -166,7 +166,7 @@ export default function QueueManagementPage() {
               Actualizado {formatDate(overview.generatedAt)} · Alcance {tenantId === "all" ? "global" : "por empresa"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Driver {overview.bus.driver} · {overview.bus.enabled ? "habilitado" : "deshabilitado"} ·{" "}
+              Controlador {overview.bus.driver} · {overview.bus.enabled ? "habilitado" : "deshabilitado"} ·{" "}
               {overview.bus.workerCount} workers activos
             </p>
           </div>

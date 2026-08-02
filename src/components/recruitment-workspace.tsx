@@ -15,9 +15,9 @@ export function RecruitmentWorkspaceNav() {
   const pathname = usePathname();
   const items = [
     { href: "/ats/candidates", label: "Candidatos" },
-    { href: "/ats/pipeline", label: "Pipeline" },
+    { href: "/ats/pipeline", label: "Flujo de selección" },
     { href: "/ats/communications", label: "Comunicaciones" },
-    { href: "/ats/scorecards", label: "Scorecards" },
+    { href: "/ats/scorecards", label: "Fichas de evaluación" },
   ];
   return <nav aria-label="Vistas de candidatos" className="flex gap-1 overflow-x-auto border-b border-border-default">
     {items.map((item) => {
@@ -34,7 +34,7 @@ const consequences: Record<ApplicationStatusKey, string> = {
   APPROVED: "Quedará lista para iniciar la decisión de contratación.",
   REJECTED: "Se cerrará el proceso para esta postulación. No se enviará comunicación automática desde esta pantalla.",
   TRAINING: "Quedará pendiente de las actividades formativas configuradas.",
-  HIRED: "Se marcará como contratada. La creación del empleado y onboarding requiere confirmación en el flujo correspondiente.",
+  HIRED: "Se marcará como contratada. La creación del empleado y su incorporación requieren confirmación en el flujo correspondiente.",
   WITHDRAWN: "La postulación fue retirada voluntariamente por el candidato y no puede asignarse manualmente.",
 };
 

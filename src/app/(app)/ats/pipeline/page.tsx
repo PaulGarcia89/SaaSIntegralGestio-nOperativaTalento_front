@@ -190,7 +190,7 @@ function PipelineContent() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Reclutamiento"
-        title="Pipeline por vacante"
+        title="Flujo de selección por vacante"
         description="Opera las etapas personalizadas definidas para cada proceso de selección."
       />
       <RecruitmentWorkspaceNav />
@@ -233,7 +233,7 @@ function PipelineContent() {
         </FilterField>
       </section>
 
-      {!vacancies.length ? <InlineFeedback tone="info" title="No hay vacantes">Crea una vacante para configurar su pipeline.</InlineFeedback> : null}
+      {!vacancies.length ? <InlineFeedback tone="info" title="No hay vacantes">Crea una vacante para configurar su flujo de selección.</InlineFeedback> : null}
       {setup.isLoading || applications.isLoading ? <AsyncState state="loading" title="Cargando pipeline" /> : null}
       {setup.isError || applications.isError ? <AsyncState state="error" title="No fue posible cargar el pipeline" onRetry={() => { void setup.refetch(); void applications.refetch(); }} /> : null}
       {move.isError ? <InlineFeedback tone="danger" title="No fue posible cambiar la etapa">{move.error instanceof Error ? move.error.message : "La postulación conserva su etapa anterior."}</InlineFeedback> : null}

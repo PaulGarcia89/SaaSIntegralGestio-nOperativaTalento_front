@@ -98,8 +98,8 @@ const taskTypeOptions: Array<{
 }> = [
   { value: "DOCUMENT_COLLECTION", label: "Recopilación documental" },
   { value: "POLICY_REVIEW", label: "Revisión de políticas" },
-  { value: "HR_CHECKLIST", label: "Checklist de RRHH" },
-  { value: "MANAGER_CHECKLIST", label: "Checklist del supervisor" },
+  { value: "HR_CHECKLIST", label: "Lista de verificación de RRHH" },
+  { value: "MANAGER_CHECKLIST", label: "Lista de verificación del supervisor" },
   { value: "DAY_ONE_READINESS", label: "Preparación del primer día" },
   { value: "ASSET_DELIVERY", label: "Entrega de activos" },
 ];
@@ -150,7 +150,7 @@ export default function OnboardingDocumentsPage() {
   const [assignmentDueDate, setAssignmentDueDate] = useState("");
   const [templateName, setTemplateName] = useState("Incorporación estándar");
   const [templateDescription, setTemplateDescription] = useState(
-    "Checklist reutilizable con dependencias y fechas relativas.",
+    "Lista de verificación reutilizable con dependencias y fechas relativas.",
   );
   const [templateIsDefault, setTemplateIsDefault] = useState(true);
   const [templateTasks, setTemplateTasks] = useState<OnboardingTemplateTaskConfigDto[]>(
@@ -224,7 +224,7 @@ export default function OnboardingDocumentsPage() {
       setSelectedTemplateId(template.id);
       setTemplateOpen(false);
       setTemplateName("Incorporación estándar");
-      setTemplateDescription("Checklist reutilizable con dependencias y fechas relativas.");
+      setTemplateDescription("Lista de verificación reutilizable con dependencias y fechas relativas.");
       setTemplateIsDefault(true);
       setTemplateTasks(
         starterTasks.map((task) => ({ ...task, dependsOnKeys: [...(task.dependsOnKeys ?? [])] })),
@@ -237,7 +237,7 @@ export default function OnboardingDocumentsPage() {
     mutationFn: () => applyOnboardingTemplate(selected!.id, selectedTemplateId),
     onSuccess: async () => {
       await refresh();
-      toast.success("Checklist aplicado al expediente");
+      toast.success("Lista de verificación aplicada al expediente");
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aplicar la plantilla.")),
   });
@@ -285,7 +285,7 @@ export default function OnboardingDocumentsPage() {
   });
   const reorderTasks = useMutation({
     mutationFn: (tasks: EmployeeOnboardingTaskDto[]) => reorderOnboardingTasks(selected!.id, tasks.map((task, index) => ({ id: task.id, sortOrder: index }))),
-    onSuccess: async () => { await refresh(); toast.success("Checklist reordenado"); },
+    onSuccess: async () => { await refresh(); toast.success("Lista de verificación reordenada"); },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible reordenar las tareas.")),
   });
   const upload = useMutation({
@@ -757,7 +757,7 @@ export default function OnboardingDocumentsPage() {
                       {selected.readinessStatus === "READY"
                         ? "El expediente está cerrado y listo para operación."
                         : selected.readinessStatus === "READY_FOR_REVIEW"
-                          ? "Checklist listo. Confirma documentos y firmas para cerrar."
+                          ? "Lista de verificación lista. Confirma documentos y firmas para cerrar."
                           : "Completa las tareas obligatorias antes de solicitar el cierre."}
                     </p>
                   </div>
@@ -834,7 +834,7 @@ export default function OnboardingDocumentsPage() {
       <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nueva plantilla de onboarding</DialogTitle>
+            <DialogTitle>Nueva plantilla de incorporación</DialogTitle>
             <DialogDescription>
               Diseña un checklist reutilizable. El orden determina qué tareas pueden configurarse como dependencias.
             </DialogDescription>
@@ -876,7 +876,7 @@ export default function OnboardingDocumentsPage() {
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-semibold">Tareas del checklist</h3>
+                <h3 className="font-semibold">Tareas de la lista de verificación</h3>
                 <p className="text-sm text-text-secondary">
                   Configura responsables, vencimientos y dependencias antes de guardar.
                 </p>

@@ -1689,6 +1689,66 @@ export interface ScorecardCompetencyDto {
   isActive: boolean;
 }
 
+export type AiEvidenceSufficiency = "SUFFICIENT" | "PARTIAL" | "INSUFFICIENT";
+
+export interface AiCompetencyAssessmentItemDto {
+  id: string;
+  criterionId?: string | null;
+  competencyCode: string;
+  competencyName: string;
+  competencyDefinition?: string | null;
+  weight: number;
+  aiScore: number | string;
+  confidence: number | string;
+  sufficiency: AiEvidenceSufficiency;
+  explanation: string;
+  evidence: Array<{ sourceId: string; sourceLabel: string; quote: string; relevance?: string | null }>;
+  missingInformation: string[];
+  suggestedQuestions: string[];
+  humanScore?: number | string | null;
+  reviewerNotes?: string | null;
+  reviewerConfirmed: boolean;
+}
+
+export interface AiCompetencyAssessmentDto {
+  id: string;
+  applicationId: string;
+  version: number;
+  status: "READY_FOR_REVIEW" | "SIGNED";
+  provider: string;
+  model: string;
+  promptVersion: string;
+  summary: string;
+  generatedAt: string;
+  reviewerNotes?: string | null;
+  reviewedAt?: string | null;
+  signedAt?: string | null;
+  signatureHash?: string | null;
+  generatedBy: { id: string; firstName: string; lastName: string };
+  reviewedBy?: { id: string; firstName: string; lastName: string } | null;
+  signedBy?: { id: string; firstName: string; lastName: string } | null;
+  items: AiCompetencyAssessmentItemDto[];
+}
+
+export interface AiCompetencyAssessmentContextDto {
+  assessment?: AiCompetencyAssessmentDto | null;
+  guardrail: {
+    assistantOnly: true;
+    automaticRejection: false;
+    changesApplicationStatus: false;
+    requiresHumanSignature: true;
+    message: string;
+  };
+  sourceAvailability: {
+    coverLetter: boolean;
+    applicationAnswers: boolean;
+    interviewEvidence: boolean;
+    externalAssessments: boolean;
+    resumeContent: boolean;
+    resumeNotice: string;
+  };
+}
+
 export interface ScorecardEvaluatorAssignmentDto {
   id: string;
   interviewId: string;

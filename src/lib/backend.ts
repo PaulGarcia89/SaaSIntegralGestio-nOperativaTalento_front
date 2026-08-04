@@ -103,6 +103,8 @@ import type {
   ScorecardTemplateDto,
   ScorecardCompetencyDto,
   ScorecardEvaluatorAssignmentDto,
+  AiCompetencyAssessmentContextDto,
+  AiCompetencyAssessmentDto,
   ExternalAssessmentDto,
   HiringManagerApprovalDto,
   EvaluatorCalibrationDto,
@@ -2191,6 +2193,9 @@ export function createScorecardTemplate(input: CreateScorecardTemplateInput) {
 export function updateScorecardTemplateAdmin(id: string, input: { isActive?: boolean; feedbackVisibility?: ScorecardTemplateDto["feedbackVisibility"] }) { return request<ScorecardTemplateDto>(`/recruitment/scorecard-templates/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function duplicateScorecardTemplate(id: string, input: { vacancyId?: string; scope?: "VACANCY" | "TENANT"; name?: string }) { return request<ScorecardTemplateDto>(`/recruitment/scorecard-templates/${encodeURIComponent(id)}/duplicate`, { method: "POST", body: JSON.stringify(input) }); }
 export function fetchScorecardCompetencies(includeInactive = false) { return request<ScorecardCompetencyDto[]>(`/recruitment/scorecard-competencies?includeInactive=${includeInactive}`); }
+export function fetchAiCompetencyAssessment(applicationId: string) { return request<AiCompetencyAssessmentContextDto>(`/recruitment/applications/${encodeURIComponent(applicationId)}/competency-ai-assessment`); }
+export function generateAiCompetencyAssessment(applicationId: string) { return request<AiCompetencyAssessmentDto>(`/recruitment/applications/${encodeURIComponent(applicationId)}/competency-ai-assessment`, { method: "POST" }); }
+export function signAiCompetencyAssessment(applicationId: string, assessmentId: string, input: { items: Array<{ itemId: string; humanScore?: number; reviewerNotes?: string; confirmed: boolean }>; reviewerNotes?: string; acknowledgement: boolean }) { return request<AiCompetencyAssessmentDto>(`/recruitment/applications/${encodeURIComponent(applicationId)}/competency-ai-assessment/${encodeURIComponent(assessmentId)}/sign`, { method: "POST", body: JSON.stringify(input) }); }
 export function createScorecardCompetency(input: Omit<ScorecardCompetencyDto, "id" | "isActive"> & { isActive?: boolean }) { return request<ScorecardCompetencyDto>("/recruitment/scorecard-competencies", { method: "POST", body: JSON.stringify(input) }); }
 export function updateScorecardCompetency(id: string, input: Omit<ScorecardCompetencyDto, "id">) { return request<ScorecardCompetencyDto>(`/recruitment/scorecard-competencies/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function replaceScorecardAssignments(interviewId: string, assignments: Array<{ evaluatorUserId: string; criterionIds: string[]; anonymousReview?: boolean }>) { return request<ScorecardEvaluatorAssignmentDto[]>(`/recruitment/interviews/${encodeURIComponent(interviewId)}/scorecard-assignments`, { method: "PUT", body: JSON.stringify({ assignments }) }); }

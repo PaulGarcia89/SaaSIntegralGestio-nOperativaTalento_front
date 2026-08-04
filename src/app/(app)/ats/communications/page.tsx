@@ -75,9 +75,9 @@ export default function AtsCommunicationsPage() {
   ) => setForm((current) => ({ ...current, [key]: value }));
 
   return <div className="space-y-7">
-    <PageHeader eyebrow="Reclutamiento" title="Comunicaciones ATS" description="Versiona mensajes por vacante y etapa, y controla qué contenido recibe cada audiencia." />
+    <PageHeader eyebrow="Reclutamiento" title="Bandeja de candidatos" description="Gestiona conversaciones de correo, responsables, pendientes y plantillas desde un historial bidireccional completo." />
     <RecruitmentWorkspaceNav />
-    <InlineFeedback tone="success" title="Correo transaccional conectado">Confirmaciones, rechazos, recordatorios, ofertas y respuestas usan la cola persistente de Resend con reintentos y tracking.</InlineFeedback>
+    <InlineFeedback tone="success" title="Correo bidireccional conectado">Envíos y respuestas se agrupan por expediente, con no leídos, asignación, reintentos, tracking y recuperación segura de correos entrantes.</InlineFeedback>
     <CommunicationOperationsConsole />
     <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
       <Card level={1}>

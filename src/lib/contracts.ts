@@ -375,6 +375,28 @@ export interface QueueMonitoringDto {
   errorsByTenant: QueueErrorsByTenantDto;
 }
 
+export type IntegrationCertificationStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
+
+export interface ProductionIntegrationCertificationDto {
+  status: Exclude<IntegrationCertificationStatus, "SKIPPED">;
+  mode: "CONFIGURATION" | "ACTIVE";
+  environment: string;
+  generatedAt: string;
+  durationMs: number;
+  summary: { passed: number; warnings: number; failed: number; skipped: number };
+  checks: Array<{
+    key: string;
+    label: string;
+    status: IntegrationCertificationStatus;
+    configured: boolean;
+    activeProbe: boolean;
+    summary: string;
+    durationMs: number;
+    evidence: Record<string, unknown>;
+    error?: string;
+  }>;
+}
+
 export interface RoleDefinitionDto {
   id: string;
   tenantId: string;
@@ -1375,6 +1397,75 @@ export interface ApplicationCandidateDto {
   updatedAt: string;
 }
 
+export type TalentActivityType = "NOTE" | "EMAIL" | "CALL" | "MEETING" | "TASK" | "STATUS_CHANGE" | "POOL_CHANGE" | "TAG_CHANGE" | "MERGE";
+
+export interface TalentPoolDto {
+  id: string;
+  tenantId: string;
+  branchId?: string | null;
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  isActive: boolean;
+  memberCount?: number;
+  branch?: { id: string; name: string } | null;
+}
+
+export interface TalentTagDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  color?: string | null;
+  isActive: boolean;
+  _count?: { candidates: number };
+}
+
+export interface TalentActivityDto {
+  id: string;
+  type: TalentActivityType;
+  subject: string;
+  description?: string | null;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  actorId: string;
+  createdAt: string;
+}
+
+export interface TalentCandidateDto {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string | null;
+  city?: string | null;
+  linkedinUrl?: string | null;
+  portfolioUrl?: string | null;
+  source?: string | null;
+  doNotContact: boolean;
+  crmStatus: "ACTIVE" | "MERGED" | "ARCHIVED";
+  createdAt: string;
+  updatedAt: string;
+  applications: Array<{ id: string; status: ApplicationStatusKey; appliedAt: string; vacancy: { id: string; title: string; branchId: string; branch?: { id: string; name: string } | null }; currentStage?: { id: string; code: string; name: string } | null }>;
+  tags: TalentTagDto[];
+  pools: TalentPoolDto[];
+  talentActivities: TalentActivityDto[];
+  resumeFile?: { id: string; version: number; originalName: string } | null;
+  mergeHistory: Array<{ id: string; sourceCandidateId: string; targetCandidateId: string; reason: string; movedApplications: number; movedFiles: number; createdAt: string }>;
+}
+
+export interface TalentCandidateListDto {
+  data: TalentCandidateDto[];
+  meta: { total: number; page: number; pageSize: number; totalPages: number };
+}
+
+export interface DuplicateCandidateMatchDto {
+  id: string;
+  score: number;
+  signals: string[];
+  source: { id: string; fullName: string; email: string; phone?: string | null; city?: string | null; applications: number; updatedAt: string };
+  target: { id: string; fullName: string; email: string; phone?: string | null; city?: string | null; applications: number; updatedAt: string };
+  conflictingVacancyIds: string[];
+}
+
 export interface ApplicationVacancyDto extends PublicVacancyDto {
   id: string;
   branchId: string;
@@ -1936,6 +2027,10 @@ export interface AtsMessageDto {
   subject: string;
   body: string;
   status: AtsMessageStatus;
+  readAt?: string | null;
+  deliveredAt?: string | null;
+  inReplyToMessageId?: string | null;
+  internetMessageId?: string | null;
   scheduledAt: string;
   createdAt: string;
   template?: { id: string; name: string; version: number } | null;
@@ -1957,7 +2052,48 @@ export interface AtsMessageDto {
       providerMessageId?: string | null;
     }>;
   } | null;
+  attachments?: Array<{ id: string; filename: string; mimeType: string; sizeBytes?: number | null; disposition?: string | null }>;
   application?: VacancyApplicationDto;
+}
+
+export type AtsConversationStatus = "OPEN" | "PENDING" | "CLOSED";
+
+export interface AtsConversationDto {
+  id: string;
+  applicationId: string;
+  status: AtsConversationStatus;
+  assignedUserId?: string | null;
+  unreadCount: number;
+  lastMessageAt: string;
+  lastInboundAt?: string | null;
+  lastOutboundAt?: string | null;
+  snoozedUntil?: string | null;
+  archivedAt?: string | null;
+  closedAt?: string | null;
+  application: {
+    id: string;
+    status: ApplicationStatusKey;
+    candidate: ApplicationCandidateDto;
+    vacancy: ApplicationVacancyDto;
+    assignedRecruiter?: { id: string; firstName: string; lastName: string; email: string } | null;
+  };
+  messages: AtsMessageDto[];
+}
+
+export interface AtsConversationListDto {
+  data: AtsConversationDto[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+  summary: { unreadConversations: number; openConversations: number; unmatched: number };
+}
+
+export interface AtsUnmatchedInboundDto {
+  id: string;
+  senderEmail: string;
+  recipientEmail: string;
+  subject: string;
+  body: string;
+  occurredAt: string;
+  attachments?: Array<{ id: string; filename: string; content_type: string; size?: number }> | null;
 }
 
 export interface CommunicationDomainDto {
@@ -2157,6 +2293,105 @@ export interface AutomationQueueItemDto {
   nextAction: string;
   owner: string;
   status?: string;
+}
+
+export type NoCodeAutomationScope = "TENANT" | "BRANCH";
+export type NoCodeAutomationTrigger =
+  | "CANDIDATE_HIRED"
+  | "EMPLOYEE_BRANCH_CHANGED"
+  | "EMPLOYEE_OFFBOARDING_STARTED"
+  | "ONBOARDING_COMPLETED"
+  | "INVENTORY_ASSET_ASSIGNED"
+  | "TRAINING_COMPLETED"
+  | "OPERATION_HANDOFF_COMPLETED"
+  | "COMPLIANCE_CLOSED";
+export type NoCodeAutomationActionType =
+  | "CREATE_ONBOARDING"
+  | "ASSIGN_ASSET"
+  | "PROVISION_ACCESS"
+  | "ACTIVATE_TRAINING"
+  | "CREATE_POLICY_CHECK"
+  | "MARK_WORKFLOW_STAGE"
+  | "NOTIFY_ACTOR"
+  | "ARCHIVE_RECORD"
+  | "REVOKE_ACCESS";
+export type NoCodeAutomationExecutionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "PARTIAL";
+export type NoCodeAutomationCondition = {
+  field: string;
+  operator: "equals" | "not_equals" | "in" | "not_in" | "exists";
+  value?: string | number | boolean | null;
+  values?: Array<string | number | boolean>;
+};
+export type NoCodeAutomationAction = {
+  type: NoCodeAutomationActionType;
+  stepKey?: string;
+  title?: string;
+  message?: string;
+  ownerLabel?: string;
+  itemId?: string;
+  courseId?: string;
+  curriculumId?: string;
+  quantity?: number;
+  policyCode?: string;
+  dueDate?: string;
+  payload?: Record<string, unknown>;
+};
+export interface NoCodeAutomationRuleDto {
+  id: string;
+  tenantId: string;
+  branchId: string | null;
+  name: string;
+  triggerEvent: NoCodeAutomationTrigger;
+  scope: NoCodeAutomationScope;
+  conditions: NoCodeAutomationCondition[] | null;
+  consequences: NoCodeAutomationAction[];
+  enabled: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface NoCodeAutomationCatalogDto {
+  triggers: Array<{ value: NoCodeAutomationTrigger; label: string; description: string; fields: Array<{ value: string; label: string }> }>;
+  conditionOperators: Array<{ value: NoCodeAutomationCondition["operator"]; label: string }>;
+  actions: Array<{ value: NoCodeAutomationActionType; label: string; description: string; fields: string[] }>;
+  scopes: Array<{ value: NoCodeAutomationScope; label: string }>;
+  workflowStages: Array<{ value: string; label: string }>;
+}
+export interface NoCodeAutomationExecutionDto {
+  id: string;
+  branchId: string | null;
+  triggerEvent: NoCodeAutomationTrigger;
+  status: NoCodeAutomationExecutionStatus;
+  result: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  rule: NoCodeAutomationRuleDto;
+  employee?: { id: string; name: string } | null;
+  candidate?: { id: string; fullName: string } | null;
+  steps: Array<{ id: string; consequence: NoCodeAutomationActionType; status: string; result: string | null }>;
+  auditTrail: Array<{ id: string; status: string; summary: string; occurredAt: string }>;
+}
+export interface NoCodeAutomationSimulationDto {
+  matched: boolean;
+  willExecute: boolean;
+  message: string;
+  conditions: Array<{ condition: NoCodeAutomationCondition; currentValue: unknown; matches: boolean }>;
+  actions: Array<{ position: number; type: NoCodeAutomationActionType; valid: { ok: boolean; reason: string | null } }>;
+}
+export interface NoCodeAutomationOperationsOverviewDto {
+  generatedAt: string;
+  periodHours: number;
+  rules: { active: number; total: number };
+  executions: {
+    total: number;
+    completed: number;
+    failed: number;
+    inProgress: number;
+    successRate: number;
+    oldestPendingAt: string | null;
+  };
+  capacity: { ruleBatchLimit: number; retryBatchLimit: number; outboxMaxAttempts: number };
+  topRules: Array<{ id: string; name: string; executions: number }>;
 }
 
 export interface OnboardingDocumentDto {
@@ -2789,6 +3024,64 @@ export interface ReportsOverviewDto {
     lost: number;
     byStatus: Array<{ status: string; count: number }>;
   };
+}
+
+export interface AtsAnalyticsDto {
+  generatedAt: string;
+  source: string;
+  period: { from: string; to: string; previousFrom: string; previousTo: string };
+  scope: {
+    type: "GLOBAL" | "TENANT" | "BRANCH";
+    tenantId: string | null;
+    branchId: string | null;
+    branchName: string | null;
+  };
+  filters: {
+    vacancyId: string | null;
+    recruiterId: string | null;
+    granularity: "day" | "week" | "month";
+  };
+  summary: {
+    applications: number;
+    uniqueCandidates: number;
+    hires: number;
+    rejected: number;
+    withdrawn: number;
+    activePipeline: number;
+    conversionRate: number;
+    rejectionRate: number;
+    withdrawalRate: number;
+    averageTimeToHireHours: number;
+    medianTimeToHireHours: number;
+    averageTimeToFirstReviewHours: number;
+    averageCandidateAgeHours: number;
+    changes: {
+      applications: number;
+      hires: number;
+      conversionRate: number;
+      averageTimeToHireHours: number;
+    };
+  };
+  funnel: Array<{
+    stageCode: string;
+    stageName: string;
+    reached: number;
+    conversionRate: number;
+    conversionFromApplications: number;
+    dropOff: number;
+    dropOffRate: number;
+    averageHours: number;
+    sampleSize: number;
+  }>;
+  trends: Array<{ period: string; applications: number; hires: number; rejected: number; withdrawn: number }>;
+  sources: Array<{ source: string; applications: number; hires: number; rejected: number; conversionRate: number; rejectionRate: number }>;
+  vacancies: Array<{ id: string; title: string; status: string; openings: number; applications: number; active: number; hires: number; rejected: number; conversionRate: number; averageTimeToHireHours: number; daysOpen: number; fillRate: number }>;
+  recruiters: Array<{ id: string | null; name: string; applications: number; active: number; hires: number; conversionRate: number; overdue: number; averageActiveStageHours: number }>;
+  sla: { measurable: number; compliant: number; breached: number; complianceRate: number; warningSent: number; escalated: number; reassigned: number; byStage: Array<{ label: string; count: number }> };
+  interviews: { total: number; scheduled: number; completed: number; cancelled: number; noShow: number; completionRate: number; noShowRate: number; cancellationRate: number; averageSchedulingLeadHours: number; averageDurationMinutes: number; averageScore: number; signedScorecards: number; byStatus: Array<{ status: string; count: number }> };
+  offers: { total: number; sent: number; accepted: number; rejected: number; expired: number; countered: number; acceptanceRate: number; counterOfferRate: number; averageApprovalHours: number; averageResponseHours: number; byStatus: Array<{ status: string; count: number }> };
+  rejectionReasons: Array<{ code: string | null; label: string; category: string | null; count: number; percentage: number }>;
+  insights: Array<{ severity: "info" | "warning" | "critical"; code: string; title: string; detail: string }>;
 }
 
 export interface ReportExportDto {

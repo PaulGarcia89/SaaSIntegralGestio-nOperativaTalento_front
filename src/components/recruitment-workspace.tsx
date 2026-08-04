@@ -15,9 +15,11 @@ export function RecruitmentWorkspaceNav() {
   const pathname = usePathname();
   const items = [
     { href: "/ats/candidates", label: "Candidatos" },
+    { href: "/ats/talent-crm", label: "Talent CRM" },
     { href: "/ats/pipeline", label: "Flujo de selección" },
     { href: "/ats/communications", label: "Comunicaciones" },
     { href: "/ats/scorecards", label: "Fichas de evaluación" },
+    { href: "/ats/analytics", label: "Analítica" },
   ];
   return <nav aria-label="Vistas de candidatos" className="flex gap-1 overflow-x-auto border-b border-border-default">
     {items.map((item) => {

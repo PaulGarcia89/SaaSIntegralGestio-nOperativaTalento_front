@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, RefreshCw, ShieldCheck } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
 import { DomainTable, StateCard } from "@/components/domain";
 import { PageHeader } from "@/components/design-system";
@@ -11,7 +11,12 @@ import { MetricCard, SectionCard } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
-import { ApiError, fetchQueueMonitoring } from "@/lib/backend";
+import {
+  ApiError,
+  fetchProductionIntegrationCertification,
+  fetchQueueMonitoring,
+  runProductionIntegrationCertification,
+} from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 
 const periodOptions = [
@@ -37,6 +42,13 @@ function formatDate(value: string | null) {
 function formatDuration(value: number) {
   if (value < 1_000) return `${Math.round(value)} ms`;
   return `${(value / 1_000).toFixed(2)} s`;
+}
+
+function evidenceValue(value: unknown) {
+  if (value === null || value === undefined) return "No informado";
+  if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }
 
 export default function QueueManagementPage() {
@@ -77,6 +89,15 @@ export default function QueueManagementPage() {
     retry: false,
     refetchInterval: Number(refreshSeconds) > 0 ? Number(refreshSeconds) * 1_000 : false,
   });
+  const certificationQuery = useQuery({
+    queryKey: ["production-integration-certification", tenantId],
+    queryFn: () => fetchProductionIntegrationCertification(tenantId === "all" ? undefined : tenantId),
+    enabled: currentRole === "admin_saas",
+    retry: false,
+  });
+  const certificationMutation = useMutation({
+    mutationFn: (targetTenantId?: string) => runProductionIntegrationCertification(targetTenantId),
+  });
 
   if (currentRole !== "admin_saas") {
     return (
@@ -116,6 +137,11 @@ export default function QueueManagementPage() {
 
   const { overview, deadLetter, throughput, errorsByTenant } = monitoringQuery.data;
   const healthy = overview.summary.failedJobs === 0 && deadLetter.openCount === 0;
+  const selectedCertificationTenant = tenantId === "all" ? undefined : tenantId;
+  const certification = certificationMutation.data
+    && certificationMutation.variables === selectedCertificationTenant
+    ? certificationMutation.data
+    : certificationQuery.data;
 
   return (
     <div className="space-y-8">
@@ -175,6 +201,88 @@ export default function QueueManagementPage() {
           {healthy ? "Sin incidencias abiertas" : "Requiere atención"}
         </Badge>
       </div>
+
+      <SectionCard
+        title="Certificación de integraciones de producción"
+        subtitle={certification?.mode === "ACTIVE" ? "Evidencia activa" : "Configuración"}
+      >
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex max-w-3xl gap-3">
+              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+              <div>
+                <p className="font-medium">Resend, almacenamiento privado, antivirus y calendarios</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  La prueba activa autentica Resend, escribe y elimina un objeto efímero en cada bucket,
+                  valida una muestra limpia y EICAR en ClamAV, y comprueba perfiles OAuth sin crear reuniones.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={() => certificationMutation.mutate(selectedCertificationTenant)}
+              disabled={certificationMutation.isPending}
+            >
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              {certificationMutation.isPending ? "Certificando..." : "Ejecutar certificación segura"}
+            </Button>
+          </div>
+
+          {certificationQuery.isLoading && !certification ? (
+            <p className="text-sm text-muted-foreground">Revisando la configuración desplegada...</p>
+          ) : certificationQuery.isError && !certification ? (
+            <StateCard
+              tone="empty"
+              title="No fue posible inspeccionar las integraciones"
+              description="Verifica que el backend actualizado esté desplegado y que tu rol tenga permisos operativos."
+            />
+          ) : certification ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-4 py-3">
+                <Badge variant={certification.status === "PASS" ? "success" : certification.status === "FAIL" ? "destructive" : "warning"}>
+                  {certification.status === "PASS" ? "Certificado" : certification.status === "FAIL" ? "Fallido" : "Con advertencias"}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {certification.summary.passed} correctas · {certification.summary.warnings} advertencias · {certification.summary.failed} fallidas
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {formatDate(certification.generatedAt)} · {formatDuration(certification.durationMs)}
+                </span>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                {certification.checks.map((check) => (
+                  <article key={check.key} className="rounded-xl border border-border/70 bg-background/55 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-medium">{check.label}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">{check.summary}</p>
+                      </div>
+                      <Badge variant={check.status === "PASS" ? "success" : check.status === "FAIL" ? "destructive" : "warning"}>
+                        {check.status === "PASS" ? "Correcto" : check.status === "FAIL" ? "Falló" : check.status === "SKIPPED" ? "Omitido" : "Advertencia"}
+                      </Badge>
+                    </div>
+                    <dl className="mt-4 space-y-2 text-xs">
+                      {Object.entries(check.evidence).map(([key, value]) => (
+                        <div key={key} className="flex items-start justify-between gap-4 border-t border-border/50 pt-2">
+                          <dt className="text-muted-foreground">{key}</dt>
+                          <dd className="max-w-[65%] break-words text-right font-medium">{evidenceValue(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    {check.error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{check.error}</p> : null}
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {certificationMutation.isError ? (
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              La certificación no pudo completarse. Revisa conectividad, credenciales y logs del backend.
+            </p>
+          ) : null}
+        </div>
+      </SectionCard>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <MetricCard label="Eventos procesados" value={String(overview.summary.processedEvents)} detail={`${overview.summary.totalEvents} eventos recibidos`} period={periodOptions.find((option) => option.value === periodHours)?.label} />

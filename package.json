@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:roles": "playwright test tests/e2e/role-navigation.spec.ts",
+    "test:e2e:ats:staging": "playwright test --config=playwright.ats-staging.config.ts",
     "test:integration:onboarding": "playwright test --config=playwright.integration.config.ts tests/integration",
     "test:a11y": "playwright test tests/e2e/public-accessibility.spec.ts",
     "audit:production": "pnpm audit --prod --audit-level critical",

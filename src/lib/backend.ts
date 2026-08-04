@@ -13,6 +13,16 @@ import type {
   TenantDto,
   UserDto,
   PlanTier,
+  NoCodeAutomationAction,
+  NoCodeAutomationCatalogDto,
+  NoCodeAutomationCondition,
+  NoCodeAutomationExecutionDto,
+  NoCodeAutomationExecutionStatus,
+  NoCodeAutomationRuleDto,
+  NoCodeAutomationOperationsOverviewDto,
+  NoCodeAutomationScope,
+  NoCodeAutomationSimulationDto,
+  NoCodeAutomationTrigger,
   PublicApplicationInput,
   PublicApplicationReceipt,
   PublicTrainingCertificateVerificationDto,
@@ -23,6 +33,7 @@ import type {
   VacancyApplicationListDto,
   UpdateApplicationInput,
   QueueMonitoringDto,
+  ProductionIntegrationCertificationDto,
   QueueOverviewDto,
   DeadLetterOverviewDto,
   QueueThroughputDto,
@@ -123,6 +134,7 @@ import type {
   NotificationPreferenceDto,
   OperationalDashboardDto,
   ReportsOverviewDto,
+  AtsAnalyticsDto,
   ReportExportDto,
   PlanAdminDto,
   PlanLimitsDto,
@@ -1651,6 +1663,25 @@ export async function fetchQueueMonitoring(input: {
   };
 }
 
+export async function fetchProductionIntegrationCertification(
+  tenantId?: string,
+): Promise<ProductionIntegrationCertificationDto> {
+  const query = new URLSearchParams();
+  if (tenantId) query.set("tenantId", tenantId);
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return request<ProductionIntegrationCertificationDto>(`/metrics/integration-certification${suffix}`);
+}
+
+export async function runProductionIntegrationCertification(
+  tenantId?: string,
+): Promise<ProductionIntegrationCertificationDto> {
+  return request<ProductionIntegrationCertificationDto>("/metrics/integration-certification/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(tenantId ? { tenantId } : {}),
+  });
+}
+
 export async function updateModuleAssignment(
   _id: string,
   input: Omit<ModuleAssignmentDto, "id">,
@@ -1799,6 +1830,35 @@ export function fetchApplications(filters: import("./contracts").ApplicationFilt
   Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
   return request<VacancyApplicationListDto>(`/applications?${query.toString()}`);
 }
+
+export function fetchTalentCandidates(filters: { search?: string; poolId?: string; tagId?: string; branchId?: string; doNotContact?: boolean; page?: number; pageSize?: number } = {}) {
+  const query = new URLSearchParams({ page: String(filters.page ?? 1), pageSize: String(filters.pageSize ?? 20) });
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  return request<import("./contracts").TalentCandidateListDto>(`/talent-crm/candidates?${query.toString()}`);
+}
+
+export function fetchTalentCandidate(candidateId: string) {
+  return request<import("./contracts").TalentCandidateDto>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}`);
+}
+
+export function updateTalentCandidate(candidateId: string, input: { fullName?: string; phone?: string; city?: string; linkedinUrl?: string; portfolioUrl?: string; source?: string; doNotContact?: boolean }) {
+  return request<import("./contracts").TalentCandidateDto>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function fetchTalentPools() { return request<import("./contracts").TalentPoolDto[]>("/talent-crm/pools"); }
+export function createTalentPool(input: { name: string; description?: string; color?: string; branchId?: string }) { return request<import("./contracts").TalentPoolDto>("/talent-crm/pools", { method: "POST", body: JSON.stringify(input) }); }
+export function updateTalentPool(poolId: string, input: { name?: string; description?: string; color?: string; isActive?: boolean }) { return request<import("./contracts").TalentPoolDto>(`/talent-crm/pools/${encodeURIComponent(poolId)}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function addCandidateToTalentPool(poolId: string, candidateId: string) { return request<{ added: boolean }>(`/talent-crm/pools/${encodeURIComponent(poolId)}/members`, { method: "POST", body: JSON.stringify({ candidateId }) }); }
+export function removeCandidateFromTalentPool(poolId: string, candidateId: string) { return request<{ removed: boolean }>(`/talent-crm/pools/${encodeURIComponent(poolId)}/members/${encodeURIComponent(candidateId)}`, { method: "DELETE" }); }
+
+export function fetchTalentTags() { return request<import("./contracts").TalentTagDto[]>("/talent-crm/tags"); }
+export function createTalentTag(input: { name: string; color?: string }) { return request<import("./contracts").TalentTagDto>("/talent-crm/tags", { method: "POST", body: JSON.stringify(input) }); }
+export function addTalentTag(candidateId: string, tagId: string) { return request<{ added: boolean }>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}/tags`, { method: "POST", body: JSON.stringify({ tagId }) }); }
+export function removeTalentTag(candidateId: string, tagId: string) { return request<{ removed: boolean }>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}/tags/${encodeURIComponent(tagId)}`, { method: "DELETE" }); }
+
+export function createTalentActivity(candidateId: string, input: { type: import("./contracts").TalentActivityType; subject: string; description?: string; dueAt?: string; completed?: boolean }) { return request<import("./contracts").TalentActivityDto>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}/activities`, { method: "POST", body: JSON.stringify(input) }); }
+export function fetchDuplicateCandidates(minimumScore = 45) { return request<{ data: import("./contracts").DuplicateCandidateMatchDto[]; scannedCandidates: number; truncated: boolean }>(`/talent-crm/duplicates?minimumScore=${minimumScore}`); }
+export function mergeTalentCandidates(input: { sourceCandidateId: string; targetCandidateId: string; reason: string }) { return request<{ auditId: string; sourceCandidateId: string; targetCandidateId: string; movedApplications: number; movedFiles: number }>("/talent-crm/duplicates/merge", { method: "POST", body: JSON.stringify(input) }); }
 
 export function exportApplications(filters: import("./contracts").ApplicationFilters = {}) {
   const query = new URLSearchParams();
@@ -2088,6 +2148,15 @@ export function configureCommunicationDomain(input: { domain: string; fromName: 
 export function verifyCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain/verify", { method: "POST" }); }
 export function fetchCommunicationInbox(filters: { page?: number; pageSize?: number; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value != null && value !== "" && query.set(key, String(value))); return request<{ data: AtsMessageDto[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/ats/communications/inbox?${query}`); }
 export function replyCandidateEmail(messageId: string, input: { subject: string; body: string }) { return request<AtsMessageDto[]>(`/ats/communications/messages/${encodeURIComponent(messageId)}/reply`, { method: "POST", body: JSON.stringify(input) }); }
+export function fetchAtsConversations(filters: { page?: number; pageSize?: number; search?: string; status?: import("./contracts").AtsConversationStatus; assignedUserId?: string; assignedToMe?: boolean; unreadOnly?: boolean; archived?: boolean } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value != null && value !== "" && query.set(key, String(value))); return request<import("./contracts").AtsConversationListDto>(`/ats/communications/conversations?${query}`); }
+export function fetchAtsConversation(id: string) { return request<import("./contracts").AtsConversationDto>(`/ats/communications/conversations/${encodeURIComponent(id)}`); }
+export function updateAtsConversation(id: string, input: { status?: import("./contracts").AtsConversationStatus; assignedUserId?: string | null; snoozedUntil?: string | null; archived?: boolean }) { return request<import("./contracts").AtsConversationDto>(`/ats/communications/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function markAtsConversationRead(id: string) { return request<{ readAt: string }>(`/ats/communications/conversations/${encodeURIComponent(id)}/read`, { method: "POST" }); }
+export function composeCandidateEmail(applicationId: string, input: { subject: string; body: string }) { return request<AtsMessageDto[]>(`/ats/communications/applications/${encodeURIComponent(applicationId)}/messages`, { method: "POST", body: JSON.stringify(input) }); }
+export function fetchUnmatchedInbound(page = 1, pageSize = 20) { return request<{ data: import("./contracts").AtsUnmatchedInboundDto[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/ats/communications/unmatched?page=${page}&pageSize=${pageSize}`); }
+export function linkUnmatchedInbound(id: string, applicationId: string) { return request<AtsMessageDto>(`/ats/communications/unmatched/${encodeURIComponent(id)}/link`, { method: "POST", body: JSON.stringify({ applicationId }) }); }
+export function ignoreUnmatchedInbound(id: string, reason: string) { return request<{ ignored: boolean }>(`/ats/communications/unmatched/${encodeURIComponent(id)}/ignore`, { method: "POST", body: JSON.stringify({ reason }) }); }
+export function fetchAtsAttachmentAccess(id: string) { return request<{ id: string; filename: string; mimeType: string; sizeBytes?: number | null; url: string; expiresAt?: string }>(`/ats/communications/attachments/${encodeURIComponent(id)}/access`); }
 
 export function submitInterviewScorecard(id: string, input: {
   criteria?: Record<string, unknown>;
@@ -3514,6 +3583,73 @@ export function retryNotificationDelivery(id: string) {
   );
 }
 
+export type SaveNoCodeAutomationRuleInput = {
+  name: string;
+  triggerEvent: NoCodeAutomationTrigger;
+  scope: NoCodeAutomationScope;
+  branchId?: string;
+  enabled?: boolean;
+  conditions: NoCodeAutomationCondition[];
+  consequences: NoCodeAutomationAction[];
+};
+
+export function fetchAutomationCatalog() {
+  return request<NoCodeAutomationCatalogDto>("/automation/catalog");
+}
+
+export function fetchAutomationRules(input?: { page?: number; pageSize?: number; enabled?: boolean; search?: string }) {
+  const query = new URLSearchParams({ page: String(input?.page ?? 1), pageSize: String(input?.pageSize ?? 50) });
+  if (input?.enabled !== undefined) query.set("enabled", String(input.enabled));
+  if (input?.search) query.set("search", input.search);
+  return request<{ data: NoCodeAutomationRuleDto[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(`/automation/rules?${query.toString()}`);
+}
+
+export function createAutomationRule(input: SaveNoCodeAutomationRuleInput) {
+  return request<NoCodeAutomationRuleDto>("/automation/rules", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateAutomationRule(id: string, input: Partial<SaveNoCodeAutomationRuleInput>) {
+  return request<NoCodeAutomationRuleDto>(`/automation/rules/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function duplicateAutomationRule(id: string) {
+  return request<NoCodeAutomationRuleDto>(`/automation/rules/${encodeURIComponent(id)}/duplicate`, { method: "POST" });
+}
+
+export function deleteAutomationRule(id: string) {
+  return request<{ deleted: boolean; disabled: boolean; message: string }>(`/automation/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function simulateAutomationRule(id: string, input: { branchId?: string; workflowId?: string; employeeId?: string; candidateId?: string; payload?: Record<string, unknown> }) {
+  return request<NoCodeAutomationSimulationDto>(`/automation/rules/${encodeURIComponent(id)}/simulate`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchAutomationExecutions(input?: { page?: number; pageSize?: number; status?: NoCodeAutomationExecutionStatus; search?: string; ruleId?: string; from?: string; to?: string }) {
+  const query = new URLSearchParams({ page: String(input?.page ?? 1), pageSize: String(input?.pageSize ?? 50) });
+  if (input?.status) query.set("status", input.status);
+  if (input?.search) query.set("search", input.search);
+  if (input?.ruleId) query.set("ruleId", input.ruleId);
+  if (input?.from) query.set("from", input.from);
+  if (input?.to) query.set("to", input.to);
+  return request<{ data: NoCodeAutomationExecutionDto[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>(`/automation/executions?${query.toString()}`);
+}
+
+export function fetchAutomationOperationsOverview() {
+  return request<NoCodeAutomationOperationsOverviewDto>("/automation/operations/overview");
+}
+
+export function bulkUpdateAutomationRules(ids: string[], action: "ENABLE" | "DISABLE" | "DELETE") {
+  return request<{ requested: number; updated: number; deleted: number; preserved: number }>("/automation/rules/bulk", { method: "POST", body: JSON.stringify({ ids, action }) });
+}
+
+export function retryAutomationExecution(id: string) {
+  return request<NoCodeAutomationExecutionDto>(`/automation/executions/${encodeURIComponent(id)}/retry`, { method: "POST" });
+}
+
+export function bulkRetryAutomationExecutions(ids: string[]) {
+  return request<{ requested: number; succeeded: number; failed: number; results: Array<{ id: string; ok: boolean; executionId?: string; error?: string }> }>("/automation/executions/bulk-retry", { method: "POST", body: JSON.stringify({ ids }) });
+}
+
 export function fetchOperationalDashboard() {
   return request<OperationalDashboardDto>("/dashboard/operational");
 }
@@ -3526,6 +3662,12 @@ export type ReportQuery = {
   scope?: "context" | "tenant";
 };
 
+export type AtsAnalyticsQuery = ReportQuery & {
+  vacancyId?: string;
+  recruiterId?: string;
+  granularity?: "day" | "week" | "month";
+};
+
 function reportQueryString(input: ReportQuery) {
   const query = new URLSearchParams();
   if (input.from) query.set("from", input.from);
@@ -3536,12 +3678,28 @@ function reportQueryString(input: ReportQuery) {
   return query.toString();
 }
 
+function atsAnalyticsQueryString(input: AtsAnalyticsQuery) {
+  const query = new URLSearchParams(reportQueryString(input));
+  if (input.vacancyId) query.set("vacancyId", input.vacancyId);
+  if (input.recruiterId) query.set("recruiterId", input.recruiterId);
+  if (input.granularity) query.set("granularity", input.granularity);
+  return query.toString();
+}
+
 export function fetchReportsOverview(input: ReportQuery) {
   return request<ReportsOverviewDto>(`/reports/overview?${reportQueryString(input)}`);
 }
 
 export function fetchReportsExport(input: ReportQuery) {
   return request<ReportExportDto>(`/reports/export?${reportQueryString(input)}`);
+}
+
+export function fetchAtsAnalytics(input: AtsAnalyticsQuery) {
+  return request<AtsAnalyticsDto>(`/reports/ats-analytics?${atsAnalyticsQueryString(input)}`);
+}
+
+export function fetchAtsAnalyticsExport(input: AtsAnalyticsQuery) {
+  return request<ReportExportDto>(`/reports/ats-analytics/export?${atsAnalyticsQueryString(input)}`);
 }
 
 export function downloadTextFile(file: ReportExportDto) {

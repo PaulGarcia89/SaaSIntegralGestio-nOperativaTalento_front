@@ -1,0 +1,44 @@
+name: ATS staging certification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ats-staging-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      E2E_ATS_ENVIRONMENT: staging
+      E2E_ATS_ALLOW_WRITES: "true"
+      E2E_ATS_FRONTEND_URL: ${{ vars.ATS_STAGING_FRONTEND_URL }}
+      E2E_ATS_BACKEND_URL: ${{ vars.ATS_STAGING_BACKEND_URL }}
+      E2E_ATS_TENANT_SLUG: ${{ vars.ATS_STAGING_TENANT_SLUG }}
+      E2E_ATS_BRANCH_ID: ${{ vars.ATS_STAGING_BRANCH_ID }}
+      E2E_ATS_ADMIN_EMAIL: ${{ secrets.ATS_STAGING_ADMIN_EMAIL }}
+      E2E_ATS_ADMIN_PASSWORD: ${{ secrets.ATS_STAGING_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:ats:staging
+      - name: Conservar evidencia de fallos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ats-staging-certification
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 14

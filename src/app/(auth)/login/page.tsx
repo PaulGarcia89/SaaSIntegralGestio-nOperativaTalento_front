@@ -174,7 +174,7 @@ export default function LoginPage() {
                 </Button>
               </div>
 
-              {DEMO_MODE_ENABLED ? <Button type="button" variant="secondary" className="w-full" onClick={() => { form.setValue("email", "ava.thompson@talentoscloud.com"); form.setValue("password", "ChangeMe123!"); }}>Entrar al entorno de demostración</Button> : null}
+              {DEMO_MODE_ENABLED ? <Button type="button" variant="secondary" className="w-full" onClick={() => { form.setValue("email", "ava.thompson@talentoscloud.com"); form.setValue("password", "ChangeMe123!"); }}>Entrar al entorno de prueba local</Button> : null}
               <Button asChild type="button" variant="ghost" className="w-full">
                 <Link href="/">
                   <ArrowLeft className="size-4" aria-hidden="true" />

@@ -1970,6 +1970,11 @@ export interface CalendarConnectionDto {
   lastError?: string | null;
 }
 
+export interface CalendarProviderConfigurationDto {
+  provider: CalendarProvider;
+  configured: boolean;
+}
+
 export interface InterviewerAvailabilityDto {
   interviewerUserId: string;
   timezone: string;
@@ -2077,6 +2082,7 @@ export interface AtsCommunicationTemplateDto {
 
 export interface AtsMessageDto {
   id: string;
+  eventKey?: string;
   type: AtsCommunicationType;
   audience: AtsCommunicationAudience;
   direction?: "OUTBOUND" | "INBOUND";

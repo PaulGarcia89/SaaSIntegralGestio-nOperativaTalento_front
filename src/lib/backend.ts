@@ -479,7 +479,7 @@ function buildMockAuthUser(userId: string): BackendAuthUser {
       location: branch.city,
     })),
     firstName: user.fullName.split(" ")[0] ?? "Usuario",
-    lastName: user.fullName.split(" ").slice(1).join(" ") || "Demo",
+    lastName: user.fullName.split(" ").slice(1).join(" ") || "Sin apellido",
     isSuperAdmin: user.role === "admin_saas",
     roles: [
       user.role === "admin_saas" ? "SUPERADMIN"
@@ -884,7 +884,7 @@ function splitFullName(fullName: string) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   return {
     firstName: parts[0] ?? "Usuario",
-    lastName: parts.slice(1).join(" ") || "Demo",
+    lastName: parts.slice(1).join(" ") || "Sin apellido",
   };
 }
 
@@ -1859,7 +1859,7 @@ export function addTalentTag(candidateId: string, tagId: string) { return reques
 export function removeTalentTag(candidateId: string, tagId: string) { return request<{ removed: boolean }>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}/tags/${encodeURIComponent(tagId)}`, { method: "DELETE" }); }
 
 export function createTalentActivity(candidateId: string, input: { type: import("./contracts").TalentActivityType; subject: string; description?: string; dueAt?: string; completed?: boolean }) { return request<import("./contracts").TalentActivityDto>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}/activities`, { method: "POST", body: JSON.stringify(input) }); }
-export function fetchDuplicateCandidates(minimumScore = 45) { return request<{ data: import("./contracts").DuplicateCandidateMatchDto[]; scannedCandidates: number; truncated: boolean }>(`/talent-crm/duplicates?minimumScore=${minimumScore}`); }
+export function fetchDuplicateCandidates(minimumScore = 45) { return request<{ data: import("./contracts").DuplicateCandidateMatchDto[]; scannedCandidates: number; truncated: boolean; ignoredSharedValues: number }>(`/talent-crm/duplicates?minimumScore=${minimumScore}`); }
 export function mergeTalentCandidates(input: { sourceCandidateId: string; targetCandidateId: string; reason: string }) { return request<{ auditId: string; sourceCandidateId: string; targetCandidateId: string; movedApplications: number; movedFiles: number }>("/talent-crm/duplicates/merge", { method: "POST", body: JSON.stringify(input) }); }
 
 export function exportApplications(filters: import("./contracts").ApplicationFilters = {}) {
@@ -1992,6 +1992,10 @@ export function updateRecruitmentInterview(id: string, input: Partial<Pick<Recru
 
 export function fetchCalendarConnections() {
   return request<CalendarConnectionDto[]>("/recruitment/calendar-connections");
+}
+
+export function fetchCalendarProviderConfiguration() {
+  return request<import("./contracts").CalendarProviderConfigurationDto[]>("/recruitment/calendar-providers");
 }
 
 export function fetchCalendarAuthorizationUrl(

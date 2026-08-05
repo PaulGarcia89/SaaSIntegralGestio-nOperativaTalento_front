@@ -36,9 +36,14 @@ describe("navigation policy", () => {
   it("separates role-specific workspaces", () => {
     const interviews = getRoutePolicy("/ats/interviews");
     const pipeline = getRoutePolicy("/ats/pipeline");
+    const communications = getRoutePolicy("/ats/communications");
     expect(isRoleAllowed(interviews?.roles, "entrevistador")).toBe(true);
     expect(isRoleAllowed(pipeline?.roles, "entrevistador")).toBe(false);
     expect(isRoleAllowed(pipeline?.roles, "reclutador")).toBe(true);
+    expect(communications?.permission).toBe("applications.view");
+    expect(communications?.branchRequired).toBe(true);
+    expect(isRoleAllowed(communications?.roles, "reclutador")).toBe(true);
+    expect(isRoleAllowed(communications?.roles, "entrevistador")).toBe(false);
   });
 
   it("centralizes the candidate portal navigation", () => {

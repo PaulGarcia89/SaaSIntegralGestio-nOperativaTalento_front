@@ -397,6 +397,41 @@ export interface ProductionIntegrationCertificationDto {
   }>;
 }
 
+export interface AtsStorageOperationsDto {
+  generatedAt: string;
+  skipped?: boolean;
+  reason?: string;
+  expiredResumes?: number;
+  expiredImages?: number;
+  configuration: {
+    driver: string;
+    provider: string;
+    bucket: string | null;
+    private: boolean;
+    directSignedUrls: boolean;
+    encryption: { enabled: boolean; mode: string };
+    endpointUsesTls: boolean;
+    credentialsConfigured: boolean;
+  };
+  usage: {
+    usedBytes: number;
+    alertBytes: number;
+    freeTierBytes: number;
+    usedPercentOfFreeTier: number;
+    alertReached: boolean;
+    bytesUntilAlert: number;
+    files: number;
+    resumes: { files: number; bytes: number };
+    vacancyImages: { files: number; bytes: number };
+  };
+  retention: {
+    enabled: boolean;
+    resumeDays: number;
+    vacancyImageDays: number;
+    pendingExpiration: number;
+  };
+}
+
 export interface RoleDefinitionDto {
   id: string;
   tenantId: string;
@@ -2364,6 +2399,10 @@ export interface AutomationQueueItemDto {
 export type NoCodeAutomationScope = "TENANT" | "BRANCH";
 export type NoCodeAutomationTrigger =
   | "CANDIDATE_HIRED"
+  | "APPLICATION_STAGE_CHANGED"
+  | "APPLICATION_REJECTED"
+  | "INTERVIEW_SCHEDULED"
+  | "INTERVIEW_COMPLETED"
   | "EMPLOYEE_BRANCH_CHANGED"
   | "EMPLOYEE_OFFBOARDING_STARTED"
   | "ONBOARDING_COMPLETED"
@@ -2422,6 +2461,14 @@ export interface NoCodeAutomationCatalogDto {
   actions: Array<{ value: NoCodeAutomationActionType; label: string; description: string; fields: string[] }>;
   scopes: Array<{ value: NoCodeAutomationScope; label: string }>;
   workflowStages: Array<{ value: string; label: string }>;
+}
+export interface NoCodeAutomationTemplateDto {
+  key: string;
+  name: string;
+  description: string;
+  triggerEvent: NoCodeAutomationTrigger;
+  conditions: NoCodeAutomationCondition[];
+  consequences: NoCodeAutomationAction[];
 }
 export interface NoCodeAutomationExecutionDto {
   id: string;

@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wizard } from "@/components/design-system";
 import { FileUpload } from "@/components/ui/file-upload";
+import { validateAtsResumeFile } from "@/lib/ats-file-security";
 
 const steps = ["Vacante", "Datos personales", "Experiencia", "Preguntas", "Documentos", "Revisión y consentimiento", "Confirmación"];
 const emptyForm: PublicApplicationInput = { fullName: "", email: "", phone: "", city: "", linkedinUrl: "", portfolioUrl: "", coverLetter: "", dynamicResponses: {} };
@@ -67,6 +68,18 @@ function ApplyWizard() {
   }, [socialCode]);
 
   useEffect(() => {
+    if (!resumeFile) return;
+    let cancelled = false;
+    void validateAtsResumeFile(resumeFile).then((message) => {
+      if (cancelled || !message) return;
+      setResumeFile(null);
+      setParsedResume(null);
+      setError(message);
+    });
+    return () => { cancelled = true; };
+  }, [resumeFile]);
+
+  useEffect(() => {
     if (!vacancyId || step === 6) return;
     const timeout = window.setTimeout(() => {
       const now = new Date();
@@ -103,6 +116,7 @@ function ApplyWizard() {
         {step < 6 ? <div className="space-y-2"><p className="text-sm text-muted-foreground" aria-live="polite">{savedAt ? `Borrador temporal guardado a las ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}; se eliminará después de 30 minutos o al cerrar el navegador.` : "El borrador permanecerá únicamente durante esta sesión y caducará en 30 minutos."}</p><p className="text-xs text-amber-700">Si compartes este dispositivo, elimina el borrador antes de retirarte.</p>{savedAt ? <Button type="button" size="sm" variant="ghost" onClick={() => { sessionStorage.removeItem(draftKey); setForm(emptyForm); setSavedAt(null); }}>Eliminar borrador</Button> : null}</div> : null}
       </section>
       <Wizard steps={steps} current={step} onStepChange={step < 6 ? setStep : undefined}>
+      {step === 4 ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Seguridad reforzada: solo PDF o DOCX sin macros ni contenido activo. El backend valida la estructura, registra SHA-256, cambia el nombre interno y mantiene el archivo en cuarentena hasta completar las comprobaciones.</p> : null}
       <Card><CardHeader><CardTitle>{steps[step]}</CardTitle></CardHeader><CardContent className="space-y-6">
         {step === 0 ? <div className="space-y-4"><p className="leading-7 text-muted-foreground">{vacancy.description || vacancy.summary || "Revisa la información disponible antes de continuar."}</p>{vacancy.requirements ? <div><h2 className="font-semibold">Requisitos</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{vacancy.requirements}</p></div> : null}</div> : null}
         {step === 1 ? <div className="space-y-5"><div className="grid gap-4 md:grid-cols-2"><Field label="Nombre completo" required value={form.fullName} onChange={(value) => setField("fullName", value)} /><Field label="Correo electrónico" type="email" required value={form.email} onChange={(value) => setField("email", value)} /><Field label="Teléfono" value={form.phone || ""} onChange={(value) => setField("phone", value)} /><Field label="Ciudad" value={form.city || ""} onChange={(value) => setField("city", value)} /></div><div className="rounded-xl border p-4"><h2 className="font-semibold">Importar perfil</h2><p className="mt-1 text-sm text-muted-foreground">LinkedIn e Indeed requieren autorización OAuth y nunca comparten tu contraseña con el ATS.</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => social.mutate("linkedin")} disabled={social.isPending}>Continuar con LinkedIn</Button><Button type="button" variant="secondary" onClick={() => social.mutate("indeed")} disabled={social.isPending}>Continuar con Indeed</Button></div></div></div> : null}

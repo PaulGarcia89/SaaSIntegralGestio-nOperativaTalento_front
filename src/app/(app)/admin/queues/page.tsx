@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Activity, RefreshCw, ShieldCheck } from "lucide-react";
+import { Activity, Database, RefreshCw, ShieldCheck } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
 import { DomainTable, StateCard } from "@/components/domain";
 import { PageHeader } from "@/components/design-system";
@@ -13,9 +13,11 @@ import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
 import {
   ApiError,
+  fetchAtsStorageOperations,
   fetchProductionIntegrationCertification,
   fetchQueueMonitoring,
   runProductionIntegrationCertification,
+  runAtsStorageMaintenance,
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 
@@ -42,6 +44,13 @@ function formatDate(value: string | null) {
 function formatDuration(value: number) {
   if (value < 1_000) return `${Math.round(value)} ms`;
   return `${(value / 1_000).toFixed(2)} s`;
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)) - 1, units.length - 1);
+  return `${(value / 1024 ** (index + 1)).toFixed(index > 0 ? 2 : 1)} ${units[index]}`;
 }
 
 function evidenceValue(value: unknown) {
@@ -97,6 +106,19 @@ export default function QueueManagementPage() {
   });
   const certificationMutation = useMutation({
     mutationFn: (targetTenantId?: string) => runProductionIntegrationCertification(targetTenantId),
+  });
+  const storageQuery = useQuery({
+    queryKey: ["ats-storage-operations"],
+    queryFn: fetchAtsStorageOperations,
+    enabled: currentRole === "admin_saas",
+    retry: false,
+  });
+  const storageMaintenanceMutation = useMutation({
+    mutationFn: runAtsStorageMaintenance,
+    onSuccess: (data) => {
+      storageQuery.refetch();
+      return data;
+    },
   });
 
   if (currentRole !== "admin_saas") {
@@ -279,6 +301,80 @@ export default function QueueManagementPage() {
           {certificationMutation.isError ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
               La certificación no pudo completarse. Revisa conectividad, credenciales y logs del backend.
+            </p>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Almacenamiento privado ATS" subtitle="Plan sin gasto adicional">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex max-w-3xl gap-3">
+              <Database className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+              <div>
+                <p className="font-medium">R2 privado, cifrado y con retención automática</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Los archivos se entregan mediante enlaces temporales directos. El sistema elimina objetos vencidos
+                  y avisa antes de alcanzar 8 GB de consumo administrado.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => storageMaintenanceMutation.mutate()}
+              disabled={storageMaintenanceMutation.isPending}
+            >
+              <RefreshCw className={`size-4 ${storageMaintenanceMutation.isPending ? "animate-spin" : ""}`} aria-hidden="true" />
+              {storageMaintenanceMutation.isPending ? "Ejecutando..." : "Ejecutar mantenimiento"}
+            </Button>
+          </div>
+
+          {storageQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Calculando uso y retención...</p>
+          ) : storageQuery.isError || !storageQuery.data ? (
+            <StateCard
+              tone="empty"
+              title="No fue posible consultar el almacenamiento"
+              description="Verifica que el backend actualizado esté desplegado y que tu rol tenga permisos operativos."
+            />
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard label="Uso actual" value={formatBytes(storageQuery.data.usage.usedBytes)} detail={`${storageQuery.data.usage.files} archivos privados`} period={`${storageQuery.data.usage.usedPercentOfFreeTier}% del nivel configurado`} />
+                <MetricCard label="Alerta preventiva" value={formatBytes(storageQuery.data.usage.alertBytes)} detail={storageQuery.data.usage.alertReached ? "Umbral alcanzado" : `${formatBytes(storageQuery.data.usage.bytesUntilAlert)} disponibles antes de alertar`} />
+                <MetricCard label="CV" value={String(storageQuery.data.usage.resumes.files)} detail={formatBytes(storageQuery.data.usage.resumes.bytes)} />
+                <MetricCard label="Imágenes" value={String(storageQuery.data.usage.vacancyImages.files)} detail={formatBytes(storageQuery.data.usage.vacancyImages.bytes)} />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ["Bucket privado", storageQuery.data.configuration.private],
+                  ["Cifrado AES-256", storageQuery.data.configuration.encryption.enabled],
+                  ["URLs firmadas directas", storageQuery.data.configuration.directSignedUrls],
+                  ["Credenciales configuradas", storageQuery.data.configuration.credentialsConfigured],
+                ].map(([label, enabled]) => (
+                  <div key={String(label)} className="flex items-center justify-between rounded-xl border border-border/70 bg-background/55 px-4 py-3">
+                    <span className="text-sm">{label}</span>
+                    <Badge variant={enabled ? "success" : "warning"}>{enabled ? "Activo" : "Pendiente"}</Badge>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Proveedor {storageQuery.data.configuration.provider} · Retención de CV {storageQuery.data.retention.resumeDays} días ·
+                Imágenes {storageQuery.data.retention.vacancyImageDays} días · {storageQuery.data.retention.pendingExpiration} pendientes de vencer ·
+                Actualizado {formatDate(storageQuery.data.generatedAt)}
+              </p>
+            </>
+          )}
+
+          {storageMaintenanceMutation.isSuccess ? (
+            <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
+              Mantenimiento completado: {storageMaintenanceMutation.data.expiredResumes ?? 0} CV y {storageMaintenanceMutation.data.expiredImages ?? 0} imágenes vencidas.
+            </p>
+          ) : null}
+          {storageMaintenanceMutation.isError ? (
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              No fue posible completar el mantenimiento. Revisa la conexión y los permisos del bucket.
             </p>
           ) : null}
         </div>

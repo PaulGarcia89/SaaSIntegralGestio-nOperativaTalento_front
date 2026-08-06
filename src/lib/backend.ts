@@ -22,6 +22,7 @@ import type {
   NoCodeAutomationOperationsOverviewDto,
   NoCodeAutomationScope,
   NoCodeAutomationSimulationDto,
+  NoCodeAutomationTemplateDto,
   NoCodeAutomationTrigger,
   PublicApplicationInput,
   PublicApplicationReceipt,
@@ -34,6 +35,7 @@ import type {
   UpdateApplicationInput,
   QueueMonitoringDto,
   ProductionIntegrationCertificationDto,
+  AtsStorageOperationsDto,
   QueueOverviewDto,
   DeadLetterOverviewDto,
   QueueThroughputDto,
@@ -1684,6 +1686,16 @@ export async function runProductionIntegrationCertification(
   });
 }
 
+export async function fetchAtsStorageOperations(): Promise<AtsStorageOperationsDto> {
+  return request<AtsStorageOperationsDto>("/metrics/ats-storage");
+}
+
+export async function runAtsStorageMaintenance(): Promise<AtsStorageOperationsDto> {
+  return request<AtsStorageOperationsDto>("/metrics/ats-storage/maintenance", {
+    method: "POST",
+  });
+}
+
 export async function updateModuleAssignment(
   _id: string,
   input: Omit<ModuleAssignmentDto, "id">,
@@ -2060,6 +2072,13 @@ export function downloadInterviewInvitation(id: string) {
   return request<Blob>(
     `/recruitment/interviews/${encodeURIComponent(id)}/invitation.ics`,
     {},
+    { responseType: "blob" },
+  );
+}
+
+export function downloadCandidateInterviewInvitation(id: string) {
+  return candidateRequest<Blob>(
+    `/candidate/applications/interviews/${encodeURIComponent(id)}/invitation.ics`,
     { responseType: "blob" },
   );
 }
@@ -3604,6 +3623,14 @@ export type SaveNoCodeAutomationRuleInput = {
 
 export function fetchAutomationCatalog() {
   return request<NoCodeAutomationCatalogDto>("/automation/catalog");
+}
+
+export function fetchAutomationTemplates() {
+  return request<NoCodeAutomationTemplateDto[]>("/automation/templates");
+}
+
+export function createAutomationFromTemplate(key: string, input?: { branchId?: string; enabled?: boolean }) {
+  return request<NoCodeAutomationRuleDto>(`/automation/templates/${encodeURIComponent(key)}`, { method: "POST", body: JSON.stringify(input ?? {}) });
 }
 
 export function fetchAutomationRules(input?: { page?: number; pageSize?: number; enabled?: boolean; search?: string }) {

@@ -16,11 +16,13 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createAutomationRule,
+  createAutomationFromTemplate,
   bulkRetryAutomationExecutions,
   bulkUpdateAutomationRules,
   deleteAutomationRule,
   duplicateAutomationRule,
   fetchAutomationCatalog,
+  fetchAutomationTemplates,
   fetchAutomationExecutions,
   fetchAutomationOperationsOverview,
   fetchAutomationRules,
@@ -73,6 +75,7 @@ export default function AutomationsPage() {
   const deferredRuleSearch = useDeferredValue(ruleSearch);
   const deferredExecutionSearch = useDeferredValue(executionSearch);
   const catalog = useQuery({ queryKey: ["automation-catalog"], queryFn: fetchAutomationCatalog });
+  const templates = useQuery({ queryKey: ["automation-templates"], queryFn: fetchAutomationTemplates });
   const overview = useQuery({ queryKey: ["automation-operations-overview"], queryFn: fetchAutomationOperationsOverview });
   const rules = useQuery({ queryKey: ["automation-rules", rulePage, deferredRuleSearch], queryFn: () => fetchAutomationRules({ page: rulePage, pageSize: 24, search: deferredRuleSearch || undefined }) });
   const executions = useQuery({ queryKey: ["automation-executions", executionPage, deferredExecutionSearch, executionStatus], queryFn: () => fetchAutomationExecutions({ page: executionPage, pageSize: 25, search: deferredExecutionSearch || undefined, status: executionStatus === "ALL" ? undefined : executionStatus as NoCodeAutomationExecutionDto["status"] }) });
@@ -101,10 +104,11 @@ export default function AutomationsPage() {
   const bulkRules = useMutation({ mutationFn: ({ action }: { action: "ENABLE" | "DISABLE" | "DELETE" }) => bulkUpdateAutomationRules(selectedRules, action), onSuccess: async (result) => { setSelectedRules([]); toast.success(`${result.updated + result.deleted} reglas procesadas`); await refresh(); }, onError: showError });
   const retryOne = useMutation({ mutationFn: retryAutomationExecution, onSuccess: async () => { toast.success("Reintento ejecutado"); await refresh(); }, onError: showError });
   const retrySelected = useMutation({ mutationFn: () => bulkRetryAutomationExecutions(selectedExecutions), onSuccess: async (result) => { setSelectedExecutions([]); toast.success(`${result.succeeded} reintentos completados; ${result.failed} con incidencia`); await refresh(); }, onError: showError });
+  const createTemplate = useMutation({ mutationFn: (key: string) => createAutomationFromTemplate(key), onSuccess: async (rule) => { toast.success(`Plantilla creada como borrador: ${rule.name}`); await refresh(); }, onError: showError });
 
-  if (catalog.isLoading || overview.isLoading || rules.isLoading || executions.isLoading) return <AsyncState state="loading" title="Preparando el estudio de automatización" />;
-  if (catalog.isError || overview.isError || rules.isError || executions.isError || !catalog.data || !overview.data || !rules.data || !executions.data) {
-    return <AsyncState state="error" title="No fue posible cargar las automatizaciones" onRetry={() => { void catalog.refetch(); void overview.refetch(); void rules.refetch(); void executions.refetch(); }} />;
+  if (catalog.isLoading || templates.isLoading || overview.isLoading || rules.isLoading || executions.isLoading) return <AsyncState state="loading" title="Preparando el estudio de automatización" />;
+  if (catalog.isError || templates.isError || overview.isError || rules.isError || executions.isError || !catalog.data || !templates.data || !overview.data || !rules.data || !executions.data) {
+    return <AsyncState state="error" title="No fue posible cargar las automatizaciones" onRetry={() => { void catalog.refetch(); void templates.refetch(); void overview.refetch(); void rules.refetch(); void executions.refetch(); }} />;
   }
 
   return <div className="space-y-8">
@@ -116,6 +120,7 @@ export default function AutomationsPage() {
       <MetricCard label="Incidencias" value={String(overview.data.executions.failed)} detail="Fallidas o parciales" period="Últimas 24 horas" />
     </div>
     <Card><CardContent className="grid gap-5 pt-6 lg:grid-cols-[1.2fr_1fr]"><div><div className="flex items-center gap-2"><Bot className="size-5 text-primary" /><h2 className="font-semibold">Capacidad operativa</h2></div><p className="mt-2 text-sm text-muted-foreground">Procesamiento mediante outbox durable, workers y recuperación automática de eventos bloqueados.</p><div className="mt-4 flex flex-wrap gap-2"><Badge variant="secondary">{overview.data.capacity.outboxMaxAttempts} intentos por evento</Badge><Badge variant="secondary">{overview.data.capacity.ruleBatchLimit} reglas por lote</Badge><Badge variant="secondary">{overview.data.capacity.retryBatchLimit} reintentos por lote</Badge>{overview.data.executions.oldestPendingAt ? <Badge variant="warning">Pendiente desde {formatDate(overview.data.executions.oldestPendingAt)}</Badge> : <Badge variant="success">Sin acumulación pendiente</Badge>}</div></div><div><p className="text-sm font-semibold">Reglas con mayor volumen, últimas 24 h</p><div className="mt-3 space-y-2">{overview.data.topRules.map((item) => <div key={item.id} className="flex items-center justify-between rounded-lg bg-muted/45 px-3 py-2 text-sm"><span className="truncate">{item.name}</span><strong>{item.executions}</strong></div>)}{!overview.data.topRules.length ? <p className="text-sm text-muted-foreground">Sin ejecuciones en el periodo.</p> : null}</div></div></CardContent></Card>
+    <section className="space-y-3"><div><h2 className="font-semibold">Plantillas listas para usar</h2><p className="text-sm text-muted-foreground">Crea una regla ATS como borrador, revisa sus acciones y actívala cuando esté lista.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{templates.data.map((template) => <Card key={template.key}><CardContent className="space-y-3 pt-5"><div><p className="font-semibold">{template.name}</p><p className="mt-1 text-sm text-muted-foreground">{template.description}</p></div><div className="flex items-center justify-between text-xs text-muted-foreground"><span>{catalog.data.triggers.find((item) => item.value === template.triggerEvent)?.label ?? template.triggerEvent}</span><span>{template.consequences.length} acciones</span></div><Button className="w-full" variant="secondary" disabled={createTemplate.isPending} onClick={() => createTemplate.mutate(template.key)}><Plus className="size-4" />Usar plantilla</Button></CardContent></Card>)}</div></section>
     <Tabs defaultValue="rules">
       <TabsList><TabsTrigger value="rules">Reglas</TabsTrigger><TabsTrigger value="executions">Ejecuciones</TabsTrigger></TabsList>
       <TabsContent value="rules" className="pt-5">

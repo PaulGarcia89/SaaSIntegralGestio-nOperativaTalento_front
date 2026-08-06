@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ClipboardCheck, Copy, History, ImageIcon, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ClipboardCheck, Copy, History, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { archiveVacancy, cloneVacancy, createPersonnelRequisition, createVacancy, decidePersonnelRequisition, fetchPersonnelRequisitions, fetchVacancies, fetchVacancyHistory, updateVacancy, uploadVacancyImage } from "@/lib/backend";
 import type { CreateVacancyInput, PersonnelRequisitionDto, PersonnelRequisitionInput, PublicVacancyDto, VacancyResponsibleDto, VacancyResponsibleRole, VacancyStageDto } from "@/lib/contracts";
 import { loadScopedDraft, purgeExpiredDrafts, removeScopedDraft, saveScopedDraft, type DraftScope } from "@/lib/draft-storage";
@@ -197,4 +197,10 @@ function VacancyStagesEditor({ stages, onChange }: { stages: VacancyStageDto[]; 
 function Field({ id, label, value, onChange, type = "text", className, maxLength }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; className?: string; maxLength?: number }) { return <label className={`space-y-2 text-sm font-medium ${className ?? ""}`} htmlFor={id}>{label}<Input id={id} type={type} min={type === "number" ? 0 : undefined} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} /></label>; }
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { const id = `vacancy-${label.toLocaleLowerCase("es")}`; return <label className="space-y-2 text-sm font-medium" htmlFor={id}>{label}<textarea id={id} value={value} onChange={(event) => onChange(event.target.value)} rows={4} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label>; }
 function Summary({ label, value }: { label: string; value?: string }) { return <div><dt className="text-xs text-text-secondary">{label}</dt><dd className="mt-1 font-medium">{value || "No informado"}</dd></div>; }
-function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) { return <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-surface-section to-info/15">{imageUrl ? <Image src={imageUrl} alt={`Imagen representativa del cargo ${title}`} fill unoptimized className="object-cover" /> : <div className="flex flex-col items-center gap-2 text-text-secondary"><ImageIcon className="size-9" aria-hidden="true" /><span className="text-xs">Sin imagen</span></div>}</div>; }
+function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) {
+  const source = imageUrl || "/images/vacancies/operations-leadership-fallback.png";
+  const alt = imageUrl
+    ? `Imagen representativa del cargo ${title}`
+    : `Equipo de liderazgo operativo, imagen descriptiva para la vacante ${title}`;
+  return <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-primary/15 via-surface-section to-info/15"><Image src={source} alt={alt} fill unoptimized className="object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-transparent" />{!imageUrl ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">Imagen ilustrativa</span> : null}</div>;
+}

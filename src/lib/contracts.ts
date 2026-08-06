@@ -1492,6 +1492,28 @@ export interface TalentCandidateListDto {
   meta: { total: number; page: number; pageSize: number; totalPages: number };
 }
 
+export interface TalentCampaignDto {
+  id: string;
+  name: string;
+  subject: string;
+  status: "DRAFT" | "SCHEDULED" | "RUNNING" | "COMPLETED" | "CANCELLED";
+  audiencePreparedAt?: string | null;
+  audienceReviewedAt?: string | null;
+  audienceReviewedById?: string | null;
+  audienceReviewNote?: string | null;
+  audienceFingerprint?: string | null;
+  createdAt: string;
+  segment: { id: string; name: string };
+  _count: { recipients: number };
+}
+
+export interface TalentCampaignAudienceDto {
+  data: Array<{ id: string; status: "PENDING" | "QUEUED" | "SKIPPED"; skipReason?: string | null; candidate: { id: string; fullName: string; email: string } }>;
+  meta: { total: number; page: number; pageSize: number; totalPages: number };
+  summary: { eligible: number; excluded: number };
+  review: { audiencePreparedAt?: string | null; audienceReviewedAt?: string | null; audienceFingerprint?: string | null; audienceReviewNote?: string | null };
+}
+
 export interface DuplicateCandidateMatchDto {
   id: string;
   score: number;
@@ -3139,6 +3161,14 @@ export interface ReportsOverviewDto {
   };
 }
 
+export interface AtsAnalyticsDashboardDto {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  filters: { reportType: "ATS_ANALYTICS"; query: Record<string, string | undefined>; widgets: string[] };
+  updatedAt: string;
+}
+
 export interface AtsAnalyticsDto {
   generatedAt: string;
   source: string;
@@ -3187,12 +3217,13 @@ export interface AtsAnalyticsDto {
     sampleSize: number;
   }>;
   trends: Array<{ period: string; applications: number; hires: number; rejected: number; withdrawn: number }>;
-  sources: Array<{ source: string; applications: number; hires: number; rejected: number; conversionRate: number; rejectionRate: number }>;
+  sources: Array<{ source: string; applications: number; hires: number; rejected: number; conversionRate: number; rejectionRate: number; cost: number; currency: string | null; costPerApplication: number; costPerHire: number | null }>;
   vacancies: Array<{ id: string; title: string; status: string; openings: number; applications: number; active: number; hires: number; rejected: number; conversionRate: number; averageTimeToHireHours: number; daysOpen: number; fillRate: number }>;
   recruiters: Array<{ id: string | null; name: string; applications: number; active: number; hires: number; conversionRate: number; overdue: number; averageActiveStageHours: number }>;
   sla: { measurable: number; compliant: number; breached: number; complianceRate: number; warningSent: number; escalated: number; reassigned: number; byStage: Array<{ label: string; count: number }> };
   interviews: { total: number; scheduled: number; completed: number; cancelled: number; noShow: number; completionRate: number; noShowRate: number; cancellationRate: number; averageSchedulingLeadHours: number; averageDurationMinutes: number; averageScore: number; signedScorecards: number; byStatus: Array<{ status: string; count: number }> };
   offers: { total: number; sent: number; accepted: number; rejected: number; expired: number; countered: number; acceptanceRate: number; counterOfferRate: number; averageApprovalHours: number; averageResponseHours: number; byStatus: Array<{ status: string; count: number }> };
+  qualityOfHire: { reviewed: number; byCheckpoint: Array<{ checkpointDays: number; reviews: number; averagePerformanceScore: number; retentionRate: number }> };
   rejectionReasons: Array<{ code: string | null; label: string; category: string | null; count: number; percentage: number }>;
   insights: Array<{ severity: "info" | "warning" | "critical"; code: string; title: string; detail: string }>;
 }

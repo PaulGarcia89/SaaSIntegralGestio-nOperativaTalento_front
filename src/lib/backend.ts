@@ -1873,6 +1873,12 @@ export function removeTalentTag(candidateId: string, tagId: string) { return req
 export function createTalentActivity(candidateId: string, input: { type: import("./contracts").TalentActivityType; subject: string; description?: string; dueAt?: string; completed?: boolean }) { return request<import("./contracts").TalentActivityDto>(`/talent-crm/candidates/${encodeURIComponent(candidateId)}/activities`, { method: "POST", body: JSON.stringify(input) }); }
 export function fetchDuplicateCandidates(minimumScore = 45) { return request<{ data: import("./contracts").DuplicateCandidateMatchDto[]; scannedCandidates: number; truncated: boolean; ignoredSharedValues: number }>(`/talent-crm/duplicates?minimumScore=${minimumScore}`); }
 export function mergeTalentCandidates(input: { sourceCandidateId: string; targetCandidateId: string; reason: string }) { return request<{ auditId: string; sourceCandidateId: string; targetCandidateId: string; movedApplications: number; movedFiles: number }>("/talent-crm/duplicates/merge", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchTalentCampaigns() { return request<import("./contracts").TalentCampaignDto[]>("/talent-crm/campaigns"); }
+export function fetchTalentSegments() { return request<Array<{ id: string; name: string; description?: string | null; candidateCount: number }>>("/talent-crm/segments"); }
+export function createTalentCampaign(input: { segmentId: string; name: string; subject: string; body: string; scheduledAt?: string }) { return request<import("./contracts").TalentCampaignDto>("/talent-crm/campaigns", { method: "POST", body: JSON.stringify(input) }); }
+export function prepareTalentCampaignAudience(campaignId: string) { return request<{ campaignId: string; total: number; eligible: number; excluded: number; audienceFingerprint: string }>(`/talent-crm/campaigns/${encodeURIComponent(campaignId)}/audience/prepare`, { method: "POST" }); }
+export function fetchTalentCampaignAudience(campaignId: string, page = 1) { return request<import("./contracts").TalentCampaignAudienceDto>(`/talent-crm/campaigns/${encodeURIComponent(campaignId)}/audience?page=${page}&pageSize=20`); }
+export function reviewTalentCampaignAudience(campaignId: string, input: { confirm: boolean; audienceFingerprint: string; note?: string }) { return request<import("./contracts").TalentCampaignDto>(`/talent-crm/campaigns/${encodeURIComponent(campaignId)}/audience/review`, { method: "POST", body: JSON.stringify(input) }); }
 
 export function exportApplications(filters: import("./contracts").ApplicationFilters = {}) {
   const query = new URLSearchParams();
@@ -3737,6 +3743,19 @@ export function fetchAtsAnalytics(input: AtsAnalyticsQuery) {
 export function fetchAtsAnalyticsExport(input: AtsAnalyticsQuery) {
   return request<ReportExportDto>(`/reports/ats-analytics/export?${atsAnalyticsQueryString(input)}`);
 }
+
+export function fetchAtsAnalyticsDashboards() {
+  return request<import("./contracts").AtsAnalyticsDashboardDto[]>("/reports/ats-analytics/dashboards");
+}
+
+export function saveAtsAnalyticsDashboard(input: AtsAnalyticsQuery & { name: string; widgets?: string[]; isDefault?: boolean }) {
+  return request<import("./contracts").AtsAnalyticsDashboardDto>("/reports/ats-analytics/dashboards", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchAtsSourceCosts() { return request<Array<{ id: string; source: string; amount: string | number; currency: string; periodStart: string; periodEnd: string; notes?: string | null }>>("/reports/ats-analytics/source-costs"); }
+export function saveAtsSourceCost(input: { source: string; amountCents: number; currency?: string; periodStart: string; periodEnd: string; notes?: string }) { return request("/reports/ats-analytics/source-costs", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchAtsHiringQuality() { return request<Array<{ id: string; name: string; jobTitle?: string | null; createdAt: string; sourceCandidate?: { source?: string | null } | null; checkpoints: Array<{ checkpointDays: number; due: boolean; review: { performanceScore: number; retained: boolean; managerComment?: string | null } | null }> }>>("/reports/ats-analytics/hiring-quality"); }
+export function saveAtsHiringQuality(input: { employeeId: string; checkpointDays: 30 | 60 | 90; performanceScore: number; retained: boolean; managerComment?: string }) { return request("/reports/ats-analytics/hiring-quality", { method: "POST", body: JSON.stringify(input) }); }
 
 export function downloadTextFile(file: ReportExportDto) {
   const blob = new Blob([file.content], { type: file.mimeType });

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BriefcaseBusiness, Clock3, Download, RefreshCw, Target, Users } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BriefcaseBusiness, Clock3, DollarSign, Download, RefreshCw, Save, Star, Target, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
@@ -12,19 +12,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type AtsAnalyticsQuery, downloadTextFile, fetchAtsAnalytics, fetchAtsAnalyticsExport, fetchVacancies } from "@/lib/backend";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { type AtsAnalyticsQuery, downloadTextFile, fetchAtsAnalytics, fetchAtsAnalyticsDashboards, fetchAtsAnalyticsExport, fetchAtsHiringQuality, fetchAtsSourceCosts, fetchVacancies, saveAtsAnalyticsDashboard, saveAtsHiringQuality, saveAtsSourceCost } from "@/lib/backend";
 import type { AtsAnalyticsDto } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 
 export default function AtsAnalyticsPage() {
   const { can, currentBranch, currentTenant, tenantBranches, tenantUsers } = useAppStore();
   const [filters, setFilters] = useState<AtsAnalyticsQuery>(() => defaultFilters());
+  const [dashboardName, setDashboardName] = useState("");
+  const [costOpen, setCostOpen] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
   const vacancies = useQuery({ queryKey: ["vacancies", "ats-analytics"], queryFn: fetchVacancies });
   const analytics = useQuery({
     queryKey: ["ats-analytics", currentTenant.id, filters],
     queryFn: () => fetchAtsAnalytics(filters),
     staleTime: 30_000,
   });
+  const dashboards = useQuery({ queryKey: ["ats-analytics-dashboards"], queryFn: fetchAtsAnalyticsDashboards });
+  const saveDashboard = useMutation({ mutationFn: () => saveAtsAnalyticsDashboard({ ...filters, name: dashboardName.trim(), widgets: ["summary", "funnel", "sources", "recruiters", "sla", "interviews", "offers"] }), onSuccess: async () => { setDashboardName(""); await dashboards.refetch(); toast.success("Dashboard guardado"); }, onError: () => toast.error("No fue posible guardar el dashboard") });
   const exporter = useMutation({
     mutationFn: () => fetchAtsAnalyticsExport(filters),
     onSuccess: (file) => { downloadTextFile(file); toast.success("Analítica ATS exportada", { description: file.filename }); },
@@ -44,11 +50,14 @@ export default function AtsAnalyticsPage() {
       title="Analítica ATS"
       description="Convierte el pipeline en decisiones: velocidad, conversión, calidad de fuente, carga operativa y riesgo de SLA en un solo lugar."
       actions={<div className="flex flex-wrap gap-2">
+        {can("candidates.update") ? <Button variant="secondary" onClick={() => setCostOpen(true)}><DollarSign className="size-4" />Registrar coste</Button> : null}
+        {can("candidates.update") ? <Button variant="secondary" onClick={() => setQualityOpen(true)}><Star className="size-4" />Calidad 30/60/90</Button> : null}
         {can("reports.export") ? <Button onClick={() => exporter.mutate()} disabled={!analytics.data || exporter.isPending}><Download className="size-4" />{exporter.isPending ? "Exportando…" : "Exportar CSV"}</Button> : null}
         <Button variant="secondary" onClick={() => analytics.refetch()} disabled={analytics.isFetching}><RefreshCw className={`size-4 ${analytics.isFetching ? "animate-spin" : ""}`} />Actualizar</Button>
       </div>}
     />
     <RecruitmentWorkspaceNav />
+    <Card level={2}><CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto_auto]"><FormSelect value="" placeholder="Cargar dashboard guardado" onValueChange={(value) => { const selected = dashboards.data?.find((item) => item.id === value); if (selected) setFilters(selected.filters.query as AtsAnalyticsQuery); }} options={(dashboards.data ?? []).map((item) => ({ value: item.id, label: item.isDefault ? `${item.name} (predeterminado)` : item.name }))} /><Input value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} maxLength={100} placeholder="Nombre del dashboard actual" /><Button variant="secondary" disabled={dashboardName.trim().length < 2 || saveDashboard.isPending} onClick={() => saveDashboard.mutate()}><Save className="size-4" />Guardar vista</Button></CardContent></Card>
 
     <Card level={2} className="overflow-hidden">
       <div className="h-1 bg-[linear-gradient(90deg,var(--color-primary),var(--color-status-success),var(--color-status-warning))]" />
@@ -66,6 +75,8 @@ export default function AtsAnalyticsPage() {
     {analytics.isPending ? <AsyncState state="loading" title="Calculando el desempeño ATS" description="Estamos reconstruyendo embudos, tiempos, SLA, entrevistas y ofertas." /> : null}
     {analytics.isError ? <AsyncState state="error" title="No fue posible calcular la analítica ATS" description={analytics.error instanceof Error ? analytics.error.message : "Revisa el alcance y vuelve a intentarlo."} onRetry={() => analytics.refetch()} /> : null}
     {analytics.data ? <AnalyticsContent data={analytics.data} /> : null}
+    <SourceCostDialog open={costOpen} onOpenChange={setCostOpen} />
+    <HiringQualityDialog open={qualityOpen} onOpenChange={setQualityOpen} />
   </div>;
 }
 
@@ -99,7 +110,8 @@ function AnalyticsContent({ data }: { data: AtsAnalyticsDto }) {
     </section>
 
     <section className="grid gap-5 xl:grid-cols-2">
-      <TableCard title="Eficiencia por fuente" headers={["Fuente", "Postulaciones", "Contrataciones", "Conversión"]} rows={data.sources.map((item) => [item.source, item.applications, item.hires, `${item.conversionRate}%`])} />
+      <TableCard title="Eficiencia y coste por fuente" headers={["Fuente", "Postulaciones", "Contrataciones", "Coste", "Coste/contratación"]} rows={data.sources.map((item) => [item.source, item.applications, item.hires, money(item.cost, item.currency), item.costPerHire === null ? "—" : money(item.costPerHire, item.currency)])} />
+      <TableCard title="Calidad de contratación" headers={["Hito", "Revisiones", "Desempeño medio", "Retención"]} rows={data.qualityOfHire.byCheckpoint.map((item) => [`${item.checkpointDays} días`, item.reviews, item.averagePerformanceScore ? `${item.averagePerformanceScore}/5` : "—", `${item.retentionRate}%`])} />
       <TableCard title="Motivos de descarte" headers={["Motivo", "Categoría", "Casos", "Peso"]} rows={data.rejectionReasons.map((item) => [item.label, item.category ?? "Sin clasificar", item.count, `${item.percentage}%`])} />
       <TableCard title="Rendimiento por vacante" headers={["Vacante", "Postulaciones", "Contrataciones", "Cobertura", "Días abierta"]} rows={data.vacancies.map((item) => [item.title, item.applications, item.hires, `${item.fillRate}%`, item.daysOpen])} />
       <TableCard title="Carga por reclutador" headers={["Responsable", "Activas", "Fuera de SLA", "Conversión", "Edad media"]} rows={data.recruiters.map((item) => [item.name, item.active, item.overdue, `${item.conversionRate}%`, duration(item.averageActiveStageHours)])} />
@@ -132,10 +144,24 @@ function TableCard({ title, headers, rows }: { title: string; headers: string[];
 }
 
 function Filter({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
+function SourceCostDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [source, setSource] = useState(""); const [amount, setAmount] = useState(""); const [currency, setCurrency] = useState("USD"); const [periodStart, setPeriodStart] = useState(inputDate(new Date())); const [periodEnd, setPeriodEnd] = useState(inputDate(new Date())); const [notes, setNotes] = useState("");
+  const mutation = useMutation({ mutationFn: () => saveAtsSourceCost({ source, amountCents: Math.round(Number(amount) * 100), currency, periodStart: new Date(`${periodStart}T00:00:00.000Z`).toISOString(), periodEnd: new Date(`${periodEnd}T23:59:59.999Z`).toISOString(), notes: notes || undefined }), onSuccess: () => { setSource(""); setAmount(""); setNotes(""); onOpenChange(false); toast.success("Coste por fuente guardado"); }, onError: () => toast.error("No fue posible guardar el coste") });
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Registrar coste por fuente</DialogTitle><DialogDescription>El coste es manual y se usará para calcular coste por postulación y contratación.</DialogDescription></DialogHeader><div className="space-y-4"><Input value={source} onChange={(event) => setSource(event.target.value)} placeholder="Ej. LinkedIn, referido, feria laboral" /><div className="grid grid-cols-2 gap-3"><Input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Importe" /><Input value={currency} maxLength={3} onChange={(event) => setCurrency(event.target.value.toUpperCase())} placeholder="USD" /></div><div className="grid grid-cols-2 gap-3"><Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} /><Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></div><textarea className="min-h-20 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notas o comprobante interno" /><Button className="w-full" disabled={source.trim().length < 2 || !Number.isFinite(Number(amount)) || Number(amount) < 0 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? "Guardando…" : "Guardar coste"}</Button></div></DialogContent></Dialog>;
+}
+
+function HiringQualityDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const employees = useQuery({ queryKey: ["ats-hiring-quality"], queryFn: fetchAtsHiringQuality, enabled: open });
+  const [employeeId, setEmployeeId] = useState(""); const [checkpointDays, setCheckpointDays] = useState<30 | 60 | 90>(30); const [performanceScore, setPerformanceScore] = useState("3"); const [retained, setRetained] = useState("yes"); const [comment, setComment] = useState("");
+  const mutation = useMutation({ mutationFn: () => saveAtsHiringQuality({ employeeId, checkpointDays, performanceScore: Number(performanceScore), retained: retained === "yes", managerComment: comment || undefined }), onSuccess: async () => { setComment(""); await employees.refetch(); toast.success("Revisión de calidad registrada"); }, onError: () => toast.error("No fue posible registrar la revisión") });
+  const eligible = (employees.data ?? []).filter((employee) => employee.checkpoints.some((checkpoint) => checkpoint.checkpointDays === checkpointDays && checkpoint.due));
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Calidad de contratación</DialogTitle><DialogDescription>Registra desempeño y retención reales a los 30, 60 o 90 días. Solo se muestran hitos ya vencidos.</DialogDescription></DialogHeader><div className="space-y-4"><FormSelect value={String(checkpointDays)} onValueChange={(value) => { setCheckpointDays(Number(value) as 30 | 60 | 90); setEmployeeId(""); }} options={[{ value: "30", label: "30 días" }, { value: "60", label: "60 días" }, { value: "90", label: "90 días" }]} /><FormSelect value={employeeId} placeholder="Selecciona un empleado contratado" onValueChange={setEmployeeId} options={eligible.map((employee) => ({ value: employee.id, label: `${employee.name}${employee.jobTitle ? ` · ${employee.jobTitle}` : ""}` }))} /><div className="grid grid-cols-2 gap-3"><FormSelect value={performanceScore} onValueChange={setPerformanceScore} options={[1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: `${value}/5 desempeño` }))} /><FormSelect value={retained} onValueChange={setRetained} options={[{ value: "yes", label: "Permanece activo" }, { value: "no", label: "No permanece" }]} /></div><textarea className="min-h-20 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm" value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Evidencia o comentario del responsable" /><Button className="w-full" disabled={!employeeId || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? "Guardando…" : "Guardar revisión"}</Button></div></DialogContent></Dialog>;
+}
 function Empty() { return <p className="rounded-xl bg-surface-section p-4 text-sm text-text-secondary">No hay datos suficientes para este periodo y alcance.</p>; }
 function defaultFilters(): AtsAnalyticsQuery { const to = new Date(); const from = new Date(to.getTime() - 89 * 86_400_000); return { from: inputDate(from), to: inputDate(to), scope: "tenant", granularity: "week" }; }
 function inputDate(value: Date) { return value.toISOString().slice(0, 10); }
 function formatDate(value: string) { return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value)); }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function duration(hours: number) { if (!hours) return "0 h"; return hours < 24 ? `${hours.toLocaleString("es-ES")} h` : `${(hours / 24).toLocaleString("es-ES", { maximumFractionDigits: 1 })} días`; }
+function money(amount: number, currency: string | null) { return new Intl.NumberFormat("es-ES", { style: "currency", currency: currency || "USD", maximumFractionDigits: 2 }).format(amount); }
 function granularityLabel(value: AtsAnalyticsDto["filters"]["granularity"]) { return value === "day" ? "Diaria" : value === "week" ? "Semanal" : "Mensual"; }

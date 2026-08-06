@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, CircleAlert, History, Merge, NotebookPen, Plus, Search, Tags, UserRoundSearch, UsersRound } from "lucide-react";
+import { ArrowRightLeft, CircleAlert, History, MailCheck, Merge, NotebookPen, Plus, Search, ShieldCheck, Tags, UserRoundSearch, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader, Pagination } from "@/components/design-system";
@@ -24,9 +24,15 @@ import {
   fetchTalentCandidates,
   fetchTalentPools,
   fetchTalentTags,
+  fetchTalentCampaigns,
+  fetchTalentCampaignAudience,
+  fetchTalentSegments,
   mergeTalentCandidates,
+  createTalentCampaign,
+  prepareTalentCampaignAudience,
+  reviewTalentCampaignAudience,
 } from "@/lib/backend";
-import type { DuplicateCandidateMatchDto, TalentCandidateDto, TalentActivityType } from "@/lib/contracts";
+import type { DuplicateCandidateMatchDto, TalentCampaignDto, TalentCandidateDto, TalentActivityType } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 
 const ALL = "ALL";
@@ -34,7 +40,7 @@ const ALL = "ALL";
 export default function TalentCrmPage() {
   const queryClient = useQueryClient();
   const { currentBranch } = useAppStore();
-  const [view, setView] = useState<"crm" | "duplicates">("crm");
+  const [view, setView] = useState<"crm" | "duplicates" | "campaigns">("crm");
   const [search, setSearch] = useState("");
   const [poolId, setPoolId] = useState(ALL);
   const [tagId, setTagId] = useState(ALL);
@@ -49,6 +55,7 @@ export default function TalentCrmPage() {
   const pools = useQuery({ queryKey: ["talent-crm", "pools"], queryFn: fetchTalentPools });
   const tagsQuery = useQuery({ queryKey: ["talent-crm", "tags"], queryFn: fetchTalentTags });
   const duplicates = useQuery({ queryKey: ["talent-crm", "duplicates"], queryFn: () => fetchDuplicateCandidates(45), enabled: view === "duplicates" });
+  const campaigns = useQuery({ queryKey: ["talent-crm", "campaigns"], queryFn: fetchTalentCampaigns, enabled: view === "campaigns" });
 
   async function refreshCrm() {
     await Promise.all([
@@ -72,6 +79,7 @@ export default function TalentCrmPage() {
     <div className="flex w-fit rounded-xl border border-border-default bg-surface-elevated p-1">
       <Button variant={view === "crm" ? "default" : "ghost"} size="sm" onClick={() => setView("crm")}><UsersRound className="size-4" />Base de talento</Button>
       <Button variant={view === "duplicates" ? "default" : "ghost"} size="sm" onClick={() => setView("duplicates")}><Merge className="size-4" />Duplicados</Button>
+      <Button variant={view === "campaigns" ? "default" : "ghost"} size="sm" onClick={() => setView("campaigns")}><MailCheck className="size-4" />Campañas</Button>
     </div>
 
     {view === "crm" ? <>
@@ -85,13 +93,35 @@ export default function TalentCrmPage() {
       {candidates.isSuccess && !candidates.data.data.length ? <InlineFeedback tone="info" title="Sin perfiles para estos filtros">Prueba otro pool, etiqueta o término de búsqueda.</InlineFeedback> : null}
       <div className="grid gap-4 xl:grid-cols-2">{candidates.data?.data.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} pools={pools.data ?? []} tags={tagsQuery.data ?? []} onAddPool={(selectedPoolId) => addPool.mutate({ candidateId: candidate.id, selectedPoolId })} onAddTag={(selectedTagId) => addTag.mutate({ candidateId: candidate.id, selectedTagId })} onActivity={() => setActivityCandidate(candidate)} />)}</div>
       {meta && meta.totalPages > 0 ? <Pagination page={meta.page - 1} totalPages={meta.totalPages} totalItems={meta.total} pageSize={meta.pageSize} onPageChange={(next) => setPage(next + 1)} /> : null}
-    </> : <DuplicateQueue query={duplicates} onMerge={setMergeMatch} />}
+    </> : view === "duplicates" ? <DuplicateQueue query={duplicates} onMerge={setMergeMatch} /> : <CampaignQueue campaigns={campaigns} onChanged={refreshCrm} />}
 
     <CreatePoolDialog open={poolOpen} onOpenChange={setPoolOpen} branchId={currentBranch?.id} onCreated={refreshCrm} />
     <CreateTagDialog open={tagOpen} onOpenChange={setTagOpen} onCreated={refreshCrm} />
     <ActivityDialog candidate={activityCandidate} onOpenChange={(open) => !open && setActivityCandidate(null)} onCreated={refreshCrm} />
     <MergeDialog match={mergeMatch} onOpenChange={(open) => !open && setMergeMatch(null)} onMerged={async () => { setMergeMatch(null); await refreshCrm(); }} />
   </div>;
+}
+
+function CampaignQueue({ campaigns, onChanged }: { campaigns: ReturnType<typeof useQuery<TalentCampaignDto[]>>; onChanged: () => Promise<void> }) {
+  const [selected, setSelected] = useState<TalentCampaignDto | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  if (campaigns.isLoading) return <AsyncState state="loading" title="Cargando campañas" />;
+  if (campaigns.isError) return <AsyncState state="error" title="No fue posible cargar las campañas" onRetry={() => void campaigns.refetch()} />;
+  return <div className="space-y-4"><div className="flex justify-end"><Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />Nueva campaña</Button></div><InlineFeedback tone="info" title="Envíos protegidos">Preparar la audiencia excluye automáticamente bajas, perfiles marcados como “No contactar” y personas sin consentimiento. La confirmación queda auditada antes de cualquier autorización de entrega.</InlineFeedback>{!campaigns.data?.length ? <InlineFeedback tone="info" title="Sin campañas creadas">Crea una campaña desde un segmento de talento para iniciar la revisión de audiencia.</InlineFeedback> : <div className="grid gap-4 xl:grid-cols-2">{campaigns.data.map((campaign) => <Card key={campaign.id} level={2}><CardContent className="space-y-4 p-5"><div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold">{campaign.name}</h2><p className="text-sm text-text-secondary">{campaign.segment.name}</p></div><Badge variant={campaign.audienceReviewedAt ? "default" : "secondary"}>{campaign.audienceReviewedAt ? "Audiencia confirmada" : "Pendiente de revisión"}</Badge></div><p className="line-clamp-2 text-sm text-text-secondary">{campaign.subject}</p><div className="grid grid-cols-2 gap-2 rounded-xl bg-surface-section p-3 text-sm"><div><p className="text-xs text-text-secondary">Audiencia preparada</p><p className="font-semibold">{campaign._count.recipients || "Aún no preparada"}</p></div><div><p className="text-xs text-text-secondary">Estado</p><p className="font-semibold">{campaign.status}</p></div></div><Button className="w-full" variant="secondary" onClick={() => setSelected(campaign)}><ShieldCheck className="size-4" />Revisar audiencia</Button></CardContent></Card>)}</div>}<CreateCampaignDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={onChanged} /><CampaignAudienceDialog campaign={selected} onOpenChange={(open) => !open && setSelected(null)} onChanged={onChanged} /></div>;
+}
+
+function CreateCampaignDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: () => Promise<void> }) {
+  const segments = useQuery({ queryKey: ["talent-crm", "segments"], queryFn: fetchTalentSegments, enabled: open });
+  const [segmentId, setSegmentId] = useState(""); const [name, setName] = useState(""); const [subject, setSubject] = useState(""); const [body, setBody] = useState("");
+  const mutation = useMutation({ mutationFn: () => createTalentCampaign({ segmentId, name, subject, body }), onSuccess: async () => { setSegmentId(""); setName(""); setSubject(""); setBody(""); onOpenChange(false); toast.success("Campaña creada. Ahora prepara su audiencia."); await onCreated(); }, onError: showError });
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Nueva campaña por correo</DialogTitle><DialogDescription>La campaña se crea como borrador. No se enviará nada al crearla.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={segmentId} onValueChange={setSegmentId}><SelectTrigger><SelectValue placeholder="Selecciona un segmento" /></SelectTrigger><SelectContent>{segments.data?.length ? segments.data.map((segment) => <SelectItem key={segment.id} value={segment.id}>{segment.name} · {segment.candidateCount} perfiles</SelectItem>) : <SelectItem value="none" disabled>No hay segmentos disponibles</SelectItem>}</SelectContent></Select>{segments.data && !segments.data.length ? <p className="text-xs text-text-secondary">Primero crea un segmento desde la administración de Talent CRM.</p> : null}<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Nombre interno de la campaña" /><Input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Asunto del correo" /><textarea className="min-h-32 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Contenido del correo" /><Button className="w-full" disabled={!segmentId || name.trim().length < 2 || subject.trim().length < 2 || body.trim().length < 2 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? "Creando…" : "Crear borrador de campaña"}</Button></div></DialogContent></Dialog>;
+}
+
+function CampaignAudienceDialog({ campaign, onOpenChange, onChanged }: { campaign: TalentCampaignDto | null; onOpenChange: (open: boolean) => void; onChanged: () => Promise<void> }) {
+  const audience = useQuery({ queryKey: ["talent-crm", "campaign-audience", campaign?.id], queryFn: () => fetchTalentCampaignAudience(campaign!.id), enabled: Boolean(campaign?.id) });
+  const prepare = useMutation({ mutationFn: () => prepareTalentCampaignAudience(campaign!.id), onSuccess: async () => { toast.success("Audiencia preparada sin enviar correos"); await onChanged(); await audience.refetch(); }, onError: showError });
+  const review = useMutation({ mutationFn: () => reviewTalentCampaignAudience(campaign!.id, { confirm: true, audienceFingerprint: audience.data!.review.audienceFingerprint!, note: "Audiencia revisada manualmente desde Talent CRM." }), onSuccess: async () => { toast.success("Audiencia confirmada y auditada"); await onChanged(); await audience.refetch(); }, onError: showError });
+  return <Dialog open={Boolean(campaign)} onOpenChange={onOpenChange}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Revisión de audiencia</DialogTitle><DialogDescription>{campaign?.name}. Esta pantalla no envía correos.</DialogDescription></DialogHeader><div className="space-y-4">{!audience.data?.review.audiencePreparedAt ? <InlineFeedback tone="warning" title="Audiencia sin preparar">Calcula primero el segmento. Se guardarán también las exclusiones por privacidad.</InlineFeedback> : <><div className="grid grid-cols-2 gap-3"><div className="rounded-xl bg-primary/10 p-3"><p className="text-xs text-text-secondary">Con consentimiento</p><p className="text-xl font-semibold">{audience.data.summary.eligible}</p></div><div className="rounded-xl bg-status-warning/10 p-3"><p className="text-xs text-text-secondary">Excluidos</p><p className="text-xl font-semibold">{audience.data.summary.excluded}</p></div></div><div className="max-h-56 space-y-2 overflow-auto">{audience.data.data.map((recipient) => <div key={recipient.id} className="rounded-lg border border-border-default p-3 text-sm"><p className="font-medium">{recipient.candidate.fullName}</p><p className="text-xs text-text-secondary">{recipient.candidate.email}</p>{recipient.skipReason ? <p className="mt-1 text-xs text-status-warning">Excluido: {recipient.skipReason}</p> : <p className="mt-1 text-xs text-status-success">Elegible con consentimiento</p>}</div>)}</div>{audience.data.review.audienceReviewedAt ? <InlineFeedback tone="success" title="Audiencia confirmada">La revisión fue registrada. La entrega continúa bloqueada hasta recibir autorización independiente.</InlineFeedback> : <Button className="w-full" disabled={!audience.data.review.audienceFingerprint || review.isPending} onClick={() => review.mutate()}><ShieldCheck className="size-4" />Confirmar audiencia revisada</Button>}</>}</div><Button className="w-full" variant="secondary" disabled={prepare.isPending} onClick={() => prepare.mutate()}>{prepare.isPending ? "Calculando…" : "Preparar o recalcular audiencia"}</Button></DialogContent></Dialog>;
 }
 
 function CandidateCard({ candidate, pools, tags, onAddPool, onAddTag, onActivity }: { candidate: TalentCandidateDto; pools: Awaited<ReturnType<typeof fetchTalentPools>>; tags: Awaited<ReturnType<typeof fetchTalentTags>>; onAddPool: (id: string) => void; onAddTag: (id: string) => void; onActivity: () => void }) {

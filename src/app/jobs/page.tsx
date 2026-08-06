@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BriefcaseBusiness, ImageIcon, MapPin, Search } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, MapPin, Search } from "lucide-react";
 import { fetchPublicVacancies } from "@/lib/backend";
 import { AsyncState } from "@/components/async-state";
 import { CandidateNav } from "@/components/candidate-nav";
@@ -47,7 +47,8 @@ export default function JobsPortalPage() {
           {visible.map((vacancy) => (
             <Card key={vacancy.id} className="flex flex-col overflow-hidden border-border/70 bg-card/95">
               <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-secondary to-cyan-100/50">
-                {vacancy.imageUrl ? <Image src={vacancy.imageUrl} alt={`Imagen representativa del cargo ${vacancy.title}`} fill unoptimized className="object-cover transition duration-300 hover:scale-[1.02]" /> : <div className="flex flex-col items-center gap-2 text-muted-foreground"><ImageIcon className="size-10" aria-hidden="true" /><span className="text-xs">Imagen no disponible</span></div>}
+                <Image src={vacancy.imageUrl || "/images/vacancies/operations-leadership-fallback.png"} alt={vacancy.imageUrl ? `Imagen representativa del cargo ${vacancy.title}` : `Equipo de liderazgo operativo, imagen descriptiva para la vacante ${vacancy.title}`} fill unoptimized className="object-cover transition duration-300 hover:scale-[1.02]" />
+                {!vacancy.imageUrl ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">Imagen ilustrativa</span> : null}
               </div>
               <CardContent className="flex flex-1 flex-col gap-5 p-6">
                 <div className="flex flex-wrap gap-2"><Badge>{vacancy.department || "Vacante"}</Badge>{vacancy.employmentType ? <Badge variant="secondary">{vacancy.employmentType}</Badge> : null}</div>

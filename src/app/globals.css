@@ -154,10 +154,14 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light;
+  background: hsl(var(--background));
 }
 
 body {
   min-height: 100vh;
+  min-width: 320px;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(14, 165, 183, 0.16), transparent 28%),
     radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
@@ -166,6 +170,7 @@ body {
   font-family: var(--font-body), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-align: start;
 }
 
 .dark body {
@@ -183,6 +188,45 @@ h5,
 h6 {
   font-family: var(--font-heading), sans-serif;
   letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+/* Keep operational content readable on narrow screens without justified gaps. */
+p,
+li,
+dd,
+dt,
+label,
+figcaption {
+  overflow-wrap: anywhere;
+  text-align: start;
+  text-wrap: pretty;
+}
+
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 639px) {
+  .operational-shell {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .operational-shell main {
+    min-width: 0;
+  }
+
+  table {
+    min-width: max-content;
+  }
 }
 
 .tracking-tight {

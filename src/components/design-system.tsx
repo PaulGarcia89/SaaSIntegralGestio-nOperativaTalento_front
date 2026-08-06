@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
-  return <header className="flex flex-col gap-5 border-b border-border-default pb-6 lg:flex-row lg:items-end lg:justify-between"><div className="space-y-2">{eyebrow ? <p className="text-sm font-medium text-primary">{eyebrow}</p> : null}<h1 className="text-3xl font-semibold text-text-primary md:text-4xl">{title}</h1>{description ? <p className="max-w-3xl leading-7 text-text-secondary">{description}</p> : null}</div>{actions ? <ActionBar>{actions}</ActionBar> : null}</header>;
+export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: ReactNode; actions?: ReactNode }) {
+  return <header className="flex min-w-0 flex-col gap-4 border-b border-border-default pb-5 sm:gap-5 sm:pb-6 lg:flex-row lg:items-end lg:justify-between"><div className="min-w-0 space-y-2">{eyebrow ? <p className="text-sm font-medium text-primary">{eyebrow}</p> : null}<h1 className="text-2xl font-semibold leading-tight text-text-primary sm:text-3xl md:text-4xl">{title}</h1>{description ? <div className="max-w-3xl leading-6 text-text-secondary sm:leading-7">{description}</div> : null}</div>{actions ? <ActionBar>{actions}</ActionBar> : null}</header>;
 }
 
 export function MetricWithProvenance({ label, value, period, updatedAt, action }: { label: string; value: string | number; period: string; updatedAt: Date; action?: ReactNode }) {
@@ -19,7 +19,7 @@ export function MetricWithProvenance({ label, value, period, updatedAt, action }
 }
 
 export function ActionBar({ children, label = "Acciones de página", sticky = false }: { children: ReactNode; label?: string; sticky?: boolean }) {
-  return <div role="toolbar" aria-label={label} className={cn("flex flex-wrap items-center gap-2", sticky && "sticky bottom-3 z-20 rounded-2xl border bg-surface-elevated/95 p-3 shadow-lg")}>{children}</div>;
+  return <div role="toolbar" aria-label={label} className={cn("flex w-full flex-wrap items-center gap-2 sm:w-auto", sticky && "sticky bottom-3 z-20 rounded-2xl border bg-surface-elevated/95 p-3 shadow-lg")}>{children}</div>;
 }
 
 export type CommandItem = { id: string; label: string; group: string; href: string; keywords?: string };

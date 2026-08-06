@@ -11,11 +11,8 @@ export function ThemeToggle({ className }: { className?: string }) {
 
   useEffect(() => {
     const stored = localStorage.getItem("theme") as "light" | "dark" | null;
-    const nextTheme = stored
-      ? stored
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
+    // TalentOS starts in a bright, high-legibility workspace on every device.
+    const nextTheme = stored === "dark" ? "dark" : "light";
 
     queueMicrotask(() => {
       setTheme(nextTheme);
@@ -27,6 +24,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     if (!hasMounted) return;
 
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
     if (persistedRef.current) {
       localStorage.setItem("theme", theme);
     }

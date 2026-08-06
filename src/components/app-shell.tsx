@@ -390,6 +390,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const workspaceBranch = isGlobalView
     ? "Todas las empresas"
     : currentBranch?.name ?? "Sin sucursal asignada";
+  const mobileRecruitment = allowedNav.find((item) => item.href === "/ats/candidates")
+    ?? allowedNav.find((item) => item.href === "/ats/vacancies");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -500,7 +502,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
       <AccessibleCommandPalette open={searchOpen} onOpenChange={setSearchOpen} items={allowedNav.map((route) => ({ id: route.href.replaceAll("/", "-") || "inicio", label: route.label, group: route.group, href: route.href }))} onNavigate={(href) => router.push(href)} />
 
-      <div className="mx-auto grid min-h-screen max-w-[1600px] gap-4 p-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mx-auto grid min-h-screen max-w-[1600px] gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="order-2 xl:order-1 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
           <div className="hidden xl:block">
             <SidebarContent
@@ -521,11 +523,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <div className="order-1 min-w-0 space-y-8 overflow-visible xl:order-2 xl:space-y-10">
+        <div className="order-1 min-w-0 space-y-6 overflow-visible sm:space-y-8 xl:order-2 xl:space-y-10">
           {impersonation?.active ? <ImpersonationBanner tenantName={currentTenant.name} /> : null}
-          <Card className="overflow-visible border-border/70 bg-card/80 px-4 py-4 backdrop-blur md:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-2">
+          <Card className="overflow-visible border-border/70 bg-card/80 px-3 py-3 backdrop-blur sm:px-4 sm:py-4 md:px-6">
+            <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <ShieldCheck className="size-4 text-primary" />
                   {currentRole === "admin_saas"
@@ -533,7 +535,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : "Espacio de trabajo de la empresa"}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tight">{workspaceName}</h1>
+                  <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{workspaceName}</h1>
                   <p className="text-sm text-muted-foreground">
                     {currentUser.fullName} · {roleLabels[currentRole]}
                     {!isGlobalView && currentBranch ? ` · ${currentBranch.city}` : ""}
@@ -541,7 +543,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
                 <AppBreadcrumb pathname={pathname} />
               </div>
-              <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[640px]">
+              <div className="flex w-full flex-col gap-2 sm:gap-3 lg:w-auto lg:min-w-[640px]">
                 <div className="flex items-center gap-3 xl:hidden">
                   <Tooltip content="Abrir menu">
                     <Button
@@ -558,13 +560,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {isGlobalView ? "Contexto global" : currentBranch ? `${currentBranch.name} · ${currentBranch.city}` : currentTenant.name}
                   </div>
                 </div>
-                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3 lg:flex-nowrap">
                     <Tooltip content="Buscar (Ctrl+K)">
                       <div className="relative min-w-0 flex-1 sm:min-w-[240px] lg:max-w-[420px]">
                         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                           placeholder="Buscar... (Ctrl+K)"
-                          className="h-12 cursor-pointer pl-9 pr-4"
+                          className="h-11 cursor-pointer pl-9 pr-4 sm:h-12"
                           readOnly
                           onClick={() => setSearchOpen(true)}
                         />
@@ -780,9 +782,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </Card>
 
-          <main id="main-content" className="space-y-10 xl:space-y-12">{children}</main>
+          <main id="main-content" className="space-y-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-8 xl:space-y-12 xl:pb-0">{children}</main>
         </div>
       </div>
+      <nav aria-label="Accesos principales" className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.18)] backdrop-blur xl:hidden">
+        <Link href="/dashboard" className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium", isActivePath("/dashboard", pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Gauge className="size-4" />Inicio</Link>
+        {mobileRecruitment ? <Link href={mobileRecruitment.href} className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium", isActivePath(mobileRecruitment.href, pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Users className="size-4" />Talento</Link> : <span className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground"><Users className="size-4" />Talento</span>}
+        <Link href="/notifications" className={cn("relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium", isActivePath("/notifications", pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Bell className="size-4" />Avisos{unreadNotifications ? <span className="absolute right-3 top-1.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[9px] font-bold text-destructive-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span> : null}</Link>
+        <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-muted-foreground hover:bg-secondary" aria-label="Abrir menú principal"><Menu className="size-4" />Menú</button>
+      </nav>
       <MobileDrawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen} title="Menú principal">
         <SidebarContent
               key={pathname}

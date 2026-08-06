@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Download, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Download, RefreshCw, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   downloadTextFile,
@@ -12,7 +12,7 @@ import {
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
-import { PageHeader } from "@/components/design-system";
+import { MobileFilterSheet, PageHeader } from "@/components/design-system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
@@ -53,6 +53,7 @@ export default function ReportsPage() {
     tenantBranches,
   } = useAppStore();
   const [filters, setFilters] = useState<ReportQuery>(() => defaultFilters());
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterName, setFilterName] = useState("");
   const storageKey = `talentos:report-filters:${currentUser.id}:${currentTenant.id}`;
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
@@ -116,6 +117,8 @@ export default function ReportsPage() {
     window.localStorage.setItem(storageKey, JSON.stringify(next));
     setSavedFilters(next);
   };
+  const resetFilters = () => setFilters(defaultFilters());
+  const filterFields = (idPrefix: string) => <><div className="space-y-2"><Label htmlFor={`${idPrefix}-from`}>Desde</Label><Input id={`${idPrefix}-from`} type="date" value={filters.from ?? ""} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></div><div className="space-y-2"><Label htmlFor={`${idPrefix}-to`}>Hasta</Label><Input id={`${idPrefix}-to`} type="date" value={filters.to ?? ""} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></div><div className="space-y-2"><Label>Alcance</Label><FormSelect aria-label="Alcance por sucursal" value={filters.scope === "tenant" ? "all" : filters.branchId ?? currentBranch?.id ?? "all"} onValueChange={(value) => setFilters({ ...filters, branchId: value === "all" ? undefined : value, scope: value === "all" ? "tenant" : "context" })} options={scopeOptions} /></div><div className="flex flex-wrap gap-2 md:col-span-3">{[7, 30, 90].map((days) => <Button key={days} size="sm" variant="secondary" onClick={() => changePeriod(days)}>Últimos {days} días</Button>)}</div></>;
 
   return (
     <div className="space-y-6">
@@ -139,32 +142,10 @@ export default function ReportsPage() {
         }
       />
 
-      <Card level={2}>
+      <div className="md:hidden"><Button variant="secondary" className="w-full" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="size-4" />Filtros de reportes</Button></div>
+      <Card level={2} className="hidden md:block">
         <CardContent className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1.2fr]">
-          <div className="space-y-2">
-            <Label htmlFor="report-from">Desde</Label>
-            <Input id="report-from" type="date" value={filters.from ?? ""} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="report-to">Hasta</Label>
-            <Input id="report-to" type="date" value={filters.to ?? ""} onChange={(event) => setFilters({ ...filters, to: event.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Alcance</Label>
-            <FormSelect
-              aria-label="Alcance por sucursal"
-              value={filters.scope === "tenant" ? "all" : filters.branchId ?? currentBranch?.id ?? "all"}
-              onValueChange={(value) => setFilters({ ...filters, branchId: value === "all" ? undefined : value, scope: value === "all" ? "tenant" : "context" })}
-              options={scopeOptions}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 lg:col-span-3">
-            {[7, 30, 90].map((days) => (
-              <Button key={days} size="sm" variant="secondary" onClick={() => changePeriod(days)}>
-                Últimos {days} días
-              </Button>
-            ))}
-          </div>
+          {filterFields("desktop-report")}
           <div className="flex flex-col gap-2 sm:flex-row lg:col-span-3">
             <Input aria-label="Nombre del filtro" placeholder="Nombre para guardar este filtro" value={filterName} onChange={(event) => setFilterName(event.target.value)} />
             <Button variant="secondary" onClick={saveFilter} disabled={!filterName.trim()}>
@@ -196,6 +177,7 @@ export default function ReportsPage() {
           ) : null}
         </CardContent>
       </Card>
+      <MobileFilterSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Filtros de reportes" onClear={resetFilters}>{filterFields("mobile-report")}</MobileFilterSheet>
 
       {query.isPending ? (
         <AsyncState state="loading" title="Calculando indicadores" />
@@ -280,12 +262,12 @@ function StatusRows({ rows }: { rows: Array<{ status: string; count: number }> }
 
 function DataRows({ headers, rows }: { headers: string[]; rows: Array<Array<string | number>> }) {
   return rows.length ? (
-    <div className="overflow-x-auto rounded-xl border">
+    <><div className="grid gap-3 md:hidden">{rows.map((row, index) => <article key={`${row[0]}-${index}`} className="rounded-xl border p-3"><p className="font-semibold">{row[0]}</p><dl className="mt-3 grid grid-cols-2 gap-3">{row.slice(1).map((cell, cellIndex) => <div key={headers[cellIndex + 1]}><dt className="text-xs text-text-secondary">{headers[cellIndex + 1]}</dt><dd className="mt-1 text-sm font-medium">{cell}</dd></div>)}</dl></article>)}</div><div className="hidden overflow-x-auto rounded-xl border md:block">
       <table className="w-full text-left text-sm">
         <thead className="bg-surface-interactive"><tr>{headers.map((header) => <th key={header} scope="col" className="px-3 py-2 font-medium">{header}</th>)}</tr></thead>
         <tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t">{row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2">{cell}</td>)}</tr>)}</tbody>
       </table>
-    </div>
+    </div></>
   ) : <p className="rounded-xl bg-surface-section p-4 text-sm text-text-secondary">No hay registros para este periodo y alcance.</p>;
 }
 

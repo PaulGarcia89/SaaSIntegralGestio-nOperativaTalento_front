@@ -47,6 +47,10 @@ export function MobileDrawer({ open, onOpenChange, title, children }: { open: bo
   );
 }
 
+export function MobileFilterSheet({ open, onOpenChange, title = "Filtros", description = "Ajusta los criterios y aplica los cambios.", children, onClear }: { open: boolean; onOpenChange: (open: boolean) => void; title?: string; description?: string; children: ReactNode; onClear?: () => void }) {
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-lg"><DialogHeader className="sticky top-0 z-10 -mt-5 border-b border-border-default bg-card pb-4 pt-5 pr-12 sm:-mt-6 sm:pt-6"><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader><div className="flex-1 space-y-4 py-5">{children}</div><div className="sticky bottom-0 -mb-[max(1.25rem,env(safe-area-inset-bottom))] flex gap-2 border-t border-border-default bg-card py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:-mb-6 sm:pb-6">{onClear ? <Button type="button" variant="secondary" className="flex-1" onClick={onClear}>Limpiar</Button> : null}<Button type="button" className="flex-1" onClick={() => onOpenChange(false)}>Ver resultados</Button></div></DialogContent></Dialog>;
+}
+
 export function ResponsiveDataView<T>({ data, getKey, desktop, mobile, empty }: { data: T[]; getKey: (row: T) => string; desktop: ReactNode; mobile: (row: T) => ReactNode; empty?: ReactNode }) {
   if (!data.length) return <>{empty ?? <InlineFeedback tone="info" title="Sin resultados">No hay datos que coincidan con los criterios actuales.</InlineFeedback>}</>;
   return <><div className="hidden md:block">{desktop}</div><div className="grid gap-3 md:hidden">{data.map((row) => <Card level={3} key={getKey(row)}><CardContent className="p-4">{mobile(row)}</CardContent></Card>)}</div></>;

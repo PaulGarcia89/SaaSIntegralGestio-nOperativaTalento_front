@@ -6,7 +6,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", trace: "on-first-retry" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
+    { name: "mobile-safari", use: { ...devices["iPhone 14"] } },
+  ],
   webServer: process.env.E2E_BASE_URL ? undefined : {
     command: "NEXT_PUBLIC_API_URL=http://127.0.0.1:39999/api NEXT_PUBLIC_ENABLE_MOCK_BACKEND=true pnpm dev",
     url: "http://localhost:3000",

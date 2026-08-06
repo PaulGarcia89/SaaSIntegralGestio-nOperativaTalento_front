@@ -127,6 +127,18 @@ function isActivePath(itemHref: string, pathname: string) {
   return pathname.startsWith(`${itemHref}/`);
 }
 
+function getMobileQuickNavigation(items: readonly NavItem[], pathname: string) {
+  const activeGroup = items.find((item) => isActivePath(item.href, pathname))?.group;
+  const priority = [
+    ...items.filter((item) => item.group === activeGroup),
+    items.find((item) => item.href === "/dashboard"),
+    items.find((item) => item.href === "/notifications"),
+    ...items,
+  ].filter((item): item is NavItem => Boolean(item));
+
+  return priority.filter((item, index) => priority.findIndex((candidate) => candidate.href === item.href) === index).slice(0, 3);
+}
+
 function SidebarContent({
   currentBranch,
   currentRoleLabel,
@@ -390,8 +402,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const workspaceBranch = isGlobalView
     ? "Todas las empresas"
     : currentBranch?.name ?? "Sin sucursal asignada";
-  const mobileRecruitment = allowedNav.find((item) => item.href === "/ats/candidates")
-    ?? allowedNav.find((item) => item.href === "/ats/vacancies");
+  const mobileQuickNavigation = useMemo(() => getMobileQuickNavigation(allowedNav, pathname), [allowedNav, pathname]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -786,9 +797,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <nav aria-label="Accesos principales" className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.18)] backdrop-blur xl:hidden">
-        <Link href="/dashboard" className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium", isActivePath("/dashboard", pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Gauge className="size-4" />Inicio</Link>
-        {mobileRecruitment ? <Link href={mobileRecruitment.href} className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium", isActivePath(mobileRecruitment.href, pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Users className="size-4" />Talento</Link> : <span className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground"><Users className="size-4" />Talento</span>}
-        <Link href="/notifications" className={cn("relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium", isActivePath("/notifications", pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Bell className="size-4" />Avisos{unreadNotifications ? <span className="absolute right-3 top-1.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[9px] font-bold text-destructive-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span> : null}</Link>
+        {mobileQuickNavigation.map((item) => {
+          const Icon = navigationIcons[item.icon];
+          const isNotifications = item.href === "/notifications";
+          return <Link key={item.href} href={item.href} aria-label={isNotifications && unreadNotifications ? `${item.label}, ${unreadNotifications} sin leer` : item.label} className={cn("relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-medium", isActivePath(item.href, pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Icon className="size-4 shrink-0" /><span className="max-w-full truncate">{item.label}</span>{isNotifications && unreadNotifications ? <span className="absolute right-2 top-1.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[9px] font-bold text-destructive-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span> : null}</Link>;
+        })}
+        {Array.from({ length: Math.max(0, 3 - mobileQuickNavigation.length) }).map((_, index) => <span key={`mobile-nav-placeholder-${index}`} aria-hidden="true" />)}
         <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-muted-foreground hover:bg-secondary" aria-label="Abrir menú principal"><Menu className="size-4" />Menú</button>
       </nav>
       <MobileDrawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen} title="Menú principal">

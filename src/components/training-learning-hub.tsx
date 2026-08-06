@@ -604,7 +604,8 @@ function AssignmentManagement() {
         <AsyncState state="error" onRetry={() => query.refetch()} />
       ) : query.data?.items.length ? (
         <>
-          <div className="overflow-x-auto rounded-2xl border bg-card">
+          <div className="grid gap-3 md:hidden">{query.data.items.map((item) => <Card key={item.id}><CardContent className="space-y-3 p-4"><div><p className="font-semibold">{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"}</p><p className="text-sm text-muted-foreground">{item.user?.email}</p></div><p className="text-sm font-medium">{item.course?.title ?? item.title}</p><div className="flex flex-wrap items-center justify-between gap-2"><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "default"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge><span className="text-sm">{item.progressPercent}%</span></div><dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-muted-foreground">Vencimiento</dt><dd>{item.dueAt ? formatDate(item.dueAt) : "Sin fecha"}</dd></div><div><dt className="text-muted-foreground">Acciones</dt><dd><Button variant="ghost" size="icon" aria-label={`Retirar asignación de ${item.user ? `${item.user.firstName} ${item.user.lastName}` : "usuario"}`} onClick={() => removeMutation.mutate(item.id)}><Trash2 className="size-4" /></Button></dd></div></dl></CardContent></Card>)}</div>
+          <div className="hidden overflow-x-auto rounded-2xl border bg-card md:block">
             <table className="w-full min-w-[860px] text-sm">
               <thead className="bg-muted/60 text-left">
                 <tr><th className="p-4">Persona</th><th className="p-4">Curso</th><th className="p-4">Estado</th><th className="p-4">Progreso</th><th className="p-4">Vencimiento</th><th className="p-4 text-right">Acciones</th></tr>

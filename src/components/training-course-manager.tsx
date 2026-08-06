@@ -508,7 +508,7 @@ function CourseActions(props: CourseActionsProps) {
 
 function CourseTable(props: Omit<CourseActionsProps, "course"> & { courses: TrainingCourseDto[] }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border-default">
+    <><div className="grid gap-3 md:hidden">{props.courses.map((course) => <Card key={course.id} level={2}><CardContent className="p-4"><CourseCard {...props} course={course} /></CardContent></Card>)}</div><div className="hidden overflow-x-auto rounded-2xl border border-border-default md:block">
       <table className="w-full min-w-[900px] text-left text-sm">
         <thead className="bg-surface-section text-text-secondary">
           <tr>
@@ -536,7 +536,7 @@ function CourseTable(props: Omit<CourseActionsProps, "course"> & { courses: Trai
           ))}
         </tbody>
       </table>
-    </div>
+    </div></>
   );
 }
 

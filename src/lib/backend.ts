@@ -74,6 +74,8 @@ import type {
   TrainingQuizDto,
   TrainingQuizQuestionDto,
   TrainingAnalyticsDto,
+  TrainingIntelligenceDto,
+  TrainingIntelligenceRecordType,
   TrainingCourseImprovementDto,
   TrainingEffectivenessDto,
   TrainingImprovementPriority,
@@ -3152,6 +3154,14 @@ export function fetchTrainingAnalytics(filters: {
   );
 }
 
+export function fetchTrainingIntelligence() {
+  return request<TrainingIntelligenceDto>("/training/admin/analytics/intelligence");
+}
+
+export function captureTrainingIntelligence(type: TrainingIntelligenceRecordType, payload: Record<string, unknown>) {
+  return request("/training/admin/analytics/intelligence", { method: "POST", body: JSON.stringify({ type, payload }) });
+}
+
 export function fetchTrainingCompliancePolicies() {
   return request<{ items: TrainingCompliancePolicyDto[] }>(
     "/training/admin/analytics/compliance-policies",
@@ -3495,19 +3505,54 @@ export function downloadOnboardingDocument(id: string) {
 export function fetchInventoryCatalog() {
   return request<import("./contracts").InventoryCatalogItemDto[]>("/inventory/catalog");
 }
+export function fetchInventoryAnalytics(branchId?: string) { return request<{ assets: { total: number; available: number; assigned: number; maintenance: number; returnPending: number }; stock: { references: number; reorder: number; belowMinimum: number }; operations: { openMaintenance: number; purchaseOrdersInProgress: number } }>(`/inventory/analytics${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
+export function fetchInventoryAuditTrail(filters: { branchId?: string; page?: number } = {}) { const q = new URLSearchParams(); if (filters.branchId) q.set("branchId", filters.branchId); if (filters.page) q.set("page", String(filters.page)); return request<{ items: Array<{ id: string; action?: string; email?: string; actorRole?: string; route: string; statusCode: number; createdAt: string; correlationId?: string }>; page: number; total: number; totalPages: number }>(`/inventory/audit-trail${q.size ? `?${q}` : ""}`); }
 export function createInventoryCatalogItem(input: { sku: string; name: string }) {
   return request<import("./contracts").InventoryCatalogItemDto>("/inventory/catalog", { method: "POST", body: JSON.stringify(input) });
 }
 export function fetchInventoryContext() {
   return request<import("./contracts").InventoryContextDto>("/inventory/context");
 }
+export function fetchInventoryLocations(branchId?: string) {
+  return request<import("./contracts").InventoryLocationDto[]>(`/inventory/locations${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`);
+}
+export function createInventoryLocation(input: { branchId: string; code: string; name: string; type?: string }) {
+  return request<import("./contracts").InventoryLocationDto>("/inventory/locations", { method: "POST", body: JSON.stringify(input) });
+}
+export function fetchInventoryWarehouse(filters: { branchId?: string; search?: string; page?: number; pageSize?: number } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  return request<import("./contracts").InventoryWarehousePageDto>(`/inventory/warehouse${query.size ? `?${query}` : ""}`);
+}
+export function adjustInventoryStock(input: { itemId: string; branchId: string; quantity: number; locationId?: string; reason: string }) {
+  return request("/inventory/warehouse/adjustments", { method: "POST", body: JSON.stringify(input) });
+}
+export function countInventoryStock(input: { itemId: string; branchId: string; countedQty: number; notes?: string }) {
+  return request("/inventory/warehouse/counts", { method: "POST", body: JSON.stringify(input) });
+}
+export function updateInventoryStockPolicy(input: { itemId: string; branchId: string; minQty: number; reorderPoint: number; maxQty?: number }) {
+  return request("/inventory/warehouse/policy", { method: "PATCH", body: JSON.stringify(input) });
+}
+export function fetchInventorySuppliers() { return request<Array<{ id: string; name: string; email?: string; phone?: string }>>("/inventory/suppliers"); }
+export function createInventorySupplier(input: { name: string; email?: string; phone?: string; taxId?: string }) { return request("/inventory/suppliers", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchInventoryPurchaseOrders(branchId?: string) { return request<Array<{ id: string; code: string; status: string; totalAmount: string | number; currency: string; lines: Array<{ id: string; itemId: string; quantity: number; receivedQty: number; unitCost: string | number }> }>>(`/inventory/purchase-orders${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
+export function createInventoryPurchaseOrder(input: { branchId: string; supplierId: string; code: string; currency?: string; budgetAmount?: number; notes?: string; lines: Array<{ itemId: string; quantity: number; unitCost: number }> }) { return request("/inventory/purchase-orders", { method: "POST", body: JSON.stringify(input) }); }
+export function approveInventoryPurchaseOrder(id: string) { return request(`/inventory/purchase-orders/${encodeURIComponent(id)}/approve`, { method: "POST" }); }
+export function receiveInventoryPurchaseOrder(id: string, lines: Array<{ lineId: string; quantity: number }>) { return request(`/inventory/purchase-orders/${encodeURIComponent(id)}/receive`, { method: "POST", body: JSON.stringify({ lines }) }); }
+export function fetchInventoryMaintenance() { return request<Array<{ id: string; type: string; status: string; title: string; dueAt?: string; costAmount?: string | number; currency: string; asset: { assetTag: string; item: { name: string }; branch: { name: string } } }>>("/inventory/maintenance"); }
+export function createInventoryMaintenance(input: { assetId: string; title: string; type: string; dueAt?: string; costAmount?: number; vendor?: string; description?: string }) { return request("/inventory/maintenance", { method: "POST", body: JSON.stringify(input) }); }
+export function resolveInventoryMaintenance(id: string, input: { costAmount?: number; notes?: string } = {}) { return request(`/inventory/maintenance/${encodeURIComponent(id)}/resolve`, { method: "POST", body: JSON.stringify(input) }); }
 export function fetchInventoryAssets(filters: { status?: string; branchId?: string; search?: string } = {}) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
   return request<import("./contracts").InventoryAssetDto[]>(`/inventory/assets${query.size ? `?${query}` : ""}`);
 }
+export function fetchMyInventoryAssets() { return request<import("./contracts").InventoryAssetDto[]>("/inventory/my-assets"); }
 export function fetchInventoryAsset(id: string) {
   return request<import("./contracts").InventoryAssetDto>(`/inventory/assets/${encodeURIComponent(id)}`);
+}
+export function lookupInventoryAsset(assetTag: string) {
+  return request<import("./contracts").InventoryAssetDto>(`/inventory/assets/lookup/${encodeURIComponent(assetTag)}`);
 }
 export function createInventoryAsset(input: { itemId: string; branchId: string; assetTag: string; serialNumber?: string; condition?: string; notes?: string }) {
   return request<import("./contracts").InventoryAssetDto>("/inventory/assets", { method: "POST", body: JSON.stringify(input) });
@@ -3551,6 +3596,22 @@ export async function downloadInventoryEvidence(id: string, filename: string) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+export async function downloadInventoryMovements(branchId?: string) {
+  const auth = getStoredAuth();
+  const headers = new Headers();
+  if (auth?.accessToken) headers.set("Authorization", `Bearer ${auth.accessToken}`);
+  const tenantId = resolveTenantHeader();
+  if (tenantId) headers.set("x-tenant-id", tenantId);
+  const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : "";
+  const response = await fetchWithTimeout(`${API_BASE_URL}/inventory/warehouse/movements/export${query}`, { headers, credentials: "include" });
+  if (!response.ok) throw new ApiError("No fue posible exportar los movimientos.", response.status);
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "movimientos-inventario.csv";
   anchor.click();
   URL.revokeObjectURL(url);
 }

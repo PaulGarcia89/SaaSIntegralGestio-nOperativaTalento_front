@@ -1122,6 +1122,18 @@ export interface TrainingAnalyticsDto {
   }>;
 }
 
+export type TrainingIntelligenceRecordType = "ROLE_PROFILE" | "ASSESSMENT" | "CAREER_PLAN" | "FEEDBACK_360" | "ROI" | "FORECAST";
+
+export interface TrainingIntelligenceDto {
+  competencyProfiles: number;
+  assessments: number;
+  gaps: Array<{ userId: string; competencyId: string; score: number; targetScore: number; gap: number }>;
+  careerPlans: { total: number; active: number };
+  feedback: { responses: number; averageRating: number | null; averageNps: number | null };
+  roi: { measurements: number; cost: number; benefit: number; roiPercent: number | null };
+  forecasts: Array<{ id: string; cohortKey: string; assigned: number; completed: number; projectedCompletionRate: number; projectedOverdue: number; generatedAt: string }>;
+}
+
 export type TrainingImprovementStatus =
   | "OPEN"
   | "PLANNED"
@@ -3154,6 +3166,37 @@ export interface InventoryContextDto {
   branches: Array<{ id: string; name: string; location: string }>;
   employees: Array<{ id: string; name: string; email: string; jobTitle?: string | null; branchAssignments: Array<{ branchId: string; isPrimary: boolean }> }>;
   workflowAssignments: Array<{ id: string; employeeId: string; branchId: string; dueDate?: string | null }>;
+}
+
+export interface InventoryLocationDto {
+  id: string;
+  branchId: string;
+  code: string;
+  name: string;
+  type: string;
+  isActive: boolean;
+}
+
+export interface InventoryWarehouseStockDto {
+  id: string;
+  itemId: string;
+  branchId: string;
+  qtyLocal: number;
+  minQty: number;
+  maxQty?: number | null;
+  reorderPoint: number;
+  needsReorder: boolean;
+  belowMinimum: boolean;
+  item: { id: string; sku: string; name: string; isSerialized: boolean; unitOfMeasure: string };
+  branch: { id: string; name: string; location: string };
+}
+
+export interface InventoryWarehousePageDto {
+  items: InventoryWarehouseStockDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface AppDatasetsDto {

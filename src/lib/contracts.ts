@@ -2634,6 +2634,32 @@ export interface OnboardingAnalyticsDto {
   comparisons: Record<"branches" | "positions" | "cohorts" | "templates", Array<{ label: string; total: number; completionRate: number; averageCompletionHours: number }>>;
 }
 
+export interface OnboardingPerformanceObjectiveDto {
+  id: string;
+  title: string;
+  description?: string | null;
+  targetValue: number;
+  currentValue: number;
+  weight: number;
+  dueDate?: string | null;
+  completedAt?: string | null;
+}
+
+export interface OnboardingPerformanceEvaluationDto {
+  id: string;
+  periodDays: 30 | 60 | 90;
+  score: number;
+  notes?: string | null;
+  completedAt: string;
+}
+
+export interface OnboardingPerformanceDto {
+  objectives: OnboardingPerformanceObjectiveDto[];
+  evaluations: OnboardingPerformanceEvaluationDto[];
+  objectiveProgress: number;
+  readyForProductivity: boolean;
+}
+
 export interface EmployeeOnboardingDocumentDto {
   id: string;
   category: string;

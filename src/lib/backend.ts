@@ -135,6 +135,7 @@ import type {
   OnboardingRetentionPolicyDto,
   OnboardingSignatureEvidenceDto,
   OnboardingAnalyticsDto,
+  OnboardingPerformanceDto,
   ElectronicSignaturePackageDto,
   ElectronicSignatureTemplateDto,
   PublicSigningContextDto,
@@ -3323,6 +3324,18 @@ export function fetchOnboardingTemplates() {
 
 export function fetchOnboardingAnalytics(branchId?: string) {
   return request<OnboardingAnalyticsDto>(`/onboarding/analytics${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`);
+}
+
+export function fetchOnboardingPerformance(flowId: string) {
+  return request<OnboardingPerformanceDto>(`/onboarding/flows/${encodeURIComponent(flowId)}/performance`);
+}
+
+export function createOnboardingPerformanceObjective(flowId: string, input: { title: string; description?: string; targetValue?: number; currentValue?: number; weight?: number; dueDate?: string }) {
+  return request(`/onboarding/flows/${encodeURIComponent(flowId)}/performance/objectives`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function recordOnboardingPerformanceEvaluation(flowId: string, input: { periodDays: 30 | 60 | 90; score: number; notes?: string }) {
+  return request(`/onboarding/flows/${encodeURIComponent(flowId)}/performance/evaluations`, { method: "POST", body: JSON.stringify(input) });
 }
 
 export function fetchOnboardingAutomationOverview() {

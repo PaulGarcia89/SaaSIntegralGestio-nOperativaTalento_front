@@ -8,13 +8,14 @@ import {
   createSignaturePackage,
   createSignatureTemplate,
   fetchOnboardingFlows,
+  fetchEnterpriseIntegrations,
   fetchSignaturePackages,
   fetchSignatureProviders,
   fetchSignatureTemplates,
   remindSignaturePackage,
   sendSignaturePackage,
 } from "@/lib/backend";
-import type { ElectronicSignaturePackageDto } from "@/lib/contracts";
+import type { ElectronicSignaturePackageDto, EnterpriseIntegrationDto } from "@/lib/contracts";
 import { findSignaturePackageFlowPrefill } from "@/lib/signature-prefill";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
@@ -43,6 +44,7 @@ export default function ElectronicSignaturesPage() {
   const [packageForm, setPackageForm] = useState({ onboardingFlowId: "", templateId: "", dueDate: "", fullName: "", email: "" });
 
   const providers = useQuery({ queryKey: ["signature-providers"], queryFn: fetchSignatureProviders });
+  const enterpriseIntegrations = useQuery({ queryKey: ["enterprise-integrations"], queryFn: fetchEnterpriseIntegrations });
   const templates = useQuery({ queryKey: ["signature-templates"], queryFn: fetchSignatureTemplates });
   const packages = useQuery({ queryKey: ["signature-packages"], queryFn: fetchSignaturePackages });
   const flows = useQuery({ queryKey: ["onboarding-flows", currentBranch?.id, "signature"], queryFn: () => fetchOnboardingFlows(currentBranch?.id) });
@@ -84,6 +86,11 @@ export default function ElectronicSignaturesPage() {
       <Metric icon={CheckCircle2} label="Completados" value={String(stats.complete)} />
     </section>
     <InlineFeedback tone="info" title="Evidencias verificables">El proveedor interno registra versión del consentimiento, fecha, checksum del documento y huellas no reversibles de red y dispositivo. DocuSign y Dropbox Sign solo se habilitan cuando sus credenciales estén configuradas.</InlineFeedback>
+    <section className="space-y-3 rounded-2xl border border-border/70 bg-card/70 p-4 sm:p-5">
+      <div><h2 className="font-semibold">Integraciones empresariales</h2><p className="mt-1 text-sm text-text-secondary">Las altas y bajas pueden dirigirse a identidad, TI, RR. HH. o nómina. Los secretos no se exponen en esta pantalla.</p></div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{enterpriseIntegrations.data?.map((integration) => <EnterpriseIntegrationCard key={integration.code} integration={integration} />)}</div>
+      {enterpriseIntegrations.isError ? <p className="text-sm text-destructive">No fue posible consultar el estado de las integraciones empresariales.</p> : null}
+    </section>
     {packages.isLoading ? <AsyncState state="loading" title="Cargando paquetes de firma" /> : null}
     {packages.isError ? <AsyncState state="error" title="No pudimos cargar las firmas" onRetry={() => void packages.refetch()} /> : null}
     {packages.isSuccess && !packages.data.length ? <InlineFeedback tone="info" title="No hay paquetes de firma">Crea una plantilla y genera el primer paquete desde una incorporación activa.</InlineFeedback> : null}
@@ -100,6 +107,7 @@ function PackageCard({ item, canManage, sending, onSend, onRemind }: { item: Ele
 }
 
 function Metric({ icon: Icon, label, value }: { icon: typeof ShieldCheck; label: string; value: string }) { return <Card level={2}><CardContent className="flex items-center gap-3 p-4"><Icon className="size-5 text-primary" /><div><p className="text-xs text-text-secondary">{label}</p><p className="font-semibold">{value}</p></div></CardContent></Card>; }
+function EnterpriseIntegrationCard({ integration }: { integration: EnterpriseIntegrationDto }) { return <div className="rounded-xl border border-border/70 bg-background/70 p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{integration.name}</p><p className="text-xs text-text-secondary">{integration.category}</p></div><Badge variant={integration.configured ? "success" : "secondary"}>{integration.configured ? "Listo" : "Pendiente"}</Badge></div><p className="mt-3 text-xs text-text-secondary">{integration.capabilities.slice(0, 2).join(" · ")}</p>{!integration.configured ? <p className="mt-2 break-words text-xs text-amber-700 dark:text-amber-300">Configurar: {integration.missing.join(", ")}</p> : null}</div>; }
 function Summary({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-text-secondary">{label}</p><p className="font-medium">{value}</p></div>; }
 function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { const id = `signature-${label.toLowerCase().replace(/\W+/g, "-")}`; return <div className="space-y-2"><Label htmlFor={id}>{label}</Label><Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} /></div>; }
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { const id = `signature-${label.toLowerCase().replace(/\W+/g, "-")}`; return <div className="space-y-2"><Label htmlFor={id}>{label}</Label><textarea id={id} rows={5} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border bg-background p-3 text-sm" /></div>; }

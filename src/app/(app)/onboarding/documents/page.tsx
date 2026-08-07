@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import {
   applyOnboardingTemplate,
+  approveOnboardingTemplate,
   completeOnboardingFlow,
   createOnboardingTask,
   createOnboardingTemplate,
@@ -37,6 +38,7 @@ import {
   fetchOnboardingTemplates,
   getApiErrorMessage,
   reviewOnboardingDocument,
+  reviseOnboardingTemplate,
   reorderOnboardingTasks,
   replaceOnboardingDocument,
   updateOnboardingDocumentLifecycle,
@@ -153,6 +155,7 @@ export default function OnboardingDocumentsPage() {
     "Lista de verificación reutilizable con dependencias y fechas relativas.",
   );
   const [templateIsDefault, setTemplateIsDefault] = useState(true);
+  const [revisionSourceId, setRevisionSourceId] = useState<string | null>(null);
   const [templateTasks, setTemplateTasks] = useState<OnboardingTemplateTaskConfigDto[]>(
     () => starterTasks.map((task) => ({ ...task, dependsOnKeys: [...(task.dependsOnKeys ?? [])] })),
   );
@@ -212,8 +215,12 @@ export default function OnboardingDocumentsPage() {
     await queryClient.invalidateQueries({ queryKey: ["onboarding-flows"] });
   };
   const createTemplate = useMutation({
-    mutationFn: () =>
-      createOnboardingTemplate({
+    mutationFn: () => revisionSourceId
+      ? reviseOnboardingTemplate(revisionSourceId, {
+        description: templateDescription.trim() || undefined,
+        tasks: prepareOnboardingTemplateTasks(templateTasks),
+      })
+      : createOnboardingTemplate({
         name: templateName.trim(),
         description: templateDescription.trim() || undefined,
         isDefault: templateIsDefault,
@@ -223,6 +230,7 @@ export default function OnboardingDocumentsPage() {
       await queryClient.invalidateQueries({ queryKey: ["onboarding-templates"] });
       setSelectedTemplateId(template.id);
       setTemplateOpen(false);
+      setRevisionSourceId(null);
       setTemplateName("Incorporación estándar");
       setTemplateDescription("Lista de verificación reutilizable con dependencias y fechas relativas.");
       setTemplateIsDefault(true);
@@ -340,6 +348,11 @@ export default function OnboardingDocumentsPage() {
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["onboarding-templates"] }); toast.success("Plantilla actualizada"); },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar la plantilla.")),
   });
+  const approveTemplate = useMutation({
+    mutationFn: (id: string) => approveOnboardingTemplate(id, { isDefault: templateIsDefault }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["onboarding-templates"] }); toast.success("Plantilla aprobada y publicada"); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aprobar la plantilla.")),
+  });
   const download = useMutation({
     mutationFn: async (document: EmployeeOnboardingDocumentDto) => ({
       document,
@@ -412,6 +425,7 @@ export default function OnboardingDocumentsPage() {
   };
 
   const createTemplateVersion = (template: NonNullable<typeof templates.data>[number]) => {
+    setRevisionSourceId(template.id);
     setTemplateName(template.name);
     setTemplateDescription(template.description ?? "");
     setTemplateIsDefault(template.isDefault);
@@ -429,8 +443,11 @@ export default function OnboardingDocumentsPage() {
         actions={
           can("onboarding.manage") ? (
             <div className="flex flex-wrap gap-2">
+              <Button asChild variant="secondary"><Link href="/onboarding/operations">Automatización</Link></Button>
+              <Button asChild variant="secondary"><Link href="/onboarding/analytics">Analítica</Link></Button>
+              <Button asChild variant="secondary"><Link href="/onboarding/compliance">Cumplimiento</Link></Button>
               <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Versiones</Button>
-              <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
+              <Button variant="secondary" onClick={() => { setRevisionSourceId(null); setTemplateOpen(true); }}>
                 <Plus className="size-4" />
                 Nueva plantilla
               </Button>
@@ -783,9 +800,10 @@ export default function OnboardingDocumentsPage() {
                 <CardContent className="flex flex-wrap items-center gap-3 p-4">
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{template.name} v{template.version}</p>
-                    <p className="text-xs text-text-secondary">{template.tasks.length} tareas · {template.isActive === false ? "Inactiva" : "Activa"}{template.isDefault ? " · predeterminada" : ""}</p>
+                    <p className="text-xs text-text-secondary">{template.tasks.length} tareas · {template.status === "DRAFT" ? "Borrador pendiente de aprobación" : "Publicada"} · {template.isActive === false ? "Inactiva" : "Activa"}{template.isDefault ? " · predeterminada" : ""}</p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => createTemplateVersion(template)}>Nueva versión</Button>
+                  {template.status === "DRAFT" ? <Button size="sm" onClick={() => approveTemplate.mutate(template.id)} disabled={approveTemplate.isPending}>Aprobar</Button> : null}
                   {!template.isDefault && template.isActive !== false ? <Button size="sm" variant="ghost" onClick={() => templateStatus.mutate({ id: template.id, input: { isDefault: true } })}>Predeterminada</Button> : null}
                   <Button size="sm" variant="ghost" onClick={() => templateStatus.mutate({ id: template.id, input: { isActive: template.isActive === false } })}>{template.isActive === false ? "Activar" : "Desactivar"}</Button>
                 </CardContent>
@@ -834,7 +852,7 @@ export default function OnboardingDocumentsPage() {
       <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nueva plantilla de incorporación</DialogTitle>
+            <DialogTitle>{revisionSourceId ? "Nueva versión de plantilla" : "Nueva plantilla de incorporación"}</DialogTitle>
             <DialogDescription>
               Diseña un checklist reutilizable. El orden determina qué tareas pueden configurarse como dependencias.
             </DialogDescription>

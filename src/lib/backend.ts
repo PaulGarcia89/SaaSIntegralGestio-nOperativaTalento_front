@@ -117,6 +117,7 @@ import type {
   CandidateSessionDto,
   CandidatePortalProfileDto,
   CandidatePortalOverviewDto,
+  CandidatePreboardingDto,
   ParsedResumeDto,
   HireCandidateInput,
   HiringContextDto,
@@ -125,13 +126,20 @@ import type {
   EmployeeOnboardingFlowDto,
   EmployeeOnboardingFlowListDto,
   OnboardingContextDto,
+  OnboardingAutomationOverviewDto,
+  OnboardingAutomationRunDto,
   OnboardingOwnerType,
   OnboardingTemplateDto,
   OnboardingTemplateTaskConfigDto,
+  OnboardingLibraryItemDto,
+  OnboardingRetentionPolicyDto,
+  OnboardingSignatureEvidenceDto,
+  OnboardingAnalyticsDto,
   ElectronicSignaturePackageDto,
   ElectronicSignatureTemplateDto,
   PublicSigningContextDto,
   SignatureProviderDto,
+  EnterpriseIntegrationDto,
   NotificationCategory,
   NotificationDeliveryDto,
   NotificationListDto,
@@ -2367,6 +2375,10 @@ export function fetchCandidatePortalOverview() {
   return candidateRequest<CandidatePortalOverviewDto>("/candidate/applications/portal");
 }
 
+export function fetchCandidatePreboarding() { return candidateRequest<CandidatePreboardingDto>("/candidate/preboarding"); }
+export function completeCandidatePreboardingTask(taskId: string) { return candidateRequest<CandidatePreboardingDto>(`/candidate/preboarding/tasks/${encodeURIComponent(taskId)}/complete`, { method: "PATCH" }); }
+export function uploadCandidatePreboardingDocument(input: { file: File; taskId?: string; category?: string }) { const body = new FormData(); body.append("file", input.file); if (input.taskId) body.append("taskId", input.taskId); body.append("category", input.category ?? "OTHER"); return candidateRequest("/candidate/preboarding/documents", { method: "POST", body }); }
+
 export function withdrawCandidateApplication(applicationId: string, reason?: string) {
   return candidateRequest<{ withdrawn: boolean }>(`/candidate/applications/${encodeURIComponent(applicationId)}/withdraw`, {
     method: "POST",
@@ -3309,6 +3321,18 @@ export function fetchOnboardingTemplates() {
   return request<OnboardingTemplateDto[]>("/onboarding/templates");
 }
 
+export function fetchOnboardingAnalytics(branchId?: string) {
+  return request<OnboardingAnalyticsDto>(`/onboarding/analytics${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`);
+}
+
+export function fetchOnboardingAutomationOverview() {
+  return request<OnboardingAutomationOverviewDto>("/onboarding/operations/overview");
+}
+
+export function runOnboardingDueTaskAutomation() {
+  return request<OnboardingAutomationRunDto>("/onboarding/operations/process-due", { method: "POST" });
+}
+
 export function updateOnboardingTemplateStatus(id: string, input: { isActive?: boolean; isDefault?: boolean }) {
   return request<OnboardingTemplateDto>(`/onboarding/templates/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -3330,6 +3354,23 @@ export function createOnboardingTemplate(input: {
   return request<OnboardingTemplateDto>("/onboarding/templates", { method: "POST", body: JSON.stringify(input) });
 }
 
+export function reviseOnboardingTemplate(id: string, input: { description?: string; effectiveFrom?: string; tasks: OnboardingTemplateTaskConfigDto[] }) {
+  return request<OnboardingTemplateDto>(`/onboarding/templates/${encodeURIComponent(id)}/revisions`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function approveOnboardingTemplate(id: string, input: { effectiveFrom?: string; isDefault?: boolean } = {}) {
+  return request<OnboardingTemplateDto>(`/onboarding/templates/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchOnboardingLibrary() { return request<OnboardingLibraryItemDto[]>("/onboarding/library"); }
+export function createOnboardingLibraryItem(input: { type: "TASK" | "DOCUMENT" | "POLICY"; name: string; description?: string; countryCode?: string; content?: Record<string, unknown> }) { return request<OnboardingLibraryItemDto>("/onboarding/library", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchOnboardingRetentionPolicies() { return request<OnboardingRetentionPolicyDto[]>("/onboarding/compliance/retention-policies"); }
+export function saveOnboardingRetentionPolicy(input: { countryCode: string; documentCategory: string; retentionDays: number; legalBasis?: string }) { return request<OnboardingRetentionPolicyDto>("/onboarding/compliance/retention-policies", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchOnboardingSignatureEvidence(countryCode?: string) { return request<OnboardingSignatureEvidenceDto>(`/onboarding/compliance/signature-evidence${countryCode ? `?countryCode=${encodeURIComponent(countryCode)}` : ""}`); }
+export function placeOnboardingLegalHold(flowId: string, input: { reason: string; reference?: string }) { return request(`/onboarding/flows/${encodeURIComponent(flowId)}/legal-holds`, { method: "POST", body: JSON.stringify(input) }); }
+export function releaseOnboardingLegalHold(id: string) { return request(`/onboarding/legal-holds/${encodeURIComponent(id)}/release`, { method: "POST" }); }
+export function exportOnboardingDossier(flowId: string) { return request(`/onboarding/flows/${encodeURIComponent(flowId)}/export`); }
+
 export function fetchOnboardingFlows(filters: string | { branchId?: string; search?: string; status?: string; page?: number; pageSize?: number } = {}) {
   const normalized = typeof filters === "string" ? { branchId: filters } : filters;
   const query = new URLSearchParams();
@@ -3344,6 +3385,10 @@ export function applyOnboardingTemplate(flowId: string, templateId: string) {
     method: "POST",
     body: JSON.stringify({ templateId }),
   });
+}
+
+export function applyOnboardingTemplateBulk(input: { flowIds: string[]; templateId: string; startDate?: string }) {
+  return request<{ requested: number; applied: number; failed: Array<{ id: string; error?: string }> }>("/onboarding/flows/bulk-apply-template", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateOnboardingTask(taskId: string, input: {
@@ -3498,6 +3543,10 @@ export async function downloadInventoryEvidence(id: string, filename: string) {
 
 export function fetchSignatureProviders() {
   return request<SignatureProviderDto[]>("/signatures/providers");
+}
+
+export function fetchEnterpriseIntegrations() {
+  return request<EnterpriseIntegrationDto[]>("/enterprise-integrations");
 }
 
 export function fetchSignatureTemplates() {

@@ -2280,6 +2280,18 @@ export interface CandidatePortalOverviewDto {
   privacyRequests: Array<{ id: string; type: "EXPORT" | "ANONYMIZE" | "DELETE"; status: "PENDING" | "PROCESSING" | "COMPLETED" | "REJECTED" | "CANCELLED"; reason?: string | null; response?: string | null; requestedAt: string }>;
 }
 
+export interface CandidatePreboardingDto {
+  id: string;
+  employee: { name: string; jobTitle?: string | null; email: string };
+  status: string;
+  readinessStatus?: string | null;
+  startedAt: string;
+  progressPercent: number;
+  tasks: Array<{ id: string; title: string; description?: string | null; status: string; ownerType: string; dueDate?: string | null; required: boolean }>;
+  documents: Array<{ id: string; originalName: string; status: string; createdAt: string; category: string }>;
+  signatures: Array<{ id: string; title: string; status: string; dueDate?: string | null }>;
+}
+
 export interface ParsedResumeDto {
   fields: { fullName?: string; email?: string; phone?: string; linkedinUrl?: string };
   textPreview: string;
@@ -2601,9 +2613,25 @@ export interface OnboardingTemplateDto {
   version: number;
   isDefault: boolean;
   isActive?: boolean;
+  status?: "DRAFT" | "PUBLISHED";
+  effectiveFrom?: string;
+  approvedAt?: string | null;
+  approvedById?: string | null;
+  supersedesId?: string | null;
   createdAt?: string;
   updatedAt?: string;
   tasks: OnboardingTemplateTaskConfigDto[];
+}
+
+export interface OnboardingLibraryItemDto { id: string; type: "TASK" | "DOCUMENT" | "POLICY"; name: string; description?: string | null; content: Record<string, unknown>; countryCode?: string | null; isActive: boolean; }
+export interface OnboardingRetentionPolicyDto { id: string; countryCode: string; documentCategory: string; retentionDays: number; legalBasis?: string | null; isActive: boolean; }
+export interface OnboardingSignatureEvidenceDto { countryCode: string; framework: string; evidence: string[]; disclaimer: string; }
+export interface OnboardingAnalyticsDto {
+  summary: { totalFlows: number; completionRate: number; documentComplianceRate: number; averageTimeToProductivityHours: number; atRisk: number };
+  timeByStage: Array<{ label: string; averageHours: number; sampleSize: number }>;
+  timeByResponsible: Array<{ label: string; averageHours: number; sampleSize: number }>;
+  risks: Array<{ id: string; employee: { jobTitle?: string | null }; branch: string; score: number; level: "HIGH" | "MEDIUM" | "LOW"; reasons: string[] }>;
+  comparisons: Record<"branches" | "positions" | "cohorts" | "templates", Array<{ label: string; total: number; completionRate: number; averageCompletionHours: number }>>;
 }
 
 export interface EmployeeOnboardingDocumentDto {
@@ -2693,6 +2721,26 @@ export interface EmployeeOnboardingFlowListDto {
   totalPages: number;
 }
 
+export interface OnboardingAutomationOverviewDto {
+  enabled: boolean;
+  reminderHours: number;
+  escalationHours: number;
+  reassignmentHours: number;
+  autoReassignmentEnabled: boolean;
+  overdue: number;
+  processing: boolean;
+  generatedAt: string;
+}
+
+export interface OnboardingAutomationRunDto extends OnboardingAutomationOverviewDto {
+  skipped: boolean;
+  reason?: string;
+  processed: number;
+  reminders: number;
+  escalations: number;
+  reassignments: number;
+}
+
 export interface OnboardingContextDto {
   assignableUsers: Array<{
     id: string;
@@ -2708,6 +2756,18 @@ export interface SignatureProviderDto {
   name: string;
   configured: boolean;
   evidence?: string[];
+  reason?: string;
+  credentialsConfigured?: boolean;
+}
+
+export interface EnterpriseIntegrationDto {
+  code: "DOCUSIGN" | "DROPBOX_SIGN" | "HRIS" | "PAYROLL" | "SCIM" | "GOOGLE_WORKSPACE" | "MICROSOFT_365" | "ITSM";
+  name: string;
+  category: "Firma" | "Personas" | "Identidad" | "Operaciones";
+  capabilities: string[];
+  configured: boolean;
+  missing: string[];
+  recommendedConfigured: boolean;
 }
 
 export interface ElectronicSignatureTemplateDto {

@@ -1,0 +1,56 @@
+name: Onboarding production certification
+
+on:
+  schedule:
+    # Monday 10:15 UTC. The protected environment can require an approval.
+    - cron: "15 10 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onboarding-production-certification
+  cancel-in-progress: false
+
+jobs:
+  onboarding-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: onboarding-production
+    env:
+      E2E_BACKEND_API_URL: ${{ vars.ONBOARDING_PRODUCTION_BACKEND_URL }}
+      E2E_ONBOARDING_APPROVED_APPLICATION_ID: ${{ vars.ONBOARDING_PRODUCTION_APPROVED_APPLICATION_ID }}
+      E2E_ONBOARDING_APPROVED_APPLICATION_BRANCH_ID: ${{ vars.ONBOARDING_PRODUCTION_BRANCH_ID }}
+      E2E_ONBOARDING_MANAGER_EMAIL: ${{ secrets.ONBOARDING_PRODUCTION_MANAGER_EMAIL }}
+      E2E_ONBOARDING_MANAGER_PASSWORD: ${{ secrets.ONBOARDING_PRODUCTION_MANAGER_PASSWORD }}
+      E2E_ONBOARDING_VIEWER_EMAIL: ${{ secrets.ONBOARDING_PRODUCTION_VIEWER_EMAIL }}
+      E2E_ONBOARDING_VIEWER_PASSWORD: ${{ secrets.ONBOARDING_PRODUCTION_VIEWER_PASSWORD }}
+      E2E_ONBOARDING_OTHER_BRANCH_EMAIL: ${{ secrets.ONBOARDING_PRODUCTION_OTHER_BRANCH_EMAIL }}
+      E2E_ONBOARDING_OTHER_BRANCH_PASSWORD: ${{ secrets.ONBOARDING_PRODUCTION_OTHER_BRANCH_PASSWORD }}
+      E2E_ONBOARDING_OTHER_TENANT_EMAIL: ${{ secrets.ONBOARDING_PRODUCTION_OTHER_TENANT_EMAIL }}
+      E2E_ONBOARDING_OTHER_TENANT_PASSWORD: ${{ secrets.ONBOARDING_PRODUCTION_OTHER_TENANT_PASSWORD }}
+      E2E_ONBOARDING_JOB_TITLE: Certificacion automatizada de incorporacion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Validar ciclo y aislamiento multiempresa
+        run: pnpm test:integration:onboarding
+      - name: Conservar evidencia de certificacion
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboarding-production-certification
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 30

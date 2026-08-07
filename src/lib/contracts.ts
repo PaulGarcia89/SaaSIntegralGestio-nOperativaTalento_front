@@ -2624,7 +2624,7 @@ export interface OnboardingTemplateDto {
 }
 
 export interface OnboardingLibraryItemDto { id: string; type: "TASK" | "DOCUMENT" | "POLICY"; name: string; description?: string | null; content: Record<string, unknown>; countryCode?: string | null; isActive: boolean; }
-export interface OnboardingRetentionPolicyDto { id: string; countryCode: string; documentCategory: string; retentionDays: number; legalBasis?: string | null; isActive: boolean; }
+export interface OnboardingRetentionPolicyDto { id: string; countryCode: string; documentCategory: string; retentionDays: number; legalBasis?: string | null; isActive: boolean; legalReviewStatus?: "DRAFT" | "APPROVED"; }
 export interface OnboardingSignatureEvidenceDto { countryCode: string; framework: string; evidence: string[]; disclaimer: string; }
 export interface OnboardingAnalyticsDto {
   summary: { totalFlows: number; completionRate: number; documentComplianceRate: number; averageTimeToProductivityHours: number; atRisk: number };

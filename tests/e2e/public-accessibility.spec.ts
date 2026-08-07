@@ -17,7 +17,7 @@ test("portal público sin violaciones WCAG A/AA detectables", async ({ page }) =
   expect(results.violations).toEqual([]);
 });
 
-for (const route of ["/application-status", "/candidate/portal", "/candidate/profile", "/candidate/reset-password?token=invalid-development-token-00000000"]) {
+for (const route of ["/application-status", "/candidate/portal", "/candidate/profile", "/candidate/preboarding", "/candidate/reset-password?token=invalid-development-token-00000000"]) {
   test(`portal ATS de candidato accesible: ${route}`, async ({ page }) => {
     await page.goto(route);
     await expect(page.getByRole("navigation")).toBeVisible();
@@ -25,6 +25,15 @@ for (const route of ["/application-status", "/candidate/portal", "/candidate/pro
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
     expect(results.violations).toEqual([]);
+  });
+}
+
+for (const width of [320, 375, 430]) {
+  test(`preboarding no se desborda a ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/candidate/preboarding?lang=en");
+    await expect(page.locator("html")).toHaveJSProperty("scrollWidth", width);
+    await expect(page.getByRole("navigation")).toBeVisible();
   });
 }
 

@@ -393,6 +393,7 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   ],
   "training.integrations.manage": ["training.integrations.manage"],
   "productivity.view": [],
+  "productivity.manage": ["productivity.manage"],
   "inventory.view": [],
   "inventory.manage": [],
   "admin.view": ["tenants.read"],
@@ -767,6 +768,9 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
   }
   if (enabledModules.includes("productivity")) {
     mapped.add("productivity.view");
+  }
+  if (hasCode("productivity.manage")) {
+    mapped.add("productivity.manage");
   }
   if (enabledModules.includes("reports")) {
     mapped.add("reports.view");

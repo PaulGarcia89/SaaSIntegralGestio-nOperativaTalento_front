@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, FileUp, PenLine } from "lucide-react";
 import { CandidateAuthCard } from "@/components/candidate-auth-card";
@@ -19,6 +19,10 @@ const copy = {
 } as const;
 
 export default function CandidatePreboardingPage() {
+  return <Suspense fallback={<main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6"><AsyncState state="loading" title={copy.es.loading} /></main>}><CandidatePreboardingContent /></Suspense>;
+}
+
+function CandidatePreboardingContent() {
   const lang = useSearchParams().get("lang") === "en" ? "en" : "es";
   const t = copy[lang];
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));

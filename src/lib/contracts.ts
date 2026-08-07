@@ -34,6 +34,7 @@ export type PermissionKey =
   | "training.manage"
   | "training.integrations.manage"
   | "productivity.view"
+  | "productivity.manage"
   | "inventory.view"
   | "inventory.manage"
   | "admin.view"

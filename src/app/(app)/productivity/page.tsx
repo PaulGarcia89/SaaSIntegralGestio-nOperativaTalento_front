@@ -1,5 +1,9 @@
-import { IntegrationUnavailable } from "@/components/integration-state";
-
-export default function ProductivityPage() {
-  return <IntegrationUnavailable title="Productividad en integración" description="Los indicadores y recomendaciones se mostrarán únicamente cuando exista una fuente real, explicable y actualizada." />;
-}
+"use client";
+import { useQuery } from "@tanstack/react-query";
+import { Activity, Camera, Clock3, MapPinned, TriangleAlert } from "lucide-react";
+import { fetchProductivityAlerts, fetchProductivityOverview } from "@/lib/backend";
+import { useAppStore } from "@/store/app-store";
+import { AsyncState } from "@/components/async-state";
+import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { Card, CardContent } from "@/components/ui/card";
+export default function ProductivityPage(){const {currentBranch}=useAppStore();const q=useQuery({queryKey:["productivity-overview",currentBranch?.id],queryFn:()=>fetchProductivityOverview(currentBranch?.id)});const alerts=useQuery({queryKey:["productivity-alerts",currentBranch?.id],queryFn:()=>fetchProductivityAlerts(currentBranch?.id)});if(q.isLoading)return <AsyncState state="loading" title="Cargando actividad operativa"/>;if(q.isError)return <AsyncState state="error" title="No pudimos cargar Productividad" onRetry={()=>void q.refetch()}/>;const d=q.data!;const items=[[Activity,"Eventos",d.totalEvents],[Clock3,"Tiempo activo",`${Math.round(d.activeSeconds/60)} min`],[Clock3,"Sin actividad",`${Math.round(d.idleSeconds/60)} min`],[Activity,"Tareas detectadas",d.taskCount],[Camera,"Cámaras en línea",d.camerasOnline],[MapPinned,"Zonas activas",d.zonesActive],[TriangleAlert,"Alertas",d.alertsOpen]] as const;return <div className="space-y-6"><PageHeader eyebrow="Operación y capacidad" title="Productividad" description="Métricas agregadas por zona. No representan evaluaciones ni decisiones laborales automáticas."/>{!d.totalEvents?<InlineFeedback tone="info" title="Aún no hay eventos">Configura una cámara y conecta un servicio de visión autorizado para empezar a recibir eventos operativos.</InlineFeedback>:null}<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{items.map(([Icon,label,value])=><Card key={label} level={2}><CardContent className="flex gap-3 p-4"><Icon className="size-5 text-primary"/><div><p className="text-sm text-text-secondary">{label}</p><p className="text-2xl font-semibold">{value}</p></div></CardContent></Card>)}</div>{alerts.data?.length?<Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Alertas recientes</h2><div className="mt-3 space-y-2">{alerts.data.slice(0,5).map(alert=><div key={alert.id} className="rounded-lg bg-surface-section p-3"><p className="font-medium">{alert.title}</p><p className="text-sm text-text-secondary">{alert.description} · {alert.status}</p></div>)}</div></CardContent></Card>:null}</div>}

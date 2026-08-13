@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, RefreshCw, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { trackProductEvent } from "@/lib/product-analytics";
 import {
   downloadTextFile,
   fetchReportsExport,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
-import { MobileFilterSheet, PageHeader } from "@/components/design-system";
+import { InlineFeedback, MobileFilterSheet, PageHeader } from "@/components/design-system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
@@ -57,6 +58,7 @@ export default function ReportsPage() {
   const [filterName, setFilterName] = useState("");
   const storageKey = `talentos:report-filters:${currentUser.id}:${currentTenant.id}`;
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const activeFilterCount = [filters.from, filters.to, filters.branchId].filter(Boolean).length;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -79,6 +81,7 @@ export default function ReportsPage() {
     mutationFn: () => fetchReportsExport(filters),
     onSuccess: (file) => {
       downloadTextFile(file);
+      trackProductEvent({ name: "export_used", surface: "reports" });
       toast.success("Reporte exportado", { description: file.filename });
     },
     onError: () => toast.error("No fue posible exportar el reporte"),
@@ -110,6 +113,7 @@ export default function ReportsPage() {
     window.localStorage.setItem(storageKey, JSON.stringify(next));
     setSavedFilters(next);
     setFilterName("");
+    trackProductEvent({ name: "filter_used", surface: "reports", activeCount: activeFilterCount });
     toast.success("Filtro guardado");
   };
   const removeFilter = (id: string) => {
@@ -142,7 +146,7 @@ export default function ReportsPage() {
         }
       />
 
-      <div className="md:hidden"><Button variant="secondary" className="w-full" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="size-4" />Filtros de reportes</Button></div>
+      <div className="md:hidden"><Button variant="secondary" className="w-full" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="size-4" />Filtros de reportes{activeFilterCount ? ` (${activeFilterCount})` : ""}</Button></div>
       <Card level={2} className="hidden md:block">
         <CardContent className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1.2fr]">
           {filterFields("desktop-report")}
@@ -196,6 +200,8 @@ export default function ReportsPage() {
             <span><strong className="text-text-primary">Alcance:</strong> {query.data.scope.branchName ?? (query.data.scope.type === "GLOBAL" ? "Global" : currentBranch?.name ?? currentTenant.name)}</span>
             <span>Actualizado {formatDateTime(query.data.generatedAt)}</span>
           </section>
+
+          {(query.data.onboarding.overdueTasks || query.data.onboarding.blockedTasks || query.data.training.overdue || query.data.inventory.pendingActions) ? <InlineFeedback tone="warning" title="Excepciones operativas que requieren seguimiento"><span>{query.data.onboarding.overdueTasks + query.data.onboarding.blockedTasks} tareas de incorporación vencidas o bloqueadas, {query.data.training.overdue} asignaciones formativas vencidas y {query.data.inventory.pendingActions} acciones pendientes de inventario.</span></InlineFeedback> : <InlineFeedback tone="success" title="Sin excepciones críticas en el periodo">No encontramos tareas vencidas, bloqueos ni acciones de inventario pendientes dentro de los filtros activos.</InlineFeedback>}
 
           <section className="grid gap-5 xl:grid-cols-2">
             <ReportSection title="ATS y tiempo por etapa" metrics={[

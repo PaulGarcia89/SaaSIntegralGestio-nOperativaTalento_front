@@ -58,9 +58,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/admin/settings", label: "Configuración", group: "Gobierno de plataforma", module: "admin", permission: "admin.company", audience: "saas", icon: "company" },
 ];
 
-const unavailableRouteHrefs = new Set([
-  "/admin/billing", "/admin/global-users", "/admin/audit", "/admin/settings",
-]);
+const unavailableRouteHrefs = new Set(["/admin/settings"]);
 
 export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
   ...item,

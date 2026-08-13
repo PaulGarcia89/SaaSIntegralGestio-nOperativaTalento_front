@@ -225,6 +225,12 @@ export function TrainingCourseManager() {
         actions={
           canCreate ? (
             <>
+              <Button asChild type="button" variant="secondary">
+                <Link href="/training/integrations">
+                  <Link2 className="size-4" aria-hidden="true" />
+                  Ayuda SCORM e integraciones
+                </Link>
+              </Button>
               <Button type="button" variant="secondary" onClick={() => setCategoryOpen(true)}>
                 <Plus className="size-4" aria-hidden="true" />
                 Categoría
@@ -237,6 +243,12 @@ export function TrainingCourseManager() {
           ) : undefined
         }
       />
+
+      <section className="grid gap-3 md:grid-cols-3" aria-label="Guía rápida para crear cursos">
+        <Card level={2}><CardContent className="space-y-2 p-4"><p className="text-sm font-semibold">1. Parte de un curso existente</p><p className="text-sm text-text-secondary">Usa “Duplicar” en cualquier curso para reutilizar su estructura, lecciones y bloques sin publicar cambios.</p></CardContent></Card>
+        <Card level={2}><CardContent className="space-y-2 p-4"><p className="text-sm font-semibold">2. Diseña por bloques</p><p className="text-sm text-text-secondary">El editor organiza texto, video, archivos, enlaces, cuestionarios y actividades en una secuencia vertical.</p></CardContent></Card>
+        <Card level={2}><CardContent className="space-y-2 p-4"><p className="text-sm font-semibold">3. Guarda y publica con control</p><p className="text-sm text-text-secondary">Cada curso inicia como borrador y el asistente valida diseño, evaluación y vista previa antes de publicarlo.</p></CardContent></Card>
+      </section>
 
       <Card level={2}>
         <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(240px,1fr)_repeat(3,minmax(150px,220px))]">

@@ -7,7 +7,13 @@ export type ProductEvent =
   | { name: "pipeline_filter_changed"; filter: string; value: string; resultCount: number }
   | { name: "candidate_stage_changed"; from: string; to: string }
   | { name: "candidate_profile_opened"; source: "list" | "pipeline" }
-  | { name: "error_recovered"; context: string };
+  | { name: "error_recovered"; context: string }
+  | { name: "quick_action_opened"; action: string; role: string }
+  | { name: "navigation_favorite_toggled"; href: string; enabled: boolean }
+  | { name: "flow_duration"; flow: "vacancy" | "interview" | "hire" | "course_assignment"; durationMs: number; outcome: "completed" | "abandoned" }
+  | { name: "filter_used"; surface: string; activeCount: number }
+  | { name: "export_used"; surface: string }
+  | { name: "automation_template_used"; template: string };
 
 export function trackProductEvent(event: ProductEvent) {
   if (typeof window === "undefined") return;

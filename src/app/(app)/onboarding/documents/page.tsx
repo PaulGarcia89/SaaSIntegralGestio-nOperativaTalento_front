@@ -446,7 +446,8 @@ export default function OnboardingDocumentsPage() {
               <Button asChild variant="secondary"><Link href="/onboarding/operations">Automatización</Link></Button>
               <Button asChild variant="secondary"><Link href="/onboarding/analytics">Analítica</Link></Button>
               <Button asChild variant="secondary"><Link href="/onboarding/compliance">Cumplimiento</Link></Button>
-              <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Versiones</Button>
+              <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Biblioteca de plantillas</Button>
+              <Button asChild variant="secondary"><Link href="/onboarding/compliance">Documentos y políticas</Link></Button>
               <Button variant="secondary" onClick={() => { setRevisionSourceId(null); setTemplateOpen(true); }}>
                 <Plus className="size-4" />
                 Nueva plantilla
@@ -1518,6 +1519,11 @@ function FlowSummary({ flow }: { flow: EmployeeOnboardingFlowDto }) {
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">Siguiente acción</p>
             <p className="mt-1 font-semibold">{flow.nextAction.title}</p>
             <p className="text-sm text-text-secondary">{flow.nextAction.description}</p>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+              <span>Responsable: <strong className="font-medium text-text-primary">{flow.nextAction.owner?.name ?? ownerTypeLabel(flow.nextAction.ownerType)}</strong></span>
+              <span>Fecha límite: <strong className="font-medium text-text-primary">{flow.nextAction.dueDate ? new Date(flow.nextAction.dueDate).toLocaleDateString("es") : "Sin fecha"}</strong></span>
+              {flow.nextAction.blocked ? <span className="font-medium text-status-danger">Bloqueada{flow.nextAction.blockingReason ? `: ${flow.nextAction.blockingReason}` : ""}</span> : null}
+            </div>
           </div>
         ) : null}
       </CardContent>

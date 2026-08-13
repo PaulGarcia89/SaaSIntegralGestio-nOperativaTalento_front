@@ -60,6 +60,7 @@ import type { NavGroup, NavItem } from "@/lib/navigation";
 import { createTenantTheme } from "@/lib/tenant-branding";
 import { ImpersonationBanner } from "@/components/design-system";
 import { fetchNotifications } from "@/lib/backend";
+import { TaskNavigation } from "@/components/task-navigation";
 
 const navigationIcons: Record<NavItem["icon"], LucideIcon> = {
   dashboard: Gauge,
@@ -792,6 +793,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </Card>
+          <TaskNavigation routes={allowedNav} pathname={pathname} role={currentRole} onSearch={() => setSearchOpen(true)} />
 
           <main id="main-content" className="space-y-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-8 xl:space-y-12 xl:pb-0">{children}</main>
         </div>

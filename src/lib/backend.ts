@@ -1461,6 +1461,50 @@ export async function fetchTenantUsers(tenantId: string): Promise<UserDto[]> {
   }
 }
 
+export type EmployeeDirectoryItem = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
+};
+
+export type EmployeeDirectoryResponse = {
+  data: EmployeeDirectoryItem[];
+  meta: { total: number; page: number; pageSize: number; totalPages: number };
+};
+
+export function fetchEmployees(input: { search?: string; status?: string; page?: number; pageSize?: number } = {}) {
+  const query = new URLSearchParams();
+  if (input.search) query.set("search", input.search);
+  if (input.status) query.set("status", input.status);
+  if (input.page) query.set("page", String(input.page));
+  if (input.pageSize) query.set("pageSize", String(input.pageSize));
+  return request<EmployeeDirectoryResponse>(`/employees${query.size ? `?${query}` : ""}`);
+}
+
+export type PlatformAuditEntry = { id: string; action: string; route?: string | null; branchId?: string | null; userId?: string | null; createdAt: string; metadata?: unknown };
+export type PlatformAuditResponse = { items: PlatformAuditEntry[]; total: number; page: number; pageSize: number };
+
+export function fetchPlatformAudit(input: { action?: string; page?: number; pageSize?: number } = {}) {
+  const query = new URLSearchParams();
+  if (input.action) query.set("action", input.action);
+  if (input.page) query.set("page", String(input.page));
+  if (input.pageSize) query.set("pageSize", String(input.pageSize));
+  return request<PlatformAuditResponse>(`/audit/logs${query.size ? `?${query}` : ""}`);
+}
+
+export type BillingOverview = {
+  billingCustomer: { provider: string; externalCustomerId: string; email?: string | null; name?: string | null } | null;
+  subscription: { status?: string; startsAt?: string; endsAt?: string | null } | null;
+  plan: { name?: string; code?: string } | null;
+  recentInvoices: Array<{ id: string; number?: string | null; status?: string; amount?: string | number; currency?: string; issuedAt: string; dueAt?: string | null }>;
+  enabledModules: string[];
+};
+
+export function fetchBillingOverview() { return request<BillingOverview>("/billing/overview"); }
+export function fetchBillingInvoices() { return request<BillingOverview["recentInvoices"]>("/billing/invoices"); }
+
 export async function fetchGlobalUsers(): Promise<UserDto[]> {
   const users = await request<BackendUser[]>("/users/global");
   return users.map(mapUser);

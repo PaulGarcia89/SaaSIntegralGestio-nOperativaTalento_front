@@ -1,5 +1,40 @@
-import { IntegrationUnavailable } from "@/components/integration-state";
+import Link from "next/link";
+import { Building2, Cable, GitBranch, ShieldCheck, UsersRound } from "lucide-react";
+import { PageHeader } from "@/components/design-system";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default function AdminPage() {
-  return <IntegrationUnavailable title="Centro administrativo en integración" description="Las métricas de cumplimiento y automatización se habilitarán al recibir eventos reales y auditables." />;
+  const sections = [
+    { href: "/admin/company", label: "Empresa", description: "Marca, contexto operativo e integraciones por empresa.", icon: Building2 },
+    { href: "/admin/branches", label: "Sucursales", description: "Crea y administra las sedes disponibles para la operación.", icon: GitBranch },
+    { href: "/admin/users", label: "Usuarios", description: "Administra identidades, roles y estados de acceso internos.", icon: UsersRound },
+    { href: "/admin/roles", label: "Roles y permisos", description: "Revisa el alcance de cada perfil antes de otorgar acceso.", icon: ShieldCheck },
+    { href: "/admin/automations", label: "Automatizaciones", description: "Crea, simula y audita reglas operativas sin código.", icon: Cable },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Administración"
+        title="Centro administrativo"
+        description="Configura la empresa y accede a los controles operativos disponibles para tu rol."
+        actions={<Button asChild><Link href="/admin/company/subscription">Ver suscripción</Link></Button>}
+      />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {sections.map(({ href, label, description, icon: Icon }) => (
+          <Card key={href} level={2} className="group transition-shadow hover:shadow-md">
+            <CardContent className="flex min-h-44 flex-col p-5">
+              <Icon className="size-5 text-primary" aria-hidden="true" />
+              <h2 className="mt-4 font-semibold">{label}</h2>
+              <p className="mt-1 text-sm leading-6 text-text-secondary">{description}</p>
+              <Button asChild variant="ghost" size="sm" className="mt-auto w-fit px-0 text-primary hover:bg-transparent hover:text-primary">
+                <Link href={href}>Abrir sección</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 }

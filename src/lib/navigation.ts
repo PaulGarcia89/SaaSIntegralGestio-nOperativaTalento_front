@@ -11,13 +11,13 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/onboarding/documents", label: "Incorporaciones", group: "Personas", module: "onboarding", permission: "onboarding.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "documents" },
   { href: "/onboarding/signatures", label: "Documentos y firmas", group: "Personas", module: "onboarding", permission: "onboarding.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "signatures" },
   { href: "/ats/vacancies", label: "Vacantes", group: "Reclutamiento", module: "ats", permission: "jobs.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "vacancies", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
-  { href: "/ats/pipeline", label: "Pipeline", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "candidates", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"], showInNavigation: false },
+  { href: "/ats/pipeline", label: "Pipeline", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "candidates", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
   { href: "/ats/candidates", label: "Candidatos", group: "Reclutamiento", module: "ats", permission: "candidates.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "candidates", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
-  { href: "/ats/talent-crm", label: "Talent CRM", group: "Reclutamiento", module: "ats", permission: "candidates.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "candidates", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"], showInNavigation: false },
-  { href: "/ats/communications", label: "Comunicaciones", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "notifications", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"], showInNavigation: false },
+  { href: "/ats/talent-crm", label: "Talent CRM", group: "Reclutamiento", module: "ats", permission: "candidates.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "candidates", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
+  { href: "/ats/communications", label: "Comunicaciones", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "notifications", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
   { href: "/ats/interviews", label: "Entrevistas", group: "Reclutamiento", module: "ats", permission: "interviews.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "interviews", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador", "entrevistador"] },
   { href: "/ats/analytics", label: "Analítica ATS", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, icon: "reports", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
-  { href: "/ats/scorecards", label: "Scorecards", group: "Reclutamiento", module: "ats", permission: "interviews.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "evaluations", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"], showInNavigation: false },
+  { href: "/ats/scorecards", label: "Scorecards", group: "Reclutamiento", module: "ats", permission: "interviews.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "evaluations", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
   { href: "/training", label: "Cursos", group: "Aprendizaje", module: "training", permission: "training.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "training" },
   { href: "/training/evaluations", label: "Evaluaciones", group: "Aprendizaje", module: "training", permission: "training.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "evaluations" },
   { href: "/training/results", label: "Resultados", group: "Aprendizaje", module: "training", permission: "training.view", audience: "shared", subscriptionStates: live, icon: "reports", roles: ["admin_saas", "admin_empresa", "instructor"] },
@@ -59,7 +59,6 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
 ];
 
 const unavailableRouteHrefs = new Set([
-  "/admin", "/admin/company/subscription",
   "/admin/billing", "/admin/global-users", "/admin/audit", "/admin/settings",
 ]);
 

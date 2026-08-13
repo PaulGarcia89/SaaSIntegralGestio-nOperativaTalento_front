@@ -146,7 +146,7 @@ export default function BranchesPage() {
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de sucursales"
+        title="Gestión de sucursales"
         description="Alta, edicion y control de sedes operativas."
         badge="Empresa"
         action={

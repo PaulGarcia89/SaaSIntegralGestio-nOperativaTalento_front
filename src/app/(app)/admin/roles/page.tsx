@@ -121,7 +121,7 @@ export default function RolesPage() {
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de roles y permisos"
+        title="Gestión de roles y permisos"
         description="Consulta, crea, modifica y elimina roles internos con conjuntos de permisos asociados."
         badge="Empresa"
         action={

@@ -106,7 +106,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de usuarios"
+        title="Gestión de usuarios"
         description="Consulta, crea, modifica y elimina usuarios internos de la empresa, incluyendo rol y estado de acceso."
         badge={isGlobalView ? "Plataforma" : "Empresa"}
         action={

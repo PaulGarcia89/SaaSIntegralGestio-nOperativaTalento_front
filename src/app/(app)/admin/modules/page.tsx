@@ -59,7 +59,7 @@ export default function ModulesPage() {
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de módulos"
+        title="Gestión de módulos"
         description="Consulta y modifica los módulos habilitados por empresa, de acuerdo con el plan o activacion manual."
         badge="Gobierno SaaS"
       />

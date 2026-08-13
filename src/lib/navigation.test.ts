@@ -46,6 +46,13 @@ describe("navigation policy", () => {
     expect(isRoleAllowed(communications?.roles, "entrevistador")).toBe(false);
   });
 
+  it("keeps the operational ATS workspaces visible in navigation", () => {
+    const atsItems = appNavigation.filter((item) => item.module === "ats");
+    for (const href of ["/ats/pipeline", "/ats/talent-crm", "/ats/communications", "/ats/scorecards"]) {
+      expect(atsItems.find((item) => item.href === href)?.showInNavigation).not.toBe(false);
+    }
+  });
+
   it("centralizes the candidate portal navigation", () => {
     expect(candidateNavigation.filter((item) => item.available).map((item) => item.href)).toEqual(["/", "/jobs", "/apply", "/application-status", "/candidate/portal", "/candidate/profile"]);
   });

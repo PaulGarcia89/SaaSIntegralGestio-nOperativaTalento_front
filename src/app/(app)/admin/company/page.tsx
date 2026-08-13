@@ -7,8 +7,8 @@ export default function CompanySettingsPage() {
     <>
       <ModuleHeader
         eyebrow="Configuración de empresa"
-        title="Branding, dominios, parametros y plantillas por empresa."
-        description="La administración de empresa necesita orden, jerarquia y acciones claras para evitar cambios accidentales."
+        title="Marca, dominios, parámetros y plantillas por empresa."
+        description="La administración de empresa necesita orden, jerarquía y acciones claras para evitar cambios accidentales."
         actions={
           <Button asChild>
             <Link href="/admin/users">Gestionar usuarios</Link>
@@ -16,7 +16,7 @@ export default function CompanySettingsPage() {
         }
         metrics={[
           { label: "Dominios conectados", value: "2", detail: "Portal de empleos y acceso corporativo" },
-          { label: "Plantillas activas", value: "14", detail: "Incorporación, firma y comunicacion automatizada" },
+          { label: "Plantillas activas", value: "14", detail: "Incorporación, firma y comunicación automatizada" },
           { label: "Integraciones listas", value: "5", detail: "SSO, correo, firma y productividad" },
         ]}
       />
@@ -27,7 +27,7 @@ export default function CompanySettingsPage() {
               items={[
                 { title: "Identidad visual", description: "Logo, colores secundarios y assets de portal de empleos", badge: "Marca" },
                 { title: "Parametros de proceso", description: "Checklists de incorporación y formularios por cargo", badge: "Flujo" },
-                { title: "Integraciones", description: "SSO, correo, firma y sistemas operativos externos", badge: "Conexion" },
+                { title: "Integraciones", description: "SSO, correo, firma y sistemas operativos externos", badge: "Conexión" },
               ]}
             />
           </SectionCard>
@@ -37,8 +37,8 @@ export default function CompanySettingsPage() {
             <InfoList
               items={[
                 { title: "Control de cambios", description: "Las modificaciones sensibles deben registrarse en auditoría y notificarse al administrador principal." },
-                { title: "Separacion por sucursal", description: "Los formularios y checklist pueden variar por sede sin romper consistencia central", badge: "Multi-sede" },
-                { title: "Politicas de acceso", description: "Las integraciones criticas se exponen solo a perfiles con permisos administrativos", badge: "RBAC" },
+                { title: "Separación por sucursal", description: "Los formularios y listas de verificación pueden variar por sede sin romper la consistencia central", badge: "Multi-sede" },
+                { title: "Políticas de acceso", description: "Las integraciones críticas se exponen solo a perfiles con permisos administrativos", badge: "RBAC" },
               ]}
             />
           </SectionCard>

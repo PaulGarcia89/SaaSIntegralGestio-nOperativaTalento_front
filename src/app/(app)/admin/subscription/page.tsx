@@ -114,7 +114,7 @@ export default function SubscriptionPage() {
     return (
       <StateCard
         tone="restricted"
-        title="Sin acceso a suscripciónes"
+        title="Sin acceso a suscripciones"
         description="El rol actual no puede gestionar planes, ciclos ni renovaciones."
       />
     );
@@ -126,8 +126,8 @@ export default function SubscriptionPage() {
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de suscripciónes"
-        description="Control de plan, ciclo, precio y renovacion."
+        title="Gestión de suscripciones"
+        description="Control de plan, ciclo, precio y renovación."
         badge="Gobierno SaaS"
         action={
           <FormDialog
@@ -238,7 +238,7 @@ export default function SubscriptionPage() {
         <CrudPanel>
           <StateCard
             tone="empty"
-            title="No hay suscripciónes visibles"
+            title="No hay suscripciones visibles"
             description="Ajusta el filtro o crea una suscripción para comenzar."
           />
         </CrudPanel>

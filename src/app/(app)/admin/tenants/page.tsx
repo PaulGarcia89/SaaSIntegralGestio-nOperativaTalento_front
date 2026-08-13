@@ -169,7 +169,7 @@ export default function TenantsPage() {
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestion de empresas"
+        title="Gestión de empresas"
         description="Alta, edicion y control operativo de empresas."
         badge="Gobierno SaaS"
         action={

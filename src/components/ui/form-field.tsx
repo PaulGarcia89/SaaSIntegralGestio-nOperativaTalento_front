@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 type FormFieldProps = {
   label: string;
   error?: string;
+  description?: string;
   required?: boolean;
   className?: string;
   id?: string;
@@ -15,10 +16,11 @@ type FormFieldProps = {
   }) => ReactNode;
 };
 
-export function FormField({ label, error, required, className, children, id: providedId }: FormFieldProps) {
+export function FormField({ label, error, description, required, className, children, id: providedId }: FormFieldProps) {
   const generatedId = useId();
   const id = providedId ?? generatedId;
   const errorId = `${id}-error`;
+  const descriptionId = `${id}-description`;
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -28,9 +30,10 @@ export function FormField({ label, error, required, className, children, id: pro
       </Label>
       {children({
         id,
-        "aria-describedby": error ? errorId : undefined,
+        "aria-describedby": [description ? descriptionId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined,
         "aria-invalid": Boolean(error),
       })}
+      {description ? <p id={descriptionId} className="text-xs leading-5 text-muted-foreground">{description}</p> : null}
       {error ? (
         <p id={errorId} className="text-sm text-destructive" role="alert">
           {error}

@@ -370,6 +370,35 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
   return error.message || fallback;
 }
 
+export type CompanyRegistrationRequestInput = {
+  companyName: string;
+  branchName: string;
+  branchLocation: string;
+  adminName: string;
+  adminEmail: string;
+  password: string;
+  plan: "BASIC" | "PRO" | "ENTERPRISE";
+  acceptTerms: boolean;
+  acceptPrivacy: boolean;
+  marketingConsent?: boolean;
+  idempotencyKey?: string;
+};
+
+export type CompanyRegistrationRequestDto = {
+  id: string;
+  companyName: string;
+  branchName: string;
+  branchLocation: string;
+  adminName: string;
+  adminEmail: string;
+  plan: "BASIC" | "PRO" | "ENTERPRISE";
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  requestedAt: string;
+  reviewedAt?: string | null;
+  reviewNotes?: string | null;
+  tenantId?: string | null;
+};
+
 const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "dashboard.view": [],
   "ats.view": ["vacancies.read", "applications.read"],
@@ -1087,6 +1116,32 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
   }
 
   return (await response.json()) as T;
+}
+
+export function submitCompanyRegistration(input: CompanyRegistrationRequestInput) {
+  return request<CompanyRegistrationRequestDto>("/public/company-registrations", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }, { auth: false, retryOnUnauthorized: false });
+}
+
+export function fetchCompanyRegistrationRequests(status?: CompanyRegistrationRequestDto["status"]) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request<CompanyRegistrationRequestDto[]>(`/admin/company-registrations${query}`);
+}
+
+export function approveCompanyRegistrationRequest(id: string, reviewNotes?: string) {
+  return request<CompanyRegistrationRequestDto>(`/admin/company-registrations/${encodeURIComponent(id)}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ reviewNotes }),
+  });
+}
+
+export function rejectCompanyRegistrationRequest(id: string, reviewNotes: string) {
+  return request<CompanyRegistrationRequestDto>(`/admin/company-registrations/${encodeURIComponent(id)}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reviewNotes }),
+  });
 }
 
 async function fetchBackendPlans() {

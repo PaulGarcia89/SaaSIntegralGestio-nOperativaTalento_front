@@ -48,6 +48,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/admin/company/subscription", label: "Suscripción", group: "Administración", module: "admin", permission: "admin.subscription", audience: "tenant", icon: "subscription", roles: ["admin_saas", "admin_empresa"] },
   { href: "/admin", label: "Resumen administrativo", group: "Administración", module: "admin", permission: "admin.view", audience: "tenant", icon: "admin" },
   { href: "/admin/tenants", label: "Gestión de empresas", group: "Gobierno de plataforma", module: "admin", permission: "tenants.view", audience: "saas", icon: "tenants" },
+  { href: "/admin/company-registrations", label: "Solicitudes de empresa", group: "Gobierno de plataforma", module: "admin", permission: "tenants.view", audience: "saas", icon: "tenants" },
   { href: "/admin/plans", label: "Planes", group: "Gobierno de plataforma", module: "admin", permission: "admin.subscription", audience: "saas", icon: "subscription" },
   { href: "/admin/modules", label: "Módulos", group: "Gobierno de plataforma", module: "admin", permission: "admin.company", audience: "saas", icon: "modules" },
   { href: "/admin/integrations", label: "Gobierno de integraciones", group: "Gobierno de plataforma", module: "admin", permission: "platform.integrations.manage", audience: "saas", icon: "queues", roles: ["admin_saas"], strictRoles: true },

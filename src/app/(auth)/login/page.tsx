@@ -101,6 +101,7 @@ export default function LoginPage() {
               <FormErrorSummary
                 errors={Object.entries(form.formState.errors).map(([field, issue]) => ({ fieldId: `login-${field}`, label: field === "email" ? "Correo corporativo" : "Contraseña", message: issue?.message ?? "Revisa este campo" }))}
                 serverError={loginMutation.error}
+                context="authentication"
               />
               <div className="space-y-2">
                 <Badge variant="secondary" className="rounded-full">Acceso seguro</Badge>

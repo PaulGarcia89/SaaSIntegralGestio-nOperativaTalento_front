@@ -14,7 +14,9 @@ const SECURE_SESSION_COOKIE =
 export async function POST(request: Request) {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
-  const demoSession = process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true" && request.headers.get("x-demo-session") === "true";
+  // Never accept a demo session in production. It can otherwise create a UI
+  // context that refers to mock tenants rather than the live database.
+  const demoSession = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true" && request.headers.get("x-demo-session") === "true";
   if (!demoSession) {
     if (!URL.canParse(API_BASE_URL)) {
       return NextResponse.json({ error: "API_URL_NOT_CONFIGURED" }, { status: 503 });

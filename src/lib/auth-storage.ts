@@ -4,7 +4,9 @@ const LEGACY_AUTH_STORAGE_KEY = "saas-integral.auth";
 const TENANT_STORAGE_KEY = "saas-integral.current-tenant";
 const BRANCH_STORAGE_KEY = "saas-integral.current-branch";
 const MOCK_AUTH_STORAGE_KEY = "saas-integral.mock-auth";
-const MOCK_BACKEND_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
+// Keep demo sessions local to non-production builds so production only uses
+// credentials and entities issued by the live backend.
+const MOCK_BACKEND_ENABLED = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
 
 export type AuthSnapshot = { accessToken: string; tenantId: string; userId: string; role: RoleKey };
 let memoryAuth: AuthSnapshot | null = null;

@@ -1,7 +1,7 @@
 import { FlaskConical } from "lucide-react";
 import { InlineFeedback } from "@/components/design-system";
 
-export const DEMO_MODE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
+export const DEMO_MODE_ENABLED = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
 
 export function DemoModeBanner() {
   if (!DEMO_MODE_ENABLED) return null;

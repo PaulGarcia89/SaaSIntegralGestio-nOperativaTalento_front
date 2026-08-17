@@ -642,8 +642,25 @@ function CourseMetadataForm({
       : emptyCourse,
   );
   const save = useMutation({
-    mutationFn: () =>
-      course ? updateTrainingCourse(course.id, form) : createTrainingCourse(form),
+    mutationFn: () => {
+      // Optional URL and text fields must be omitted when empty. Sending an
+      // empty string makes backend validation treat them as invalid values.
+      const payload: TrainingCourseInput = {
+        title: form.title.trim(),
+        slug: form.slug?.trim() || undefined,
+        summary: form.summary?.trim() || undefined,
+        description: form.description?.trim() || undefined,
+        categoryId: form.categoryId,
+        coverImageUrl: form.coverImageUrl?.trim() || undefined,
+        introVideoUrl: form.introVideoUrl?.trim() || undefined,
+        difficulty: form.difficulty,
+        estimatedMinutes: form.estimatedMinutes,
+        language: form.language?.trim() || undefined,
+        tags: form.tags?.filter(Boolean),
+        scope: form.scope,
+      };
+      return course ? updateTrainingCourse(course.id, payload) : createTrainingCourse(payload);
+    },
     onSuccess: (saved) => {
       toast.success(course ? "Información actualizada" : "Curso creado como borrador");
       onSaved(saved);

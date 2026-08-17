@@ -13,6 +13,7 @@ export function getServerFormMessage(error: unknown, context: "form" | "authenti
   if (!(error instanceof ApiError)) return fallback;
   if (error.status === 401) return "El correo o la contraseña no son correctos.";
   if (error.status === 403) return "Tu cuenta no tiene acceso a este espacio de trabajo.";
+  if (error.status === 400) return `Revisa los datos ingresados. ${error.message}`;
   if (error.status === 409) return "Otro registro utiliza estos datos. Revisa los valores e inténtalo nuevamente.";
   if (error.status === 422) return "El servidor encontró datos que necesitan corrección.";
   if (error.status === 429) return "Has realizado demasiados intentos. Espera un momento antes de continuar.";

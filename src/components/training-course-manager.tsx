@@ -37,6 +37,7 @@ import {
   InlineFeedback,
   PageHeader,
   Pagination,
+  ResponsiveDialog,
   ResponsiveDataView,
 } from "@/components/design-system";
 import { FormErrorSummary } from "@/components/form-error-summary";
@@ -44,13 +45,6 @@ import { TrainingCourseFoundation } from "@/components/training-course-foundatio
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1005,7 +999,7 @@ function PreviewWizardStep({ previewed, onPreview, onContinue }: { previewed: bo
     <Card level={2}>
       <CardHeader><CardTitle>Experiencia del participante</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-text-secondary">Revisa portada, secuencia, títulos y recursos antes de solicitar aprobación.</p>
+        <p className="text-sm text-text-secondary">Abre una simulación de solo lectura para revisar portada, secuencia, títulos y recursos. No guarda progreso ni modifica el curso.</p>
         {previewed ? <InlineFeedback tone="success" title="Vista previa revisada">Esta sesión ya abrió la experiencia del participante.</InlineFeedback> : null}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onPreview}><Eye className="size-4" />Abrir vista previa</Button>
@@ -1465,13 +1459,17 @@ function ScheduleDialog({ open, onOpenChange, pending, onConfirm }: { open: bool
 function CoursePreviewDialog({ courseId, open, onOpenChange }: { courseId: string | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const query = useQuery({ queryKey: ["training-course-preview", courseId], queryFn: () => fetchTrainingCoursePreview(courseId!), enabled: Boolean(courseId && open) });
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
-        <DialogHeader><DialogTitle>Vista previa del curso</DialogTitle><DialogDescription>Así se organiza el contenido antes de asignarlo.</DialogDescription></DialogHeader>
-        {query.isLoading ? <AsyncState state="loading" /> : null}
-        {query.isError ? <AsyncState state="error" onRetry={() => void query.refetch()} /> : null}
-        {query.data ? <article className="space-y-6">{query.data.coverImageUrl ? <div role="img" aria-label={`Portada de ${query.data.title}`} className="aspect-[16/6] w-full rounded-2xl bg-cover bg-center" style={{ backgroundImage: `url("${query.data.coverImageUrl.replace(/"/g, "%22")}")` }} /> : null}<div><div className="flex flex-wrap gap-2"><CourseStatusBadge status={query.data.status} /><Badge>{query.data.difficulty}</Badge><Badge>{query.data.estimatedMinutes} min</Badge></div><h2 className="mt-4 text-3xl font-semibold">{query.data.title}</h2><p className="mt-2 text-text-secondary">{query.data.summary}</p></div>{query.data.modules.map((module) => <section key={module.id} className="space-y-3"><h3 className="text-xl font-semibold">{module.title}</h3>{module.lessons.map((lesson) => <div key={lesson.id} className="rounded-xl border border-border-default p-4"><h4 className="font-medium">{lesson.title}</h4><ul className="mt-3 space-y-2">{lesson.blocks.map((block) => <li key={block.id} className="flex gap-2 text-sm text-text-secondary"><FileText className="size-4 shrink-0" />{block.title || blockLabels[block.type]}</li>)}</ul></div>)}</section>)}</article> : null}
-      </DialogContent>
-    </Dialog>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Vista previa del participante"
+      description="Revisión de solo lectura: no guarda progreso ni modifica el curso."
+      className="sm:h-[min(52rem,calc(100dvh-3rem))] sm:max-w-5xl"
+      footer={<div className="flex justify-end"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cerrar vista previa</Button></div>}
+    >
+      {query.isLoading ? <AsyncState state="loading" title="Preparando vista previa" /> : null}
+      {query.isError ? <AsyncState state="error" title="No fue posible abrir la vista previa" onRetry={() => void query.refetch()} /> : null}
+      {query.data ? <article className="mx-auto max-w-4xl space-y-6 pb-2">{query.data.coverImageUrl ? <div role="img" aria-label={`Portada de ${query.data.title}`} className="aspect-[16/6] w-full rounded-2xl bg-cover bg-center shadow-sm" style={{ backgroundImage: `url("${query.data.coverImageUrl.replace(/"/g, "%22")}")` }} /> : null}<div><div className="flex flex-wrap gap-2"><CourseStatusBadge status={query.data.status} /><Badge>{query.data.difficulty}</Badge><Badge>{query.data.estimatedMinutes} min</Badge><Badge variant="secondary">Solo lectura</Badge></div><h2 className="mt-4 text-3xl font-semibold">{query.data.title}</h2><p className="mt-2 text-text-secondary">{query.data.summary}</p></div>{query.data.modules.map((module, moduleIndex) => <section key={module.id} className="space-y-3 rounded-2xl border border-border-default bg-surface-section/40 p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{moduleIndex + 1}</span><h3 className="text-xl font-semibold">{module.title}</h3></div>{module.lessons.map((lesson, lessonIndex) => <div key={lesson.id} className="rounded-xl border border-border-default bg-card p-4"><p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Lección {moduleIndex + 1}.{lessonIndex + 1}</p><h4 className="mt-1 font-medium">{lesson.title}</h4><ul className="mt-3 space-y-2">{lesson.blocks.map((block) => <li key={block.id} className="flex gap-2 text-sm text-text-secondary"><FileText className="size-4 shrink-0" />{block.title || blockLabels[block.type]}</li>)}</ul></div>)}</section>)}</article> : null}
+    </ResponsiveDialog>
   );
 }

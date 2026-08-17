@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Info, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -182,24 +182,39 @@ function FoundationForm({
       ) : null}
 
       <Card level={2}>
-        <CardHeader><CardTitle>Brief del curso</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Lo esencial del curso</CardTitle>
+          <p className="text-sm text-text-secondary">Describe el problema, el cambio esperado, cómo medirlo y para quién es. Lo demás es opcional.</p>
+        </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <TextArea label="Necesidad del negocio" value={brief.businessNeed} disabled={!editable} onChange={(businessNeed) => setBrief({ ...brief, businessNeed })} />
-          <TextArea label="Resultado esperado" value={brief.targetOutcome} disabled={!editable} onChange={(targetOutcome) => setBrief({ ...brief, targetOutcome })} />
-          <Field label="KPI de éxito" value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
-          <Field label="Audiencia general" value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
-          <Field label="Línea base" value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
-          <Field label="Meta" value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
-          <UserChoice label="Responsable del contenido" value={brief.contentOwnerId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, contentOwnerId: value === "NONE" ? undefined : value })} />
-          <UserChoice label="Experto de negocio" value={brief.subjectMatterExpertId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, subjectMatterExpertId: value === "NONE" ? undefined : value })} />
-          <Field label="Fecha objetivo" type="date" value={brief.targetDate?.slice(0, 10) ?? ""} disabled={!editable} onChange={(targetDate) => setBrief({ ...brief, targetDate: targetDate ? new Date(`${targetDate}T12:00:00`).toISOString() : undefined })} />
-          <TextArea label="Riesgo de no completar" value={brief.riskIfNotCompleted ?? ""} disabled={!editable} onChange={(riskIfNotCompleted) => setBrief({ ...brief, riskIfNotCompleted })} />
+          <TextArea label="¿Qué necesidad resuelve este curso?" value={brief.businessNeed} disabled={!editable} onChange={(businessNeed) => setBrief({ ...brief, businessNeed })} />
+          <TextArea label="¿Qué podrá hacer la persona al terminar?" value={brief.targetOutcome} disabled={!editable} onChange={(targetOutcome) => setBrief({ ...brief, targetOutcome })} />
+          <Field label="¿Cómo sabrás que funcionó?" hint="Ej.: 30% menos errores de registro" value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
+          <Field label="¿Para quién es?" hint="Ej.: Supervisores de tienda nuevos" value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
+          <details className="md:col-span-2">
+            <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80">Añadir contexto opcional</summary>
+            <div className="mt-4 grid gap-4 border-t border-border-default pt-4 md:grid-cols-2">
+              <Field label="Línea base" hint="Valor actual antes de capacitar" value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
+              <Field label="Meta" hint="Valor que deseas alcanzar" value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
+              <UserChoice label="Responsable del contenido" value={brief.contentOwnerId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, contentOwnerId: value === "NONE" ? undefined : value })} />
+              <UserChoice label="Experto de negocio" value={brief.subjectMatterExpertId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, subjectMatterExpertId: value === "NONE" ? undefined : value })} />
+              <Field label="Fecha objetivo" type="date" value={brief.targetDate?.slice(0, 10) ?? ""} disabled={!editable} onChange={(targetDate) => setBrief({ ...brief, targetDate: targetDate ? new Date(`${targetDate}T12:00:00`).toISOString() : undefined })} />
+              <TextArea label="Riesgo de no completar" value={brief.riskIfNotCompleted ?? ""} disabled={!editable} onChange={(riskIfNotCompleted) => setBrief({ ...brief, riskIfNotCompleted })} />
+            </div>
+          </details>
         </CardContent>
       </Card>
 
       <Card level={2}>
-        <CardHeader><CardTitle>Competencias</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Competencias que desarrolla</CardTitle>
+          <p className="text-sm text-text-secondary">Selecciona la habilidad observable que este curso ayuda a desarrollar. Se requiere al menos una para publicarlo.</p>
+        </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex gap-3 rounded-2xl border border-status-info/20 bg-status-info/5 p-4 text-sm leading-6 text-text-secondary">
+            <Info className="mt-0.5 size-5 shrink-0 text-status-info" aria-hidden="true" />
+            <p><strong className="text-text-primary">Competencia:</strong> una capacidad que puede observarse o evaluarse, como “Atención al cliente” o “Manejo seguro de alimentos”. <strong className="text-text-primary">Código:</strong> su identificador único para buscarla y reutilizarla en rutas y reportes, por ejemplo <code className="rounded bg-card px-1.5 py-0.5 text-xs">OPS-SEG-01</code>. No es necesario crear una nueva si ya existe una adecuada.</p>
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             {availableCompetencies.filter((item) => item.isActive).map((competency) => {
               const current = selected.find((item) => item.competencyId === competency.id);
@@ -222,11 +237,15 @@ function FoundationForm({
             })}
           </div>
           {editable ? (
-            <div className="grid gap-2 rounded-xl border border-dashed border-border-strong p-3 sm:grid-cols-[160px_1fr_auto]">
-              <Input aria-label="Código de competencia" placeholder="Código" value={newCode} onChange={(event) => setNewCode(event.target.value)} />
-              <Input aria-label="Nombre de competencia" placeholder="Nueva competencia" value={newName} onChange={(event) => setNewName(event.target.value)} />
-              <Button type="button" variant="secondary" disabled={!newCode.trim() || !newName.trim() || createCompetency.isPending} onClick={() => createCompetency.mutate()}><Plus className="size-4" />Crear</Button>
-            </div>
+            <details className="rounded-2xl border border-dashed border-border-strong p-4">
+              <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80">Crear una competencia nueva</summary>
+              <p className="mt-2 text-sm text-text-secondary">Úsalo solo si no existe una competencia reutilizable. El código debe ser corto y único, por ejemplo <code className="rounded bg-surface-section px-1.5 py-0.5 text-xs">VENTA-CIERRE-01</code>.</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-[160px_1fr_auto]">
+                <Input aria-label="Código de competencia" placeholder="Ej.: VENTA-CIERRE-01" value={newCode} onChange={(event) => setNewCode(event.target.value)} />
+                <Input aria-label="Nombre de competencia" placeholder="Ej.: Cierre de venta consultivo" value={newName} onChange={(event) => setNewName(event.target.value)} />
+                <Button type="button" variant="secondary" disabled={!newCode.trim() || !newName.trim() || createCompetency.isPending} onClick={() => createCompetency.mutate()}><Plus className="size-4" />Crear</Button>
+              </div>
+            </details>
           ) : null}
         </CardContent>
       </Card>
@@ -251,7 +270,7 @@ function FoundationForm({
       </Card>
 
       <Card level={2}>
-        <CardHeader><CardTitle>Reglas de audiencia</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Segmentación avanzada</CardTitle><p className="text-sm text-text-secondary">Opcional. Úsala si necesitas asignar el curso automáticamente por rol, puesto, sucursal o grupo.</p></CardHeader>
         <CardContent className="space-y-3">
           {audienceRules.map((rule, index) => (
             <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 md:grid-cols-[180px_160px_1fr_auto]">
@@ -286,8 +305,8 @@ function updateRule(index: number, patch: Partial<TrainingCourseDesignInput["aud
   setItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
 }
 
-function Field({ label, value, onChange, disabled, type = "text" }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean; type?: string }) {
-  return <label className="space-y-2 text-sm font-medium">{label}<Input type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
+function Field({ label, hint, value, onChange, disabled, type = "text" }: { label: string; hint?: string; value: string; onChange: (value: string) => void; disabled: boolean; type?: string }) {
+  return <label className="space-y-2 text-sm font-medium"><span className="block">{label}{hint ? <span className="mt-1 block text-xs font-normal text-text-secondary">{hint}</span> : null}</span><Input type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function TextArea({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -53,12 +54,12 @@ export function FormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="overflow-hidden p-0">
+        <DialogHeader className="border-b border-border-default px-5 pb-4 pt-5 pr-14 sm:px-6 sm:pt-6">
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        {children}
+        <div className="px-5 py-5 sm:px-6">{children}</div>
       </DialogContent>
     </Dialog>
   );
@@ -80,20 +81,34 @@ export function ConfirmDeleteDialog({
   pending?: boolean;
 }) {
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={title}
-      description={description}
-    >
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-          Cancelar
-        </Button>
-        <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
-          {pending ? "Eliminando..." : "Eliminar"}
-        </Button>
-      </div>
-    </FormDialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="border-b border-border-default px-5 pb-5 pt-5 pr-14 sm:px-6 sm:pt-6">
+          <div className="flex items-start gap-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-status-danger/10 text-status-danger">
+              <Trash2 className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 space-y-1">
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>{description}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="px-5 py-5 sm:px-6">
+          <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
+            Esta acción es permanente. No podrás recuperar este registro una vez eliminado.
+          </div>
+        </div>
+        <footer className="flex flex-col-reverse gap-2 border-t border-border-default bg-surface-section/50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
+            <Trash2 className="size-4" />
+            {pending ? "Eliminando..." : "Eliminar definitivamente"}
+          </Button>
+        </footer>
+      </DialogContent>
+    </Dialog>
   );
 }

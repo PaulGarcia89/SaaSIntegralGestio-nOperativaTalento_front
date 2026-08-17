@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  ArrowLeft,
   ArrowDown,
   ArrowUp,
   BookOpen,
@@ -174,9 +175,7 @@ export function TrainingCourseManager() {
   const status = searchParams.get("status") ?? "";
   const scope = (searchParams.get("scope") ?? "") as "" | "TENANT" | "GLOBAL";
   const categoryId = searchParams.get("category") ?? "";
-  const [createOpen, setCreateOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [editorId, setEditorId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TrainingCourseDto | null>(null);
 
@@ -235,9 +234,11 @@ export function TrainingCourseManager() {
                 <Plus className="size-4" aria-hidden="true" />
                 Categoría
               </Button>
-              <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Button asChild type="button">
+                <Link href="/training/content/new">
                 <Plus className="size-4" aria-hidden="true" />
                 Nuevo curso
+                </Link>
               </Button>
             </>
           ) : undefined
@@ -321,7 +322,7 @@ export function TrainingCourseManager() {
                 canEdit={can("courses.update")}
                 canDelete={can("courses.delete")}
                 canDuplicate={canCreate}
-                onEdit={setEditorId}
+                onEdit={(courseId) => router.push(`/training/content/${encodeURIComponent(courseId)}`)}
                 onPreview={setPreviewId}
                 onDelete={setDeleteTarget}
               />
@@ -332,7 +333,7 @@ export function TrainingCourseManager() {
                 canEdit={can("courses.update")}
                 canDelete={can("courses.delete")}
                 canDuplicate={canCreate}
-                onEdit={setEditorId}
+                onEdit={(courseId) => router.push(`/training/content/${encodeURIComponent(courseId)}`)}
                 onPreview={setPreviewId}
                 onDelete={setDeleteTarget}
               />
@@ -348,17 +349,6 @@ export function TrainingCourseManager() {
         </div>
       ) : null}
 
-      <CourseFormDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        categories={categoriesQuery.data ?? []}
-        globalAllowed={currentRole === "admin_saas"}
-        onSaved={(course) => {
-          setCreateOpen(false);
-          setEditorId(course.id);
-          void queryClient.invalidateQueries({ queryKey: ["training-admin-courses"] });
-        }}
-      />
       <CategoryFormDialog
         open={categoryOpen}
         onOpenChange={setCategoryOpen}
@@ -369,11 +359,6 @@ export function TrainingCourseManager() {
           await queryClient.invalidateQueries({ queryKey: ["training-categories"] });
         }}
       />
-      {editorId ? <CourseEditorDialog
-        courseId={editorId}
-        open
-        onOpenChange={(open) => !open && setEditorId(null)}
-      /> : null}
       <CoursePreviewDialog
         courseId={previewId}
         open={Boolean(previewId)}
@@ -572,44 +557,60 @@ function CourseCard(props: CourseActionsProps) {
   );
 }
 
-function CourseFormDialog({
-  open,
-  onOpenChange,
-  categories,
-  globalAllowed,
-  onSaved,
-  course,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  categories: Array<{ id: string; name: string }>;
-  globalAllowed: boolean;
-  onSaved: (course: TrainingCourseDto) => void;
-  course?: TrainingCourseDto;
-}) {
-  return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={course ? "Editar información del curso" : "Crear curso"}
-      description="Define los datos que ayudarán a identificar y encontrar el contenido."
-    >
-      <CourseMetadataForm
-        key={course?.id ?? "new-course"}
-        course={course}
-        categories={categories}
-        globalAllowed={globalAllowed}
-        onSaved={onSaved}
-        onCancel={() => onOpenChange(false)}
-      />
-    </FormDialog>
-  );
+export function TrainingCourseCreatePage() {
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [categoryId, setCategoryId] = useState("NONE");
+  const categories = useQuery({ queryKey: ["training-categories"], queryFn: fetchTrainingCategories });
+  const create = useMutation({
+    mutationFn: () => createTrainingCourse({
+      title: title.trim(),
+      summary: summary.trim() || undefined,
+      categoryId: categoryId === "NONE" ? undefined : categoryId,
+      scope: "TENANT",
+    }),
+    onSuccess: (course) => {
+      toast.success("Curso creado como borrador");
+      router.replace(`/training/content/${encodeURIComponent(course.id)}`);
+    },
+  });
+  const errors = !title.trim()
+    ? [{ fieldId: "course-title", label: "Título", message: "Es obligatorio." }]
+    : [];
+
+  return <div className="mx-auto max-w-4xl space-y-6">
+    <PageHeader
+      eyebrow="Aprendizaje"
+      title="Crear curso"
+      description="Empieza con lo esencial. Podrás añadir contenido, evaluaciones, certificación y configuración avanzada en el editor."
+      actions={<Button asChild variant="secondary"><Link href="/training/content"><ArrowLeft className="size-4" />Volver a cursos</Link></Button>}
+    />
+    <Card level={2}>
+      <CardHeader><CardTitle>Información inicial</CardTitle></CardHeader>
+      <CardContent>
+        <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); if (!errors.length) create.mutate(); }}>
+          <FormErrorSummary errors={errors} serverError={create.error} />
+          <FormField id="course-title" label="Título del curso" description="Usa un nombre claro para que las personas lo encuentren fácilmente." required>
+            {(field) => <Input {...field} autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ej. Seguridad básica en el trabajo" />}
+          </FormField>
+          <FormField id="course-summary" label="Resumen" description="Opcional. Una frase breve sobre lo que aprenderán las personas.">
+            {(field) => <textarea {...field} className="min-h-28 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Ej. Principios y prácticas para trabajar de forma segura." />}
+          </FormField>
+          <FormField id="course-category" label="Categoría" description="Opcional. Puedes crear o cambiar categorías más adelante.">
+            {(field) => <Select value={categoryId} onValueChange={setCategoryId} disabled={categories.isLoading}><SelectTrigger {...field}><SelectValue placeholder="Sin categoría" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin categoría</SelectItem>{(categories.data ?? []).map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent></Select>}
+          </FormField>
+          <InlineFeedback tone="info" title="El resto se configura después">Dificultad, duración, idioma, etiquetas, portada y visibilidad no son necesarios para crear el borrador.</InlineFeedback>
+          <div className="flex flex-col-reverse gap-3 border-t border-border-default pt-5 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={() => router.push("/training/content")}>Cancelar</Button><Button type="submit" disabled={create.isPending || Boolean(errors.length)}>{create.isPending ? "Creando…" : "Crear y diseñar curso"}</Button></div>
+        </form>
+      </CardContent>
+    </Card>
+  </div>;
 }
 
 function CourseMetadataForm({
   course,
   categories,
-  globalAllowed,
   onSaved,
   onCancel,
   showCancel = true,
@@ -617,7 +618,6 @@ function CourseMetadataForm({
 }: {
   course?: TrainingCourseDto;
   categories: Array<{ id: string; name: string }>;
-  globalAllowed: boolean;
   onSaved: (course: TrainingCourseDto) => void;
   onCancel?: () => void;
   showCancel?: boolean;
@@ -665,48 +665,21 @@ function CourseMetadataForm({
       <FormField id="course-title" label="Título" required>
         {(field) => <Input {...field} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />}
       </FormField>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField id="course-category" label="Categoría">
-          {(field) => <Select value={form.categoryId ?? "NONE"} onValueChange={(value) => setForm({ ...form, categoryId: value === "NONE" ? undefined : value })}>
-            <SelectTrigger {...field}><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="NONE">Sin categoría</SelectItem>{categories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent>
-          </Select>}
-        </FormField>
-        <FormField id="course-difficulty" label="Dificultad">
-          {(field) => <Select value={form.difficulty} onValueChange={(value) => setForm({ ...form, difficulty: value as TrainingCourseDto["difficulty"] })}>
-            <SelectTrigger {...field}><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="BEGINNER">Inicial</SelectItem><SelectItem value="INTERMEDIATE">Intermedio</SelectItem><SelectItem value="ADVANCED">Avanzado</SelectItem></SelectContent>
-          </Select>}
-        </FormField>
-      </div>
+      <FormField id="course-category" label="Categoría">
+        {(field) => <Select value={form.categoryId ?? "NONE"} onValueChange={(value) => setForm({ ...form, categoryId: value === "NONE" ? undefined : value })}>
+          <SelectTrigger {...field}><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="NONE">Sin categoría</SelectItem>{categories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent>
+        </Select>}
+      </FormField>
       <FormField id="course-summary" label="Resumen">
         {(field) => <textarea {...field} className="min-h-24 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />}
       </FormField>
       <FormField id="course-description" label="Descripción">
         {(field) => <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />}
       </FormField>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField id="course-duration" label="Duración estimada (minutos)">
-          {(field) => <Input {...field} type="number" min={0} value={form.estimatedMinutes} onChange={(event) => setForm({ ...form, estimatedMinutes: Number(event.target.value) })} />}
-        </FormField>
-        <FormField id="course-language" label="Idioma">
-          {(field) => <Input {...field} value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })} />}
-        </FormField>
-      </div>
-      <FormField id="course-cover" label="URL de portada">
-        {(field) => <Input {...field} type="url" value={form.coverImageUrl} onChange={(event) => setForm({ ...form, coverImageUrl: event.target.value })} />}
+      <FormField id="course-duration" label="Duración estimada (minutos)" description="Puedes ajustar este valor cuando definas las lecciones.">
+        {(field) => <Input {...field} type="number" min={0} value={form.estimatedMinutes} onChange={(event) => setForm({ ...form, estimatedMinutes: Number(event.target.value) })} />}
       </FormField>
-      <FormField id="course-tags" label="Etiquetas separadas por coma">
-        {(field) => <Input {...field} value={form.tags?.join(", ")} onChange={(event) => setForm({ ...form, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />}
-      </FormField>
-      {globalAllowed && !course ? (
-        <FormField id="course-scope" label="Alcance">
-          {(field) => <Select value={form.scope} onValueChange={(value) => setForm({ ...form, scope: value as "TENANT" | "GLOBAL" })}>
-            <SelectTrigger {...field}><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="TENANT">Empresa activa</SelectItem><SelectItem value="GLOBAL">Toda la plataforma</SelectItem></SelectContent>
-          </Select>}
-        </FormField>
-      ) : null}
       <div className="flex justify-end gap-2">
         {showCancel ? <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button> : null}
         <Button type="submit" disabled={save.isPending || Boolean(errors.length)}>{save.isPending ? "Guardando…" : submitLabel ?? "Guardar"}</Button>
@@ -715,9 +688,10 @@ function CourseMetadataForm({
   );
 }
 
-function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function TrainingCourseEditor({ courseId }: { courseId: string }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const { can, currentRole } = useAppStore();
+  const { can } = useAppStore();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [step, setStep] = useState<TrainingCourseWizardStep>(() => {
@@ -732,14 +706,12 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
   const query = useQuery({
     queryKey: ["training-course", courseId],
     queryFn: () => fetchTrainingCourse(courseId),
-    enabled: open,
   });
   const design = useQuery({
     queryKey: ["training-course-design", courseId],
     queryFn: () => fetchTrainingCourseDesign(courseId),
-    enabled: open,
   });
-  const categories = useQuery({ queryKey: ["training-categories"], queryFn: fetchTrainingCategories, enabled: open });
+  const categories = useQuery({ queryKey: ["training-categories"], queryFn: fetchTrainingCategories });
 
   function selectStep(next: TrainingCourseWizardStep) {
     setStep(next);
@@ -766,14 +738,17 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
   const currentStep = TRAINING_COURSE_WIZARD_STEPS[currentIndex] ?? TRAINING_COURSE_WIZARD_STEPS[0];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[94dvh] max-w-7xl flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 border-b border-border-default p-6 pr-14">
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Aprendizaje"
+        title={query.data?.title ?? "Editor de curso"}
+        description="Asistente editorial con guardado por etapa y requisitos de publicación."
+        actions={<Button type="button" variant="secondary" onClick={() => router.push("/training/content")}><ArrowLeft className="size-4" />Volver a cursos</Button>}
+      />
+      <section className="overflow-hidden rounded-3xl border border-border-default bg-card shadow-sm">
+        <header className="border-b border-border-default p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <DialogTitle>{query.data?.title ?? "Editor de curso"}</DialogTitle>
-              <DialogDescription>Asistente editorial con guardado por etapa y requisitos de publicación.</DialogDescription>
-            </div>
+            <div><p className="text-sm font-medium text-text-secondary">Borrador y publicación</p><p className="mt-1 text-sm text-text-secondary">Completa cada etapa a tu ritmo; los campos avanzados son opcionales.</p></div>
             {wizard ? (
               <div className="min-w-48">
                 <div className="mb-2 flex justify-between text-xs font-medium"><span>Avance editorial</span><span>{wizard.progressPercent}%</span></div>
@@ -781,10 +756,10 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
               </div>
             ) : null}
           </div>
-        </DialogHeader>
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+        </header>
+        <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
           {query.data && wizard ? <WizardSidebar step={step} wizard={wizard} onSelect={selectStep} /> : null}
-          <div className="min-h-0 overflow-y-auto p-6">
+          <div className="min-w-0 p-5 sm:p-6">
           {query.isLoading ? <AsyncState state="loading" /> : null}
           {query.isError || design.isError ? <AsyncState state="error" onRetry={() => { void query.refetch(); void design.refetch(); }} /> : null}
           {query.data && design.data && wizard ? (
@@ -798,7 +773,6 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
                 <Card level={2}><CardContent className="p-5"><CourseMetadataForm
                   course={query.data}
                   categories={categories.data ?? []}
-                  globalAllowed={currentRole === "admin_saas"}
                   showCancel={false}
                   submitLabel="Guardar y continuar"
                   onSaved={async () => { await refresh(); selectStep("FOUNDATION"); }}
@@ -852,7 +826,7 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
           ) : null}
           </div>
         </div>
-      </DialogContent>
+      </section>
       <ScheduleDialog
         open={scheduleOpen}
         onOpenChange={setScheduleOpen}
@@ -860,7 +834,7 @@ function CourseEditorDialog({ courseId, open, onOpenChange }: { courseId: string
         onConfirm={(input) => transition.mutate({ action: "schedule", input })}
       />
       <CoursePreviewDialog courseId={courseId} open={previewOpen} onOpenChange={setPreviewOpen} />
-    </Dialog>
+    </div>
   );
 }
 

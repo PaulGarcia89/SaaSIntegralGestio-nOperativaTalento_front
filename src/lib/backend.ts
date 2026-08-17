@@ -1529,6 +1529,28 @@ export type EmployeeDirectoryResponse = {
   meta: { total: number; page: number; pageSize: number; totalPages: number };
 };
 
+export type CreateEmployeeInput = {
+  name: string;
+  email: string;
+  status?: "ACTIVE" | "INACTIVE" | "TERMINATED";
+  primaryBranchId: string;
+  primaryRole: string;
+};
+
+export function createEmployee(input: CreateEmployeeInput) {
+  return request<EmployeeDirectoryItem>("/employees", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function bulkCreateEmployees(employees: CreateEmployeeInput[]) {
+  return request<{ created: number; employees: Array<{ id: string; email: string }> }>("/employees/bulk", {
+    method: "POST",
+    body: JSON.stringify({ employees }),
+  });
+}
+
 export function fetchEmployees(input: { search?: string; status?: string; page?: number; pageSize?: number } = {}) {
   const query = new URLSearchParams();
   if (input.search) query.set("search", input.search);

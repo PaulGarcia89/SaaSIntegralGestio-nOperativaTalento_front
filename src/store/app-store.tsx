@@ -51,6 +51,7 @@ type AppState = {
   currentBranch: BranchDto | null;
   currentUser: UserDto;
   currentRole: RoleKey;
+  canAccessGlobalGovernance: boolean;
   currentSubscriptionStatus: SubscriptionAccessState;
   subscriptionGraceEndsAt: string | null;
   allowedTenantIds: string[];
@@ -108,11 +109,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     () => (authQuery.data ? mapAuthUserToUi(authQuery.data) : null),
     [authQuery.data],
   );
-  const roleForAdministrativeQueries =
-    authContext?.role ?? session?.role ?? "empleado";
-  const hasGlobalGovernance =
-    roleForAdministrativeQueries === "admin_saas" ||
-    roleForAdministrativeQueries === "admin_plataforma";
+  const canAccessGlobalGovernance = authContext?.canAccessGlobalGovernance ?? false;
+  const hasGlobalGovernance = canAccessGlobalGovernance;
 
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", session?.token],
@@ -133,8 +131,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       currentTenantId &&
       !isGlobalSuperAdmin &&
       (
-        roleForAdministrativeQueries === "admin_saas" ||
-        roleForAdministrativeQueries === "admin_plataforma" ||
+        canAccessGlobalGovernance ||
         authQuery.data?.permissions.includes("branches.read")
       ),
     ),
@@ -149,8 +146,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       currentTenantId &&
       !isGlobalSuperAdmin &&
       (
-        roleForAdministrativeQueries === "admin_saas" ||
-        roleForAdministrativeQueries === "admin_plataforma" ||
+        canAccessGlobalGovernance ||
         authQuery.data?.permissions.some((permission) => permission.startsWith("users."))
       ),
     ),
@@ -364,6 +360,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       currentBranch,
       currentUser,
       currentRole,
+      canAccessGlobalGovernance,
       currentSubscriptionStatus,
       subscriptionGraceEndsAt,
       allowedTenantIds,
@@ -409,6 +406,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       canAccessBranch,
       currentBranch,
       currentRole,
+      canAccessGlobalGovernance,
       currentSubscriptionStatus,
       currentTenant,
       currentUser,

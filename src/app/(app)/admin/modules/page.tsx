@@ -13,9 +13,13 @@ import { InfoList, SectionCard } from "@/components/ui";
 import { AsyncState } from "@/components/async-state";
 
 export default function ModulesPage() {
-  const { can } = useAppStore();
+  const { can, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
-  const tenantsQuery = useQuery({ queryKey: ["admin-tenants"], queryFn: fetchTenants });
+  const tenantsQuery = useQuery({
+    queryKey: ["admin-tenants"],
+    queryFn: fetchTenants,
+    enabled: canAccessGlobalGovernance,
+  });
   const modulesQuery = useQuery({ queryKey: ["module-assignments"], queryFn: () => fetchModuleAssignments() });
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("");

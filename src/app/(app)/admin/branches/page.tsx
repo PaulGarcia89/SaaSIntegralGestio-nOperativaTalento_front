@@ -34,9 +34,9 @@ type BranchFormValues = z.output<typeof branchSchema>;
 type BranchFormInput = z.input<typeof branchSchema>;
 
 export default function BranchesPage() {
-  const { can, currentTenant, currentRole } = useAppStore();
+  const { can, currentTenant, currentRole, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
-  const hasGlobalGovernance = currentRole === "admin_saas" || currentRole === "admin_plataforma";
+  const hasGlobalGovernance = canAccessGlobalGovernance;
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", hasGlobalGovernance ? "global" : currentTenant.id],
     queryFn: () => hasGlobalGovernance ? fetchTenants() : Promise.resolve([currentTenant]),

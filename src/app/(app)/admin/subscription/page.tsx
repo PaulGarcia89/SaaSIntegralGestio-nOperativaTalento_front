@@ -37,9 +37,13 @@ type SubscriptionFormValues = z.output<typeof subscriptionSchema>;
 type SubscriptionFormInput = z.input<typeof subscriptionSchema>;
 
 export default function SubscriptionPage() {
-  const { can } = useAppStore();
+  const { can, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
-  const tenantsQuery = useQuery({ queryKey: ["admin-tenants"], queryFn: fetchTenants });
+  const tenantsQuery = useQuery({
+    queryKey: ["admin-tenants"],
+    queryFn: fetchTenants,
+    enabled: canAccessGlobalGovernance,
+  });
   const subscriptionsQuery = useQuery({ queryKey: ["subscriptions"], queryFn: fetchSubscriptions });
   const plansQuery = useQuery({ queryKey: ["plan-catalog"], queryFn: fetchPlanCatalog });
   const [query, setQuery] = useState("");

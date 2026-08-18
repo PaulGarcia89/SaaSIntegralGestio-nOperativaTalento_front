@@ -217,6 +217,7 @@ type BackendAuthUser = {
   lastName: string;
   isSuperAdmin: boolean;
   isGlobalContext?: boolean;
+  canAccessGlobalGovernance?: boolean;
   roles: string[];
   permissions: string[];
   enabledModules: string[];
@@ -525,6 +526,7 @@ function buildMockAuthUser(userId: string): BackendAuthUser {
     roleScope: user.role,
     allowedBranchIds: branches.map((branch) => branch.id),
     activeBranchId: branches[0]?.id ?? null,
+    canAccessGlobalGovernance: user.role === "admin_saas" || user.role === "admin_plataforma",
     availableBranches: branches.map((branch) => ({
       id: branch.id,
       tenantId: branch.tenantId,
@@ -700,14 +702,7 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
   const mapped = new Set<PermissionKey>(["dashboard.view", "notifications.view", "profile.view"]);
   const hasAny = (prefix: string) => codes.some((code) => code.startsWith(prefix));
   const hasCode = (code: string) => codes.includes(code);
-  const hasAdminAccess =
-    isSuperAdmin ||
-    hasAny("tenants.") ||
-    hasAny("branches.") ||
-    hasAny("users.") ||
-    hasAny("roles.") ||
-    hasAny("subscriptions.") ||
-    hasAny("modules.");
+  const hasAdminAccess = isSuperAdmin;
 
   if (isSuperAdmin) {
     PERMISSION_KEYS.forEach((permission) => mapped.add(permission));
@@ -4050,6 +4045,7 @@ export function mapAuthUserToUi(authUser: BackendAuthUser): {
   enabledModules: ModuleKey[];
   featureFlags: string[];
   role: RoleKey;
+  canAccessGlobalGovernance: boolean;
   allowedBranchIds: string[];
   allowedTenantIds: string[];
   activeBranchId: string | null;
@@ -4058,9 +4054,12 @@ export function mapAuthUserToUi(authUser: BackendAuthUser): {
   impersonation: { active: boolean; tenantId?: string | null; startedAt?: string | null } | null;
   tenant: TenantDto;
 } {
+  const canAccessGlobalGovernance = Boolean(
+    authUser.canAccessGlobalGovernance ?? (authUser.isSuperAdmin && authUser.isGlobalContext),
+  );
   const enabledModules = deriveEnabledModules(
     authUser.tenant?.enabledModules ?? authUser.enabledModules,
-    authUser.isSuperAdmin || authUser.permissions.some((code) => code.startsWith("tenants.") || code.startsWith("users.") || code.startsWith("roles.")),
+    canAccessGlobalGovernance,
   );
   const role = roleCodesToRoleKey(authUser.roles, authUser.isSuperAdmin);
 
@@ -4082,6 +4081,7 @@ export function mapAuthUserToUi(authUser: BackendAuthUser): {
       ]),
     ],
     role,
+    canAccessGlobalGovernance,
     allowedBranchIds: authUser.allowedBranchIds,
     allowedTenantIds: authUser.allowedTenantIds ?? [authUser.tenantId],
     activeBranchId: authUser.activeBranchId,

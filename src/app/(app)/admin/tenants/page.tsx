@@ -52,11 +52,12 @@ const tenantSchema = z.object({
 type TenantFormValues = z.infer<typeof tenantSchema>;
 
 export default function TenantsPage() {
-  const { can } = useAppStore();
+  const { can, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants"],
     queryFn: fetchTenants,
+    enabled: canAccessGlobalGovernance,
   });
   const subscriptionsQuery = useQuery({
     queryKey: ["subscriptions"],

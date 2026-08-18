@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, RefreshCw, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trackProductEvent } from "@/lib/product-analytics";
 import {
   downloadTextFile,
+  deleteSavedReportFilter,
+  fetchSavedReportFilters,
   fetchReportsExport,
   fetchReportsOverview,
+  saveReportFilter,
   type ReportQuery,
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
@@ -19,8 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-type SavedFilter = { id: string; name: string; filters: ReportQuery };
 
 const statusLabels: Record<string, string> = {
   SUBMITTED: "Recibida",
@@ -50,27 +51,41 @@ export default function ReportsPage() {
     currentBranch,
     currentRole,
     currentTenant,
-    currentUser,
     tenantBranches,
   } = useAppStore();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<ReportQuery>(() => defaultFilters());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterName, setFilterName] = useState("");
-  const storageKey = `talentos:report-filters:${currentUser.id}:${currentTenant.id}`;
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const activeFilterCount = [filters.from, filters.to, filters.branchId].filter(Boolean).length;
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const stored = window.localStorage.getItem(storageKey);
-        setSavedFilters(stored ? (JSON.parse(stored) as SavedFilter[]) : []);
-      } catch {
-        setSavedFilters([]);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [storageKey]);
+  const savedFiltersQuery = useQuery({
+    queryKey: ["report-saved-filters", currentTenant.id],
+    queryFn: fetchSavedReportFilters,
+  });
+  const savedFilters = savedFiltersQuery.data ?? [];
+  const saveFilterMutation = useMutation({
+    mutationFn: saveReportFilter,
+    onSuccess: async () => {
+      setFilterName("");
+      await queryClient.invalidateQueries({ queryKey: ["report-saved-filters", currentTenant.id] });
+      trackProductEvent({ name: "filter_used", surface: "reports", activeCount: activeFilterCount });
+      toast.success("Filtro guardado en la base de datos");
+    },
+    onError: (error) => toast.error("No fue posible guardar el filtro", {
+      description: error instanceof Error ? error.message : undefined,
+    }),
+  });
+  const deleteFilterMutation = useMutation({
+    mutationFn: deleteSavedReportFilter,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["report-saved-filters", currentTenant.id] });
+      toast.success("Filtro eliminado");
+    },
+    onError: (error) => toast.error("No fue posible eliminar el filtro", {
+      description: error instanceof Error ? error.message : undefined,
+    }),
+  });
 
   const query = useQuery({
     queryKey: ["reports-overview", currentTenant.id, filters],
@@ -106,20 +121,10 @@ export default function ReportsPage() {
   const saveFilter = () => {
     const name = filterName.trim();
     if (!name) return;
-    const next = [
-      ...savedFilters.filter((item) => item.name.toLocaleLowerCase() !== name.toLocaleLowerCase()),
-      { id: crypto.randomUUID(), name, filters },
-    ];
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-    setSavedFilters(next);
-    setFilterName("");
-    trackProductEvent({ name: "filter_used", surface: "reports", activeCount: activeFilterCount });
-    toast.success("Filtro guardado");
+    saveFilterMutation.mutate({ name, filters });
   };
   const removeFilter = (id: string) => {
-    const next = savedFilters.filter((item) => item.id !== id);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-    setSavedFilters(next);
+    deleteFilterMutation.mutate(id);
   };
   const resetFilters = () => setFilters(defaultFilters());
   const filterFields = (idPrefix: string) => <><div className="space-y-2"><Label htmlFor={`${idPrefix}-from`}>Desde</Label><Input id={`${idPrefix}-from`} type="date" value={filters.from ?? ""} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></div><div className="space-y-2"><Label htmlFor={`${idPrefix}-to`}>Hasta</Label><Input id={`${idPrefix}-to`} type="date" value={filters.to ?? ""} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></div><div className="space-y-2"><Label>Alcance</Label><FormSelect aria-label="Alcance por sucursal" value={filters.scope === "tenant" ? "all" : filters.branchId ?? currentBranch?.id ?? "all"} onValueChange={(value) => setFilters({ ...filters, branchId: value === "all" ? undefined : value, scope: value === "all" ? "tenant" : "context" })} options={scopeOptions} /></div><div className="flex flex-wrap gap-2 md:col-span-3">{[7, 30, 90].map((days) => <Button key={days} size="sm" variant="secondary" onClick={() => changePeriod(days)}>Últimos {days} días</Button>)}</div></>;
@@ -152,9 +157,9 @@ export default function ReportsPage() {
           {filterFields("desktop-report")}
           <div className="flex flex-col gap-2 sm:flex-row lg:col-span-3">
             <Input aria-label="Nombre del filtro" placeholder="Nombre para guardar este filtro" value={filterName} onChange={(event) => setFilterName(event.target.value)} />
-            <Button variant="secondary" onClick={saveFilter} disabled={!filterName.trim()}>
+            <Button variant="secondary" onClick={saveFilter} disabled={!filterName.trim() || saveFilterMutation.isPending}>
               <Save className="size-4" aria-hidden="true" />
-              Guardar filtro
+              {saveFilterMutation.isPending ? "Guardando…" : "Guardar filtro"}
             </Button>
             {savedFilters.length ? (
               <FormSelect
@@ -172,7 +177,7 @@ export default function ReportsPage() {
           {savedFilters.length ? (
             <div className="flex flex-wrap gap-2 lg:col-span-3">
               {savedFilters.map((item) => (
-                <Button key={item.id} size="sm" variant="ghost" onClick={() => removeFilter(item.id)} aria-label={`Eliminar filtro ${item.name}`}>
+                <Button key={item.id} size="sm" variant="ghost" onClick={() => removeFilter(item.id)} disabled={deleteFilterMutation.isPending} aria-label={`Eliminar filtro ${item.name}`}>
                   {item.name}
                   <Trash2 className="size-3.5" aria-hidden="true" />
                 </Button>

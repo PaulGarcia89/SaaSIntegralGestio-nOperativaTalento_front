@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Activity, Camera, Clock3, MapPinned, Play, RefreshCw, Sparkles, TriangleAlert, Video } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Activity, Camera, Clock3, MapPinned, Play, RefreshCw, Sparkles, TriangleAlert } from "lucide-react";
 import {
+  createProductivityDemoEvent,
   fetchProductivityAlerts,
   fetchProductivityCameras,
+  fetchProductivityEvents,
   fetchProductivityInsights,
   fetchProductivityOverview,
   fetchProductivityZones,
 } from "@/lib/backend";
 import {
-  advanceDemoSession,
-  loadDemoSession,
-  resetDemoSession,
-  saveDemoSession,
+  createDemoSession,
+  createNextDemoEvent,
   summarizeDemoSession,
-  toggleDemoRunning,
   type ProductivityDemoSession,
 } from "@/lib/productivity-demo";
 import { useAppStore } from "@/store/app-store";
@@ -65,11 +64,11 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
                 <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr]">
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm">
                     <p className="text-xs uppercase tracking-[0.3em] text-white/60">Zona activa</p>
-                    <p className="mt-2 text-2xl font-semibold">{activeEvent?.zoneName ?? "Mostrador A"}</p>
+                    <p className="mt-2 text-2xl font-semibold">{activeEvent?.zoneName ?? "Sin eventos registrados"}</p>
                     <p className="mt-2 text-sm text-white/80">La cámara está registrando ocupación, flujo y tiempos de permanencia para generar productividad demo.</p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Personas {activeEvent?.peopleDetected ?? 4}</Badge>
-                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Productividad {activeEvent?.productivityScore ?? 91}%</Badge>
+                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Personas {activeEvent?.peopleDetected ?? 0}</Badge>
+                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Productividad {activeEvent?.productivityScore ?? 0}%</Badge>
                       <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Eventos {summary.totalEvents}</Badge>
                     </div>
                   </div>
@@ -98,6 +97,9 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
 export default function ProductivityPage() {
   const { currentBranch } = useAppStore();
   const branchId = currentBranch?.id;
+  const queryClient = useQueryClient();
+  const [running, setRunning] = useState(true);
+  const [frame, setFrame] = useState(0);
 
   const overview = useQuery({
     queryKey: ["productivity-overview", branchId],
@@ -124,51 +126,77 @@ export default function ProductivityPage() {
     queryFn: () => fetchProductivityZones(),
     enabled: Boolean(branchId),
   });
+  const events = useQuery({
+    queryKey: ["productivity-events", branchId, "DEMO"],
+    queryFn: () => fetchProductivityEvents({ branchId: branchId!, source: "DEMO", limit: 100 }),
+    enabled: Boolean(branchId),
+    refetchInterval: running ? 3500 : false,
+  });
 
-  const [session, setSession] = useState<ProductivityDemoSession | null>(null);
-
-  useEffect(() => {
-    if (!currentBranch) return;
-    setSession((current) => {
-      if (current && current.cameras.length && current.zones.length) return current;
-      return loadDemoSession({
-        branchName: currentBranch.name,
+  const session = useMemo(
+    () =>
+      createDemoSession({
         cameras: cameras.data ?? [],
         zones: zones.data ?? [],
-      });
-    });
-  }, [currentBranch, cameras.data, zones.data]);
+        events: events.data ?? [],
+        running,
+        frame,
+      }),
+    [cameras.data, events.data, frame, running, zones.data],
+  );
+  const sessionRef = useRef(session);
+  const pendingRef = useRef(false);
+  const createEventRef = useRef<(input: ReturnType<typeof createNextDemoEvent>) => void>(() => undefined);
+  const createEvent = useMutation({
+    mutationFn: createProductivityDemoEvent,
+    onSuccess: async () => {
+      setFrame((current) => current + 1);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["productivity-events", branchId] }),
+        queryClient.invalidateQueries({ queryKey: ["productivity-overview", branchId] }),
+        queryClient.invalidateQueries({ queryKey: ["productivity-alerts", branchId] }),
+        queryClient.invalidateQueries({ queryKey: ["productivity-insights", branchId] }),
+      ]);
+    },
+  });
+  const persistDemoEvent = createEvent.mutate;
 
   useEffect(() => {
-    if (!session?.running) return;
+    sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    pendingRef.current = createEvent.isPending;
+  }, [createEvent.isPending]);
+
+  useEffect(() => {
+    createEventRef.current = (input) => {
+      if (input) persistDemoEvent(input);
+    };
+  }, [persistDemoEvent]);
+
+  useEffect(() => {
+    if (!running || session.cameras.length === 0) return;
     const id = window.setInterval(() => {
-      setSession((current) => {
-        if (!current) return current;
-        return advanceDemoSession(current);
-      });
+      if (pendingRef.current) return;
+      const nextEvent = createNextDemoEvent(sessionRef.current);
+      createEventRef.current(nextEvent);
     }, 3200);
     return () => window.clearInterval(id);
-  }, [session?.running]);
+  }, [running, session.cameras.length]);
 
-  const sessionSummary = useMemo(() => (session ? summarizeDemoSession(session) : null), [session]);
+  const sessionSummary = useMemo(() => summarizeDemoSession(session), [session]);
 
   if (!branchId) {
     return <AsyncState state="error" title="Selecciona una sucursal para revisar productividad" />;
   }
-  if (overview.isLoading || !sessionSummary) {
+  if (overview.isLoading || cameras.isLoading || zones.isLoading || events.isLoading) {
     return <AsyncState state="loading" title="Cargando demo de productividad" />;
   }
-  if (overview.isError) {
-    return <AsyncState state="error" title="No pudimos cargar Productividad" onRetry={() => void overview.refetch()} />;
+  if (overview.isError || cameras.isError || zones.isError || events.isError) {
+    const error = overview.error ?? cameras.error ?? zones.error ?? events.error;
+    return <AsyncState state="error" title="No pudimos cargar Productividad" description={error instanceof Error ? error.message : undefined} onRetry={() => void Promise.all([overview.refetch(), cameras.refetch(), zones.refetch(), events.refetch()])} />;
   }
-
-  const demoSession =
-    session ??
-    loadDemoSession({
-      branchName: currentBranch.name,
-      cameras: cameras.data ?? [],
-      zones: zones.data ?? [],
-    });
   const overviewData = overview.data!;
   const metricItems = [
     [Activity, "Eventos", overviewData.totalEvents],
@@ -198,36 +226,44 @@ export default function ProductivityPage() {
           <>
             <Button
               variant="secondary"
-              onClick={() => {
-                if (!currentBranch) return;
-                const next = session ? toggleDemoRunning(session) : loadDemoSession({ branchName: currentBranch.name, cameras: cameras.data ?? [], zones: zones.data ?? [] });
-                setSession(next);
-                saveDemoSession(next);
-              }}
+              onClick={() => setRunning((current) => !current)}
+              disabled={session.cameras.length === 0}
             >
-              {session?.running ? <RefreshCw className="size-4" /> : <Play className="size-4" />}
-              {session?.running ? "Pausar demo" : "Reanudar demo"}
+              {running ? <RefreshCw className="size-4" /> : <Play className="size-4" />}
+              {running ? "Pausar demo" : "Reanudar demo"}
             </Button>
             <Button
               onClick={() => {
-                if (!currentBranch) return;
-                const next = resetDemoSession({ branchName: currentBranch.name, cameras: cameras.data ?? [], zones: zones.data ?? [] });
-                setSession(next);
+                const nextEvent = createNextDemoEvent(session);
+                if (nextEvent) createEvent.mutate(nextEvent);
               }}
+              disabled={session.cameras.length === 0 || createEvent.isPending}
             >
               <Sparkles className="size-4" />
-              Reiniciar demo
+              {createEvent.isPending ? "Guardando evento" : "Generar evento"}
             </Button>
           </>
         }
       />
 
       <InlineFeedback tone="info" title="Escenario de demostración activo">
-        La cámara registrada puede simular grabación continua, generar eventos y poblar métricas de productividad en tiempo real.
+        Cada captura demo se almacena en la base de datos y vuelve a consultarse desde el backend para poblar estas métricas.
       </InlineFeedback>
 
+      {session.cameras.length === 0 ? (
+        <InlineFeedback tone="warning" title="No hay cámaras activas en esta sucursal">
+          Registra y activa una cámara en Cámaras y zonas antes de iniciar la demostración. No se generarán datos ficticios.
+        </InlineFeedback>
+      ) : null}
+
+      {createEvent.isError ? (
+        <InlineFeedback tone="danger" title="El evento no pudo almacenarse">
+          {createEvent.error instanceof Error ? createEvent.error.message : "El backend rechazó el registro."}
+        </InlineFeedback>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
-        <DemoCameraPreview session={demoSession} />
+        <DemoCameraPreview session={session} />
         <Card level={2}>
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
@@ -235,7 +271,7 @@ export default function ProductivityPage() {
                 <p className="text-sm font-medium text-primary">Resumen del demo</p>
                 <h2 className="text-xl font-semibold">{currentBranch.name}</h2>
               </div>
-              <Badge variant={session?.running ? "success" : "secondary"}>{session?.running ? "Grabando" : "En pausa"}</Badge>
+              <Badge variant={running ? "success" : "secondary"}>{running ? "Grabando" : "En pausa"}</Badge>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-surface-section p-4">
@@ -258,7 +294,7 @@ export default function ProductivityPage() {
             <div className="rounded-2xl border border-border-default p-4">
               <p className="text-sm font-medium">Cámaras registradas</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {(session?.cameras ?? []).map((camera) => (
+                {session.cameras.map((camera) => (
                   <Badge key={camera.id} variant="secondary">
                     {camera.name}
                   </Badge>
@@ -299,6 +335,11 @@ export default function ProductivityPage() {
                   </p>
                 </div>
               ))}
+              {session.events.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-border-default p-4 text-sm text-text-secondary">
+                  Aún no hay eventos demo almacenados para esta sucursal.
+                </p>
+              ) : null}
             </div>
           </CardContent>
         </Card>

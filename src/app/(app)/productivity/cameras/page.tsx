@@ -10,7 +10,6 @@ import {
   fetchProductivityCameras,
   fetchProductivityZones,
 } from "@/lib/backend";
-import { resetDemoSession } from "@/lib/productivity-demo";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
@@ -130,24 +129,12 @@ export default function CamerasPage() {
       <PageHeader
         eyebrow="Configuración operativa"
         title="Cámaras y zonas"
-        description="Registra fuentes por sucursal, define zonas y simula una grabación demo sin usar ventanas emergentes."
+        description="Registra fuentes por sucursal y define las zonas que se analizarán en Productividad."
         actions={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                if (!currentBranch) return;
-                void resetDemoSession({ branchName: currentBranch.name, cameras: currentCameras, zones: currentZones });
-              }}
-            >
-              <RefreshCw className="size-4" />
-              Reiniciar demo
-            </Button>
-            <Button onClick={() => void refresh()}>
-              <RefreshCw className="size-4" />
-              Actualizar
-            </Button>
-          </>
+          <Button onClick={() => void refresh()}>
+            <RefreshCw className="size-4" />
+            Actualizar
+          </Button>
         }
       />
 
@@ -345,8 +332,8 @@ export default function CamerasPage() {
               <h2 id="sources-note" className="font-semibold">Notas del demo</h2>
             </div>
             <p className="text-sm text-text-secondary">
-              La simulación se queda dentro de esta página y la de <strong>Productividad</strong>. Si quieres, el siguiente paso es conectar una fuente real
-              autorizada y hacer que el demo reproduzca el estado de grabación y las zonas en ambas vistas.
+              Esta página solo administra fuentes y zonas persistentes. La grabación simulada, sus eventos y sus indicadores se consultan exclusivamente en
+              <strong> Productividad</strong>.
             </p>
           </CardContent>
         </Card>

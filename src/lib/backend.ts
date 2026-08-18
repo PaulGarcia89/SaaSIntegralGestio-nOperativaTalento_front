@@ -3651,6 +3651,30 @@ export function fetchProductivityCameras(branchId?:string){return request<Array<
 export function createProductivityCamera(input:{branchId:string;name:string;sourceType?:string;description?:string;streamUrl?:string}){return request("/productivity/cameras",{method:"POST",body:JSON.stringify(input)})}
 export function fetchProductivityZones(cameraId?:string){return request<Array<{id:string;cameraId:string;name:string;zoneType:string}>>(`/productivity/zones${cameraId?`?cameraId=${encodeURIComponent(cameraId)}`:""}`)}
 export function createProductivityZone(input:{cameraId:string;name:string;zoneType:string;description?:string;polygonCoordinates:unknown}){return request("/productivity/zones",{method:"POST",body:JSON.stringify(input)})}
+export type ProductivityEventDto = {
+  id: string;
+  cameraId: string;
+  zoneId?: string | null;
+  eventType: string;
+  startedAt: string;
+  endedAt?: string | null;
+  durationSeconds?: number | null;
+  confidence?: number | null;
+  source: string;
+  metadata?: Record<string, unknown> | null;
+  cameraName?: string | null;
+  zoneName?: string | null;
+  createdAt: string;
+};
+export function fetchProductivityEvents(input:{branchId:string;source?:"DEMO"|"CV_SERVICE";limit?:number}) {
+  const query = new URLSearchParams({ branchId: input.branchId });
+  if (input.source) query.set("source", input.source);
+  if (input.limit) query.set("limit", String(input.limit));
+  return request<ProductivityEventDto[]>(`/productivity/events?${query.toString()}`);
+}
+export function createProductivityDemoEvent(input:{cameraId:string;zoneId?:string;eventType:string;startedAt:string;endedAt?:string;confidence?:number;metadata?:Record<string,unknown>;idempotencyKey:string}) {
+  return request<{event:ProductivityEventDto;duplicate:boolean}>("/productivity/events/demo", { method:"POST", body:JSON.stringify(input) });
+}
 export function fetchInventoryAnalytics(branchId?: string) { return request<{ assets: { total: number; available: number; assigned: number; maintenance: number; returnPending: number }; stock: { references: number; reorder: number; belowMinimum: number }; operations: { openMaintenance: number; purchaseOrdersInProgress: number } }>(`/inventory/analytics${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
 export function fetchInventoryAuditTrail(filters: { branchId?: string; page?: number } = {}) { const q = new URLSearchParams(); if (filters.branchId) q.set("branchId", filters.branchId); if (filters.page) q.set("page", String(filters.page)); return request<{ items: Array<{ id: string; action?: string; email?: string; actorRole?: string; route: string; statusCode: number; createdAt: string; correlationId?: string }>; page: number; total: number; totalPages: number }>(`/inventory/audit-trail${q.size ? `?${q}` : ""}`); }
 export function createInventoryCatalogItem(input: { sku: string; name: string }) {
@@ -3980,6 +4004,16 @@ export type AtsAnalyticsQuery = ReportQuery & {
   granularity?: "day" | "week" | "month";
 };
 
+export type SavedReportFilterDto = {
+  id: string;
+  tenantId: string;
+  userId: string;
+  name: string;
+  filters: ReportQuery;
+  createdAt: string;
+  updatedAt: string;
+};
+
 function reportQueryString(input: ReportQuery) {
   const query = new URLSearchParams();
   if (input.from) query.set("from", input.from);
@@ -4004,6 +4038,18 @@ export function fetchReportsOverview(input: ReportQuery) {
 
 export function fetchReportsExport(input: ReportQuery) {
   return request<ReportExportDto>(`/reports/export?${reportQueryString(input)}`);
+}
+
+export function fetchSavedReportFilters() {
+  return request<SavedReportFilterDto[]>("/reports/saved-filters");
+}
+
+export function saveReportFilter(input: { name: string; filters: ReportQuery }) {
+  return request<SavedReportFilterDto>("/reports/saved-filters", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function deleteSavedReportFilter(id: string) {
+  return request<{ deleted: boolean; id: string }>(`/reports/saved-filters/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function fetchAtsAnalytics(input: AtsAnalyticsQuery) {

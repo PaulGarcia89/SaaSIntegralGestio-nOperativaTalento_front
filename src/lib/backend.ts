@@ -736,6 +736,9 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
     mapped.add("jobs.update");
     mapped.add("jobs.publish");
   }
+  if (hasCode("employees.read")) mapped.add("employees.read");
+  if (hasCode("employees.create")) mapped.add("employees.create");
+  if (hasCode("employees.update")) mapped.add("employees.update");
   if (hasCode("applications.read")) {
     mapped.add("applications.view");
     mapped.add("candidates.view");

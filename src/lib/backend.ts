@@ -159,6 +159,7 @@ import { applicationFormSchemaForApi } from "@/lib/application-form";
 import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
 import { PERMISSION_KEYS } from "@/lib/contracts";
 import { authenticateUser as authenticateMockUser } from "@/lib/mock-backend";
+import { deleteTrainingCourse as deleteMockTrainingCourse } from "@/lib/mock-backend";
 import {
   clearStoredAuth,
   getStoredAuth,
@@ -2738,6 +2739,10 @@ export function duplicateTrainingCourse(courseId: string, title?: string) {
 }
 
 export function deleteTrainingCourse(courseId: string) {
+  if (MOCK_BACKEND_ENABLED) {
+    return deleteMockTrainingCourse(courseId);
+  }
+
   return request<{ deleted: boolean; id: string }>(
     `/training/admin/courses/${encodeURIComponent(courseId)}`,
     { method: "DELETE" },

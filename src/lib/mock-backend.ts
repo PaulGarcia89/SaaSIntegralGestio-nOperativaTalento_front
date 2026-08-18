@@ -1355,6 +1355,20 @@ export async function fetchVacancyHiringPlans(tenantId: string): Promise<Vacancy
   return vacancyHiringPlansDb.filter((plan) => visibleIds.has(plan.vacancyId));
 }
 
+export async function deleteTrainingCourse(courseId: string) {
+  await wait();
+  const course = coursesDb.find((item) => item.id === courseId);
+
+  if (!course) {
+    throw new Error("Curso no encontrado");
+  }
+
+  coursesDb = coursesDb.filter((item) => item.id !== courseId);
+  trainingActivationsDb = trainingActivationsDb.filter((item) => item.courseTitle !== course.title);
+
+  return { deleted: true, id: courseId };
+}
+
 export async function fetchInventory(tenantId: string): Promise<InventoryItemDto[]> {
   await wait();
   if (tenantId === "tenant-2") {

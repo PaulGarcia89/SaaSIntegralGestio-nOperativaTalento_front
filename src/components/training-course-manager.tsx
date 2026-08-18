@@ -78,6 +78,7 @@ import {
   reorderTrainingLessons,
   requestTrainingQualityReviews,
   decideTrainingQualityReview,
+  ApiError,
   transitionTrainingCourse,
   updateTrainingContentBlock,
   updateTrainingCourse,
@@ -196,7 +197,14 @@ export function TrainingCourseManager() {
       toast.success("Curso eliminado");
       await queryClient.invalidateQueries({ queryKey: ["training-admin-courses"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible eliminar el curso.")),
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 403) {
+        toast.error("El backend negó el borrado del curso. Revisa permisos o el estado del tenant.");
+        return;
+      }
+
+      toast.error(getApiErrorMessage(error, "No fue posible eliminar el curso."));
+    },
   });
 
   function setFilter(key: string, value: string) {

@@ -199,7 +199,7 @@ export function TrainingCourseManager() {
     },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 403) {
-        toast.error("El backend negó el borrado del curso. Revisa permisos o el estado del tenant.");
+        toast.error(error.message || "No tienes permiso para borrar este curso.");
         return;
       }
 

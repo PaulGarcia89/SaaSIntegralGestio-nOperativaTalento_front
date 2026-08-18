@@ -189,6 +189,10 @@ const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "15000")
 const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
 const AUTH_API_BASE_URL = STATIC_HOSTING ? API_BASE_URL : "/api";
 
+// This legacy registration is not backed by the production database. Keep it
+// out of administrative selectors until its original data source is reconciled.
+const HIDDEN_LEGACY_TENANT_SLUGS = new Set(["superiortech"]);
+
 type BackendAuthUser = {
   id: string;
   userId: string;
@@ -1388,13 +1392,15 @@ export async function logoutCurrentSession() {
 export async function fetchTenants(): Promise<TenantDto[]> {
   try {
     const tenants = await request<BackendTenant[]>("/tenants");
-    return tenants.map(mapTenant);
+    return tenants
+      .map(mapTenant)
+      .filter((tenant) => !HIDDEN_LEGACY_TENANT_SLUGS.has(tenant.slug.toLowerCase()));
   } catch (error) {
     if (!shouldUseMockBackend(error)) {
       throw error;
     }
 
-    return mockTenants;
+    return mockTenants.filter((tenant) => !HIDDEN_LEGACY_TENANT_SLUGS.has(tenant.slug.toLowerCase()));
   }
 }
 

@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { FilterToolbar } from "@/components/domain";
 import { InlineFeedback, PageHeader, ResponsiveDataView } from "@/components/design-system";
-import { bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, getApiErrorMessage, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
+import { ApiError, bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, getApiErrorMessage, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 
 type EmployeeStatus = NonNullable<CreateEmployeeInput["status"]>;
@@ -34,7 +34,22 @@ export default function EmployeesPage() {
   const refresh = async () => { await queryClient.invalidateQueries({ queryKey: ["employees"] }); };
 
   if (employees.isLoading) return <AsyncState state="loading" title="Cargando empleados" />;
-  if (employees.isError) return <AsyncState state="error" title="No fue posible cargar el directorio" onRetry={() => void employees.refetch()} />;
+  if (employees.isError) {
+    const apiError = employees.error instanceof ApiError ? employees.error : null;
+    const fallback = "No fue posible cargar el directorio";
+    const description = apiError
+      ? `(${apiError.code ?? `HTTP ${apiError.status}`}) ${getApiErrorMessage(employees.error, fallback)}`
+      : getApiErrorMessage(employees.error, fallback);
+
+    return (
+      <AsyncState
+        state="error"
+        title="No fue posible cargar el directorio"
+        description={description}
+        onRetry={() => void employees.refetch()}
+      />
+    );
+  }
   const data = employees.data?.data ?? [];
   const canCreate = can("employees.create");
 

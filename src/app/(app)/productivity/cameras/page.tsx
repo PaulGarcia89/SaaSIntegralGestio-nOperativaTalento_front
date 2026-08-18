@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Camera, MapPinned, Pause, Play, Plus, Radio, RefreshCw, Video } from "lucide-react";
+import { Camera, MapPinned, Plus, Radio, RefreshCw, Video } from "lucide-react";
 import { toast } from "sonner";
 import {
   createProductivityCamera,
@@ -10,14 +10,7 @@ import {
   fetchProductivityCameras,
   fetchProductivityZones,
 } from "@/lib/backend";
-import {
-  advanceDemoSession,
-  loadDemoSession,
-  resetDemoSession,
-  summarizeDemoSession,
-  toggleDemoRunning,
-  type ProductivityDemoSession,
-} from "@/lib/productivity-demo";
+import { resetDemoSession } from "@/lib/productivity-demo";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
@@ -40,89 +33,12 @@ function formatTime(iso?: string | null) {
   return new Intl.DateTimeFormat("es", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
 }
 
-function DemoFeed({ session }: { session: ProductivityDemoSession }) {
-  const summary = summarizeDemoSession(session);
-  const activeEvent = summary.latestEvent;
-
-  return (
-    <Card level={2} className="overflow-hidden">
-      <CardContent className="space-y-4 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-primary">Cabina de simulación</p>
-            <h2 className="text-xl font-semibold">Vista previa de la cámara demo</h2>
-          </div>
-          <Badge variant={session.running ? "success" : "secondary"}>{session.running ? "Grabando" : "Pausada"}</Badge>
-        </div>
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-border-default bg-slate-950">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.3),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.16),transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.55),rgba(2,6,23,0.95))]" />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:48px_48px] opacity-30" />
-            <div className="absolute inset-0 p-5 text-white">
-              <div className="flex items-start justify-between gap-3">
-                <div className="rounded-full bg-black/40 px-3 py-1 text-xs uppercase tracking-[0.3em] text-white/70">{session.cameras[0]?.name ?? "Recepción principal"}</div>
-                <div className="rounded-full border border-sky-300/30 bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-100">Cámaras que miden tu eficiencia</div>
-              </div>
-              <div className="mt-8 grid gap-3 lg:grid-cols-[1.4fr_0.6fr]">
-                <div className="rounded-3xl border border-white/10 bg-black/35 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.32em] text-white/60">Zona activa</p>
-                  <p className="mt-2 text-3xl font-semibold">{activeEvent?.zoneName ?? "Mostrador A"}</p>
-                  <p className="mt-2 max-w-xl text-sm text-white/80">
-                    La cámara simulada detecta flujo, permanencia y ocupación para poblar indicadores de productividad demo.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Personas {activeEvent?.peopleDetected ?? 4}</Badge>
-                    <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Productividad {activeEvent?.productivityScore ?? 91}%</Badge>
-                    <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Eventos {summary.totalEvents}</Badge>
-                  </div>
-                </div>
-                <div className="grid gap-3">
-                  <div className="rounded-3xl border border-white/10 bg-black/35 p-4 backdrop-blur-sm">
-                    <p className="text-xs uppercase tracking-[0.32em] text-white/60">Estado</p>
-                    <p className="mt-2 text-lg font-semibold">Grabación continua</p>
-                    <p className="text-sm text-white/80">{activeEvent?.note ?? "La simulación mantiene un flujo de eventos y señales periódicas."}</p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-black/35 p-4 backdrop-blur-sm">
-                    <p className="text-xs uppercase tracking-[0.32em] text-white/60">Última señal</p>
-                    <p className="mt-2 text-lg font-semibold">{formatTime(summary.latestEvent?.occurredAt)}</p>
-                    <p className="text-sm text-white/80">La fuente se almacena protegida; en el demo nunca se expone la URL.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-3">
-            <div className="rounded-3xl bg-surface-section p-4">
-              <p className="text-sm text-text-secondary">Cámaras vivas</p>
-              <p className="mt-1 text-3xl font-semibold">{summary.activeCameras}</p>
-            </div>
-            <div className="rounded-3xl bg-surface-section p-4">
-              <p className="text-sm text-text-secondary">Zonas conectadas</p>
-              <p className="mt-1 text-3xl font-semibold">{session.zones.length}</p>
-            </div>
-            <div className="rounded-3xl bg-surface-section p-4">
-              <p className="text-sm text-text-secondary">Productividad media</p>
-              <p className="mt-1 text-3xl font-semibold">{Math.round(summary.averageProductivity)}%</p>
-            </div>
-            <div className="rounded-3xl bg-surface-section p-4">
-              <p className="text-sm text-text-secondary">Eventos simulados</p>
-              <p className="mt-1 text-3xl font-semibold">{summary.totalEvents}</p>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function CamerasPage() {
   const { can, currentBranch } = useAppStore();
   const queryClient = useQueryClient();
   const branchId = currentBranch?.id;
   const [cameraForm, setCameraForm] = useState({ name: "", sourceType: "RTSP", streamUrl: "" });
   const [zoneForm, setZoneForm] = useState({ cameraId: "", name: "", zoneType: "WORKSTATION" });
-  const [session, setSession] = useState<ProductivityDemoSession | null>(null);
-
   const cameras = useQuery({
     queryKey: ["productivity-cameras", branchId],
     queryFn: () => fetchProductivityCameras(branchId),
@@ -177,31 +93,6 @@ export default function CamerasPage() {
     onError: () => toast.error("No fue posible registrar la zona"),
   });
 
-  useEffect(() => {
-    if (!currentBranch) return;
-    setSession((current) => {
-      if (current && current.cameras.length && current.zones.length) return current;
-      return loadDemoSession({
-        branchName: currentBranch.name,
-        cameras: cameras.data ?? [],
-        zones: zones.data ?? [],
-      });
-    });
-  }, [currentBranch, cameras.data, zones.data]);
-
-  useEffect(() => {
-    if (!session?.running) return;
-    const id = window.setInterval(() => {
-      setSession((current) => {
-        if (!current) return current;
-        return advanceDemoSession(current);
-      });
-    }, 3200);
-    return () => window.clearInterval(id);
-  }, [session?.running]);
-
-  const sessionSummary = useMemo(() => (session ? summarizeDemoSession(session) : null), [session]);
-
   if (!can("productivity.manage")) {
     return (
       <Card level={2}>
@@ -224,20 +115,13 @@ export default function CamerasPage() {
     );
   }
 
-  if (cameras.isLoading || zones.isLoading || !sessionSummary) {
+  if (cameras.isLoading || zones.isLoading) {
     return <AsyncState state="loading" title="Cargando cámaras y zonas" />;
   }
   if (cameras.isError || zones.isError) {
     return <AsyncState state="error" title="No fue posible cargar la configuración" onRetry={() => void refresh()} />;
   }
 
-  const demoSession =
-    session ??
-    loadDemoSession({
-      branchName: currentBranch.name,
-      cameras: cameras.data ?? [],
-      zones: zones.data ?? [],
-    });
   const currentZones = zones.data ?? [];
   const currentCameras = cameras.data ?? [];
 
@@ -253,21 +137,7 @@ export default function CamerasPage() {
               variant="secondary"
               onClick={() => {
                 if (!currentBranch) return;
-                const next = toggleDemoRunning(
-                  session ?? loadDemoSession({ branchName: currentBranch.name, cameras: currentCameras, zones: currentZones }),
-                );
-                setSession(next);
-              }}
-            >
-              {session?.running ? <Pause className="size-4" /> : <Play className="size-4" />}
-              {session?.running ? "Pausar demo" : "Reanudar demo"}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                if (!currentBranch) return;
-                const next = resetDemoSession({ branchName: currentBranch.name, cameras: currentCameras, zones: currentZones });
-                setSession(next);
+                void resetDemoSession({ branchName: currentBranch.name, cameras: currentCameras, zones: currentZones });
               }}
             >
               <RefreshCw className="size-4" />
@@ -282,10 +152,8 @@ export default function CamerasPage() {
       />
 
       <InlineFeedback tone="info" title="Flujo sin popups">
-        Todo el alta, edición y simulación ocurre dentro de páginas normales. La cámara demo puede generar eventos y alimentar productividad en tiempo real.
+        Todo el alta, edición y simulación ocurre dentro de páginas normales. Las cámaras y zonas se administran aquí, mientras la vista previa demo vive en Productividad.
       </InlineFeedback>
-
-      <DemoFeed session={demoSession} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card level={2}>
@@ -467,31 +335,6 @@ export default function CamerasPage() {
             Define al menos una zona para que la simulación empiece a generar productividad por área.
           </InlineFeedback>
         )}
-      </section>
-
-      <section aria-labelledby="demo-history" className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Activity className="size-4 text-primary" aria-hidden="true" />
-          <h2 id="demo-history" className="font-semibold">Historial del demo</h2>
-        </div>
-        <div className="grid gap-3">
-          {session?.events.slice(0, 6).map((event) => (
-            <Card key={event.id} level={2}>
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div>
-                  <p className="font-medium">{event.label}</p>
-                  <p className="text-sm text-text-secondary">
-                    {event.cameraName} · {event.zoneName} · {event.peopleDetected} personas
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">{event.productivityScore}%</p>
-                  <p className="text-xs text-text-secondary">{formatTime(event.occurredAt)}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       </section>
 
       <section aria-labelledby="sources-note">

@@ -1,8 +1,5 @@
 import type { RoleKey, SessionDto } from "@/lib/contracts";
 
-const LEGACY_AUTH_STORAGE_KEY = "saas-integral.auth";
-const TENANT_STORAGE_KEY = "saas-integral.current-tenant";
-const BRANCH_STORAGE_KEY = "saas-integral.current-branch";
 const MOCK_AUTH_STORAGE_KEY = "saas-integral.mock-auth";
 // Keep demo sessions local to non-production builds so production only uses
 // credentials and entities issued by the live backend.
@@ -27,7 +24,6 @@ export function getStoredAuth() {
 export function persistAuth(auth: AuthSnapshot) {
   memoryAuth = auth;
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
   if (MOCK_BACKEND_ENABLED) {
     window.sessionStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify(auth));
   }
@@ -35,11 +31,10 @@ export function persistAuth(auth: AuthSnapshot) {
 export function clearStoredAuth() {
   memoryAuth = null;
   if (typeof window === "undefined") return;
-  [LEGACY_AUTH_STORAGE_KEY, TENANT_STORAGE_KEY, BRANCH_STORAGE_KEY].forEach((key) => window.localStorage.removeItem(key));
   window.sessionStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
 }
-export function getStoredTenantId() { return typeof window === "undefined" ? "" : window.localStorage.getItem(TENANT_STORAGE_KEY) ?? ""; }
-export function persistSelectedTenantId(tenantId: string) { if (typeof window === "undefined") return; if (tenantId) window.localStorage.setItem(TENANT_STORAGE_KEY, tenantId); else window.localStorage.removeItem(TENANT_STORAGE_KEY); }
-export function getStoredBranchId() { return typeof window === "undefined" ? "" : window.localStorage.getItem(BRANCH_STORAGE_KEY) ?? ""; }
-export function persistSelectedBranchId(branchId: string) { if (typeof window === "undefined") return; if (branchId) window.localStorage.setItem(BRANCH_STORAGE_KEY, branchId); else window.localStorage.removeItem(BRANCH_STORAGE_KEY); }
+export function getStoredTenantId() { return ""; }
+export function persistSelectedTenantId(_tenantId: string) {}
+export function getStoredBranchId() { return ""; }
+export function persistSelectedBranchId(_branchId: string) {}
 export function getStoredSession(): SessionDto | null { const auth = getStoredAuth(); return auth ? { token: auth.accessToken, tenantId: auth.tenantId, userId: auth.userId, role: auth.role } : null; }

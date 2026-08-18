@@ -713,15 +713,8 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
   const { can } = useAppStore();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [step, setStep] = useState<TrainingCourseWizardStep>(() => {
-    const saved = localStorage.getItem(`training-course-wizard:${courseId}`);
-    return TRAINING_COURSE_WIZARD_STEPS.some((item) => item.id === saved)
-      ? saved as TrainingCourseWizardStep
-      : "GENERAL";
-  });
-  const [previewed, setPreviewed] = useState(
-    () => localStorage.getItem(`training-course-previewed:${courseId}`) === "true",
-  );
+  const [step, setStep] = useState<TrainingCourseWizardStep>("GENERAL");
+  const [previewed, setPreviewed] = useState(false);
   const query = useQuery({
     queryKey: ["training-course", courseId],
     queryFn: () => fetchTrainingCourse(courseId),
@@ -734,7 +727,6 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
 
   function selectStep(next: TrainingCourseWizardStep) {
     setStep(next);
-    localStorage.setItem(`training-course-wizard:${courseId}`, next);
   }
 
   const refresh = async () => {
@@ -820,7 +812,6 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
                   onPreview={() => {
                     setPreviewOpen(true);
                     setPreviewed(true);
-                    localStorage.setItem(`training-course-previewed:${query.data.id}`, "true");
                   }}
                   onContinue={() => selectStep("PUBLISH")}
                 />

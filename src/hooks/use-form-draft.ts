@@ -10,20 +10,13 @@ export function useFormDraft<T extends FieldValues>(
 ) {
   useEffect(() => {
     if (!enabled) return;
-    const saved = window.sessionStorage.getItem(key);
-    if (saved) {
-      try {
-        form.reset(JSON.parse(saved) as T);
-      } catch {
-        window.sessionStorage.removeItem(key);
-      }
-    }
-
     return form.subscribe({
       formState: { values: true },
-      callback: ({ values }) => window.sessionStorage.setItem(key, JSON.stringify(values)),
+      callback: () => {
+        void key;
+      },
     });
   }, [enabled, form, key]);
 
-  return () => window.sessionStorage.removeItem(key);
+  return () => {};
 }

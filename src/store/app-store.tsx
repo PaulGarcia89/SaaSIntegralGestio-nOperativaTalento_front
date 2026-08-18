@@ -27,12 +27,8 @@ import {
   fetchTenantUsers,
   fetchTenants,
   getStoredSession,
-  getStoredBranchId,
-  getStoredTenantId,
   logoutCurrentSession,
   mapAuthUserToUi,
-  persistSelectedTenantId,
-  persistSelectedBranchId,
   updateBranchContext,
   updateTenantContext,
   restoreCurrentSession,
@@ -82,13 +78,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [hasHydratedSession, setHasHydratedSession] = useState(false);
 
   useEffect(() => {
-    const storedTenantId = getStoredTenantId();
-    const storedBranchId = getStoredBranchId();
     void restoreCurrentSession().then((restoredSession) => {
       setSession(restoredSession);
-      setCurrentTenantIdState(storedTenantId || restoredSession?.tenantId || "");
+      setCurrentTenantIdState(restoredSession?.tenantId || "");
       setCurrentUserIdState(restoredSession?.userId || "");
-      setCurrentBranchIdState(storedBranchId);
+      setCurrentBranchIdState("");
     }).finally(() => setHasHydratedSession(true));
   }, []);
 
@@ -183,7 +177,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       });
       setCurrentUserIdState(authContext.user.id);
       setCurrentBranchIdState((previous) => previous || authContext.activeBranchId || "");
-      setCurrentTenantIdState((previous) => previous || getStoredTenantId() || authContext.user.tenantId);
+      setCurrentTenantIdState((previous) => previous || authContext.user.tenantId);
     });
   }, [authContext]);
 
@@ -251,7 +245,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (tenantBranches.length === 0) {
-      persistSelectedBranchId("");
       queueMicrotask(() => setCurrentBranchIdState(""));
       return;
     }
@@ -259,7 +252,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const branchStillVisible = tenantBranches.some((branch) => branch.id === currentBranchId);
     if (!branchStillVisible) {
       const fallbackBranchId = tenantBranches[0]?.id ?? "";
-      persistSelectedBranchId(fallbackBranchId);
       queueMicrotask(() => setCurrentBranchIdState(fallbackBranchId));
     }
   }, [currentBranchId, tenantBranches]);
@@ -370,15 +362,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setCurrentTenantId: async (tenantId: string) => {
         if (!accessContextVerified || currentRole !== "admin_plataforma" || !can("platform.tenant.switch") || !allowedTenantIds.includes(tenantId)) return;
         await updateTenantContext(tenantId);
-        persistSelectedTenantId(tenantId);
-        persistSelectedBranchId("");
         setCurrentBranchIdState("");
         setCurrentTenantIdState(tenantId);
       },
       setCurrentBranchId: async (branchId: string) => {
         if (currentRole === "admin_saas" || !tenantBranches.some((branch) => branch.id === branchId)) return;
         await updateBranchContext(branchId);
-        persistSelectedBranchId(branchId);
         setCurrentBranchIdState(branchId);
       },
       setCurrentUserId: (userId: string) => {

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, ClipboardCheck, Copy, History, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { archiveVacancy, cloneVacancy, createPersonnelRequisition, createVacancy, decidePersonnelRequisition, fetchPersonnelRequisitions, fetchVacancies, fetchVacancyHistory, updateVacancy, uploadVacancyImage } from "@/lib/backend";
 import type { CreateVacancyInput, PersonnelRequisitionDto, PersonnelRequisitionInput, PublicVacancyDto, VacancyResponsibleDto, VacancyResponsibleRole, VacancyStageDto } from "@/lib/contracts";
-import { loadScopedDraft, purgeExpiredDrafts, removeScopedDraft, saveScopedDraft, type DraftScope } from "@/lib/draft-storage";
 import { useAppStore } from "@/store/app-store";
 import { technicalLabel } from "@/lib/ui-labels";
 import { ActionBar, InlineFeedback, PageHeader, Wizard } from "@/components/design-system";
@@ -19,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DEFAULT_DRAFT_TTL_MS, loadScopedDraft, removeScopedDraft, saveScopedDraft } from "@/lib/draft-storage";
 
 const steps = ["Información", "Contenido", "Condiciones", "Formulario", "Proceso", "Responsables", "Revisión"];
 const initial = (branchId: string): CreateVacancyInput => ({ branchId, title: "", summary: "", description: "", requirements: "", responsibilities: "", benefits: "", city: "", country: "", department: "", seniority: "", workMode: "HYBRID", employmentType: "FULL_TIME", openings: 1, applicationFormSchema: { version: 1, fields: [] }, status: "DRAFT" });
@@ -34,7 +34,6 @@ interface VacancyDraft { form: CreateVacancyInput; stages: VacancyStageDto[]; re
 
 export default function VacanciesPage() {
   const queryClient = useQueryClient(); const { currentBranch, currentTenant, currentUser, branches, tenantUsers, can } = useAppStore();
-  const draftScope = useMemo<DraftScope>(() => ({ namespace: "vacancy-create", tenantId: currentTenant.id, userId: currentUser.id }), [currentTenant.id, currentUser.id]);
   const [open, setOpen] = useState(false); const [step, setStep] = useState(0); const [form, setForm] = useState<CreateVacancyInput>(() => initial(currentBranch?.id ?? "")); const [errors, setErrors] = useState<Array<{ fieldId: string; label: string; message: string }>>([]);
   const [stages, setStages] = useState<VacancyStageDto[]>(initialStages);
   const [responsibles, setResponsibles] = useState<VacancyResponsibleDto[]>([]);
@@ -44,10 +43,10 @@ export default function VacanciesPage() {
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<PublicVacancyDto | null>(null);
   const [archiveReason, setArchiveReason] = useState("");
-  useEffect(() => { purgeExpiredDrafts(); }, []);
-  useEffect(() => { if (!open) return; const timer = window.setTimeout(() => saveScopedDraft<VacancyDraft>(draftScope, { form, stages, responsibles }), 400); return () => window.clearTimeout(timer); }, [draftScope, form, open, responsibles, stages]);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftTimer = useRef<number | null>(null);
   const vacancies = useQuery({ queryKey: ["vacancies", currentBranch?.id], queryFn: fetchVacancies, enabled: Boolean(currentBranch) });
-  const save = useMutation({ mutationFn: async (input: CreateVacancyInput) => { const vacancy = editingId ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, { stages, responsibles }) : await createVacancy({ ...input, imageUrl: undefined }, { stages, responsibles }); if (imageFile) await uploadVacancyImage(vacancy.id, imageFile); return vacancy; }, onSuccess: async () => { removeScopedDraft(draftScope); await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); } });
+  const save = useMutation({ mutationFn: async (input: CreateVacancyInput) => { const vacancy = editingId ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, { stages, responsibles }) : await createVacancy({ ...input, imageUrl: undefined }, { stages, responsibles }); if (imageFile) await uploadVacancyImage(vacancy.id, imageFile); return vacancy; }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); } });
   const clone = useMutation({ mutationFn: (id: string) => cloneVacancy(id, "Clonación administrada desde ATS"), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
   const archive = useMutation({ mutationFn: () => archiveVacancy(archiveTarget!.id, archiveReason), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setArchiveTarget(null); setArchiveReason(""); } });
   const restore = useMutation({ mutationFn: (vacancy: PublicVacancyDto) => updateVacancy(vacancy.id, { ...vacancyToInput(vacancy), status: "PAUSED" }, { stages: vacancy.stages ?? [], responsibles: vacancy.responsibles ?? [] }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
@@ -62,11 +61,46 @@ export default function VacanciesPage() {
   const errorsForStep = (value: number) => validateAll().filter((item) => editingId && item.fieldId === "vacancy-image" ? false : value === 0 ? ["vacancy-title", "vacancy-branch", "vacancy-image"].includes(item.fieldId) : value === 1 ? item.fieldId === "vacancy-description" : value === 2 ? ["vacancy-openings", "vacancy-salary-max"].includes(item.fieldId) : value === 3 ? item.fieldId.startsWith("question-") : value === 4 ? item.fieldId.startsWith("stage-") : false);
   const next = () => { const nextErrors = errorsForStep(step); setErrors(nextErrors); if (!nextErrors.length) setStep((value) => Math.min(steps.length - 1, value + 1)); };
   const submit = (status: CreateVacancyInput["status"]) => { const nextErrors = (status === "PUBLISHED" || status === "OPEN" ? validateAll() : []).filter((item) => !(editingId && item.fieldId === "vacancy-image")); setErrors(nextErrors); if (!nextErrors.length) save.mutate({ ...form, status }); };
-  const openWizard = () => { setEditingId(null); const saved = loadScopedDraft<VacancyDraft | CreateVacancyInput>(draftScope); const value = saved?.value; const isCurrentDraft = Boolean(value && "form" in value); setForm(isCurrentDraft ? { ...initial(currentBranch?.id ?? ""), ...(value as VacancyDraft).form, imageUrl: undefined } : value ? { ...initial(currentBranch?.id ?? ""), ...(value as CreateVacancyInput), imageUrl: undefined } : initial(currentBranch?.id ?? "")); setStages(isCurrentDraft ? (value as VacancyDraft).stages : initialStages()); setResponsibles(isCurrentDraft ? (value as VacancyDraft).responsibles : []); setImageFile(null); setImagePreview(""); setErrors([]); setOpen(true); };
+  const draftScope = useMemo(() => currentUser && currentTenant && currentBranch && !editingId ? { namespace: "vacancy", tenantId: currentTenant.id, userId: currentUser.id, resourceId: currentBranch.id } : null, [currentBranch, currentTenant, currentUser, editingId]);
+  const openWizard = () => { setEditingId(null); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); setErrors([]); setDraftReady(false); setOpen(true); };
   const editVacancy = (vacancy: PublicVacancyDto) => { setEditingId(vacancy.id); setForm(vacancyToInput(vacancy)); setStages(vacancy.stages ?? initialStages()); setResponsibles(vacancy.responsibles ?? []); setImageFile(null); setImagePreview(vacancy.imageUrl ?? ""); setErrors([]); setStep(0); setOpen(true); };
   const setFields = (nextFields: typeof fields) => update("applicationFormSchema", { version: 1, fields: nextFields });
   const addQuestion = () => setFields([...fields, { key: `question_${crypto.randomUUID().slice(0, 8)}`, label: "", type: "TEXT", required: false }]);
   const items = vacancies.data?.data ?? [];
+
+  useEffect(() => {
+    if (!open || editingId || !draftScope) return;
+    let cancelled = false;
+    setDraftReady(false);
+    void loadScopedDraft<VacancyDraft>(draftScope).then((draft) => {
+      if (cancelled) return;
+      if (draft?.value) {
+        setForm(draft.value.form);
+        setStages(draft.value.stages);
+        setResponsibles(draft.value.responsibles);
+      }
+      setDraftReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [draftScope, editingId, open]);
+
+  useEffect(() => {
+    if (!open || editingId || !draftScope || !draftReady) return;
+    if (draftTimer.current) window.clearTimeout(draftTimer.current);
+    draftTimer.current = window.setTimeout(() => {
+      void saveScopedDraft<VacancyDraft>(draftScope, { form, stages, responsibles }, DEFAULT_DRAFT_TTL_MS);
+    }, 300);
+    return () => {
+      if (draftTimer.current) window.clearTimeout(draftTimer.current);
+    };
+  }, [draftReady, draftScope, editingId, form, open, responsibles, stages]);
+
+  useEffect(() => {
+    if (!open || editingId || !draftScope || !draftReady) return;
+    if (step === 6) {
+      void removeScopedDraft(draftScope);
+    }
+  }, [draftReady, draftScope, editingId, open, step]);
 
   return <div className="space-y-7"><PageHeader eyebrow="Reclutamiento" title="Vacantes" description="Crea borradores, revisa el contenido y publica únicamente después de validar el resumen." actions={can("jobs.create") ? <Button onClick={openWizard}><Plus className="size-4" />Nueva vacante</Button> : undefined} />
     {vacancies.isLoading ? <AsyncState state="loading" title="Cargando vacantes" /> : null}{vacancies.isError ? <AsyncState state="error" onRetry={() => void vacancies.refetch()} /> : null}

@@ -1,23 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fetchMyPreferences, updateMyPreference } from "@/lib/backend";
 
 export function ThemeToggle({ className }: { className?: string }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [hasMounted, setHasMounted] = useState(false);
-  const persistedRef = useRef(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme") as "light" | "dark" | null;
+    let cancelled = false;
     // TalentOS starts in a bright, high-legibility workspace on every device.
-    const nextTheme = stored === "dark" ? "dark" : "light";
-
-    queueMicrotask(() => {
-      setTheme(nextTheme);
-      setHasMounted(true);
-    });
+    void fetchMyPreferences()
+      .then((preferences) => {
+        if (cancelled) return;
+        const stored = preferences["ui-theme"] as { theme?: "light" | "dark" } | undefined;
+        setTheme(stored?.theme === "dark" ? "dark" : "light");
+        setHasMounted(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        setHasMounted(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -25,10 +34,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.style.colorScheme = theme;
-    if (persistedRef.current) {
-      localStorage.setItem("theme", theme);
-    }
-    persistedRef.current = true;
+    void updateMyPreference("ui-theme", { theme }).catch(() => undefined);
   }, [hasMounted, theme]);
 
   function toggle() {

@@ -2345,6 +2345,21 @@ export interface ApplicationSavedViewDto {
   updatedAt: string;
 }
 
+export interface WorkspaceViewDto {
+  id: string;
+  tenantId: string;
+  userId: string;
+  module: string;
+  screen: string;
+  workspaceKey: string | null;
+  name: string;
+  config: Record<string, unknown>;
+  isShared: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RejectionReasonDto {
   id: string;
   code: string;

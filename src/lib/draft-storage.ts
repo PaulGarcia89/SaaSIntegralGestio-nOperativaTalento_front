@@ -15,11 +15,10 @@ interface DraftEnvelope<T> {
   value: T;
 }
 
-const PREFIX = "talentos.draft";
+import { fetchMyPreferences, updateMyPreference } from "@/lib/backend";
 
-function segment(value: string) {
-  return encodeURIComponent(value.trim());
-}
+const PREF_NAMESPACE = "drafts";
+const PREFIX = "talentos.draft";
 
 export function draftStorageKey(scope: DraftScope) {
   if (!scope.namespace || !scope.tenantId || !scope.userId) {
@@ -35,42 +34,63 @@ function sameScope(left: DraftScope, right: DraftScope) {
   return left.namespace === right.namespace && left.tenantId === right.tenantId && left.userId === right.userId && left.resourceId === right.resourceId;
 }
 
-export function saveScopedDraft<T>(scope: DraftScope, value: T, ttlMs = DEFAULT_DRAFT_TTL_MS, now = Date.now()) {
-  if (typeof window === "undefined") return;
-  const envelope: DraftEnvelope<T> = { version: 1, scope, savedAt: now, expiresAt: now + ttlMs, value };
-  window.sessionStorage.setItem(draftStorageKey(scope), JSON.stringify(envelope));
+function segment(value: string) {
+  return encodeURIComponent(value.trim());
 }
 
-export function loadScopedDraft<T>(scope: DraftScope, now = Date.now()): { value: T; savedAt: number; expiresAt: number } | null {
-  if (typeof window === "undefined") return null;
+async function readDraftMap(now = Date.now(), includeExpired = false) {
+  const preferences = await fetchMyPreferences().catch(() => ({} as Record<string, unknown>));
+  const stored = preferences[PREF_NAMESPACE];
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+  const entries = Object.entries(stored as Record<string, unknown>);
+  return Object.fromEntries(entries.filter(([, value]) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const envelope = value as DraftEnvelope<unknown>;
+    return envelope.version === 1 && (includeExpired || envelope.expiresAt > now);
+  }));
+}
+
+async function writeDraftMap(map: Record<string, unknown>) {
+  await updateMyPreference(PREF_NAMESPACE, map);
+}
+
+export async function saveScopedDraft<T>(scope: DraftScope, value: T, ttlMs = DEFAULT_DRAFT_TTL_MS, now = Date.now()) {
+  const envelope: DraftEnvelope<T> = { version: 1, scope, savedAt: now, expiresAt: now + ttlMs, value };
+  const key = draftStorageKey(scope);
+  const map = await readDraftMap(now);
+  map[key] = envelope;
+  await writeDraftMap(map);
+}
+
+export async function loadScopedDraft<T>(scope: DraftScope, now = Date.now()): Promise<{ value: T; savedAt: number; expiresAt: number } | null> {
   const key = draftStorageKey(scope);
   try {
-    const envelope = JSON.parse(window.sessionStorage.getItem(key) ?? "null") as DraftEnvelope<T> | null;
+    const map = await readDraftMap(now);
+    const envelope = map[key] as DraftEnvelope<T> | undefined;
     if (!envelope || envelope.version !== 1 || !sameScope(envelope.scope, scope) || envelope.expiresAt <= now) {
-      window.sessionStorage.removeItem(key);
+      if (Object.prototype.hasOwnProperty.call(map, key)) {
+        delete map[key];
+        await writeDraftMap(map);
+      }
       return null;
     }
     return { value: envelope.value, savedAt: envelope.savedAt, expiresAt: envelope.expiresAt };
   } catch {
-    window.sessionStorage.removeItem(key);
     return null;
   }
 }
 
-export function removeScopedDraft(scope: DraftScope) {
-  if (typeof window !== "undefined") window.sessionStorage.removeItem(draftStorageKey(scope));
+export async function removeScopedDraft(scope: DraftScope) {
+  const key = draftStorageKey(scope);
+  // Explicit deletion must also remove expired records left behind by a prior session.
+  const map = await readDraftMap(Date.now(), true);
+  if (Object.prototype.hasOwnProperty.call(map, key)) {
+    delete map[key];
+    await writeDraftMap(map);
+  }
 }
 
-export function purgeExpiredDrafts(now = Date.now()) {
-  if (typeof window === "undefined") return;
-  for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
-    const key = window.sessionStorage.key(index);
-    if (!key?.startsWith(`${PREFIX}:`)) continue;
-    try {
-      const envelope = JSON.parse(window.sessionStorage.getItem(key) ?? "null") as DraftEnvelope<unknown> | null;
-      if (!envelope || envelope.version !== 1 || envelope.expiresAt <= now) window.sessionStorage.removeItem(key);
-    } catch {
-      window.sessionStorage.removeItem(key);
-    }
-  }
+export async function purgeExpiredDrafts(now = Date.now()) {
+  const map = await readDraftMap(now);
+  await writeDraftMap(map);
 }

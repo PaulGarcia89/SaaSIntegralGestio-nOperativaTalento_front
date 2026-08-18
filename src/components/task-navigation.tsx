@@ -7,6 +7,7 @@ import { trackProductEvent } from "@/lib/product-analytics";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fetchMyPreferences, updateMyPreference } from "@/lib/backend";
 
 type AllowedRoute = { href: string; label: string; group: string };
 
@@ -30,33 +31,39 @@ const glossary = [
 ] as const;
 
 export function TaskNavigation({ routes, pathname, role, onSearch }: { routes: AllowedRoute[]; pathname: string; role: string; onSearch: () => void }) {
-  const storageKey = `talentos:task-navigation:${role}`;
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const saved = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as { favorites?: string[]; recent?: string[] };
-        setFavorites(saved.favorites ?? []);
-        const nextRecent = [pathname, ...(saved.recent ?? []).filter((href) => href !== pathname)].slice(0, 5);
-        setRecent(nextRecent);
-        window.localStorage.setItem(storageKey, JSON.stringify({ favorites: saved.favorites ?? [], recent: nextRecent }));
-      } catch { /* Navigation remains usable when storage is unavailable. */ }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [pathname, storageKey]);
+    let cancelled = false;
+    void fetchMyPreferences()
+      .then((preferences) => {
+        if (cancelled) return;
+        const stored = preferences[`task-navigation:${role}`] as { favorites?: string[]; recent?: string[] } | undefined;
+        setFavorites(stored?.favorites ?? []);
+        setRecent([pathname, ...(stored?.recent ?? []).filter((href) => href !== pathname)].slice(0, 5));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRecent((current) => [pathname, ...current.filter((href) => href !== pathname)].slice(0, 5));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, role]);
+
+  useEffect(() => {
+    void updateMyPreference(`task-navigation:${role}`, { favorites, recent }).catch(() => undefined);
+  }, [favorites, recent, role]);
 
   const routeByHref = useMemo(() => new Map(routes.map((route) => [route.href, route])), [routes]);
   const quick = (roleActionLabels[role] ?? ["Inicio", "Alertas", "Mi perfil"]).map((label) => routes.find((route) => route.label === label)).filter((route): route is AllowedRoute => Boolean(route));
-  const persist = (nextFavorites: string[]) => {
-    setFavorites(nextFavorites);
-    window.localStorage.setItem(storageKey, JSON.stringify({ favorites: nextFavorites, recent }));
-  };
   const toggleFavorite = (href: string) => {
     const enabled = !favorites.includes(href);
-    persist(enabled ? [...favorites, href] : favorites.filter((item) => item !== href));
+    const nextFavorites = enabled ? [...favorites, href] : favorites.filter((item) => item !== href);
+    setFavorites(nextFavorites);
+    void updateMyPreference(`task-navigation:${role}`, { favorites: nextFavorites, recent }).catch(() => undefined);
     trackProductEvent({ name: "navigation_favorite_toggled", href, enabled });
   };
 

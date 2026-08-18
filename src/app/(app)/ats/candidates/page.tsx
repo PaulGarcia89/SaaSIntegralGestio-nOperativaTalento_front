@@ -4,18 +4,19 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, BookmarkPlus, Download, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowRight, Download, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { ActionBar, InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
 import { FilterField, RecruitmentWorkspaceNav } from "@/components/recruitment-workspace";
+import { WorkspaceViewManager } from "@/components/workspace-view-manager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { applicationNextAction, applicationStageLabel, formatApplicationDate } from "@/lib/applications";
-import { bulkUpdateApplications, createApplicationSavedView, deleteApplicationSavedView, exportApplications, fetchApplicationSavedViews, fetchApplications, fetchRejectionReasons, fetchUsers, fetchVacancies, fetchVacancySetup } from "@/lib/backend";
+import { bulkUpdateApplications, exportApplications, fetchApplications, fetchRejectionReasons, fetchUsers, fetchVacancies, fetchVacancySetup } from "@/lib/backend";
 import type { ApplicationFilters, VacancyApplicationDto } from "@/lib/contracts";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { useAppStore } from "@/store/app-store";
@@ -52,7 +53,6 @@ function CandidatesContent() {
   const [bulkRecruiter, setBulkRecruiter] = useState(ALL);
   const [bulkRejectionReasonId, setBulkRejectionReasonId] = useState(ALL);
   const [bulkReason, setBulkReason] = useState("");
-  const [viewName, setViewName] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount = [search, vacancyId !== ALL, stage !== ALL, overdueOnly, assignedRecruiterId !== ALL, rejectionReasonId !== ALL].filter(Boolean).length;
 
@@ -71,7 +71,6 @@ function CandidatesContent() {
   const vacanciesQuery = useQuery({ queryKey: ["vacancies", "candidate-filters"], queryFn: fetchVacancies });
   const setup = useQuery({ queryKey: ["vacancy-setup", vacancyId], queryFn: () => fetchVacancySetup(vacancyId), enabled: vacancyId !== ALL });
   const users = useQuery({ queryKey: ["users", "ats-bulk"], queryFn: fetchUsers });
-  const views = useQuery({ queryKey: ["application-saved-views"], queryFn: fetchApplicationSavedViews });
   const rejectionReasons = useQuery({ queryKey: ["application-rejection-reasons"], queryFn: fetchRejectionReasons });
   const items = applications.data?.data ?? [];
   const meta = applications.data?.meta;
@@ -92,11 +91,6 @@ function CandidatesContent() {
     onSuccess: async (result) => { toast.success(`${result.updated} postulaciones actualizadas`); setSelected([]); setBulkStage(ALL); setBulkRecruiter(ALL); setBulkRejectionReasonId(ALL); setBulkReason(""); await queryClient.invalidateQueries({ queryKey: ["applications"] }); },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No fue posible actualizar la selección"),
   });
-  const saveView = useMutation({
-    mutationFn: () => createApplicationSavedView({ name: viewName, filters: { search: search || undefined, vacancyId: vacancyId === ALL ? undefined : vacancyId, currentStageId: stage === ALL ? undefined : stage, overdueOnly: overdueOnly || undefined, assignedRecruiterId: assignedRecruiterId === ALL ? undefined : assignedRecruiterId, rejectionReasonId: rejectionReasonId === ALL ? undefined : rejectionReasonId, pageSize } }),
-    onSuccess: async () => { setViewName(""); toast.success("Vista guardada"); await queryClient.invalidateQueries({ queryKey: ["application-saved-views"] }); },
-  });
-  const removeView = useMutation({ mutationFn: deleteApplicationSavedView, onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["application-saved-views"] }) });
   const exporting = useMutation({ mutationFn: () => exportApplications(filters), onSuccess: (result) => { downloadCsv(result.data); toast.success(`${result.count} registros exportados`); }, onError: () => toast.error("No fue posible generar la exportación") });
 
   function applyView(viewFilters: ApplicationFilters) {
@@ -114,7 +108,7 @@ function CandidatesContent() {
   const candidateCard = (item: VacancyApplicationDto) => <div className="space-y-3"><div className="flex items-start gap-3"><input type="checkbox" aria-label={`Seleccionar ${item.candidate.fullName}`} checked={selected.includes(item.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} className="mt-1 size-4" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{item.candidate.fullName}</p><p className="text-sm text-text-secondary">{item.candidate.email}</p></div><Badge variant="secondary">{item.currentStage?.name ?? applicationStageLabel(item.status)}</Badge></div><div className="mt-3 space-y-1 text-sm"><p>{item.vacancy.title}</p><p className="text-text-secondary">{item.vacancy.branch?.name ?? "Sin sucursal"} · {formatApplicationDate(item.appliedAt)}</p><p><span className="font-medium">Siguiente:</span> {applicationNextAction(item.status)}</p>{item.isStageOverdue ? <p className="font-medium text-status-danger">SLA vencido</p> : null}</div></div></div><Button asChild variant="secondary"><Link href={`/ats/candidates/${item.id}`} onClick={() => trackProductEvent({ name: "candidate_profile_opened", source: "list" })}>Abrir perfil 360°<ArrowRight className="size-4" /></Link></Button></div>;
 
   return <div className="space-y-6"><PageHeader eyebrow="Reclutamiento" title="Candidatos" description="Opera el universo completo de postulaciones con filtros de servidor, acciones masivas y vistas reutilizables." actions={<Button variant="secondary" onClick={() => exporting.mutate()} disabled={exporting.isPending}><Download className="size-4" />{exporting.isPending ? "Generando…" : "Exportar todo"}</Button>} /><RecruitmentWorkspaceNav />
-    <section aria-label="Vistas guardadas" className="space-y-3 rounded-2xl border border-border-default bg-surface-elevated p-4"><div className="flex flex-wrap gap-2">{views.data?.map((view) => <div key={view.id} className="flex items-center rounded-full border border-border-default"><button type="button" className="min-h-10 px-3 text-sm font-medium" onClick={() => applyView(view.filters)}>{view.name}</button><button type="button" aria-label={`Eliminar vista ${view.name}`} className="min-h-10 border-l px-2 text-text-secondary" onClick={() => removeView.mutate(view.id)}><Trash2 className="size-4" /></button></div>)}{!views.data?.length ? <p className="text-sm text-text-secondary">Todavía no tienes vistas guardadas.</p> : null}</div><div className="flex flex-col gap-2 sm:flex-row"><Input value={viewName} onChange={(event) => setViewName(event.target.value)} maxLength={80} placeholder="Nombre de esta vista" /><Button variant="secondary" disabled={!viewName.trim() || saveView.isPending} onClick={() => saveView.mutate()}><BookmarkPlus className="size-4" />Guardar filtros</Button></div></section>
+    <WorkspaceViewManager module="ats" screen="candidates" workspaceKey={currentBranch?.id} getConfig={() => ({ filters: { search, vacancyId: vacancyId === ALL ? undefined : vacancyId, currentStageId: stage === ALL ? undefined : stage, overdueOnly, assignedRecruiterId: assignedRecruiterId === ALL ? undefined : assignedRecruiterId, rejectionReasonId: rejectionReasonId === ALL ? undefined : rejectionReasonId, pageSize }, ordering: { pageSize }, columns: ["candidate", "vacancy", "stage", "nextAction"] })} onApply={(config) => applyView((config.filters ?? {}) as ApplicationFilters)} />
     <div className="md:hidden"><Button variant="secondary" className="w-full" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="size-4" />Filtros avanzados{activeFilterCount ? ` (${activeFilterCount})` : ""}</Button></div>
     <MobileFilterSheet open={filtersOpen} onOpenChange={setFiltersOpen} title="Filtrar candidatos" description="Los resultados se actualizan desde el servidor." onClear={() => { router.replace(pathname, { scroll: false }); setSelected([]); }}><CandidateFilters search={search} vacancyId={vacancyId} stage={stage} overdueOnly={overdueOnly} assignedRecruiterId={assignedRecruiterId} rejectionReasonId={rejectionReasonId} pageSize={pageSize} vacancies={vacanciesQuery.data?.data ?? []} stages={stages} users={users.data ?? []} rejectionReasons={rejectionReasons.data ?? []} setFilter={setFilter} /></MobileFilterSheet>
     <section aria-label="Filtros de candidatos" className="hidden gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 md:grid md:grid-cols-2 xl:grid-cols-4"><CandidateFilters search={search} vacancyId={vacancyId} stage={stage} overdueOnly={overdueOnly} assignedRecruiterId={assignedRecruiterId} rejectionReasonId={rejectionReasonId} pageSize={pageSize} vacancies={vacanciesQuery.data?.data ?? []} stages={stages} users={users.data ?? []} rejectionReasons={rejectionReasons.data ?? []} setFilter={setFilter} /></section>

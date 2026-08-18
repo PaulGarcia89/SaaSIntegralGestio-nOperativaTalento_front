@@ -1,13 +1,14 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search } from "lucide-react";
-import { type ReactNode, useState, useMemo } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search, SlidersHorizontal } from "lucide-react";
+import { type ReactNode, useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { InlineFeedback, Pagination, ResponsiveDataView } from "@/components/design-system";
+import { fetchMyPreferences, updateMyPreference } from "@/lib/backend";
 
 type ToolbarOption = {
   label: string;
@@ -166,6 +167,7 @@ export function DomainTable<T>({
   exportable,
   tableClassName,
   mobileRender,
+  preferencesKey,
 }: {
   data: T[];
   columns: DataColumn<T>[];
@@ -175,6 +177,7 @@ export function DomainTable<T>({
   exportable?: boolean;
   tableClassName?: string;
   mobileRender?: (row: T) => ReactNode;
+  preferencesKey?: string;
 }) {
   const [page, setPage] = useState(0);
   const dataIdentity = data.map(getKey).join("|");
@@ -186,6 +189,26 @@ export function DomainTable<T>({
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => columns.map((column) => column.key));
+  const columnKeySignature = columns.map((column) => column.key).join("|");
+  const visibleColumns = columns.filter((column) => visibleColumnKeys.includes(column.key));
+
+  useEffect(() => {
+    if (!preferencesKey) return;
+    let active = true;
+    void fetchMyPreferences().then((preferences) => {
+      if (!active) return;
+      const stored = preferences[`table:${preferencesKey}`] as { visibleColumnKeys?: string[]; sortKey?: string | null; sortDir?: "asc" | "desc" } | undefined;
+      if (stored?.visibleColumnKeys?.length) setVisibleColumnKeys(stored.visibleColumnKeys.filter((key) => columns.some((column) => column.key === key)));
+      if (stored?.sortKey && columns.some((column) => column.key === stored.sortKey)) setSortKey(stored.sortKey);
+      if (stored?.sortDir) setSortDir(stored.sortDir);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [columnKeySignature, preferencesKey]);
+
+  function persist(next: { visibleColumnKeys?: string[]; sortKey?: string | null; sortDir?: "asc" | "desc" }) {
+    if (preferencesKey) void updateMyPreference(`table:${preferencesKey}`, { visibleColumnKeys, sortKey, sortDir, ...next }).catch(() => undefined);
+  }
 
   const sortedData = useMemo(() => {
     if (!sortKey) return data;
@@ -210,10 +233,13 @@ export function DomainTable<T>({
 
   function handleSort(key: string) {
     if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      const nextDirection = sortDir === "asc" ? "desc" : "asc";
+      setSortDir(nextDirection);
+      persist({ sortKey: key, sortDir: nextDirection });
     } else {
       setSortKey(key);
       setSortDir("asc");
+      persist({ sortKey: key, sortDir: "asc" });
     }
   }
 
@@ -232,7 +258,7 @@ export function DomainTable<T>({
       <ResponsiveDataView data={paginatedData} getKey={getKey} desktop={null} mobile={(row) => <div className="space-y-3">
               {mobileRender
                 ? mobileRender(row)
-                : columns.filter((column) => !column.mobileHidden).map((column) => (
+                : visibleColumns.filter((column) => !column.mobileHidden).map((column) => (
                     <div key={`${getKey(row)}-mobile-${column.key}`} className="grid grid-cols-[minmax(90px,0.4fr)_1fr] gap-3 border-b border-border/60 pb-2 last:border-0 last:pb-0">
                       <span className="text-xs font-medium text-muted-foreground">{column.mobileLabel ?? column.header}</span>
                       <div className="min-w-0 text-sm text-foreground">{column.render(row)}</div>
@@ -250,7 +276,7 @@ export function DomainTable<T>({
           <table className={cn("w-full text-left text-sm", tableClassName)}>
             <thead className="bg-secondary/60">
               <tr>
-                {columns.map((column) => (
+                {visibleColumns.map((column) => (
                   <th
                     key={column.key}
                     className={cn(
@@ -284,7 +310,7 @@ export function DomainTable<T>({
                   key={getKey(row)}
                   className="transition-colors hover:bg-accent/20"
                 >
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <td
                       key={`${getKey(row)}-${column.key}`}
                       className={cn("px-4 py-3 align-middle", column.cellClassName)}
@@ -346,6 +372,7 @@ export function DomainTable<T>({
           </div>
         </div>
       )}
+      {preferencesKey ? <details className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm"><summary className="flex cursor-pointer list-none items-center gap-2 font-medium"><SlidersHorizontal className="size-4" />Columnas visibles</summary><div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">{columns.filter((column) => column.key !== "actions").map((column) => <label key={column.key} className="flex items-center gap-2"><input type="checkbox" checked={visibleColumnKeys.includes(column.key)} disabled={visibleColumnKeys.length === 1 && visibleColumnKeys.includes(column.key)} onChange={(event) => { const next = event.target.checked ? [...visibleColumnKeys, column.key] : visibleColumnKeys.filter((key) => key !== column.key); setVisibleColumnKeys(next); persist({ visibleColumnKeys: next }); }} />{column.header}</label>)}</div></details> : null}
     </div>
   );
 }

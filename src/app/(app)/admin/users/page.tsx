@@ -197,7 +197,7 @@ export default function UsersPage() {
             description="Esta empresa no tiene usuarios visibles para los filtros seleccionados."
           />
         ) : (
-          <DomainTable exportable
+          <DomainTable exportable preferencesKey="admin.users.table"
             data={scopedUsers}
             getKey={(user) => user.id}
             columns={[

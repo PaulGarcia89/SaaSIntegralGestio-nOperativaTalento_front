@@ -48,6 +48,7 @@ function PipelineContent() {
     target: VacancyStageDto;
   } | null>(null);
   const [preview, setPreview] = useState<VacancyApplicationDto | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const vacanciesQuery = useQuery({
     queryKey: ["vacancies", "pipeline"],
@@ -130,7 +131,17 @@ function PipelineContent() {
     const pendingTransition = application.pendingTransitions?.[0];
     return (
       <Card level={2} key={application.id}>
-        <CardContent className="space-y-3 p-4">
+        <CardContent
+          className={`space-y-3 p-4 transition-opacity ${draggingId === application.id ? "opacity-50" : ""}`}
+          draggable={can("applications.change_stage")}
+          onDragStart={(event) => {
+            if (!can("applications.change_stage")) return;
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("application-id", application.id);
+            setDraggingId(application.id);
+          }}
+          onDragEnd={() => setDraggingId(null)}
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold">{application.candidate.fullName}</p>
@@ -272,11 +283,30 @@ function PipelineContent() {
               {stages.map((stage) => {
                 const items = filtered.filter((item) => currentApplicationStage(item, stages)?.id === stage.id);
                 return (
-                  <section key={stage.id} className="rounded-2xl bg-surface-section p-3" aria-labelledby={`stage-${stage.id}`}>
+                  <section
+                    key={stage.id}
+                    className={`rounded-2xl bg-surface-section p-3 transition-colors ${draggingId ? "outline outline-2 outline-dashed outline-primary/30" : ""}`}
+                    aria-labelledby={`stage-${stage.id}`}
+                    onDragOver={(event) => {
+                      if (!draggingId) return;
+                      event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const applicationId = event.dataTransfer.getData("application-id") || draggingId;
+                      const application = filtered.find((item) => item.id === applicationId);
+                      if (!application || !can("applications.change_stage")) return;
+                      const currentStage = currentApplicationStage(application, stages);
+                      if (currentStage?.id === stage.id) return;
+                      setStageChange({ application, target: stage });
+                      setDraggingId(null);
+                    }}
+                  >
                     <div className="mb-3 flex items-center justify-between">
                       <h2 id={`stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
                       <Badge variant="secondary">{items.length}</Badge>
                     </div>
+                    <p className="mb-3 text-xs text-text-secondary">Suelta una tarjeta aquí para moverla.</p>
                     <div className="space-y-3">
                       {items.map((item) => card(item))}
                       {!items.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-text-secondary">Sin postulaciones</p> : null}

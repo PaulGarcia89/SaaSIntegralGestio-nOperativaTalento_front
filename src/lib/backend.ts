@@ -163,14 +163,11 @@ import { deleteTrainingCourse as deleteMockTrainingCourse } from "@/lib/mock-bac
 import {
   clearStoredAuth,
   getStoredAuth,
-  getStoredBranchId,
   getStoredSession,
-  getStoredTenantId,
   persistAuth,
-  persistSelectedTenantId,
   type AuthSnapshot,
 } from "@/lib/auth-storage";
-export { clearStoredAuth, getStoredBranchId, getStoredSession, getStoredTenantId, persistSelectedBranchId, persistSelectedTenantId } from "@/lib/auth-storage";
+export { clearStoredAuth, getStoredSession } from "@/lib/auth-storage";
 import {
   mockBranches,
   mockTenants,
@@ -244,6 +241,7 @@ type BackendAuthUser = {
       logoUrl?: string | null;
     };
   };
+  preferences?: Record<string, unknown>;
 };
 
 type LoginResponse = {
@@ -351,6 +349,7 @@ type RequestOptions = {
   retryOnUnauthorized?: boolean;
   tenantId?: string;
   responseType?: "json" | "blob";
+  retrySafe?: boolean;
 };
 
 export class ApiError extends Error {
@@ -943,11 +942,11 @@ function splitFullName(fullName: string) {
 }
 
 function resolveTenantHeader(explicitTenantId?: string) {
-  return explicitTenantId || getStoredTenantId() || getStoredAuth()?.tenantId || "";
+  return explicitTenantId || getStoredAuth()?.tenantId || "";
 }
 
 function resolveBranchHeader() {
-  return getStoredBranchId();
+  return "";
 }
 
 async function readJsonSafe(response: Response) {
@@ -982,6 +981,33 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
     window.clearTimeout(timeout);
     init.signal?.removeEventListener("abort", abortFromCaller);
   }
+}
+
+function requestId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function waitForRetry(attempt: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, 250 * 2 ** attempt));
+}
+
+async function fetchSafeRead(input: RequestInfo | URL, init: RequestInit, enabled: boolean) {
+  const attempts = enabled ? 3 : 1;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(input, init);
+      if (![408, 429, 502, 503, 504].includes(response.status) || attempt === attempts - 1) return response;
+      await waitForRetry(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) throw error;
+      await waitForRetry(attempt);
+    }
+  }
+  throw lastError;
 }
 
 async function refreshAccessToken() {
@@ -1048,6 +1074,7 @@ export async function restoreCurrentSession() {
 async function request<T>(path: string, init: RequestInit = {}, options: RequestOptions = {}): Promise<T> {
   const auth = getStoredAuth();
   const headers = new Headers(init.headers);
+  if (!headers.has("x-request-id")) headers.set("x-request-id", requestId());
   const tenantId = resolveTenantHeader(options.tenantId);
   const branchId = resolveBranchHeader();
 
@@ -1068,21 +1095,22 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
   }
 
   const requestBaseUrl = options.authBridge ? AUTH_API_BASE_URL : API_BASE_URL;
-  let response = await fetchWithTimeout(`${requestBaseUrl}${path}`, {
+  const isSafeRead = (init.method ?? "GET").toUpperCase() === "GET" && options.retrySafe !== false;
+  let response = await fetchSafeRead(`${requestBaseUrl}${path}`, {
     ...init,
     headers,
     credentials: init.credentials ?? "include",
-  });
+  }, isSafeRead);
 
   if (response.status === 401 && options.auth !== false && options.retryOnUnauthorized !== false && auth) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       headers.set("Authorization", `Bearer ${refreshed.accessToken}`);
-      response = await fetchWithTimeout(`${requestBaseUrl}${path}`, {
+      response = await fetchSafeRead(`${requestBaseUrl}${path}`, {
         ...init,
         headers,
         credentials: init.credentials ?? "include",
-      });
+      }, isSafeRead);
     }
   }
 
@@ -1298,7 +1326,6 @@ export async function authenticateUser(input: {
 
     const snapshot = buildSessionSnapshot(payload);
     persistAuth(snapshot);
-    persistSelectedTenantId(snapshot.tenantId);
     await establishFrontendSession(snapshot.accessToken);
 
     return {
@@ -1339,7 +1366,6 @@ async function authenticateWithExplicitMock(email: string) {
   };
 
   persistAuth(snapshot);
-  persistSelectedTenantId(snapshot.tenantId);
   await establishFrontendSession(snapshot.accessToken);
 
   return {
@@ -1372,6 +1398,35 @@ export function updateTenantContext(tenantId: string) {
 
 export function updateBranchContext(branchId: string) {
   return request<BackendAuthUser>("/auth/context/branch", { method: "PUT", body: JSON.stringify({ branchId }) });
+}
+
+export function fetchMyPreferences() {
+  return request<Record<string, unknown>>("/auth/preferences");
+}
+
+export function updateMyPreference(namespace: string, value: unknown) {
+  return request("/auth/preferences/" + encodeURIComponent(namespace), {
+    method: "PUT",
+    body: JSON.stringify({ value }),
+  });
+}
+
+export function fetchWorkspaceViews(module: string, screen: string, workspaceKey?: string) {
+  const query = new URLSearchParams({ module, screen });
+  if (workspaceKey) query.set("workspaceKey", workspaceKey);
+  return request<import("./contracts").WorkspaceViewDto[]>(`/auth/workspace-views?${query.toString()}`);
+}
+
+export function createWorkspaceView(input: { module: string; screen: string; workspaceKey?: string; name: string; config: Record<string, unknown>; isShared?: boolean; isDefault?: boolean }) {
+  return request<import("./contracts").WorkspaceViewDto>("/auth/workspace-views", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateWorkspaceView(id: string, input: { name: string; config: Record<string, unknown>; isShared?: boolean; isDefault?: boolean }) {
+  return request<import("./contracts").WorkspaceViewDto>(`/auth/workspace-views/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function deleteWorkspaceView(id: string) {
+  return request<{ deleted: boolean }>(`/auth/workspace-views/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function logoutCurrentSession() {
@@ -2436,25 +2491,21 @@ export function finalizeDecisionCommittee(id: string, input: {
   );
 }
 
-const CANDIDATE_SESSION_KEY = "talentos.candidate-session";
+let candidateSession: CandidateSessionDto | null = null;
 
 function getCandidateAccessToken() {
-  if (typeof window === "undefined") return "";
-  try {
-    return (JSON.parse(sessionStorage.getItem(CANDIDATE_SESSION_KEY) ?? "null") as CandidateSessionDto | null)?.accessToken ?? "";
-  } catch {
-    return "";
-  }
+  return candidateSession?.accessToken ?? "";
 }
 
 export function getCandidateSession(): CandidateSessionDto | null {
-  if (typeof window === "undefined") return null;
-  try { return JSON.parse(sessionStorage.getItem(CANDIDATE_SESSION_KEY) ?? "null") as CandidateSessionDto | null; }
-  catch { return null; }
+  return candidateSession;
 }
 
 export function clearCandidateSession() {
-  if (typeof window !== "undefined") sessionStorage.removeItem(CANDIDATE_SESSION_KEY);
+  candidateSession = null;
+  if (typeof window !== "undefined") {
+    void fetchWithTimeout(`${API_BASE_URL}/candidate-auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
+  }
 }
 
 async function candidateRequest<T>(path: string, init: RequestInit & { responseType?: "json" | "blob" } = {}) {
@@ -2463,7 +2514,7 @@ async function candidateRequest<T>(path: string, init: RequestInit & { responseT
   if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const token = getCandidateAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...fetchInit, headers });
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...fetchInit, headers, credentials: "include" });
   if (!response.ok) {
     const payload = await readJsonSafe(response);
     const message = typeof payload === "object" && payload && "message" in payload ? String(payload.message) : `Error ${response.status}`;
@@ -2477,7 +2528,7 @@ export async function authenticateCandidate(email: string, password: string, mod
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
-  sessionStorage.setItem(CANDIDATE_SESSION_KEY, JSON.stringify(session));
+  candidateSession = session;
   return session;
 }
 
@@ -2494,7 +2545,7 @@ export async function resetCandidatePassword(token: string, password: string) {
     method: "POST",
     body: JSON.stringify({ token, password }),
   });
-  sessionStorage.setItem(CANDIDATE_SESSION_KEY, JSON.stringify(session));
+  candidateSession = session;
   return session;
 }
 
@@ -2554,7 +2605,7 @@ export async function exchangeCandidateSocialCode(token: string) {
     method: "POST",
     body: JSON.stringify({ token }),
   });
-  sessionStorage.setItem(CANDIDATE_SESSION_KEY, JSON.stringify(session));
+  candidateSession = session;
   return session;
 }
 
@@ -2576,6 +2627,33 @@ export function submitCandidateApplication(
     method: "POST",
     body,
   });
+}
+
+export type PublicApplicationDraftPayload = { step: number; form: PublicApplicationInput };
+
+type PublicApplicationDraftResponse = {
+  token: string;
+  value: PublicApplicationDraftPayload | null;
+  expiresAt: string | null;
+};
+
+export function fetchPublicApplicationDraft(vacancyId: string) {
+  return request<PublicApplicationDraftResponse>(`/public/vacancies/${encodeURIComponent(vacancyId)}/applications/draft`, {}, { auth: false });
+}
+
+export function savePublicApplicationDraft(vacancyId: string, value: PublicApplicationDraftPayload) {
+  return request<PublicApplicationDraftResponse>(
+    `/public/vacancies/${encodeURIComponent(vacancyId)}/applications/draft`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    },
+    { auth: false },
+  );
+}
+
+export function deletePublicApplicationDraft(vacancyId: string) {
+  return request<{ ok: boolean }>(`/public/vacancies/${encodeURIComponent(vacancyId)}/applications/draft`, { method: "DELETE" }, { auth: false });
 }
 
 export function fetchTrainingCourses(filters: {

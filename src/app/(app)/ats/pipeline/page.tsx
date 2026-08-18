@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Clock3, Eye, Search, X } from "lucide-react";
+import { Check, Clock3, Eye, Search, Settings2, X, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader, Pagination } from "@/components/design-system";
 import {
@@ -15,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { applicationNextAction, currentApplicationStage, formatApplicationDate } from "@/lib/applications";
@@ -23,6 +25,7 @@ import {
   fetchVacancies,
   fetchVacancySetup,
   decideApplicationTransition,
+  createAutomationRule,
   fetchRejectionReasons,
   updateApplication,
 } from "@/lib/backend";
@@ -49,6 +52,10 @@ function PipelineContent() {
   } | null>(null);
   const [preview, setPreview] = useState<VacancyApplicationDto | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const [automationStage, setAutomationStage] = useState<VacancyStageDto | null>(null);
+  const [automationTitle, setAutomationTitle] = useState("");
+  const [automationMessage, setAutomationMessage] = useState("");
 
   const vacanciesQuery = useQuery({
     queryKey: ["vacancies", "pipeline"],
@@ -112,6 +119,33 @@ function PipelineContent() {
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
   });
+  const createStageAutomation = useMutation({
+    mutationFn: () => {
+      if (!automationStage) throw new Error("Selecciona una etapa para automatizar.");
+      return createAutomationRule({
+        name: `ATS · ${effectiveVacancyId ? vacancies.find((vacancy) => vacancy.id === effectiveVacancyId)?.title ?? "Vacante" : "Vacante"} · ${automationStage.name}`,
+        triggerEvent: "APPLICATION_STAGE_CHANGED",
+        scope: currentBranch?.id ? "BRANCH" : "TENANT",
+        branchId: currentBranch?.id,
+        enabled: true,
+        conditions: [{ field: "payload.stageCode", operator: "equals", value: automationStage.code }],
+        consequences: [{ type: "NOTIFY_ACTOR", title: automationTitle.trim(), message: automationMessage.trim() }],
+      });
+    },
+    onSuccess: () => {
+      toast.success("Automatización de etapa activada");
+      setAutomationStage(null);
+      setAutomationTitle("");
+      setAutomationMessage("");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No fue posible crear la automatización"),
+  });
+
+  function openStageAutomation(stage: VacancyStageDto) {
+    setAutomationStage(stage);
+    setAutomationTitle(`Revisar candidato en ${stage.name}`);
+    setAutomationMessage(`Un candidato avanzó a ${stage.name}. Revisa la información y define la siguiente acción.`);
+  }
 
   function setFilter(name: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -141,6 +175,19 @@ function PipelineContent() {
             setDraggingId(application.id);
           }}
           onDragEnd={() => setDraggingId(null)}
+          onTouchStart={(event) => {
+            touchStartX.current = event.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(event) => {
+            const startX = touchStartX.current;
+            touchStartX.current = null;
+            const endX = event.changedTouches[0]?.clientX;
+            if (!compact || startX === null || endX === undefined || Math.abs(endX - startX) < 72 || !can("applications.change_stage")) return;
+            const currentIndex = stages.findIndex((stage) => stage.id === currentStageId);
+            const direction = endX > startX ? 1 : -1;
+            const target = stages[currentIndex + direction];
+            if (target && movableStages.some((stage) => stage.id === target.id)) setStageChange({ application, target });
+          }}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -154,6 +201,7 @@ function PipelineContent() {
             <p><span className="font-medium text-text-primary">Siguiente:</span> {applicationNextAction(application.status)}</p>
             {application.stageDueAt ? <p className={application.isStageOverdue ? "font-medium text-status-danger" : ""}><Clock3 className="mr-1 inline size-3.5" />{application.isStageOverdue ? "SLA vencido" : `SLA: ${formatApplicationDate(application.stageDueAt)}`}</p> : null}
           </div>
+          {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">Desliza la tarjeta hacia la siguiente etapa para moverla.</p> : null}
           {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && pendingTransition.requestedByUserId !== currentUser.id ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>La solicitud debe resolverla otro responsable.</p>}</div> : null}
           {can("applications.change_stage") && application.status !== "HIRED" && movableStages.length ? (
             <FilterField label="Mover a">
@@ -259,9 +307,9 @@ function PipelineContent() {
               const items = filtered.filter((item) => currentApplicationStage(item, stages)?.id === stage.id);
               return (
                 <section key={stage.id} aria-labelledby={`mobile-stage-${stage.id}`}>
-                  <div className="mb-3 flex items-center justify-between">
+                  <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 id={`mobile-stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
-                    <Badge variant="secondary">{items.length}</Badge>
+                    <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="icon" variant="ghost" aria-label={`Automatizar ${stage.name}`} onClick={() => openStageAutomation(stage)}><Zap className="size-4" /></Button> : null}</div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {items.map((item) => card(item, true))}
@@ -302,9 +350,9 @@ function PipelineContent() {
                       setDraggingId(null);
                     }}
                   >
-                    <div className="mb-3 flex items-center justify-between">
+                    <div className="mb-3 flex items-center justify-between gap-2">
                       <h2 id={`stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
-                      <Badge variant="secondary">{items.length}</Badge>
+                      <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="sm" variant="ghost" onClick={() => openStageAutomation(stage)}><Settings2 className="size-4" />Automatizar</Button> : null}</div>
                     </div>
                     <p className="mb-3 text-xs text-text-secondary">Suelta una tarjeta aquí para moverla.</p>
                     <div className="space-y-3">
@@ -332,6 +380,12 @@ function PipelineContent() {
         }}
       />
       <CandidatePreviewDialog application={preview} open={Boolean(preview)} onOpenChange={(open) => { if (!open) setPreview(null); }} />
+      <Dialog open={Boolean(automationStage)} onOpenChange={(open) => { if (!open && !createStageAutomation.isPending) setAutomationStage(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Automatizar {automationStage?.name}</DialogTitle><DialogDescription>Al entrar a esta etapa se creará una notificación interna para quien ejecutó el cambio. La regla queda activa y persistida en el motor de automatizaciones.</DialogDescription></DialogHeader>
+          <div className="space-y-4"><label className="block space-y-2 text-sm font-medium">Título<Input value={automationTitle} maxLength={160} onChange={(event) => setAutomationTitle(event.target.value)} /></label><label className="block space-y-2 text-sm font-medium">Instrucción<textarea value={automationMessage} maxLength={1000} rows={4} onChange={(event) => setAutomationMessage(event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label><p className="text-xs text-text-secondary">Puedes administrar, ampliar o desactivar esta regla desde Automatizaciones.</p><Button className="w-full" onClick={() => createStageAutomation.mutate()} disabled={createStageAutomation.isPending || automationTitle.trim().length < 3 || automationMessage.trim().length < 3}>{createStageAutomation.isPending ? "Activando…" : "Activar automatización"}</Button></div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

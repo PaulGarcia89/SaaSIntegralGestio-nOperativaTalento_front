@@ -2290,11 +2290,12 @@ export interface CandidatePortalProfileDto {
 }
 
 export interface CandidatePortalOverviewDto {
-  communications: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; createdAt: string }>;
+  communications: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; readAt?: string | null; createdAt: string }>;
   offers: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; createdAt: string }>;
   resumes: Array<{ id: string; applicationId?: string | null; version: number; status: string; originalName: string; mimeType: string; sizeBytes: number; createdAt: string }>;
   signatureDocuments: Array<{ id: string; status: string; signedAt?: string | null; tokenExpiresAt?: string | null; createdAt: string; signaturePackage: { id: string; title: string; status: string; dueDate?: string | null; sentAt?: string | null } }>;
   privacyRequests: Array<{ id: string; type: "EXPORT" | "ANONYMIZE" | "DELETE"; status: "PENDING" | "PROCESSING" | "COMPLETED" | "REJECTED" | "CANCELLED"; reason?: string | null; response?: string | null; requestedAt: string }>;
+  supportRequests: Array<{ id: string; subject: string; message: string; status: string; response?: string | null; requestedAt: string }>;
 }
 
 export interface CandidatePreboardingDto {

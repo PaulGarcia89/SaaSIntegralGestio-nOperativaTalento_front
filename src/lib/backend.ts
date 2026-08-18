@@ -2087,7 +2087,7 @@ export function exportApplications(filters: import("./contracts").ApplicationFil
   return request<{ generatedAt: string; count: number; data: VacancyApplicationDto[] }>(`/applications/export?${query.toString()}`);
 }
 
-export function bulkUpdateApplications(input: { ids: string[]; status?: string; currentStageId?: string; assignedRecruiterId?: string; rejectionReasonId?: string; reason?: string }) {
+export function bulkUpdateApplications(input: { ids: string[]; status?: string; currentStageId?: string; assignedRecruiterId?: string; rejectionReasonId?: string; reason?: string; notes?: string }) {
   return request<{ updated: number }>("/applications/bulk/status", { method: "PATCH", body: JSON.stringify(input) });
 }
 
@@ -2586,6 +2586,14 @@ export function cancelCandidatePrivacyRequest(id: string) {
   return candidateRequest<CandidatePortalOverviewDto["privacyRequests"][number]>(`/candidate/applications/privacy-requests/${encodeURIComponent(id)}/cancel`, { method: "POST" });
 }
 
+export function markCandidateCommunicationRead(id: string) {
+  return candidateRequest<{ id: string; readAt: string }>(`/candidate/applications/communications/${encodeURIComponent(id)}/read`, { method: "POST" });
+}
+
+export function createCandidateSupportRequest(input: { subject: string; message: string }) {
+  return candidateRequest<{ id: string; subject: string; message: string; status: string; requestedAt: string }>("/candidate/applications/support-requests", { method: "POST", body: JSON.stringify(input) });
+}
+
 export function parseCandidateResume(resume: File) {
   const body = new FormData();
   body.append("resume", resume);
@@ -2629,9 +2637,9 @@ export function submitCandidateApplication(
   });
 }
 
-export type PublicApplicationDraftPayload = { step: number; form: PublicApplicationInput };
+export type PublicApplicationDraftPayload = { step: number; form: PublicApplicationInput; flowVersion?: number; pausedAt?: string; resumedAt?: string };
 
-type PublicApplicationDraftResponse = {
+export type PublicApplicationDraftResponse = {
   token: string;
   value: PublicApplicationDraftPayload | null;
   expiresAt: string | null;
@@ -2654,6 +2662,15 @@ export function savePublicApplicationDraft(vacancyId: string, value: PublicAppli
 
 export function deletePublicApplicationDraft(vacancyId: string) {
   return request<{ ok: boolean }>(`/public/vacancies/${encodeURIComponent(vacancyId)}/applications/draft`, { method: "DELETE" }, { auth: false });
+}
+
+export type CandidateConversionMetrics = {
+  totals: { started: number; paused: number; resumed: number; submitted: number; completionRate: number; resumeRate: number };
+  vacancies: Array<{ vacancyId: string; title: string; started: number; paused: number; resumed: number; submitted: number; completionRate: number; resumeRate: number }>;
+};
+
+export function fetchCandidateConversionMetrics() {
+  return request<CandidateConversionMetrics>("/applications/conversion-metrics");
 }
 
 export function fetchTrainingCourses(filters: {

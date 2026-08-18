@@ -7,11 +7,12 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import type { PlanTier, SubscriptionDto } from "@/lib/contracts";
 import { createSubscription, deleteSubscription, fetchPlanCatalog, fetchSubscriptions, fetchTenants, updateSubscription } from "@/lib/backend";
-import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
+import { CrudHeader, CrudPanel } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { tenantStatusLabels } from "@/lib/ui-labels";
 import { FormSelect } from "@/components/ui/form-select";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -130,17 +131,7 @@ export default function SubscriptionPage() {
         description="Control de plan, ciclo, precio y renovación."
         badge="Gobierno SaaS"
         action={
-          <FormDialog
-            open={open}
-            onOpenChange={(value) => {
-              setOpen(value);
-              if (!value) {
-                setEditing(null);
-                form.reset();
-              }
-            }}
-            title={editing ? "Editar suscripción" : "Crear suscripción"}
-            trigger={<Button onClick={() => {
+          <Button onClick={() => {
               form.reset({
                 tenantId: tenantsQuery.data?.[0]?.id ?? "",
                 plan: "starter",
@@ -150,8 +141,16 @@ export default function SubscriptionPage() {
                 renewalDate: "2026-08-01",
               });
               setOpen(true);
-            }}>Nueva suscripción</Button>}
-          >
+            }}>Nueva suscripción</Button>
+        }
+      />
+      {open ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">{editing ? "Editar suscripción" : "Crear suscripción"}</h2>
+              <p className="text-sm text-text-secondary">Gestiona la suscripción como una sección normal de la página.</p>
+            </div>
             <form id="subscription-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="space-y-2">
                 <Label>Empresa</Label>
@@ -210,7 +209,11 @@ export default function SubscriptionPage() {
                 onChange={(v) => form.setValue("renewalDate", v)}
               />
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                <Button type="button" variant="secondary" onClick={() => {
+                  setOpen(false);
+                  setEditing(null);
+                  form.reset();
+                }}>
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={saveMutation.isPending}>
@@ -218,9 +221,9 @@ export default function SubscriptionPage() {
                 </Button>
               </div>
             </form>
-          </FormDialog>
-        }
-      />
+          </CardContent>
+        </Card>
+      ) : null}
       <FilterToolbar
         searchPlaceholder="Buscar empresa, plan o estado"
         options={[
@@ -346,14 +349,27 @@ export default function SubscriptionPage() {
           ) : null}
         </div>
       )}
-      <ConfirmDeleteDialog
-        open={Boolean(deleting)}
-        onOpenChange={(value) => !value && setDeleting(null)}
-        title="Eliminar suscripción"
-        description={`Se eliminara la suscripción ${deleting?.id ?? ""}.`}
-        pending={deleteMutation.isPending}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
-      />
+      {deleting ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Eliminar suscripción</h2>
+              <p className="text-sm text-text-secondary">Se eliminará la suscripción {deleting.id}.</p>
+            </div>
+            <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
+              Esta acción es permanente. No podrás recuperar este registro una vez eliminado.
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setDeleting(null)} disabled={deleteMutation.isPending}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" onClick={() => deleting && deleteMutation.mutate(deleting.id)} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "Eliminando..." : "Eliminar definitivamente"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

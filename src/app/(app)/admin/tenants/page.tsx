@@ -8,12 +8,13 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { createTenant, deleteTenant, fetchSubscriptions, fetchTenants, updateTenant } from "@/lib/backend";
 import type { ModuleKey, PlanTier, TenantDto } from "@/lib/contracts";
-import { CrudHeader, CrudPanel, FormDialog, ConfirmDeleteDialog } from "@/components/admin-crud";
+import { CrudHeader, CrudPanel } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
 import { moduleLabels, tenantStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
@@ -174,18 +175,17 @@ export default function TenantsPage() {
         badge="Gobierno SaaS"
         action={
           <PermissionGate permission="tenants.create">
-          <FormDialog
-            open={open}
-            onOpenChange={(value) => {
-              setOpen(value);
-              if (!value) {
-                setEditing(null);
-                form.reset();
-              }
-            }}
-            title={editing ? "Editar empresa" : "Crear empresa"}
-            trigger={<Button onClick={() => setOpen(true)}>Nueva empresa</Button>}
-          >
+            <Button onClick={() => setOpen(true)}>Nueva empresa</Button>
+          </PermissionGate>
+        }
+      />
+      {open ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">{editing ? "Editar empresa" : "Crear empresa"}</h2>
+              <p className="text-sm text-text-secondary">Configura la compañía y sus módulos habilitados sin ventanas emergentes.</p>
+            </div>
             <form id="tenant-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -252,7 +252,15 @@ export default function TenantsPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setOpen(false);
+                    setEditing(null);
+                    form.reset();
+                  }}
+                >
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={saveMutation.isPending}>
@@ -260,10 +268,9 @@ export default function TenantsPage() {
                 </Button>
               </div>
             </form>
-          </FormDialog>
-          </PermissionGate>
-        }
-      />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <FilterToolbar
         searchPlaceholder="Buscar empresa, plan o estado"
@@ -425,14 +432,27 @@ export default function TenantsPage() {
         </div>
       )}
 
-      <ConfirmDeleteDialog
-        open={Boolean(deleting)}
-        onOpenChange={(value) => !value && setDeleting(null)}
-        title="Eliminar empresa"
-        description={`Se eliminara ${deleting?.name ?? "la empresa"}.`}
-        pending={deleteMutation.isPending}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
-      />
+      {deleting ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Eliminar empresa</h2>
+              <p className="text-sm text-text-secondary">Se eliminará {deleting.name}.</p>
+            </div>
+            <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
+              Esta acción es permanente. No podrás recuperar este registro una vez eliminado.
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setDeleting(null)} disabled={deleteMutation.isPending}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" onClick={() => deleteMutation.mutate(deleting.id)} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "Eliminando..." : "Eliminar definitivamente"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

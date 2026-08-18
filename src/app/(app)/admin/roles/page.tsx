@@ -9,11 +9,12 @@ import { PERMISSION_KEYS, type PermissionKey, type RoleDefinitionDto } from "@/l
 import { createRoleDefinition, deleteRoleDefinition, fetchRoleDefinitions, updateRoleDefinition } from "@/lib/backend";
 import { scopeLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
-import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
+import { CrudHeader, CrudPanel } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/ui/form-select";
 import { AsyncState } from "@/components/async-state";
@@ -125,19 +126,16 @@ export default function RolesPage() {
         description="Consulta, crea, modifica y elimina roles internos con conjuntos de permisos asociados."
         badge="Empresa"
         action={
-          <FormDialog
-            open={open}
-            onOpenChange={(value) => {
-              setOpen(value);
-              if (!value) {
-                setEditing(null);
-                form.reset();
-              }
-            }}
-            title={editing ? "Editar rol" : "Crear rol"}
-            description="Define alcance, cantidad de miembros y permisos heredados o personalizados."
-            trigger={<Button onClick={() => setOpen(true)}>Nuevo rol</Button>}
-          >
+          <Button onClick={() => setOpen(true)}>Nuevo rol</Button>
+        }
+      />
+      {open ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">{editing ? "Editar rol" : "Crear rol"}</h2>
+              <p className="text-sm text-text-secondary">Define alcance, cantidad de miembros y permisos heredados o personalizados.</p>
+            </div>
             <form id="role-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -187,7 +185,15 @@ export default function RolesPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setOpen(false);
+                    setEditing(null);
+                    form.reset();
+                  }}
+                >
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={saveMutation.isPending}>
@@ -195,9 +201,9 @@ export default function RolesPage() {
                 </Button>
               </div>
             </form>
-          </FormDialog>
-        }
-      />
+          </CardContent>
+        </Card>
+      ) : null}
       <FilterToolbar
         searchPlaceholder="Buscar por rol, alcance o permiso"
         options={[
@@ -249,14 +255,27 @@ export default function RolesPage() {
           ]}
         />
       </CrudPanel>
-      <ConfirmDeleteDialog
-        open={Boolean(deleting)}
-        onOpenChange={(value) => !value && setDeleting(null)}
-        title="Eliminar rol"
-        description={`Se eliminara el rol ${deleting?.name ?? ""}.`}
-        pending={deleteMutation.isPending}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
-      />
+      {deleting ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Eliminar rol</h2>
+              <p className="text-sm text-text-secondary">Se eliminará el rol {deleting.name}.</p>
+            </div>
+            <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
+              Esta acción es permanente. No podrás recuperar este registro una vez eliminado.
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setDeleting(null)} disabled={deleteMutation.isPending}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" onClick={() => deleteMutation.mutate(deleting)} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? "Eliminando..." : "Eliminar definitivamente"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

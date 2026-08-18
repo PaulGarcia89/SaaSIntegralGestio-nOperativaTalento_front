@@ -10,12 +10,13 @@ import { ROLE_KEYS, type RoleKey, type UserDto } from "@/lib/contracts";
 import { createTenantUser, deleteTenantUser, fetchGlobalUsers, fetchTenantUsers, updateTenantUser } from "@/lib/backend";
 import { roleLabels, userStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
-import { CrudHeader, CrudPanel, ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
+import { CrudHeader, CrudPanel } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormSelect } from "@/components/ui/form-select";
+import { Card, CardContent } from "@/components/ui/card";
 import { AsyncState } from "@/components/async-state";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
@@ -110,20 +111,16 @@ export default function UsersPage() {
         description="Consulta, crea, modifica y elimina usuarios internos de la empresa, incluyendo rol y estado de acceso."
         badge={isGlobalView ? "Plataforma" : "Empresa"}
         action={
-          isGlobalView ? undefined :
-          <FormDialog
-            open={open}
-            onOpenChange={(value) => {
-              setOpen(value);
-              if (!value) {
-                setEditing(null);
-                form.reset();
-              }
-            }}
-            title={editing ? "Editar usuario" : "Crear usuario"}
-            description="Invita o actualiza usuarios de la empresa activa."
-            trigger={<Button onClick={() => setOpen(true)}>Nuevo usuario</Button>}
-          >
+          isGlobalView ? undefined : <Button onClick={() => setOpen(true)}>Nuevo usuario</Button>
+        }
+      />
+      {!isGlobalView && open ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">{editing ? "Editar usuario" : "Crear usuario"}</h2>
+              <p className="text-sm text-text-secondary">Invita o actualiza usuarios de la empresa activa.</p>
+            </div>
             <form id="user-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="space-y-2">
                 <Label>Nombre completo</Label>
@@ -158,7 +155,15 @@ export default function UsersPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setOpen(false);
+                    setEditing(null);
+                    form.reset();
+                  }}
+                >
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={saveMutation.isPending}>
@@ -166,9 +171,9 @@ export default function UsersPage() {
                 </Button>
               </div>
             </form>
-          </FormDialog>
-        }
-      />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <FilterToolbar
         searchPlaceholder="Buscar por nombre, correo, rol o estado"
@@ -238,14 +243,37 @@ export default function UsersPage() {
         )}
       </CrudPanel>
 
-      <ConfirmDeleteDialog
-        open={Boolean(deleting)}
-        onOpenChange={(value) => !value && setDeleting(null)}
-        title="Eliminar usuario"
-        description={`Se eliminara el usuario ${deleting?.fullName ?? ""}.`}
-        pending={deleteMutation.isPending}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
-      />
+      {deleting ? (
+        <Card level={2}>
+          <CardContent className="space-y-4 p-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Eliminar usuario</h2>
+              <p className="text-sm text-text-secondary">Se eliminará el usuario {deleting.fullName}.</p>
+            </div>
+            <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
+              Esta acción es permanente. No podrás recuperar este registro una vez eliminado.
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setDeleting(null)}
+                disabled={deleteMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => deleteMutation.mutate(deleting)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "Eliminando..." : "Eliminar definitivamente"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

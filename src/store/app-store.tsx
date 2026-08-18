@@ -110,18 +110,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
   const roleForAdministrativeQueries =
     authContext?.role ?? session?.role ?? "empleado";
+  const hasGlobalGovernance =
+    roleForAdministrativeQueries === "admin_saas" ||
+    roleForAdministrativeQueries === "admin_plataforma";
 
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", session?.token],
     queryFn: fetchTenants,
-    enabled: Boolean(
-      session?.token &&
-      (
-        roleForAdministrativeQueries === "admin_saas" ||
-        roleForAdministrativeQueries === "admin_plataforma" ||
-        authQuery.data?.permissions.some((permission) => permission.startsWith("tenants."))
-      ),
-    ),
+    // Sólo la gobernanza global puede pedir /tenants; un tenant admin nunca debe disparar esta llamada.
+    enabled: Boolean(session?.token && hasGlobalGovernance),
   });
 
   const isGlobalSuperAdmin = Boolean(

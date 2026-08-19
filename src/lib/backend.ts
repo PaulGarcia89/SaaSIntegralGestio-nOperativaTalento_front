@@ -171,7 +171,6 @@ import {
   restoreEmployee as restoreMockEmployee,
   transferEmployee as transferMockEmployee,
   updateEmployee as updateMockEmployee,
-  updateEmployeeRole as updateMockEmployeeRole,
 } from "@/lib/mock-backend";
 import {
   clearStoredAuth,
@@ -1647,10 +1646,51 @@ export type EmployeeDirectoryItem = {
   documentSummary?: { totalDocuments: number };
 };
 
+type EmployeeApiItem = Omit<EmployeeDirectoryItem, "branchAssignments"> & {
+  branchAssignments?: EmployeeDirectoryItem["branchAssignments"];
+  primaryBranch?: {
+    assignmentId: string;
+    branchId: string;
+    role: string;
+    branch: { id: string; name: string };
+  } | null;
+  activeBranches?: Array<{
+    assignmentId: string;
+    branchId: string;
+    role: string;
+    isPrimary: boolean;
+    branch: { id: string; name: string };
+  }>;
+};
+
 export type EmployeeDirectoryResponse = {
   data: EmployeeDirectoryItem[];
   meta: { total: number; page: number; pageSize: number; totalPages: number };
 };
+
+type EmployeeDirectoryApiResponse = Omit<EmployeeDirectoryResponse, "data"> & { data: EmployeeApiItem[] };
+
+function normalizeEmployeeDirectoryItem(employee: EmployeeApiItem): EmployeeDirectoryItem {
+  const assignments = Array.isArray(employee.branchAssignments)
+    ? employee.branchAssignments
+    : Array.isArray(employee.activeBranches)
+      ? employee.activeBranches.map((assignment) => ({
+          id: assignment.assignmentId,
+          role: assignment.role,
+          isPrimary: assignment.isPrimary,
+          branch: assignment.branch,
+        }))
+      : employee.primaryBranch
+        ? [{
+            id: employee.primaryBranch.assignmentId,
+            role: employee.primaryBranch.role,
+            isPrimary: true,
+            branch: employee.primaryBranch.branch,
+          }]
+        : [];
+
+  return { ...employee, branchAssignments: assignments };
+}
 
 export type CreateEmployeeInput = {
   name: string;
@@ -1668,13 +1708,15 @@ export type UpdateEmployeeInput = {
 };
 
 export function createEmployee(input: CreateEmployeeInput) {
-  return request<EmployeeDirectoryItem>("/employees", {
+  return request<EmployeeApiItem>("/employees", {
     method: "POST",
     body: JSON.stringify(input),
-  }).catch(async (error) => {
-    if (!shouldUseMockBackend(error)) throw error;
-    return createMockEmployee(input);
-  });
+  })
+    .then(normalizeEmployeeDirectoryItem)
+    .catch(async (error) => {
+      if (!shouldUseMockBackend(error)) throw error;
+      return createMockEmployee(input);
+    });
 }
 
 export function bulkCreateEmployees(employees: CreateEmployeeInput[]) {
@@ -1701,17 +1743,19 @@ export function fetchEmployees(input: { search?: string; status?: string; branch
   if (input.branchId) query.set("branchId", input.branchId);
   if (input.page) query.set("page", String(input.page));
   if (input.pageSize) query.set("pageSize", String(input.pageSize));
-  return request<EmployeeDirectoryResponse>(`/employees${query.size ? `?${query}` : ""}`).catch(async (error) => {
-    if (!shouldUseMockBackend(error)) throw error;
-    return fetchMockEmployees(input);
-  });
+  return request<EmployeeDirectoryApiResponse>(`/employees${query.size ? `?${query}` : ""}`)
+    .then((response) => ({ ...response, data: response.data.map(normalizeEmployeeDirectoryItem) }))
+    .catch(async (error) => {
+      if (!shouldUseMockBackend(error)) throw error;
+      return fetchMockEmployees(input);
+    });
 }
 
 export function updateEmployee(id: string, input: UpdateEmployeeInput) {
-  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}`, {
+  return request<EmployeeApiItem>(`/employees/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(input),
-  }).catch(async (error) => {
+  }).then(normalizeEmployeeDirectoryItem).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;
     return updateMockEmployee(id, input);
   });
@@ -1743,30 +1787,20 @@ export function fetchEmployeeDetail(id: string) {
 }
 
 export function transferEmployee(id: string, input: { branchId: string; role?: string }) {
-  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/transfer`, {
+  return request<EmployeeApiItem>(`/employees/${encodeURIComponent(id)}/transfer`, {
     method: "POST",
     body: JSON.stringify(input),
-  }).catch(async (error) => {
+  }).then(normalizeEmployeeDirectoryItem).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;
     return transferMockEmployee(id, input);
   });
 }
 
-export function updateEmployeeRole(id: string, primaryRole: string) {
-  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/role`, {
-    method: "PATCH",
-    body: JSON.stringify({ primaryRole }),
-  }).catch(async (error) => {
-    if (!shouldUseMockBackend(error)) throw error;
-    return updateMockEmployeeRole(id, primaryRole);
-  });
-}
-
 export function assignEmployeePrimaryBranch(id: string, branchId: string, role: string) {
-  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/assignments`, {
+  return request<EmployeeApiItem>(`/employees/${encodeURIComponent(id)}/assignments`, {
     method: "POST",
     body: JSON.stringify({ branchId, role }),
-  }).catch(async (error) => {
+  }).then(normalizeEmployeeDirectoryItem).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;
     return assignMockEmployeeBranches(id, [branchId], branchId, role);
   });

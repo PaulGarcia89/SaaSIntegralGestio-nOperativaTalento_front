@@ -14,13 +14,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
+import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
 type EmployeeStatus = NonNullable<CreateEmployeeInput["status"]>;
 type ImportRow = CreateEmployeeInput & { row: number; branchLabel: string; errors: string[] };
-type EmployeeEditorState = { id: string; name: string; email: string; status: EmployeeStatus; primaryBranchId: string; primaryRole: string; initialPrimaryBranchId: string; initialPrimaryRole: string } | null;
+type EmployeeEditorState = { id: string; name: string; email: string; status: EmployeeStatus; primaryBranchId: string; primaryRole: string; initialPrimaryBranchId: string } | null;
 type EmployeeWithSoftDelete = EmployeeDirectoryItem & { deletedAt?: string | null };
 type EmployeeStatusFilter = "all" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "DELETED";
 
@@ -198,9 +198,6 @@ export function EmployeesDirectoryPage() {
       }
       if (input.primaryBranchId !== input.initialPrimaryBranchId) {
         return transferEmployee(input.id, { branchId: input.primaryBranchId, role: input.primaryRole });
-      }
-      if (input.primaryRole !== input.initialPrimaryRole) {
-        return updateEmployeeRole(input.id, input.primaryRole);
       }
       return updated;
     },
@@ -1198,7 +1195,6 @@ function buildEmployeeEditorState(employee: EmployeeDirectoryItem): NonNullable<
     primaryBranchId: primary?.branch.id ?? "",
     primaryRole: primary?.role ?? "",
     initialPrimaryBranchId: primary?.branch.id ?? "",
-    initialPrimaryRole: primary?.role ?? "",
   };
 }
 

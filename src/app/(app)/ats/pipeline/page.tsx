@@ -73,14 +73,20 @@ function PipelineContent() {
     queryFn: () => fetchVacancySetup(effectiveVacancyId!),
     enabled: Boolean(effectiveVacancyId),
   });
+  const stages = useMemo(
+    () => [...(setup.data?.stages ?? [])].sort((a, b) => a.position - b.position),
+    [setup.data?.stages],
+  );
+  // Older shared links use a stage code; the API receives the stage UUID.
+  const selectedStageId = stages.find((stage) => stage.id === stageFilter || stage.code === stageFilter)?.id;
   const applications = useQuery({
-    queryKey: ["applications", currentBranch?.id, effectiveVacancyId, search, stageFilter, age, page],
+    queryKey: ["applications", currentBranch?.id, effectiveVacancyId, search, selectedStageId, age, page],
     queryFn: () =>
       fetchApplications({
         branchId: currentBranch?.id,
         vacancyId: effectiveVacancyId,
         search: search || undefined,
-        currentStageId: stageFilter === ALL ? undefined : stageFilter,
+        currentStageId: stageFilter === ALL ? undefined : selectedStageId,
         appliedFrom: age === ALL ? undefined : new Date(Date.now() - Number(age) * 86_400_000).toISOString().slice(0, 10),
         page,
         pageSize: 100,
@@ -89,10 +95,6 @@ function PipelineContent() {
   });
   const rejectionReasons = useQuery({ queryKey: ["application-rejection-reasons"], queryFn: fetchRejectionReasons });
 
-  const stages = useMemo(
-    () => [...(setup.data?.stages ?? [])].sort((a, b) => a.position - b.position),
-    [setup.data?.stages],
-  );
   const filtered = applications.data?.data ?? [];
 
   const move = useMutation({
@@ -305,7 +307,7 @@ function PipelineContent() {
           </Select>
         </FilterField>
         <FilterField label="Etapa">
-          <Select value={stageFilter} onValueChange={(value) => setFilter("stage", value)}>
+          <Select value={selectedStageId ?? stageFilter} onValueChange={(value) => setFilter("stage", value)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Todas las etapas</SelectItem>

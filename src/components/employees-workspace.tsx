@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileSpreadsheet, Upload, UserPlus, UsersRound, ArrowLeft } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Download, FileSpreadsheet, MapPin, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FilterToolbar } from "@/components/domain";
 import { InlineFeedback, PageHeader, ResponsiveDataView } from "@/components/design-system";
 import { ApiError, bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, getApiErrorMessage, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
 type EmployeeStatus = NonNullable<CreateEmployeeInput["status"]>;
@@ -23,9 +24,10 @@ type ImportRow = CreateEmployeeInput & { row: number; branchLabel: string; error
 const initialEmployee: CreateEmployeeInput = { name: "", email: "", primaryBranchId: "", primaryRole: "", status: "ACTIVE" };
 
 export function EmployeesDirectoryPage() {
-  const { can } = useAppStore();
+  const { can, currentTenant, currentBranch, tenantBranches } = useAppStore();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [branchFilter, setBranchFilter] = useState(currentBranch?.id ?? "");
   const employees = useQuery({ queryKey: ["employees", search, status], queryFn: () => fetchEmployees({ search, status, page: 1, pageSize: 50 }) });
 
   if (employees.isLoading) return <AsyncState state="loading" title="Cargando empleados" />;
@@ -47,10 +49,47 @@ export function EmployeesDirectoryPage() {
   }
 
   const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
+  const visibleData = branchFilter
+    ? data.filter((employee) => employee.branchAssignments.some((assignment) => assignment.branch.id === branchFilter))
+    : data;
   const canCreate = can("employees.create");
 
   return (
     <div className="space-y-5">
+      <section className="relative overflow-hidden rounded-[2rem] border border-border-default bg-gradient-to-br from-surface-section via-card to-primary/5 p-5 shadow-sm">
+        <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.14),_transparent_60%)] lg:block" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl space-y-2">
+            <p className="text-sm font-medium text-primary">Personas</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Directorio documental de empleados</h2>
+            <p className="max-w-2xl text-sm leading-6 text-text-secondary sm:text-base">
+              Consulta, registra y carga expedientes del personal activo con datos trazables para auditoría, gestión y mantenimiento operativo.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Badge variant="secondary">{currentTenant.name}</Badge>
+              <Badge variant="secondary">{currentBranch?.name ?? "Sucursal activa"}</Badge>
+              <Badge variant="outline">{employees.data?.meta?.total ?? data.length} expedientes</Badge>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-xs font-medium uppercase tracking-wide text-text-secondary">Filtrar por sucursal</span>
+              <Select value={branchFilter || "all"} onValueChange={(value) => setBranchFilter(value === "all" ? "" : value)}>
+                <SelectTrigger className="h-10 w-full sm:w-72">
+                  <SelectValue placeholder="Todas las sucursales" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 lg:w-[420px]">
+            <MiniStat label="Expedientes" value={String(visibleData.length)} />
+            <MiniStat label="Alta individual" value="1 a 1" />
+            <MiniStat label="Carga masiva" value="Prevalidada" />
+          </div>
+        </div>
+      </section>
       <PageHeader
         eyebrow="Personas"
         title="Directorio de empleados"
@@ -61,13 +100,13 @@ export function EmployeesDirectoryPage() {
               <Button asChild type="button" variant="secondary">
                 <Link href="/employees/import">
                   <FileSpreadsheet className="size-4" />
-                  Subir documento
+                  Carga masiva
                 </Link>
               </Button>
               <Button asChild type="button">
                 <Link href="/employees/new">
                   <UserPlus className="size-4" />
-                  Agregar empleado
+                  Registrar empleado
                 </Link>
               </Button>
             </div>
@@ -87,11 +126,11 @@ export function EmployeesDirectoryPage() {
         filterValue={status}
         onFilterChange={setStatus}
       />
-      <p className="text-sm text-text-secondary">{employees.data?.meta?.total ?? data.length} empleados encontrados</p>
+      <p className="text-sm text-text-secondary">{visibleData.length} empleados encontrados</p>
       <ResponsiveDataView
-        data={data}
+        data={visibleData}
         getKey={(employee) => employee.id}
-        desktop={<div className="grid gap-3 lg:grid-cols-2">{data.map((employee) => <EmployeeCard key={employee.id} employee={employee} />)}</div>}
+        desktop={<div className="grid gap-3 lg:grid-cols-2">{visibleData.map((employee) => <EmployeeCard key={employee.id} employee={employee} />)}</div>}
         mobile={(employee) => <EmployeeCard employee={employee} />}
         empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros de la sucursal activa.</CardContent></Card>}
       />
@@ -120,8 +159,8 @@ export function EmployeeCreatePage() {
     <div className="space-y-5">
       <PageHeader
         eyebrow="Personas"
-        title="Agregar empleado"
-        description="Registra la oferta aceptada y prepara el alta laboral sin volver a pedir información ya evaluada."
+        title="Registrar empleado"
+        description="Registra a las personas que ya trabajan en la empresa y construye una base documental lista para auditorías y gestión continua."
         actions={
           <Button asChild type="button" variant="secondary">
             <Link href="/employees">
@@ -134,75 +173,141 @@ export function EmployeeCreatePage() {
       <section aria-labelledby="employee-hiring-flow" className="rounded-2xl border border-border-default bg-surface-section p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 id="employee-hiring-flow" className="font-semibold">Ruta de contratación</h2>
-            <p className="mt-1 text-sm text-text-secondary">Solicita cada dato una sola vez, en el momento en que aporta valor.</p>
+            <h2 id="employee-hiring-flow" className="font-semibold">Base documental del empleado</h2>
+            <p className="mt-1 text-sm text-text-secondary">Consolida datos, documentos y asignaciones de personas que ya forman parte de la empresa.</p>
           </div>
-          <Badge variant="outline">Etapa actual: Oferta</Badge>
+          <Badge variant="outline">Objetivo: gestión continua</Badge>
         </div>
         <ol className="mt-5 grid gap-3 md:grid-cols-4">
-          <HiringStep number="1" title="Postulación" description="Nombre, email, teléfono, ciudad, CV, experiencia o certificación esencial y consentimiento." />
-          <HiringStep number="2" title="Entrevista" description="Evaluación de competencias, disponibilidad y evidencia relevante para el cargo." />
-          <HiringStep current number="3" title="Oferta" description="Aquí: datos de contacto, sucursal, cargo y estado inicial del nuevo empleado." />
-          <HiringStep number="4" title="Documentos" description="Después de aceptar: I-9, W-4, SSN/ITIN, nómina, identidad y verificaciones." />
+          <HiringStep number="1" title="Identificación" description="Nombre, correo, contacto, sucursal principal y cargo actual de la persona." />
+          <HiringStep number="2" title="Perfil laboral" description="Rol, estado, asignaciones y datos útiles para mantener el directorio actualizado." />
+          <HiringStep current number="3" title="Documentación" description="Centraliza contratos, identificaciones, soportes y archivos necesarios para auditoría." />
+          <HiringStep number="4" title="Historial" description="Consulta cambios, movimientos, archivos cargados y trazabilidad de gestión." />
         </ol>
       </section>
-      <Card level={2}>
-        <CardContent className="p-6">
-          <InlineFeedback tone="info" title="Solo datos necesarios para esta etapa">
-            No solicites aquí documentos de identidad, información fiscal, nómina ni verificaciones. Se pedirán de forma segura en Documentos de contratación después de la oferta.
-          </InlineFeedback>
-          <form
-            className="mt-5 space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (valid) create.mutate();
-            }}
-          >
-            <FormField id="employee-name" label="Nombre completo" required>
-              {(field) => <Input {...field} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}
-            </FormField>
-            <FormField id="employee-email" label="Correo electrónico" description="Usaremos este correo para enviar la oferta y los próximos pasos." required>
-              {(field) => <Input {...field} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}
-            </FormField>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField id="employee-branch" label="Sucursal principal" required>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+        <Card level={2}>
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-text-secondary">Alta individual</p>
+                <h3 className="mt-1 text-xl font-semibold">Registrar una persona manualmente</h3>
+              </div>
+              <Badge variant="secondary">1 a 1</Badge>
+            </div>
+            <InlineFeedback tone="info" title="Solo datos necesarios para esta etapa">
+              Usa este formulario cuando necesitas capturar o corregir un solo expediente con trazabilidad completa.
+            </InlineFeedback>
+            <form
+              className="mt-5 space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (valid) create.mutate();
+              }}
+            >
+              <FormField id="employee-name" label="Nombre completo" required>
+                {(field) => <Input {...field} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}
+              </FormField>
+              <FormField id="employee-email" label="Correo electrónico" description="Usaremos este correo como dato de contacto y para trazabilidad interna." required>
+                {(field) => <Input {...field} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}
+              </FormField>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField id="employee-branch" label="Sucursal principal" required>
+                  {(field) => (
+                    <Select value={form.primaryBranchId} onValueChange={(primaryBranchId) => setForm({ ...form, primaryBranchId })}>
+                      <SelectTrigger {...field}>
+                        <SelectValue placeholder="Selecciona una sucursal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </FormField>
+                <FormField id="employee-role" label="Cargo o función" required>
+                  {(field) => <Input {...field} placeholder="Ej. Supervisor de tienda" value={form.primaryRole} onChange={(event) => setForm({ ...form, primaryRole: event.target.value })} />}
+                </FormField>
+              </div>
+              <FormField id="employee-status" label="Estado inicial" description="Por defecto queda activo si la persona ya trabaja contigo.">
                 {(field) => (
-                  <Select value={form.primaryBranchId} onValueChange={(primaryBranchId) => setForm({ ...form, primaryBranchId })}>
+                  <Select value={form.status ?? "ACTIVE"} onValueChange={(status) => setForm({ ...form, status: status as EmployeeStatus })}>
                     <SelectTrigger {...field}>
-                      <SelectValue placeholder="Selecciona una sucursal" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                      <SelectItem value="ACTIVE">Activo</SelectItem>
+                      <SelectItem value="INACTIVE">Inactivo</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               </FormField>
-              <FormField id="employee-role" label="Cargo o función" required>
-                {(field) => <Input {...field} placeholder="Ej. Supervisor de tienda" value={form.primaryRole} onChange={(event) => setForm({ ...form, primaryRole: event.target.value })} />}
-              </FormField>
-            </div>
-            <FormField id="employee-status" label="Estado inicial" description="Por defecto queda activo si la persona ya trabaja contigo.">
-              {(field) => (
-                <Select value={form.status ?? "ACTIVE"} onValueChange={(status) => setForm({ ...form, status: status as EmployeeStatus })}>
-                  <SelectTrigger {...field}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ACTIVE">Activo</SelectItem>
-                    <SelectItem value="INACTIVE">Inactivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </FormField>
-            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-              <Button asChild type="button" variant="secondary">
-                <Link href="/employees">Cancelar</Link>
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <Button asChild type="button" variant="secondary">
+                  <Link href="/employees">Cancelar</Link>
+                </Button>
+                <Button type="submit" disabled={!valid || create.isPending}>{create.isPending ? "Guardando..." : "Registrar empleado"}</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-5">
+          <Card level={2}>
+            <CardContent className="p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-text-secondary">Carga masiva</p>
+                  <h3 className="mt-1 text-xl font-semibold">Cargar empleados en lote</h3>
+                </div>
+                <Badge variant="secondary">CSV / Excel</Badge>
+              </div>
+              <div className="mt-4 rounded-2xl border border-border-default bg-surface-elevated p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Upload className="size-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Ideal para altas de equipo completas</p>
+                    <p className="mt-1 text-sm leading-6 text-text-secondary">
+                      Revisa el archivo antes de confirmar y crea expedientes con validación previa.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <Metric label="Formato" value="XLSX" />
+                  <Metric label="Límite" value="500" />
+                  <Metric label="Flujo" value="Prevalidado" />
+                </div>
+                <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <GuideStep number="1" title="Preparar" description="Descarga la plantilla y organiza nombre, correo, sucursal y cargo." icon={<FileSpreadsheet className="size-4" />} accent="primary" />
+                  <GuideStep number="2" title="Validar" description="Sube el archivo y revisa errores antes de confirmar la carga." icon={<ShieldCheck className="size-4" />} accent="info" />
+                  <GuideStep number="3" title="Confirmar" description="Ejecuta la carga cuando todas las filas estén listas." icon={<CheckCircle2 className="size-4" />} accent="success" />
+                </ol>
+              </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button asChild type="button" variant="secondary" className="w-full sm:w-auto">
+                <Link href="/employees/import">
+                  <FileSpreadsheet className="size-4" />
+                  Cargar empleados
+                </Link>
               </Button>
-              <Button type="submit" disabled={!valid || create.isPending}>{create.isPending ? "Guardando..." : "Agregar empleado"}</Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          <Card level={2}>
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-text-secondary">Qué queda centralizado</p>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-text-secondary">
+                <li>Datos personales y de contacto.</li>
+                <li>Sucursal principal y cargo actual.</li>
+                <li>Estado del empleado y trazabilidad de cambios.</li>
+                <li>Documentos y soportes asociados para auditoría.</li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -216,6 +321,56 @@ function HiringStep({ current = false, description, number, title }: { current?:
     </li>
   );
 }
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border-default bg-card p-3">
+      <p className="text-xs text-text-secondary">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border-default bg-surface-elevated p-4 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-text-primary">{value}</p>
+    </div>
+  );
+}
+
+function StatusPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border-default bg-surface-elevated px-3 py-1.5 text-xs">
+      <span className="font-medium text-text-secondary">{label}:</span>
+      <span className="max-w-[14rem] truncate font-semibold text-text-primary">{value}</span>
+    </div>
+  );
+}
+
+function GuideStep({ number, title, description, icon, accent }: { number: string; title: string; description: string; icon: React.ReactNode; accent: "primary" | "info" | "success" }) {
+  return (
+    <li className="rounded-2xl border border-border-default bg-card p-4">
+      <div className="flex items-start gap-3">
+        <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
+          accent === "primary" ? "bg-primary/10 text-primary" : accent === "info" ? "bg-info/10 text-info" : "bg-status-success/10 text-status-success"
+        }`}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-primary">Paso {number}</p>
+          <p className="mt-1 font-medium">{title}</p>
+          <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+type EmployeeDirectoryWithDocuments = EmployeeDirectoryItem & {
+  documentSummary?: { pending: number; total: number };
+};
 
 export function EmployeeImportPage() {
   const queryClient = useQueryClient();
@@ -233,7 +388,7 @@ export function EmployeeImportPage() {
       setFileName("");
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible importar los empleados.")),
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cargar los empleados.")),
   });
   const handleFile = async (file?: File) => {
     if (!file) return;
@@ -245,7 +400,7 @@ export function EmployeeImportPage() {
     <div className="space-y-5">
       <PageHeader
         eyebrow="Personas"
-        title="Importar empleados"
+        title="Cargar empleados"
         description="Carga hasta 500 empleados desde un archivo CSV o Excel. Primero revisa los errores y luego confirma la creación."
         actions={
           <Button asChild type="button" variant="secondary">
@@ -258,7 +413,7 @@ export function EmployeeImportPage() {
       />
       <Card level={2}>
         <CardContent className="space-y-4 p-6">
-          <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4">
+          <div className="overflow-hidden rounded-2xl border border-dashed border-primary/40 bg-gradient-to-br from-primary/10 via-surface-section to-info/10 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Documento de empleados</p>
@@ -285,6 +440,48 @@ export function EmployeeImportPage() {
               </div>
             </div>
             <p className="mt-3 text-xs text-text-secondary">Si tu archivo viene desde Excel, puedes subirlo directamente en .xlsx o exportarlo como CSV/TSV.</p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="rounded-2xl bg-surface-elevated p-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <FileSpreadsheet className="size-4" />
+                </div>
+              </div>
+              <div className="rounded-2xl bg-surface-elevated p-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-info/10 text-info">
+                  <UsersRound className="size-4" />
+                </div>
+              </div>
+              <div className="rounded-2xl bg-surface-elevated p-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-status-success/10 text-status-success">
+                  <Upload className="size-4" />
+                </div>
+              </div>
+            </div>
+            {fileName ? (
+              <div className="mt-4 rounded-2xl border border-border-default bg-card p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text-primary">Archivo listo para validar</p>
+                    <p className="mt-1 truncate text-xs text-text-secondary">{fileName}</p>
+                  </div>
+                  <Badge variant={invalidRows.length ? "secondary" : "success"}>{invalidRows.length ? "Revisar" : "Listo"}</Badge>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-elevated">
+                  <div
+                    className={cn("h-full rounded-full transition-all", invalidRows.length ? "bg-status-warning" : "bg-status-success")}
+                    style={{ width: rows.length ? `${Math.max(35, Math.min(100, (validRows.length / rows.length) * 100))}%` : "0%" }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-text-secondary">
+                  {rows.length ? `${validRows.length} de ${rows.length} filas listas para cargar` : "Todavía no hay filas cargadas"}
+                </p>
+              </div>
+            ) : null}
+            <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+              <GuideStep number="1" title="Preparar" description="Descarga la plantilla y organiza nombre, correo, sucursal y cargo." icon={<FileSpreadsheet className="size-4" />} accent="primary" />
+              <GuideStep number="2" title="Validar" description="Sube el archivo y revisa errores antes de confirmar la carga." icon={<ShieldCheck className="size-4" />} accent="info" />
+              <GuideStep number="3" title="Confirmar" description="Ejecuta la carga cuando todas las filas estén listas." icon={<CheckCircle2 className="size-4" />} accent="success" />
+            </ol>
           </div>
           {branches.isLoading ? <AsyncState state="loading" title="Cargando sucursales" /> : null}
           {fileName ? <p className="text-sm text-text-secondary">Archivo seleccionado: <strong className="text-text-primary">{fileName}</strong></p> : null}
@@ -292,16 +489,16 @@ export function EmployeeImportPage() {
             <>
               <div className="grid gap-3 sm:grid-cols-3">
                 <ImportMetric label="Filas leídas" value={rows.length} />
-                <ImportMetric label="Listas para importar" value={validRows.length} tone="success" />
+                <ImportMetric label="Listas para cargar" value={validRows.length} tone="success" />
                 <ImportMetric label="Con errores" value={invalidRows.length} tone={invalidRows.length ? "danger" : "default"} />
               </div>
               {invalidRows.length ? (
-                <InlineFeedback tone="danger" title="Corrige el archivo antes de importar">
+                <InlineFeedback tone="danger" title="Corrige el archivo antes de cargar">
                   Cada fila debe tener nombre, correo válido, sucursal existente y cargo. También se bloquean correos repetidos.
                 </InlineFeedback>
               ) : (
                 <InlineFeedback tone="success" title="Archivo listo">
-                  Todas las filas son válidas. La importación se ejecutará en una sola operación.
+                  Todas las filas son válidas. La carga se ejecutará en una sola operación.
                 </InlineFeedback>
               )}
               <div className="max-h-64 overflow-auto rounded-xl border border-border-default">
@@ -339,7 +536,7 @@ export function EmployeeImportPage() {
               <Link href="/employees">Cancelar</Link>
             </Button>
             <Button type="button" disabled={!validRows.length || invalidRows.length > 0 || importEmployees.isPending} onClick={() => importEmployees.mutate()}>
-              {importEmployees.isPending ? "Importando..." : `Importar ${validRows.length || ""} empleados`}
+              {importEmployees.isPending ? "Cargando..." : `Cargar ${validRows.length || ""} empleados`}
             </Button>
           </div>
         </CardContent>
@@ -351,6 +548,8 @@ export function EmployeeImportPage() {
 function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
+  const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
+  const documentSummary = (employee as EmployeeDirectoryWithDocuments).documentSummary;
   return (
     <Card level={2}>
       <CardContent className="p-5">
@@ -364,7 +563,26 @@ function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
           </div>
           <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
         </div>
-        <p className="mt-4 text-sm text-text-secondary">{primary ? `${primary.branch?.name ?? "Sucursal sin nombre"} · ${primary.role}` : "Sin asignación activa"}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StatusPill label="Sucursal" value={primary?.branch?.name ?? "Sin nombre"} />
+          <StatusPill label="Rol" value={primary?.role ?? "Sin asignación"} />
+          <StatusPill label="Asignaciones" value={String(activeAssignments.length)} />
+          {documentSummary ? <StatusPill label="Documentos" value={documentSummary.pending ? `${documentSummary.pending} pendientes` : "Completo"} /> : null}
+        </div>
+        <div className="mt-4 grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 text-sm">
+          <div className="flex items-center gap-2 text-text-secondary">
+            <BriefcaseBusiness className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">{primary ? primary.role : "Sin asignación activa"}</span>
+          </div>
+          <div className="flex items-center gap-2 text-text-secondary">
+            <MapPin className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">{primary?.branch?.name ?? "Sucursal sin nombre"}</span>
+          </div>
+          <div className="flex items-center gap-2 text-text-secondary">
+            <CheckCircle2 className="size-4 shrink-0 text-status-success" />
+            <span>{activeAssignments.length ? `${activeAssignments.length} asignación${activeAssignments.length === 1 ? "" : "es"} registrada${activeAssignments.length === 1 ? "" : "s"}` : "Sin asignaciones adicionales"}</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

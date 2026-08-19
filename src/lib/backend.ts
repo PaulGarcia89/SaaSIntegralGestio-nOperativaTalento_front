@@ -1628,6 +1628,7 @@ export type EmployeeDirectoryItem = {
   email: string;
   status: string;
   branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
+  documentSummary?: { pending: number; total: number };
 };
 
 export type EmployeeDirectoryResponse = {

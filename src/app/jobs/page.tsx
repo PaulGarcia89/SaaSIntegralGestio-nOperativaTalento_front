@@ -46,10 +46,7 @@ export default function JobsPortalPage() {
         <section aria-label="Vacantes disponibles" className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((vacancy) => (
             <Card key={vacancy.id} className="flex flex-col overflow-hidden border-border/70 bg-card/95">
-              <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-secondary to-cyan-100/50">
-                <Image src={vacancy.imageUrl || "/images/vacancies/operations-leadership-fallback.png"} alt={vacancy.imageUrl ? `Imagen representativa del cargo ${vacancy.title}` : `Equipo de liderazgo operativo, imagen descriptiva para la vacante ${vacancy.title}`} fill unoptimized className="object-cover transition duration-300 hover:scale-[1.02]" />
-                {!vacancy.imageUrl ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">Imagen ilustrativa</span> : null}
-              </div>
+              <VacancyImage imageUrl={vacancy.imageUrl} title={vacancy.title} />
               <CardContent className="flex flex-1 flex-col gap-5 p-6">
                 <div className="flex flex-wrap gap-2"><Badge>{vacancy.department || "Vacante"}</Badge>{vacancy.employmentType ? <Badge variant="secondary">{vacancy.employmentType}</Badge> : null}</div>
                 <div className="space-y-2"><h2 className="text-2xl font-semibold tracking-tight">{vacancy.title}</h2><p className="text-sm text-muted-foreground">{vacancy.tenant?.name}</p></div>
@@ -64,6 +61,28 @@ export default function JobsPortalPage() {
           ))}
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) {
+  const [hasError, setHasError] = useState(false);
+  const source = !imageUrl || hasError ? "/images/vacancies/operations-leadership-fallback.png" : imageUrl;
+  const alt = imageUrl
+    ? `Imagen representativa del cargo ${title}`
+    : `Equipo de liderazgo operativo, imagen descriptiva para la vacante ${title}`;
+
+  return (
+    <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-gradient-to-br from-primary/15 via-secondary to-cyan-100/50">
+      <Image
+        src={source}
+        alt={alt}
+        fill
+        unoptimized
+        className="object-cover transition duration-300 hover:scale-[1.02]"
+        onError={() => setHasError(true)}
+      />
+      {!imageUrl || hasError ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">Imagen ilustrativa</span> : null}
     </div>
   );
 }

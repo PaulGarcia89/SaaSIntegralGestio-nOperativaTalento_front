@@ -339,9 +339,10 @@ function Field({ id, label, value, onChange, type = "text", className, maxLength
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { const id = `vacancy-${label.toLocaleLowerCase("es")}`; return <label className="space-y-2 text-sm font-medium" htmlFor={id}>{label}<textarea id={id} value={value} onChange={(event) => onChange(event.target.value)} rows={4} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label>; }
 function Summary({ label, value }: { label: string; value?: string }) { return <div><dt className="text-xs text-text-secondary">{label}</dt><dd className="mt-1 font-medium">{value || "No informado"}</dd></div>; }
 function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) {
-  const source = imageUrl || "/images/vacancies/operations-leadership-fallback.png";
+  const [hasError, setHasError] = useState(false);
+  const source = !imageUrl || hasError ? "/images/vacancies/operations-leadership-fallback.png" : imageUrl;
   const alt = imageUrl
     ? `Imagen representativa del cargo ${title}`
     : `Equipo de liderazgo operativo, imagen descriptiva para la vacante ${title}`;
-  return <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-primary/15 via-surface-section to-info/15"><Image src={source} alt={alt} fill unoptimized className="object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-transparent" />{!imageUrl ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">Imagen ilustrativa</span> : null}</div>;
+  return <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-primary/15 via-surface-section to-info/15"><Image src={source} alt={alt} fill unoptimized className="object-cover" onError={() => setHasError(true)} /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-transparent" />{!imageUrl || hasError ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">Imagen ilustrativa</span> : null}</div>;
 }

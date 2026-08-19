@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, getApiErrorMessage, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
+import { ApiError, bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, fetchMyPreferences, getApiErrorMessage, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -33,6 +33,7 @@ export function EmployeesDirectoryPage() {
   const [sortField, setSortField] = useState<"name" | "email" | "status" | "documents" | "assignments">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [savedFiltersReady, setSavedFiltersReady] = useState(false);
   const employees = useQuery({
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status, branchId: branchFilter || undefined, page, pageSize }),
@@ -72,6 +73,44 @@ export function EmployeesDirectoryPage() {
     setSelectedIds([]);
   }, [search, status, branchFilter, page, pageSize, viewMode, sortField, sortDirection]);
 
+  useEffect(() => {
+    let active = true;
+    void fetchMyPreferences()
+      .then((preferences) => {
+        if (!active) return;
+        const stored = preferences["employees-directory"] as {
+          search?: string;
+          status?: string;
+          branchFilter?: string;
+          pageSize?: number;
+          viewMode?: "table" | "cards";
+          sortField?: typeof sortField;
+          sortDirection?: "asc" | "desc";
+        } | undefined;
+        if (stored) {
+          if (stored.search !== undefined) setSearch(stored.search);
+          if (stored.status !== undefined) setStatus(stored.status);
+          if (stored.branchFilter !== undefined) setBranchFilter(stored.branchFilter);
+          if (stored.pageSize && [10, 20, 50, 100].includes(stored.pageSize)) setPageSize(stored.pageSize);
+          if (stored.viewMode) setViewMode(stored.viewMode);
+          if (stored.sortField) setSortField(stored.sortField);
+          if (stored.sortDirection) setSortDirection(stored.sortDirection);
+        }
+        setSavedFiltersReady(true);
+      })
+      .catch(() => {
+        if (active) setSavedFiltersReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!savedFiltersReady) return;
+    void updateMyPreference("employees-directory", { search, status, branchFilter, pageSize, viewMode, sortField, sortDirection }).catch(() => undefined);
+  }, [savedFiltersReady, search, status, branchFilter, pageSize, viewMode, sortField, sortDirection]);
+
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) {
       setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -90,6 +129,7 @@ export function EmployeesDirectoryPage() {
     const allSelected = sortedData.every((employee) => selectedIds.includes(employee.id));
     setSelectedIds(allSelected ? [] : sortedData.map((employee) => employee.id));
   };
+  const selectionData = sortedData.filter((employee) => selectedIds.includes(employee.id));
 
   return (
     <div className="space-y-5">
@@ -199,11 +239,11 @@ export function EmployeesDirectoryPage() {
               </Select>
             </label>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant={viewMode === "table" ? "default" : "secondary"} onClick={() => setViewMode("table")}>
-                <LayoutList className="size-4" />
-                Tabla
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant={viewMode === "table" ? "default" : "secondary"} onClick={() => setViewMode("table")}>
+                  <LayoutList className="size-4" />
+                  Tabla
+                </Button>
               <Button type="button" variant={viewMode === "cards" ? "default" : "secondary"} onClick={() => setViewMode("cards")}>
                 <UsersRound className="size-4" />
                 Tarjetas
@@ -222,6 +262,9 @@ export function EmployeesDirectoryPage() {
                 {selectionCount} empleados seleccionados para acciones masivas.
               </p>
               <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(selectionData, "empleados-seleccionados")}>
+                  Exportar selección
+                </Button>
                 <Button type="button" variant="secondary" onClick={() => setSelectedIds([])}>
                   Limpiar selección
                 </Button>
@@ -231,6 +274,14 @@ export function EmployeesDirectoryPage() {
               </div>
             </div>
           ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(sortedData, "empleados-resultado")}>
+              Exportar resultado
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setSelectedIds(sortedData.map((employee) => employee.id))}>
+              Seleccionar visibles
+            </Button>
+          </div>
         </CardContent>
       </Card>
       {viewMode === "table" ? (
@@ -804,6 +855,36 @@ async function copySelectedEmails(data: EmployeeDirectoryItem[], selectedIds: st
   if (!emails.length) return;
   await navigator.clipboard.writeText(emails.join("\n"));
   toast.success(`${emails.length} correos copiados`);
+}
+
+async function exportEmployeesCsv(data: EmployeeDirectoryItem[], filename: string) {
+  if (!data.length) return;
+  const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const rows = [
+    ["Nombre", "Correo", "Estado", "Sucursal", "Rol", "Documentos", "Asignaciones"],
+    ...data.map((employee) => {
+      const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+      const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
+      const documentSummary = (employee as EmployeeDirectoryWithDocuments).documentSummary;
+      return [
+        employee.name,
+        employee.email,
+        employee.status,
+        primary?.branch?.name ?? "",
+        primary?.role ?? "",
+        String(documentSummary?.totalDocuments ?? 0),
+        String(assignments.length),
+      ];
+    }),
+  ];
+  const csv = `\uFEFF${rows.map((row) => row.map(escape).join(",")).join("\n")}`;
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${filename}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  toast.success(`Exportados ${data.length} empleados`);
 }
 
 function compareEmployees(left: EmployeeDirectoryItem, right: EmployeeDirectoryItem, field: "name" | "email" | "status" | "documents" | "assignments", direction: "asc" | "desc") {

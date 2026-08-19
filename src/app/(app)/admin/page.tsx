@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Building2, Cable, GitBranch, ShieldCheck, UsersRound } from "lucide-react";
 import { PageHeader } from "@/components/design-system";

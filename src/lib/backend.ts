@@ -1735,7 +1735,7 @@ export function fetchEmployeeDetail(id: string) {
   });
 }
 
-export function transferEmployee(id: string, input: { primaryBranchId: string; primaryRole?: string }) {
+export function transferEmployee(id: string, input: { branchId: string; role?: string }) {
   return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/transfer`, {
     method: "POST",
     body: JSON.stringify(input),

@@ -239,7 +239,7 @@ export function EmployeesDirectoryPage() {
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible reasignar sucursales.")),
   });
   const quickTransfer = useMutation({
-    mutationFn: (input: { id: string; primaryBranchId: string; primaryRole?: string }) => transferEmployee(input.id, { primaryBranchId: input.primaryBranchId, primaryRole: input.primaryRole }),
+    mutationFn: (input: { id: string; branchId: string; role?: string }) => transferEmployee(input.id, { branchId: input.branchId, role: input.role }),
     onSuccess: async () => {
       toast.success("Sucursal actualizada");
       setQuickAction(null);
@@ -737,7 +737,7 @@ export function EmployeesDirectoryPage() {
               onClick={() => {
                 if (!quickAction) return;
                 if (quickAction.mode === "branch") {
-                  quickTransfer.mutate({ id: quickAction.employee.id, primaryBranchId: quickAction.primaryBranchId, primaryRole: quickAction.primaryRole });
+                  quickTransfer.mutate({ id: quickAction.employee.id, branchId: quickAction.primaryBranchId, role: quickAction.primaryRole });
                 } else {
                   quickRole.mutate({ id: quickAction.employee.id, primaryRole: quickAction.primaryRole });
                 }

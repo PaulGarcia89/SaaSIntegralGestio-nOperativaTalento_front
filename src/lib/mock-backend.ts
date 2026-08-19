@@ -488,16 +488,16 @@ export async function fetchEmployeeDetail(id: string) {
   };
 }
 
-export async function transferEmployee(id: string, input: { primaryBranchId: string; primaryRole?: string }) {
+export async function transferEmployee(id: string, input: { branchId: string; role?: string }) {
   await wait();
-  const branch = branchesDb.find((item) => item.id === input.primaryBranchId);
+  const branch = branchesDb.find((item) => item.id === input.branchId);
   if (!branch) throw new Error("Sucursal no encontrada");
   employeesDb = employeesDb.map((employee) =>
     employee.id === id
       ? {
           ...employee,
           branchAssignments: employee.branchAssignments.map((assignment) =>
-            assignment.isPrimary ? { ...assignment, branch: { id: branch.id, name: branch.name }, role: input.primaryRole ?? assignment.role } : assignment,
+            assignment.isPrimary ? { ...assignment, branch: { id: branch.id, name: branch.name }, role: input.role ?? assignment.role } : assignment,
           ),
         }
       : employee,

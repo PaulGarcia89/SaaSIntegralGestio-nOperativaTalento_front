@@ -1659,6 +1659,18 @@ export type EmployeeHistoryResponse = {
   auditTrail: Array<{ id: string; action: string; email?: string | null; actorRole?: string | null; createdAt: string }>;
 };
 
+export type EmployeePayrollComplianceSnapshot = {
+  employeeId: string;
+  payroll: { payType: string | null; payRate: string | number | null; payFrequency: string | null; overtimeEligible: boolean | null; regularHourlyRate: string | number | null; workweekStartDay: string | null; workweekStartTime: string | null; payrollProvider: string | null; payrollEmployeeId: string | null; externalPayrollReference: string | null };
+  tax: { w4Status: string; w4CompletedAt: string | null; w4EffectiveAt: string | null; w4DocumentId: string | null; w4Version: number | null; ssnMasked: string | null };
+  i9: { status: string; firstDayOfEmployment: string | null; section1CompletedAt: string | null; section2CompletedAt: string | null; verificationDueDate: string | null; verificationCompletedAt: string | null; reverificationRequired: boolean; reverificationDueDate: string | null; documentId: string | null; retentionUntil: string | null };
+  eVerify: { required: boolean; requirementReason: string | null; status: string; caseNumber: string | null; submittedAt: string | null; completedAt: string | null; documentId: string | null };
+  floridaNewHire: { required: boolean; status: string; dueDate: string | null; submittedAt: string | null; confirmationNumber: string | null; failureReason: string | null };
+  complianceSummary: { totalDocuments: number; pendingReview: number; approved: number; rejected: number; expired: number; expiringWithin30Days: number; byCategory: Record<string, number>; expiringDocuments: Array<{ id: string; category: string; originalName: string; expiresAt: string | null }> };
+  auditTrail: Array<{ id: string; action: string; actorEmail: string | null; actorRole: string | null; createdAt: string }>;
+  alerts: Array<{ type: string; severity: "info" | "warning" | "danger"; message: string }>;
+};
+
 type EmployeeApiItem = Omit<EmployeeDirectoryItem, "branchAssignments"> & {
   branchAssignments?: EmployeeDirectoryItem["branchAssignments"];
   primaryBranch?: {
@@ -1800,6 +1812,10 @@ export function fetchEmployeeDetail(id: string) {
     if (!shouldUseMockBackend(error)) throw error;
     return fetchMockEmployeeDetail(id);
   });
+}
+
+export function fetchEmployeePayrollCompliance(id: string) {
+  return request<EmployeePayrollComplianceSnapshot>(`/employees/${encodeURIComponent(id)}/payroll-compliance`);
 }
 
 export function transferEmployee(id: string, input: { branchId: string; role?: string }) {

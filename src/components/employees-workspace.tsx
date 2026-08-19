@@ -1230,12 +1230,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onView, onEd
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {onView ? <Button type="button" size="sm" variant="secondary" onClick={onView}><FileText className="size-4" />Detalle</Button> : null}
-          {onQuickBranch ? <Button type="button" size="sm" variant="secondary" onClick={onQuickBranch}><MapPin className="size-4" />Sucursal</Button> : null}
-          {onQuickRole ? <Button type="button" size="sm" variant="secondary" onClick={onQuickRole}><BriefcaseBusiness className="size-4" />Cargo</Button> : null}
-          {onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}><FilePenLine className="size-4" />Editar</Button> : null}
-          {onToggleStatus ? <Button type="button" size="sm" variant="secondary" onClick={onToggleStatus}><Undo2 className="size-4" />Cambiar estado</Button> : null}
-          {onDelete ? <Button type="button" size="sm" variant="secondary" onClick={onDelete}><Trash2 className="size-4" />Eliminar</Button> : null}
+          {onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}><FilePenLine className="size-4" />Editar registro</Button> : null}
         </div>
       </CardContent>
     </Card>
@@ -1273,12 +1268,7 @@ function EmployeeRow({ employee, compact = false, selected = false, onToggleSele
       <div className="flex items-center justify-between gap-3 md:justify-end">
         <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
         <div className="hidden items-center gap-1 md:flex">
-          {onView ? <Button type="button" size="icon" variant="ghost" onClick={onView} aria-label={`Ver detalle de ${employee.name}`}><FileText className="size-4" /></Button> : null}
-          {onQuickBranch ? <Button type="button" size="icon" variant="ghost" onClick={onQuickBranch} aria-label={`Cambiar sucursal de ${employee.name}`}><MapPin className="size-4" /></Button> : null}
-          {onQuickRole ? <Button type="button" size="icon" variant="ghost" onClick={onQuickRole} aria-label={`Cambiar cargo de ${employee.name}`}><BriefcaseBusiness className="size-4" /></Button> : null}
           {onEdit ? <Button type="button" size="icon" variant="ghost" onClick={onEdit} aria-label={`Editar ${employee.name}`}><FilePenLine className="size-4" /></Button> : null}
-          {onToggleStatus ? <Button type="button" size="icon" variant="ghost" onClick={onToggleStatus} aria-label={`Cambiar estado de ${employee.name}`}><Undo2 className="size-4" /></Button> : null}
-          {onDelete ? <Button type="button" size="icon" variant="ghost" onClick={onDelete} aria-label={`Eliminar ${employee.name}`}><Trash2 className="size-4" /></Button> : null}
           <ChevronRight className="size-4 shrink-0 text-text-secondary" />
         </div>
       </div>

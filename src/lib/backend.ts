@@ -1663,6 +1663,7 @@ export type CreateEmployeeInput = {
 export type UpdateEmployeeInput = {
   name: string;
   email: string;
+  jobTitle?: string;
   status?: "ACTIVE" | "INACTIVE" | "TERMINATED";
 };
 

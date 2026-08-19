@@ -191,6 +191,7 @@ export function EmployeesDirectoryPage() {
     mutationFn: (input: NonNullable<EmployeeEditorState>) => updateEmployee(input.id, {
       name: input.name,
       email: input.email,
+      jobTitle: input.primaryRole,
       status: input.status,
     }),
     onSuccess: async (updated) => {
@@ -563,19 +564,12 @@ export function EmployeesDirectoryPage() {
               <FormField id="employee-edit-email" label="Correo electrónico" required>
                 {(field) => <Input {...field} type="email" value={editingEmployee.email} onChange={(event) => setEditingEmployee({ ...editingEmployee, email: event.target.value })} />}
               </FormField>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField id="employee-edit-branch" label="Sucursal principal" required>
-                  {(field) => (
-                    <Select value={editingEmployee.primaryBranchId} onValueChange={(primaryBranchId) => setEditingEmployee({ ...editingEmployee, primaryBranchId })}>
-                      <SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger>
-                      <SelectContent>{tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )}
-                </FormField>
-                <FormField id="employee-edit-role" label="Cargo o función" required>
-                  {(field) => <Input {...field} value={editingEmployee.primaryRole} onChange={(event) => setEditingEmployee({ ...editingEmployee, primaryRole: event.target.value })} />}
-                </FormField>
-              </div>
+              <FormField id="employee-edit-role" label="Cargo o función" required>
+                {(field) => <Input {...field} value={editingEmployee.primaryRole} onChange={(event) => setEditingEmployee({ ...editingEmployee, primaryRole: event.target.value })} />}
+              </FormField>
+              <p className="text-xs text-text-secondary">
+                La sucursal principal se gestiona desde la acción rápida o el detalle del expediente.
+              </p>
               <FormField id="employee-edit-status" label="Estado">
                 {(field) => (
                   <Select value={editingEmployee.status} onValueChange={(value) => setEditingEmployee({ ...editingEmployee, status: value as EmployeeStatus })}>

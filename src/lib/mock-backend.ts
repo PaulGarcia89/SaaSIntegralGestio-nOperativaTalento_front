@@ -109,6 +109,7 @@ type EmployeeRecord = {
   id: string;
   name: string;
   email: string;
+  jobTitle?: string | null;
   status: "ACTIVE" | "INACTIVE" | "TERMINATED";
   deletedAt?: string | null;
   branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
@@ -120,6 +121,7 @@ let employeesDb: EmployeeRecord[] = [
     id: "emp-1",
     name: "Paul Garcia",
     email: "datalinkprotech@gmail.com",
+    jobTitle: "Administrador de empresa",
     status: "ACTIVE",
     deletedAt: null,
     branchAssignments: [
@@ -131,6 +133,7 @@ let employeesDb: EmployeeRecord[] = [
     id: "emp-2",
     name: "Luis Sosa",
     email: "luissosa@lessa.com",
+    jobTitle: "Supervisor",
     status: "ACTIVE",
     deletedAt: null,
     branchAssignments: [
@@ -445,9 +448,22 @@ export async function bulkCreateEmployees(employees: Array<{ name: string; email
   return { created: createdEmployees.length, employees: createdEmployees.map((employee) => ({ id: employee.id, email: employee.email })) };
 }
 
-export async function updateEmployee(id: string, input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED" }) {
+export async function updateEmployee(id: string, input: { name: string; email: string; jobTitle?: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED" }) {
   await wait();
-  employeesDb = employeesDb.map((employee) => (employee.id === id ? { ...employee, name: input.name.trim(), email: input.email.trim().toLowerCase(), status: input.status ?? employee.status } : employee));
+  employeesDb = employeesDb.map((employee) =>
+    employee.id === id
+      ? {
+          ...employee,
+          name: input.name.trim(),
+          email: input.email.trim().toLowerCase(),
+          jobTitle: input.jobTitle?.trim() || employee.jobTitle,
+          branchAssignments: input.jobTitle
+            ? employee.branchAssignments.map((assignment) => (assignment.isPrimary ? { ...assignment, role: input.jobTitle?.trim() || assignment.role } : assignment))
+            : employee.branchAssignments,
+          status: input.status ?? employee.status,
+        }
+      : employee,
+  );
   const updated = employeesDb.find((employee) => employee.id === id);
   if (!updated) throw new Error("Empleado no encontrado");
   return updated;

@@ -51,6 +51,7 @@ export type PermissionKey =
   | "branches.view"
   | "branches.create"
   | "branches.update"
+  | "branches.delete"
   | "branches.switch"
   | "users.view"
   | "users.create"

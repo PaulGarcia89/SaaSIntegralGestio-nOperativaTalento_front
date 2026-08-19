@@ -453,6 +453,7 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "branches.view": ["branches.read"],
   "branches.create": ["branches.create"],
   "branches.update": ["branches.update"],
+  "branches.delete": ["branches.delete"],
   "branches.switch": ["branch.switch"],
   "users.view": ["users.read"],
   "users.create": ["users.create"],
@@ -713,6 +714,7 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
   if (hasCode("branches.read")) mapped.add("branches.view");
   if (hasCode("branches.create")) mapped.add("branches.create");
   if (hasCode("branches.update")) mapped.add("branches.update");
+  if (hasCode("branches.delete")) mapped.add("branches.delete");
   if (hasCode("branch.switch") || hasCode("branches.switch")) mapped.add("branches.switch");
   if (hasCode("users.read")) mapped.add("users.view");
   if (hasCode("users.create")) mapped.add("users.create");

@@ -1,7 +1,7 @@
 import type { ModuleKey, PermissionKey, RoleKey, SubscriptionAccessState } from "@/lib/contracts";
 
 export type NavGroup = "Inicio" | "Personas" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Analítica" | "Administración" | "Gobierno de plataforma";
-export type NavItem = { href: string; label: string; group: NavGroup; module: ModuleKey; permission: PermissionKey; requiredPermissions: PermissionKey[]; audience: "shared" | "saas" | "tenant"; featureFlag: string; available: boolean; showInNavigation?: boolean; subscriptionStates?: SubscriptionAccessState[]; branchRequired?: boolean; roles?: RoleKey[]; strictRoles?: boolean; icon: "dashboard" | "notifications" | "reports" | "profile" | "vacancies" | "candidates" | "interviews" | "documents" | "signatures" | "training" | "evaluations" | "productivity" | "inventory" | "admin" | "users" | "roles" | "company" | "tenants" | "branches" | "modules" | "subscription" | "queues" };
+export type NavItem = { href: string; label: string; group: NavGroup; module: ModuleKey; permission: PermissionKey; requiredPermissions: PermissionKey[]; audience: "shared" | "saas" | "tenant"; featureFlag: string; available: boolean; requiresCommercialModule?: boolean; showInNavigation?: boolean; subscriptionStates?: SubscriptionAccessState[]; branchRequired?: boolean; roles?: RoleKey[]; strictRoles?: boolean; icon: "dashboard" | "notifications" | "reports" | "profile" | "vacancies" | "candidates" | "interviews" | "documents" | "signatures" | "training" | "evaluations" | "productivity" | "inventory" | "admin" | "users" | "roles" | "company" | "tenants" | "branches" | "modules" | "subscription" | "queues" };
 const live: SubscriptionAccessState[] = ["active", "trial", "grace_period"];
 
 const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "requiredPermissions">> = [
@@ -41,7 +41,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/reports", label: "Reportes", group: "Analítica", module: "reports", permission: "reports.view", audience: "shared", subscriptionStates: live, icon: "reports" },
   { href: "/notifications", label: "Alertas", group: "Analítica", module: "notifications", permission: "notifications.view", audience: "shared", icon: "notifications" },
   { href: "/admin/company", label: "Configuración de empresa", group: "Administración", module: "admin", permission: "admin.company", audience: "tenant", icon: "company" },
-  { href: "/admin/branches", label: "Sucursales", group: "Administración", module: "admin", permission: "branches.view", audience: "tenant", icon: "branches" },
+  { href: "/admin/branches", label: "Sucursales", group: "Administración", module: "admin", permission: "branches.view", audience: "tenant", requiresCommercialModule: false, icon: "branches" },
   { href: "/admin/users", label: "Usuarios", group: "Administración", module: "admin", permission: "users.view", audience: "tenant", icon: "users" },
   { href: "/admin/roles", label: "Roles y permisos", group: "Administración", module: "admin", permission: "roles.view", audience: "tenant", icon: "roles" },
   { href: "/admin/automations", label: "Automatizaciones", group: "Administración", module: "admin", permission: "admin.view", audience: "tenant", icon: "queues", roles: ["admin_saas", "admin_empresa"] },
@@ -85,8 +85,8 @@ export function evaluateRouteAccess(policy: NavItem, context: RouteAccessContext
   }
   if (!context.tenantAllowed) return { allowed: false, code: "TENANT_ACCESS_DENIED", reason: "La empresa seleccionada no pertenece a tu alcance autorizado." };
   if (policy.subscriptionStates && !policy.subscriptionStates.includes(context.subscriptionStatus)) return { allowed: false, code: "SUBSCRIPTION_BLOCKED", reason: "La suscripción actual no permite acceder a esta sección." };
-  if (!context.hasModule(policy.module)) return { allowed: false, code: "MODULE_NOT_ENABLED", reason: "Esta función no está activa para la empresa." };
-  if (!context.hasFeature(policy.featureFlag)) return { allowed: false, code: "FEATURE_NOT_ENABLED", reason: "Esta función no está habilitada para tu contexto." };
+  if (policy.requiresCommercialModule !== false && !context.hasModule(policy.module)) return { allowed: false, code: "MODULE_NOT_ENABLED", reason: "Esta función no está activa para la empresa." };
+  if (policy.requiresCommercialModule !== false && !context.hasFeature(policy.featureFlag)) return { allowed: false, code: "FEATURE_NOT_ENABLED", reason: "Esta función no está habilitada para tu contexto." };
   if (!policy.available) return { allowed: false, code: "ROUTE_NOT_READY", reason: "Esta función todavía no está disponible en el entorno productivo." };
   if (!isAudienceAllowed(policy.audience, context.role) || !isRoleAllowed(policy.roles, context.role, policy.strictRoles)) return { allowed: false, code: "ROLE_NOT_ALLOWED", reason: "Esta sección no está asignada a tu perfil." };
   if (!policy.requiredPermissions.every(context.can)) return { allowed: false, code: "PERMISSION_DENIED", reason: "No tienes el permiso necesario para esta acción." };

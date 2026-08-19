@@ -35,6 +35,10 @@ type BranchFormInput = z.input<typeof branchSchema>;
 
 export default function BranchesPage() {
   const { can, currentTenant, currentRole, canAccessGlobalGovernance } = useAppStore();
+  const canViewBranches = can("branches.view");
+  const canCreateBranch = can("branches.create");
+  const canUpdateBranch = can("branches.update");
+  const canDeleteBranch = can("branches.delete");
   const queryClient = useQueryClient();
   const hasGlobalGovernance = canAccessGlobalGovernance;
   const tenantsQuery = useQuery({
@@ -131,7 +135,7 @@ export default function BranchesPage() {
     onError: () => toast.error("Error al eliminar la sucursal"),
   });
 
-  if (!can("admin.company")) {
+  if (!canViewBranches) {
     return (
       <StateCard
         tone="restricted"
@@ -151,7 +155,7 @@ export default function BranchesPage() {
         description="Alta, edicion y control de sedes operativas."
         badge="Empresa"
         action={
-          <Button onClick={() => {
+          canCreateBranch ? <Button onClick={() => {
               form.reset({
                 tenantId: currentTenant.id,
                 name: "",
@@ -161,7 +165,7 @@ export default function BranchesPage() {
                 status: "active",
               });
               setOpen(true);
-            }}>Nueva sucursal</Button>
+            }}>Nueva sucursal</Button> : null
         }
       />
       {open ? (
@@ -275,7 +279,7 @@ export default function BranchesPage() {
                   header: "Acciones",
                   render: (branch) => (
                     <div className="flex gap-2">
-                      <Button
+                      {canUpdateBranch ? <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => {
@@ -285,10 +289,10 @@ export default function BranchesPage() {
                         }}
                       >
                         Editar
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => setDeleting(branch)}>
+                      </Button> : null}
+                      {canDeleteBranch ? <Button size="sm" variant="destructive" onClick={() => setDeleting(branch)}>
                         Eliminar
-                      </Button>
+                      </Button> : null}
                     </div>
                   ),
                 },

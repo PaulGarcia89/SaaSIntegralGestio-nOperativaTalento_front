@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Download, FileSpreadsheet, MapPin, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Filter, LayoutList, MapPin, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -12,8 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { FilterToolbar } from "@/components/domain";
-import { InlineFeedback, PageHeader, ResponsiveDataView } from "@/components/design-system";
+import { InlineFeedback, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
 import { ApiError, bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, getApiErrorMessage, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
@@ -28,10 +27,16 @@ export function EmployeesDirectoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [branchFilter, setBranchFilter] = useState(currentBranch?.id ?? "");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const employees = useQuery({
-    queryKey: ["employees", search, status, branchFilter],
-    queryFn: () => fetchEmployees({ search, status, branchId: branchFilter || undefined, page: 1, pageSize: 50 }),
+    queryKey: ["employees", search, status, branchFilter, page, pageSize],
+    queryFn: () => fetchEmployees({ search, status, branchId: branchFilter || undefined, page, pageSize }),
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, status, branchFilter, pageSize]);
 
   if (employees.isLoading) return <AsyncState state="loading" title="Cargando empleados" />;
   if (employees.isError) {
@@ -52,48 +57,41 @@ export function EmployeesDirectoryPage() {
   }
 
   const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
+  const meta = employees.data?.meta;
   const canCreate = can("employees.create");
+  const totalItems = meta?.total ?? data.length;
+  const totalPages = meta?.totalPages ?? 1;
 
   return (
     <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border-default bg-gradient-to-br from-surface-section via-card to-primary/5 p-5 shadow-sm">
-        <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.14),_transparent_60%)] lg:block" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl space-y-2">
-            <p className="text-sm font-medium text-primary">Personas</p>
-            <h2 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Directorio documental de empleados</h2>
-            <p className="max-w-2xl text-sm leading-6 text-text-secondary sm:text-base">
-              Consulta, registra y carga expedientes del personal activo con datos trazables para auditoría, gestión y mantenimiento operativo.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-2">
+      <section className="rounded-[2rem] border border-border-default bg-gradient-to-br from-surface-section via-card to-primary/5 p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl space-y-3">
+            <div>
+              <p className="text-sm font-medium text-primary">Personas</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Directorio de empleados</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary sm:text-base">
+                Gestión rápida para equipos pequeños o muy grandes. Busca, filtra, navega por páginas y entra al expediente sin cargar información innecesaria.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{currentTenant.name}</Badge>
               <Badge variant="secondary">{currentBranch?.name ?? "Sucursal activa"}</Badge>
-              <Badge variant="outline">{employees.data?.meta?.total ?? data.length} expedientes</Badge>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="text-xs font-medium uppercase tracking-wide text-text-secondary">Filtrar por sucursal</span>
-              <Select value={branchFilter || "all"} onValueChange={(value) => setBranchFilter(value === "all" ? "" : value)}>
-                <SelectTrigger className="h-10 w-full sm:w-72">
-                  <SelectValue placeholder="Todas las sucursales" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las sucursales</SelectItem>
-                  {tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Badge variant="outline">{totalItems} expedientes</Badge>
+              <Badge variant="outline">{totalPages} páginas</Badge>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3 lg:w-[420px]">
-            <MiniStat label="Expedientes" value={String(employees.data?.meta?.total ?? data.length)} />
-            <MiniStat label="Alta individual" value="1 a 1" />
-            <MiniStat label="Carga masiva" value="Prevalidada" />
+            <MiniStat label="Total" value={String(totalItems)} />
+            <MiniStat label="Página" value={`${page} / ${Math.max(totalPages, 1)}`} />
+            <MiniStat label="Tamaño" value={`${pageSize} filas`} />
           </div>
         </div>
       </section>
       <PageHeader
         eyebrow="Personas"
-        title="Directorio de empleados"
-        description="Consulta el equipo de la sucursal activa, su estado y sus asignaciones actuales."
+        title="Explorar expedientes"
+        description="Usa los filtros para reducir resultados y entra al detalle solo cuando lo necesites."
         actions={
           canCreate ? (
             <div className="flex flex-wrap gap-2">
@@ -113,27 +111,89 @@ export function EmployeesDirectoryPage() {
           ) : null
         }
       />
-      <FilterToolbar
-        searchPlaceholder="Buscar por nombre o correo"
-        options={[
-          { label: "Todos", value: "" },
-          { label: "Activos", value: "ACTIVE" },
-          { label: "Inactivos", value: "INACTIVE" },
-          { label: "Finalizados", value: "TERMINATED" },
-        ]}
-        searchValue={search}
-        onSearchChange={setSearch}
-        filterValue={status}
-        onFilterChange={setStatus}
-      />
-      <p className="text-sm text-text-secondary">{employees.data?.meta?.total ?? data.length} empleados encontrados</p>
+      <Card level={2}>
+        <CardContent className="space-y-4 p-4">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_220px_220px_180px]">
+            <label className="space-y-2">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                <Search className="size-4" />
+                Buscar
+              </span>
+              <Input placeholder="Nombre o correo" value={search} onChange={(event) => setSearch(event.target.value)} />
+            </label>
+            <label className="space-y-2">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                <Filter className="size-4" />
+                Estado
+              </span>
+              <Select value={status || "all"} onValueChange={(value) => setStatus(value === "all" ? "" : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="ACTIVE">Activos</SelectItem>
+                  <SelectItem value="INACTIVE">Inactivos</SelectItem>
+                  <SelectItem value="TERMINATED">Finalizados</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="space-y-2">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                <LayoutList className="size-4" />
+                Sucursal
+              </span>
+              <Select value={branchFilter || "all"} onValueChange={(value) => setBranchFilter(value === "all" ? "" : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Por página</span>
+              <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-default pt-4 text-sm">
+            <p className="text-text-secondary">
+              {meta ? `${meta.total} empleados encontrados` : `${data.length} empleados encontrados`}
+            </p>
+            <p className="text-text-secondary">La vista muestra resultados paginados para mantener la pantalla rápida.</p>
+          </div>
+        </CardContent>
+      </Card>
       <ResponsiveDataView
         data={data}
         getKey={(employee) => employee.id}
-        desktop={<div className="grid gap-3 lg:grid-cols-2">{data.map((employee) => <EmployeeCard key={employee.id} employee={employee} />)}</div>}
+        desktop={<div className="overflow-hidden rounded-2xl border border-border-default bg-card shadow-sm"><div className="grid grid-cols-[minmax(0,1.3fr)_180px_180px_120px_1fr_130px] gap-4 border-b border-border-default bg-surface-section px-4 py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary"><span>Empleado</span><span>Sucursal</span><span>Rol</span><span>Docs</span><span>Asignaciones</span><span>Estado</span></div><div>{data.map((employee, index) => <EmployeeRow key={employee.id} employee={employee} compact={index >= 10} />)}</div></div>}
         mobile={(employee) => <EmployeeCard employee={employee} />}
-        empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros de la sucursal activa.</CardContent></Card>}
+        empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
       />
+      {meta ? (
+        <div className="rounded-2xl border border-border-default bg-card p-4 shadow-sm">
+          <Pagination
+            page={meta.page - 1}
+            totalPages={meta.totalPages}
+            totalItems={meta.total}
+            pageSize={meta.pageSize}
+            onPageChange={(next) => setPage(next + 1)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -369,7 +429,7 @@ function GuideStep({ number, title, description, icon, accent }: { number: strin
 }
 
 type EmployeeDirectoryWithDocuments = EmployeeDirectoryItem & {
-  documentSummary?: { pending: number; total: number };
+  documentSummary?: { totalDocuments: number };
 };
 
 export function EmployeeImportPage() {
@@ -585,6 +645,39 @@ function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function EmployeeRow({ employee, compact = false }: { employee: EmployeeDirectoryItem; compact?: boolean }) {
+  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+  const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
+  const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
+  const documentSummary = (employee as EmployeeDirectoryWithDocuments).documentSummary;
+
+  return (
+    <div className={cn("grid grid-cols-1 gap-3 border-b border-border-default px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1.3fr)_180px_180px_120px_1fr_130px] md:items-center", compact && "opacity-95")}>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <UsersRound className="size-4 shrink-0 text-primary" />
+          <p className="truncate font-semibold">{employee.name}</p>
+        </div>
+        <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-text-secondary md:min-w-0">
+        <MapPin className="size-4 shrink-0" />
+        <span className="truncate">{primary?.branch?.name ?? "Sin nombre"}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-text-secondary md:min-w-0">
+        <BriefcaseBusiness className="size-4 shrink-0" />
+        <span className="truncate">{primary?.role ?? "Sin asignación"}</span>
+      </div>
+      <div className="text-sm text-text-secondary">{documentSummary ? <span className="font-medium text-text-primary">{documentSummary.totalDocuments}</span> : "0"} docs</div>
+      <div className="text-sm text-text-secondary">{activeAssignments.length} asignación{activeAssignments.length === 1 ? "" : "es"}</div>
+      <div className="flex items-center justify-between gap-3 md:justify-end">
+        <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
+        <ChevronRight className="hidden size-4 shrink-0 text-text-secondary md:block" />
+      </div>
+    </div>
   );
 }
 

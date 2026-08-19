@@ -3,7 +3,7 @@ import type { RoleKey, SessionDto } from "@/lib/contracts";
 const MOCK_AUTH_STORAGE_KEY = "saas-integral.mock-auth";
 // Keep demo sessions local to non-production builds so production only uses
 // credentials and entities issued by the live backend.
-const MOCK_BACKEND_ENABLED = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
+const MOCK_BACKEND_ENABLED = false;
 
 export type AuthSnapshot = { accessToken: string; tenantId: string; userId: string; role: RoleKey };
 let memoryAuth: AuthSnapshot | null = null;

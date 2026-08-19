@@ -195,7 +195,7 @@ const API_BASE_URL = (
 ).replace(/\/$/, "");
 // Production must always reflect the API. Allowing the mock fallback here can
 // render entities that do not exist in PostgreSQL and make destructive actions fail.
-const MOCK_BACKEND_ENABLED = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
+const MOCK_BACKEND_ENABLED = false;
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "15000");
 const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
 const AUTH_API_BASE_URL = STATIC_HOSTING ? API_BASE_URL : "/api";

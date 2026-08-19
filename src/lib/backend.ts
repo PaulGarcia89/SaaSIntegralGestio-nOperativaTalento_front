@@ -1628,7 +1628,7 @@ export type EmployeeDirectoryItem = {
   email: string;
   status: string;
   branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
-  documentSummary?: { pending: number; total: number };
+  documentSummary?: { totalDocuments: number };
 };
 
 export type EmployeeDirectoryResponse = {
@@ -1658,10 +1658,11 @@ export function bulkCreateEmployees(employees: CreateEmployeeInput[]) {
   });
 }
 
-export function fetchEmployees(input: { search?: string; status?: string; page?: number; pageSize?: number } = {}) {
+export function fetchEmployees(input: { search?: string; status?: string; branchId?: string; page?: number; pageSize?: number } = {}) {
   const query = new URLSearchParams();
   if (input.search) query.set("search", input.search);
   if (input.status) query.set("status", input.status);
+  if (input.branchId) query.set("branchId", input.branchId);
   if (input.page) query.set("page", String(input.page));
   if (input.pageSize) query.set("pageSize", String(input.pageSize));
   return request<EmployeeDirectoryResponse>(`/employees${query.size ? `?${query}` : ""}`);

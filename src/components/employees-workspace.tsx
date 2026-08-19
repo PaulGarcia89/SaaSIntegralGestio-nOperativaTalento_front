@@ -28,7 +28,10 @@ export function EmployeesDirectoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [branchFilter, setBranchFilter] = useState(currentBranch?.id ?? "");
-  const employees = useQuery({ queryKey: ["employees", search, status], queryFn: () => fetchEmployees({ search, status, page: 1, pageSize: 50 }) });
+  const employees = useQuery({
+    queryKey: ["employees", search, status, branchFilter],
+    queryFn: () => fetchEmployees({ search, status, branchId: branchFilter || undefined, page: 1, pageSize: 50 }),
+  });
 
   if (employees.isLoading) return <AsyncState state="loading" title="Cargando empleados" />;
   if (employees.isError) {
@@ -49,9 +52,6 @@ export function EmployeesDirectoryPage() {
   }
 
   const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
-  const visibleData = branchFilter
-    ? data.filter((employee) => employee.branchAssignments.some((assignment) => assignment.branch.id === branchFilter))
-    : data;
   const canCreate = can("employees.create");
 
   return (
@@ -84,7 +84,7 @@ export function EmployeesDirectoryPage() {
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3 lg:w-[420px]">
-            <MiniStat label="Expedientes" value={String(visibleData.length)} />
+            <MiniStat label="Expedientes" value={String(employees.data?.meta?.total ?? data.length)} />
             <MiniStat label="Alta individual" value="1 a 1" />
             <MiniStat label="Carga masiva" value="Prevalidada" />
           </div>
@@ -126,11 +126,11 @@ export function EmployeesDirectoryPage() {
         filterValue={status}
         onFilterChange={setStatus}
       />
-      <p className="text-sm text-text-secondary">{visibleData.length} empleados encontrados</p>
+      <p className="text-sm text-text-secondary">{employees.data?.meta?.total ?? data.length} empleados encontrados</p>
       <ResponsiveDataView
-        data={visibleData}
+        data={data}
         getKey={(employee) => employee.id}
-        desktop={<div className="grid gap-3 lg:grid-cols-2">{visibleData.map((employee) => <EmployeeCard key={employee.id} employee={employee} />)}</div>}
+        desktop={<div className="grid gap-3 lg:grid-cols-2">{data.map((employee) => <EmployeeCard key={employee.id} employee={employee} />)}</div>}
         mobile={(employee) => <EmployeeCard employee={employee} />}
         empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros de la sucursal activa.</CardContent></Card>}
       />
@@ -567,7 +567,7 @@ function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
           <StatusPill label="Sucursal" value={primary?.branch?.name ?? "Sin nombre"} />
           <StatusPill label="Rol" value={primary?.role ?? "Sin asignación"} />
           <StatusPill label="Asignaciones" value={String(activeAssignments.length)} />
-          {documentSummary ? <StatusPill label="Documentos" value={documentSummary.pending ? `${documentSummary.pending} pendientes` : "Completo"} /> : null}
+          {documentSummary ? <StatusPill label="Documentos" value={`${documentSummary.totalDocuments} documentos`} /> : null}
         </div>
         <div className="mt-4 grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 text-sm">
           <div className="flex items-center gap-2 text-text-secondary">

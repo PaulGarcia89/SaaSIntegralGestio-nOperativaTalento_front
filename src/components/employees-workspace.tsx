@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Filter, LayoutList, MapPin, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, bulkCreateEmployees, createEmployee, fetchBranches, fetchEmployees, fetchMyPreferences, getApiErrorMessage, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
+import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, fetchBranches, fetchEmployees, fetchMyPreferences, getApiErrorMessage, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -34,6 +34,9 @@ export function EmployeesDirectoryPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [savedFiltersReady, setSavedFiltersReady] = useState(false);
+  const [loadedEmployees, setLoadedEmployees] = useState<EmployeeDirectoryItem[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const employees = useQuery({
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status, branchId: branchFilter || undefined, page, pageSize }),
@@ -41,9 +44,11 @@ export function EmployeesDirectoryPage() {
 
   useEffect(() => {
     setPage(1);
+    setLoadedEmployees([]);
+    setHasMore(true);
   }, [search, status, branchFilter, pageSize]);
 
-  if (employees.isLoading) return <AsyncState state="loading" title="Cargando empleados" />;
+  if (employees.isLoading && page === 1) return <AsyncState state="loading" title="Cargando empleados" />;
   if (employees.isError) {
     const apiError = employees.error instanceof ApiError ? employees.error : null;
     const fallback = "No fue posible cargar el directorio";
@@ -67,7 +72,23 @@ export function EmployeesDirectoryPage() {
   const totalItems = meta?.total ?? data.length;
   const totalPages = meta?.totalPages ?? 1;
   const selectionCount = selectedIds.length;
-  const sortedData = [...data].sort((left, right) => compareEmployees(left, right, sortField, sortDirection));
+  useEffect(() => {
+    if (!employees.data) return;
+    setLoadedEmployees((current) => {
+      const next = page === 1 ? employees.data!.data : [...current, ...employees.data!.data];
+      const seen = new Set<string>();
+      return next.filter((employee) => {
+        if (seen.has(employee.id)) return false;
+        seen.add(employee.id);
+        return true;
+      });
+    });
+    setHasMore(Boolean(meta && meta.page < meta.totalPages));
+    setIsLoadingMore(false);
+  }, [employees.data, meta, page]);
+
+  const visibleEmployees = loadedEmployees.length ? loadedEmployees : data;
+  const sortedData = useMemo(() => [...visibleEmployees].sort((left, right) => compareEmployees(left, right, sortField, sortDirection)), [visibleEmployees, sortField, sortDirection]);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -130,6 +151,16 @@ export function EmployeesDirectoryPage() {
     setSelectedIds(allSelected ? [] : sortedData.map((employee) => employee.id));
   };
   const selectionData = sortedData.filter((employee) => selectedIds.includes(employee.id));
+  const bulkStatus = useMutation({
+    mutationFn: (status: "ACTIVE" | "INACTIVE" | "TERMINATED") => bulkUpdateEmployeeStatus({ employeeIds: selectedIds, status }),
+    onSuccess: async (result) => {
+      toast.success(`${result.updated.length} empleados actualizados`);
+      setSelectedIds([]);
+      await employees.refetch();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aplicar la acción masiva.")),
+  });
+  const exportName = buildEmployeesExportName({ branchName: branchFilter ? tenantBranches.find((branch) => branch.id === branchFilter)?.name : currentBranch?.name, status, pageSize, page });
 
   return (
     <div className="space-y-5">
@@ -262,7 +293,7 @@ export function EmployeesDirectoryPage() {
                 {selectionCount} empleados seleccionados para acciones masivas.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(selectionData, "empleados-seleccionados")}>
+                <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(selectionData, `${exportName}-seleccion`)}>
                   Exportar selección
                 </Button>
                 <Button type="button" variant="secondary" onClick={() => setSelectedIds([])}>
@@ -271,11 +302,20 @@ export function EmployeesDirectoryPage() {
                 <Button type="button" variant="secondary" onClick={() => void copySelectedEmails(sortedData, selectedIds)}>
                   Copiar correos
                 </Button>
+                <Button type="button" variant="secondary" disabled={bulkStatus.isPending} onClick={() => bulkStatus.mutate("ACTIVE")}>
+                  Marcar activos
+                </Button>
+                <Button type="button" variant="secondary" disabled={bulkStatus.isPending} onClick={() => bulkStatus.mutate("INACTIVE")}>
+                  Marcar inactivos
+                </Button>
+                <Button type="button" variant="secondary" disabled={bulkStatus.isPending} onClick={() => bulkStatus.mutate("TERMINATED")}>
+                  Marcar finalizados
+                </Button>
               </div>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(sortedData, "empleados-resultado")}>
+            <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(sortedData, exportName)}>
               Exportar resultado
             </Button>
             <Button type="button" variant="secondary" onClick={() => setSelectedIds(sortedData.map((employee) => employee.id))}>
@@ -322,17 +362,15 @@ export function EmployeesDirectoryPage() {
           empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
         />
       )}
-      {meta ? (
-        <div className="rounded-2xl border border-border-default bg-card p-4 shadow-sm">
-          <Pagination
-            page={meta.page - 1}
-            totalPages={meta.totalPages}
-            totalItems={meta.total}
-            pageSize={meta.pageSize}
-            onPageChange={(next) => setPage(next + 1)}
-          />
-        </div>
-      ) : null}
+      <div className="flex items-center justify-center py-2">
+        {hasMore ? (
+          <Button type="button" variant="secondary" disabled={isLoadingMore} onClick={() => { setIsLoadingMore(true); setPage((current) => current + 1); }}>
+            {isLoadingMore ? "Cargando más..." : "Cargar más empleados"}
+          </Button>
+        ) : (
+          <p className="text-sm text-text-secondary">No hay más empleados para cargar.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -887,6 +925,15 @@ async function exportEmployeesCsv(data: EmployeeDirectoryItem[], filename: strin
   toast.success(`Exportados ${data.length} empleados`);
 }
 
+function buildEmployeesExportName(input: { branchName?: string; status?: string; pageSize: number; page: number }) {
+  const parts = ["empleados"];
+  if (input.branchName) parts.push(slugify(input.branchName));
+  if (input.status) parts.push(slugify(input.status));
+  parts.push(`p${input.page}`);
+  parts.push(`x${input.pageSize}`);
+  return parts.filter(Boolean).join("-");
+}
+
 function compareEmployees(left: EmployeeDirectoryItem, right: EmployeeDirectoryItem, field: "name" | "email" | "status" | "documents" | "assignments", direction: "asc" | "desc") {
   const factor = direction === "asc" ? 1 : -1;
   const leftAssignments = Array.isArray(left.branchAssignments) ? left.branchAssignments : [];
@@ -902,6 +949,15 @@ function compareEmployees(left: EmployeeDirectoryItem, right: EmployeeDirectoryI
   if (field === "documents") return (leftDocs - rightDocs) * factor;
   if (field === "assignments") return ((leftAssignments.length - rightAssignments.length) || compareText(leftPrimary?.branch?.name ?? "", rightPrimary?.branch?.name ?? "")) * factor;
   return compareText(left.name, right.name) * factor;
+}
+
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
 }
 
 async function parseEmployeeFile(file: File, branches: Awaited<ReturnType<typeof fetchBranches>>): Promise<ImportRow[]> {

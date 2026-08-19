@@ -162,6 +162,13 @@ import { PERMISSION_KEYS } from "@/lib/contracts";
 import { authenticateUser as authenticateMockUser } from "@/lib/mock-backend";
 import { deleteTrainingCourse as deleteMockTrainingCourse } from "@/lib/mock-backend";
 import {
+  bulkCreateEmployees as bulkCreateMockEmployees,
+  createEmployee as createMockEmployee,
+  deleteEmployee as deleteMockEmployee,
+  fetchEmployees as fetchMockEmployees,
+  updateEmployee as updateMockEmployee,
+} from "@/lib/mock-backend";
+import {
   clearStoredAuth,
   getStoredAuth,
   getStoredSession,
@@ -1648,6 +1655,9 @@ export function createEmployee(input: CreateEmployeeInput) {
   return request<EmployeeDirectoryItem>("/employees", {
     method: "POST",
     body: JSON.stringify(input),
+  }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return createMockEmployee(input);
   });
 }
 
@@ -1655,6 +1665,16 @@ export function bulkCreateEmployees(employees: CreateEmployeeInput[]) {
   return request<{ created: number; employees: Array<{ id: string; email: string }> }>("/employees/bulk", {
     method: "POST",
     body: JSON.stringify({ employees }),
+  }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return bulkCreateMockEmployees(employees);
+  });
+}
+
+export function bulkUpdateEmployeeStatus(input: { employeeIds: string[]; status: "ACTIVE" | "INACTIVE" | "TERMINATED" }) {
+  return request<{ updated: EmployeeDirectoryItem[]; previous: Array<{ id: string; name: string; email: string; status: string; jobTitle?: string | null }>; status: string }>("/employees/bulk/status", {
+    method: "PATCH",
+    body: JSON.stringify(input),
   });
 }
 
@@ -1665,7 +1685,27 @@ export function fetchEmployees(input: { search?: string; status?: string; branch
   if (input.branchId) query.set("branchId", input.branchId);
   if (input.page) query.set("page", String(input.page));
   if (input.pageSize) query.set("pageSize", String(input.pageSize));
-  return request<EmployeeDirectoryResponse>(`/employees${query.size ? `?${query}` : ""}`);
+  return request<EmployeeDirectoryResponse>(`/employees${query.size ? `?${query}` : ""}`).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return fetchMockEmployees(input);
+  });
+}
+
+export function updateEmployee(id: string, input: CreateEmployeeInput) {
+  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return updateMockEmployee(id, input);
+  });
+}
+
+export function deleteEmployee(id: string) {
+  return request(`/employees/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return deleteMockEmployee(id);
+  });
 }
 
 export type PlatformAuditEntry = { id: string; action: string; route?: string | null; branchId?: string | null; userId?: string | null; createdAt: string; metadata?: unknown };

@@ -105,6 +105,37 @@ let complianceCheckpointsDb: ComplianceCheckpointDto[] = structuredClone(complia
 const productivityRowsDb: ProductivityRowDto[] = structuredClone(productivityRows);
 let accessTasksDb: AccessTaskDto[] = structuredClone(accessTasks);
 let operationalEventsDb: OperationalEventDto[] = structuredClone(operationalEvents);
+type EmployeeRecord = {
+  id: string;
+  name: string;
+  email: string;
+  status: "ACTIVE" | "INACTIVE" | "TERMINATED";
+  branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
+  documentSummary?: { totalDocuments: number };
+};
+
+let employeesDb: EmployeeRecord[] = [
+  {
+    id: "emp-1",
+    name: "Paul Garcia",
+    email: "datalinkprotech@gmail.com",
+    status: "ACTIVE",
+    branchAssignments: [
+      { id: "emp-1-a1", role: "Administrador de empresa", isPrimary: true, branch: { id: "branch-1", name: "Sede principal de Miami" } },
+    ],
+    documentSummary: { totalDocuments: 0 },
+  },
+  {
+    id: "emp-2",
+    name: "Luis Sosa",
+    email: "luissosa@lessa.com",
+    status: "ACTIVE",
+    branchAssignments: [
+      { id: "emp-2-a1", role: "Supervisor", isPrimary: true, branch: { id: "branch-1b", name: "Centro operativo de Orlando" } },
+    ],
+    documentSummary: { totalDocuments: 0 },
+  },
+];
 
 function getTenantById(tenantId: string): TenantDto {
   return tenantsDb.find((tenant) => tenant.id === tenantId) ?? tenantsDb[0];
@@ -350,6 +381,17 @@ function syncHiringMasterFlow(employeeName: string) {
   }
 }
 
+function mapEmployeeFromInput(input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId: string; primaryRole: string }) {
+  const branch = branchesDb.find((item) => item.id === input.primaryBranchId);
+  if (!branch) throw new Error("Sucursal no encontrada");
+  return {
+    name: input.name.trim(),
+    email: input.email.trim().toLowerCase(),
+    status: input.status ?? "ACTIVE",
+    branchAssignments: [{ id: makeId("emp-asg"), role: input.primaryRole.trim(), isPrimary: true, branch: { id: branch.id, name: branch.name } }],
+  };
+}
+
 export async function authenticateUser(email: string): Promise<SessionDto> {
   await wait();
   const matchedUser = getUserByEmail(email);
@@ -360,6 +402,55 @@ export async function authenticateUser(email: string): Promise<SessionDto> {
     userId: matchedUser.id,
     role: matchedUser.role,
   };
+}
+
+export async function fetchEmployees(input: { search?: string; status?: string; branchId?: string; page?: number; pageSize?: number } = {}) {
+  await wait();
+  const page = Math.max(1, input.page ?? 1);
+  const pageSize = Math.max(1, input.pageSize ?? 20);
+  const search = (input.search ?? "").trim().toLowerCase();
+  const filtered = employeesDb.filter((employee) => {
+    const primary = employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? employee.branchAssignments[0];
+    const matchesSearch = !search || employee.name.toLowerCase().includes(search) || employee.email.toLowerCase().includes(search);
+    const matchesStatus = !input.status || employee.status === input.status;
+    const matchesBranch = !input.branchId || primary?.branch.id === input.branchId;
+    return matchesSearch && matchesStatus && matchesBranch;
+  });
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const items = filtered.slice((page - 1) * pageSize, page * pageSize);
+  return { data: items, meta: { total, page, pageSize, totalPages } };
+}
+
+export async function createEmployee(input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId: string; primaryRole: string }) {
+  await wait();
+  const created = { id: makeId("emp"), ...mapEmployeeFromInput(input), documentSummary: { totalDocuments: 0 } };
+  employeesDb = [created, ...employeesDb];
+  return created;
+}
+
+export async function bulkCreateEmployees(employees: Array<{ name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId: string; primaryRole: string }>) {
+  await wait();
+  const createdEmployees = employees.map((employee) => {
+    const created = { id: makeId("emp"), ...mapEmployeeFromInput(employee), documentSummary: { totalDocuments: 0 } };
+    return created;
+  });
+  employeesDb = [...createdEmployees, ...employeesDb];
+  return { created: createdEmployees.length, employees: createdEmployees.map((employee) => ({ id: employee.id, email: employee.email })) };
+}
+
+export async function updateEmployee(id: string, input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId: string; primaryRole: string }) {
+  await wait();
+  employeesDb = employeesDb.map((employee) => (employee.id === id ? { id, ...mapEmployeeFromInput(input), documentSummary: employee.documentSummary } : employee));
+  const updated = employeesDb.find((employee) => employee.id === id);
+  if (!updated) throw new Error("Empleado no encontrado");
+  return updated;
+}
+
+export async function deleteEmployee(id: string) {
+  await wait();
+  employeesDb = employeesDb.filter((employee) => employee.id !== id);
+  return { id };
 }
 
 export async function fetchNavigationSchema(tenantId: string, role: RoleKey) {

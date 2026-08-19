@@ -1702,7 +1702,7 @@ export function fetchEmployees(input: { search?: string; status?: string; branch
 
 export function updateEmployee(id: string, input: CreateEmployeeInput) {
   return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}`, {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify(input),
   }).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;

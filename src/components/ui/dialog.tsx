@@ -22,11 +22,12 @@ export function DialogOverlay({
 export function DialogContent({
   className,
   children,
+  "data-full-page": fullPage = false,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { "data-full-page"?: boolean }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      {!fullPage ? <DialogOverlay /> : null}
       <DialogPrimitive.Content
         className={cn(
           "fixed inset-0 z-50 flex h-dvh !max-h-dvh w-full max-w-none flex-col overflow-y-auto rounded-none border border-border-default bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl [-webkit-overflow-scrolling:touch] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:!max-h-[calc(100dvh-3rem)] sm:w-[calc(100%-2rem)] sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-6",

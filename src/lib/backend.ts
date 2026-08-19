@@ -813,7 +813,7 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
   if (enabledModules.includes("reports")) {
     mapped.add("reports.view");
   }
-  if (hasAdminAccess) {
+  if (hasAdminAccess || hasAny("branches.") || hasAny("users.") || hasAny("roles.") || hasAny("tenants.") || hasAny("modules.") || hasAny("subscriptions.")) {
     mapped.add("admin.view");
   }
   if (hasAny("users.")) {

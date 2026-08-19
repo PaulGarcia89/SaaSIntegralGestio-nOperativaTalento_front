@@ -3,15 +3,17 @@ import { Building2, Cable, GitBranch, ShieldCheck, UsersRound } from "lucide-rea
 import { PageHeader } from "@/components/design-system";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useAppStore } from "@/store/app-store";
 
 export default function AdminPage() {
+  const { can } = useAppStore();
   const sections = [
-    { href: "/admin/company", label: "Empresa", description: "Marca, contexto operativo e integraciones por empresa.", icon: Building2 },
-    { href: "/admin/branches", label: "Sucursales", description: "Crea y administra las sedes disponibles para la operación.", icon: GitBranch },
-    { href: "/admin/users", label: "Usuarios", description: "Administra identidades, roles y estados de acceso internos.", icon: UsersRound },
-    { href: "/admin/roles", label: "Roles y permisos", description: "Revisa el alcance de cada perfil antes de otorgar acceso.", icon: ShieldCheck },
-    { href: "/admin/automations", label: "Automatizaciones", description: "Crea, simula y audita reglas operativas sin código.", icon: Cable },
-  ];
+    { href: "/admin/company", permission: "admin.company" as const, label: "Empresa", description: "Marca, contexto operativo e integraciones por empresa.", icon: Building2 },
+    { href: "/admin/branches", permission: "branches.view" as const, label: "Sucursales", description: "Crea y administra las sedes disponibles para la operación.", icon: GitBranch },
+    { href: "/admin/users", permission: "users.view" as const, label: "Usuarios", description: "Administra identidades, roles y estados de acceso internos.", icon: UsersRound },
+    { href: "/admin/roles", permission: "roles.view" as const, label: "Roles y permisos", description: "Revisa el alcance de cada perfil antes de otorgar acceso.", icon: ShieldCheck },
+    { href: "/admin/automations", permission: "admin.view" as const, label: "Automatizaciones", description: "Crea, simula y audita reglas operativas sin código.", icon: Cable },
+  ].filter((section) => can(section.permission));
 
   return (
     <div className="space-y-6">

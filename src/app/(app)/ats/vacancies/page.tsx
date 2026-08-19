@@ -38,12 +38,22 @@ function toVacancyStageInput(stage: VacancyStageDto): VacancyStageInput {
   return { code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours, slaWarningHoursBefore, slaEscalationHours, autoReassignAfterHours };
 }
 
+function sameVacancySetup<T>(current: T, initialValue: T) {
+  return JSON.stringify(current) === JSON.stringify(initialValue);
+}
+
+function responsibleInput(responsible: VacancyResponsibleDto) {
+  return { userId: responsible.userId, role: responsible.role };
+}
+
 export function VacanciesPage({ editId }: { editId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient(); const { currentBranch, currentTenant, currentUser, branches, tenantUsers, can } = useAppStore();
   const [open, setOpen] = useState(false); const [step, setStep] = useState(0); const [form, setForm] = useState<CreateVacancyInput>(() => initial(currentBranch?.id ?? "")); const [errors, setErrors] = useState<Array<{ fieldId: string; label: string; message: string }>>([]);
   const [stages, setStages] = useState<VacancyStageDto[]>(initialStages);
   const [responsibles, setResponsibles] = useState<VacancyResponsibleDto[]>([]);
+  const [initialStagesForEdit, setInitialStagesForEdit] = useState<VacancyStageDto[]>([]);
+  const [initialResponsiblesForEdit, setInitialResponsiblesForEdit] = useState<VacancyResponsibleDto[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -53,7 +63,21 @@ export function VacanciesPage({ editId }: { editId?: string }) {
   const [draftReady, setDraftReady] = useState(false);
   const draftTimer = useRef<number | null>(null);
   const vacancies = useQuery({ queryKey: ["vacancies", currentBranch?.id], queryFn: fetchVacancies, enabled: Boolean(currentBranch) });
-  const save = useMutation({ mutationFn: async (input: CreateVacancyInput) => { const setup = { stages: stages.map(toVacancyStageInput), responsibles }; const vacancy = editingId ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, setup) : await createVacancy({ ...input, imageUrl: undefined }, setup); if (imageFile) await uploadVacancyImage(vacancy.id, imageFile); return vacancy; }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); if (editId) router.push("/ats/vacancies"); } });
+  const save = useMutation({ mutationFn: async (input: CreateVacancyInput) => {
+    const stageInput = stages.map(toVacancyStageInput);
+    const responsibleSetup = responsibles.map(responsibleInput);
+    const initialStageInput = initialStagesForEdit.map(toVacancyStageInput);
+    const initialResponsibleSetup = initialResponsiblesForEdit.map(responsibleInput);
+    const updateSetup = {
+      ...(sameVacancySetup(stageInput, initialStageInput) ? {} : { stages: stageInput }),
+      ...(sameVacancySetup(responsibleSetup, initialResponsibleSetup) ? {} : { responsibles }),
+    };
+    const vacancy = editingId
+      ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, updateSetup)
+      : await createVacancy({ ...input, imageUrl: undefined }, { stages: stageInput, responsibles });
+    if (imageFile) await uploadVacancyImage(vacancy.id, imageFile);
+    return vacancy;
+  }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setImageFile(null); setImagePreview(""); if (editId) router.push("/ats/vacancies"); } });
   const clone = useMutation({ mutationFn: (id: string) => cloneVacancy(id, "Clonación administrada desde ATS"), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
   const archive = useMutation({ mutationFn: () => archiveVacancy(archiveTarget!.id, archiveReason), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setArchiveTarget(null); setArchiveReason(""); } });
   const restore = useMutation({ mutationFn: (vacancy: PublicVacancyDto) => updateVacancy(vacancy.id, { ...vacancyToInput(vacancy), status: "PAUSED" }, { stages: (vacancy.stages ?? []).map(toVacancyStageInput), responsibles: vacancy.responsibles ?? [] }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
@@ -69,8 +93,14 @@ export function VacanciesPage({ editId }: { editId?: string }) {
   const next = () => { const nextErrors = errorsForStep(step); setErrors(nextErrors); if (!nextErrors.length) setStep((value) => Math.min(steps.length - 1, value + 1)); };
   const submit = (status: CreateVacancyInput["status"]) => { const nextErrors = (status === "PUBLISHED" || status === "OPEN" ? validateAll() : []).filter((item) => !(editingId && item.fieldId === "vacancy-image")); setErrors(nextErrors); if (!nextErrors.length) save.mutate({ ...form, status }); };
   const draftScope = useMemo(() => currentUser && currentTenant && currentBranch && !editingId ? { namespace: "vacancy", tenantId: currentTenant.id, userId: currentUser.id, resourceId: currentBranch.id } : null, [currentBranch, currentTenant, currentUser, editingId]);
-  const openWizard = () => { setEditingId(null); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); setErrors([]); setDraftReady(false); setOpen(true); };
-  const editVacancy = (vacancy: PublicVacancyDto) => { setEditingId(vacancy.id); setForm(vacancyToInput(vacancy)); setStages(vacancy.stages ?? initialStages()); setResponsibles(vacancy.responsibles ?? []); setImageFile(null); setImagePreview(vacancy.imageUrl ?? ""); setErrors([]); setStep(0); setOpen(true); };
+  const openWizard = () => { setEditingId(null); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setImageFile(null); setImagePreview(""); setErrors([]); setDraftReady(false); setOpen(true); };
+  const editVacancy = (vacancy: PublicVacancyDto) => {
+    const vacancyStages = vacancy.stages ?? initialStages();
+    const vacancyResponsibles = vacancy.responsibles ?? [];
+    setEditingId(vacancy.id); setForm(vacancyToInput(vacancy)); setStages(vacancyStages); setResponsibles(vacancyResponsibles);
+    setInitialStagesForEdit(vacancyStages); setInitialResponsiblesForEdit(vacancyResponsibles);
+    setImageFile(null); setImagePreview(vacancy.imageUrl ?? ""); setErrors([]); setStep(0); setOpen(true);
+  };
   const setFields = (nextFields: typeof fields) => update("applicationFormSchema", { version: 1, fields: nextFields });
   const addQuestion = () => setFields([...fields, { key: `question_${crypto.randomUUID().slice(0, 8)}`, label: "", type: "TEXT", required: false }]);
   const items = vacancies.data?.data ?? [];

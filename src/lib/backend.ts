@@ -1978,15 +1978,19 @@ export function createVacancy(
 export function updateVacancy(
   vacancyId: string,
   input: CreateVacancyInput,
-  setup: { stages: VacancyStageInput[]; responsibles: VacancyResponsibleDto[] },
+  setup?: { stages?: VacancyStageInput[]; responsibles?: VacancyResponsibleDto[] },
 ): Promise<VacancySetupDto> {
   return request<VacancySetupDto>(`/vacancies/${encodeURIComponent(vacancyId)}`, {
     method: "PATCH",
     body: JSON.stringify({
       ...input,
       imageUrl: undefined,
-      stages: setup.stages,
-      responsibles: setup.responsibles.map(({ userId, role }) => ({ userId, role })),
+      // Updating copy or compensation must not replace the pipeline or owners.
+      // Those collections are only sent when the user changed them in the wizard.
+      ...(setup?.stages !== undefined ? { stages: setup.stages } : {}),
+      ...(setup?.responsibles !== undefined
+        ? { responsibles: setup.responsibles.map(({ userId, role }) => ({ userId, role })) }
+        : {}),
       applicationFormSchema: applicationFormSchemaForApi(input.applicationFormSchema),
       workMode: input.workMode === "ONSITE" ? "ON_SITE" : input.workMode,
       status: input.status === "PUBLISHED" ? "OPEN" : input.status === "DRAFT" ? "PAUSED" : input.status,

@@ -538,6 +538,10 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
 };
 
 function isApiUnavailable(error: unknown) {
+  if (error instanceof ApiError) {
+    return error.status === 404 || error.status === 405 || error.status >= 500;
+  }
+
   if (!(error instanceof Error)) return false;
 
   return (

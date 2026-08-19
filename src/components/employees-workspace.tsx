@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { InlineFeedback, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
+import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
 import { ApiError, assignEmployeeBranches, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
@@ -55,6 +55,7 @@ export function EmployeesDirectoryPage() {
   const [detailTab, setDetailTab] = useState<"activity" | "documents" | "branches">("activity");
   const [detailBranchIds, setDetailBranchIds] = useState<string[]>([]);
   const [quickAction, setQuickAction] = useState<EmployeeQuickAction>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const employees = useQuery({
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status: status === "all" ? undefined : status, branchId: branchFilter || undefined, page, pageSize }),
@@ -309,15 +310,21 @@ export function EmployeesDirectoryPage() {
       />
       <Card level={2}>
         <CardContent className="space-y-4 p-4">
-          <div className="sticky top-4 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-border-default bg-surface-elevated/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80">
-            <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">Estado</span>
+          <div className="flex justify-end sm:hidden">
+            <Button type="button" variant="secondary" onClick={() => setMobileFiltersOpen(true)}>
+              <Filter className="size-4" />
+              Filtros
+            </Button>
+          </div>
+          <div className="sticky top-4 z-20 hidden flex-nowrap items-center gap-2 overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80 sm:flex sm:flex-wrap sm:p-3">
+            <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-secondary sm:text-xs sm:tracking-wide">Estado</span>
             {statusChips.map((chip) => (
               <button
                 key={chip.value}
                 type="button"
                 onClick={() => setStatus(chip.value)}
                 className={cn(
-                  "rounded-full border px-3 py-1.5 text-sm font-medium transition",
+                  "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition sm:px-3 sm:py-1.5 sm:text-sm",
                   (status || "all") === chip.value ? "border-primary bg-primary text-text-on-accent" : "border-border-default bg-card text-text-secondary hover:text-text-primary",
                 )}
               >
@@ -436,6 +443,57 @@ export function EmployeesDirectoryPage() {
           </div>
         </CardContent>
       </Card>
+      <MobileFilterSheet
+        open={mobileFiltersOpen}
+        onOpenChange={setMobileFiltersOpen}
+        title="Filtros de empleados"
+        description="Selecciona un estado, sucursal o búsqueda para reducir resultados."
+        onClear={() => {
+          setStatus("all");
+          setBranchFilter("");
+          setSearch("");
+        }}
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Estado</p>
+            <div className="flex flex-wrap gap-2">
+              {statusChips.map((chip) => (
+                <Button
+                  key={chip.value}
+                  type="button"
+                  variant={(status || "all") === chip.value ? "default" : "secondary"}
+                  onClick={() => setStatus(chip.value)}
+                >
+                  {chip.label} {chip.value === "all" ? totalItems : statusCounts[chip.value]}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <label className="space-y-2 text-sm font-medium">
+            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              <Search className="size-4" />
+              Buscar
+            </span>
+            <Input placeholder="Nombre o correo" value={search} onChange={(event) => setSearch(event.target.value)} />
+          </label>
+          <label className="space-y-2 text-sm font-medium">
+            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              <LayoutList className="size-4" />
+              Sucursal
+            </span>
+            <Select value={branchFilter || "all"} onValueChange={(value) => setBranchFilter(value === "all" ? "" : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las sucursales</SelectItem>
+                {tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </label>
+        </div>
+      </MobileFilterSheet>
       {viewMode === "table" ? (
         <Card level={2}>
           <CardContent className="p-0">

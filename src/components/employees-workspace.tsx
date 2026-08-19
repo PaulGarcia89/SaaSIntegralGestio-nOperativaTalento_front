@@ -1226,6 +1226,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onView, onEd
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}><FilePenLine className="size-4" />Editar registro</Button> : null}
+          {onQuickBranch ? <Button type="button" size="sm" variant="secondary" onClick={onQuickBranch}><MapPin className="size-4" />Editar sucursal</Button> : null}
         </div>
       </CardContent>
     </Card>
@@ -1263,6 +1264,7 @@ function EmployeeRow({ employee, compact = false, selected = false, onToggleSele
       <div className="flex items-center justify-between gap-3 md:justify-end">
         <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
         <div className="hidden items-center gap-1 md:flex">
+          {onQuickBranch ? <Button type="button" size="icon" variant="ghost" onClick={onQuickBranch} aria-label={`Editar sucursal de ${employee.name}`}><MapPin className="size-4" /></Button> : null}
           {onEdit ? <Button type="button" size="icon" variant="ghost" onClick={onEdit} aria-label={`Editar ${employee.name}`}><FilePenLine className="size-4" /></Button> : null}
           <ChevronRight className="size-4 shrink-0 text-text-secondary" />
         </div>

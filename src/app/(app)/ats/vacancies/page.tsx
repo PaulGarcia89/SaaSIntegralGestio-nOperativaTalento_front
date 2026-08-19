@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, ClipboardCheck, Copy, History, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { archiveVacancy, cloneVacancy, createPersonnelRequisition, createVacancy, decidePersonnelRequisition, fetchPersonnelRequisitions, fetchVacancies, fetchVacancyHistory, updateVacancy, uploadVacancyImage } from "@/lib/backend";
-import type { CreateVacancyInput, PersonnelRequisitionDto, PersonnelRequisitionInput, PublicVacancyDto, VacancyResponsibleDto, VacancyResponsibleRole, VacancyStageDto } from "@/lib/contracts";
+import type { CreateVacancyInput, PersonnelRequisitionDto, PersonnelRequisitionInput, PublicVacancyDto, VacancyResponsibleDto, VacancyResponsibleRole, VacancyStageDto, VacancyStageInput } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 import { technicalLabel } from "@/lib/ui-labels";
 import { ActionBar, InlineFeedback, PageHeader, Wizard } from "@/components/design-system";
@@ -31,6 +31,10 @@ const initialStages = (): VacancyStageDto[] => [
   { code: "HIRED", name: "Contratación", position: 5, applicationStatus: "HIRED", isTerminal: true, allowedNextStageCodes: [] },
 ];
 interface VacancyDraft { form: CreateVacancyInput; stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] }
+function toVacancyStageInput(stage: VacancyStageDto): VacancyStageInput {
+  const { id, code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours } = stage;
+  return { ...(id ? { id } : {}), code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours };
+}
 
 export default function VacanciesPage() {
   const queryClient = useQueryClient(); const { currentBranch, currentTenant, currentUser, branches, tenantUsers, can } = useAppStore();
@@ -46,10 +50,10 @@ export default function VacanciesPage() {
   const [draftReady, setDraftReady] = useState(false);
   const draftTimer = useRef<number | null>(null);
   const vacancies = useQuery({ queryKey: ["vacancies", currentBranch?.id], queryFn: fetchVacancies, enabled: Boolean(currentBranch) });
-  const save = useMutation({ mutationFn: async (input: CreateVacancyInput) => { const vacancy = editingId ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, { stages, responsibles }) : await createVacancy({ ...input, imageUrl: undefined }, { stages, responsibles }); if (imageFile) await uploadVacancyImage(vacancy.id, imageFile); return vacancy; }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); } });
+  const save = useMutation({ mutationFn: async (input: CreateVacancyInput) => { const setup = { stages: stages.map(toVacancyStageInput), responsibles }; const vacancy = editingId ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, setup) : await createVacancy({ ...input, imageUrl: undefined }, setup); if (imageFile) await uploadVacancyImage(vacancy.id, imageFile); return vacancy; }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setImageFile(null); setImagePreview(""); } });
   const clone = useMutation({ mutationFn: (id: string) => cloneVacancy(id, "Clonación administrada desde ATS"), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
   const archive = useMutation({ mutationFn: () => archiveVacancy(archiveTarget!.id, archiveReason), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setArchiveTarget(null); setArchiveReason(""); } });
-  const restore = useMutation({ mutationFn: (vacancy: PublicVacancyDto) => updateVacancy(vacancy.id, { ...vacancyToInput(vacancy), status: "PAUSED" }, { stages: vacancy.stages ?? [], responsibles: vacancy.responsibles ?? [] }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
+  const restore = useMutation({ mutationFn: (vacancy: PublicVacancyDto) => updateVacancy(vacancy.id, { ...vacancyToInput(vacancy), status: "PAUSED" }, { stages: (vacancy.stages ?? []).map(toVacancyStageInput), responsibles: vacancy.responsibles ?? [] }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
   const history = useQuery({ queryKey: ["vacancy-history", historyId], queryFn: () => fetchVacancyHistory(historyId!), enabled: Boolean(historyId) });
   const update = <K extends keyof CreateVacancyInput>(key: K, value: CreateVacancyInput[K]) => setForm((current) => ({ ...current, [key]: value }));
   const fields = form.applicationFormSchema?.fields ?? [];

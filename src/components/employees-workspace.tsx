@@ -46,7 +46,7 @@ export function EmployeesDirectoryPage() {
     );
   }
 
-  const data = employees.data?.data ?? [];
+  const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
   const canCreate = can("employees.create");
 
   return (
@@ -87,7 +87,7 @@ export function EmployeesDirectoryPage() {
         filterValue={status}
         onFilterChange={setStatus}
       />
-      <p className="text-sm text-text-secondary">{employees.data?.meta.total ?? 0} empleados encontrados</p>
+      <p className="text-sm text-text-secondary">{employees.data?.meta?.total ?? data.length} empleados encontrados</p>
       <ResponsiveDataView
         data={data}
         getKey={(employee) => employee.id}
@@ -321,7 +321,8 @@ export function EmployeeImportPage() {
 }
 
 function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
-  const primary = employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? employee.branchAssignments[0];
+  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+  const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
   return (
     <Card level={2}>
       <CardContent className="p-5">
@@ -335,7 +336,7 @@ function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
           </div>
           <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
         </div>
-        <p className="mt-4 text-sm text-text-secondary">{primary ? `${primary.branch.name} · ${primary.role}` : "Sin asignación activa"}</p>
+        <p className="mt-4 text-sm text-text-secondary">{primary ? `${primary.branch?.name ?? "Sucursal sin nombre"} · ${primary.role}` : "Sin asignación activa"}</p>
       </CardContent>
     </Card>
   );

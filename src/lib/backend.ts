@@ -86,6 +86,7 @@ import type {
   TrainingCompliancePolicyDto,
   VacancySetupDto,
   VacancyStageDto,
+  VacancyStageInput,
   VacancyResponsibleDto,
   PersonnelRequisitionDto,
   PersonnelRequisitionInput,
@@ -1957,7 +1958,7 @@ export function submitPublicApplication(vacancyId: string, input: PublicApplicat
 
 export function createVacancy(
   input: CreateVacancyInput,
-  setup?: { stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] },
+  setup?: { stages: VacancyStageInput[]; responsibles: VacancyResponsibleDto[] },
 ): Promise<VacancySetupDto> {
   const safeInput = { ...input };
   delete safeInput.imageUrl;
@@ -1977,7 +1978,7 @@ export function createVacancy(
 export function updateVacancy(
   vacancyId: string,
   input: CreateVacancyInput,
-  setup: { stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] },
+  setup: { stages: VacancyStageInput[]; responsibles: VacancyResponsibleDto[] },
 ): Promise<VacancySetupDto> {
   return request<VacancySetupDto>(`/vacancies/${encodeURIComponent(vacancyId)}`, {
     method: "PATCH",

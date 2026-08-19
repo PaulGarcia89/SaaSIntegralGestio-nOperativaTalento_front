@@ -109,6 +109,23 @@ describe("navigation policy", () => {
     expect(evaluateRouteAccess({ ...getRoutePolicy("/reports")!, available: false }, restrictedContext).code).toBe("ROUTE_NOT_READY");
   });
 
+  it("allows platform administrators into global governance without a tenant context", () => {
+    const platformContext: RouteAccessContext = {
+      sessionValid: true,
+      tenantAllowed: false,
+      globalContext: true,
+      subscriptionStatus: "suspended",
+      role: "admin_plataforma",
+      hasModule: () => false,
+      hasFeature: () => false,
+      can: () => true,
+      branchAvailable: false,
+    };
+
+    expect(evaluateRouteAccess({ ...getRoutePolicy("/admin/tenants")!, available: true }, platformContext).code).toBe("ALLOWED");
+    expect(evaluateRouteAccess({ ...getRoutePolicy("/ats/candidates")!, available: true }, platformContext).code).toBe("BRANCH_REQUIRED");
+  });
+
   it("reserves bus and queue governance for the superadministrator", () => {
     const policy = getRoutePolicy("/admin/integrations");
     expect(policy).toBeDefined();

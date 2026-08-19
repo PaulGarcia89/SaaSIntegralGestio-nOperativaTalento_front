@@ -113,8 +113,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(session?.token && hasGlobalGovernance),
   });
 
-  const isGlobalSuperAdmin = Boolean(
-    authQuery.data?.isSuperAdmin && authQuery.data.isGlobalContext,
+  const isGlobalGovernanceContext = Boolean(
+    authQuery.data?.isGlobalContext && canAccessGlobalGovernance,
   );
 
   const branchesQuery = useQuery({
@@ -123,7 +123,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(
       session?.token &&
       currentTenantId &&
-      !isGlobalSuperAdmin &&
+      !isGlobalGovernanceContext &&
       (
         canAccessGlobalGovernance ||
         authQuery.data?.permissions.includes("branches.read")
@@ -138,7 +138,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(
       session?.token &&
       currentTenantId &&
-      !isGlobalSuperAdmin &&
+      !isGlobalGovernanceContext &&
       (
         canAccessGlobalGovernance ||
         authQuery.data?.permissions.some((permission) => permission.startsWith("users."))
@@ -315,7 +315,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     () =>
       appNavigation.filter((item) => item.showInNavigation !== false && evaluateRouteAccess(item, {
         sessionValid: accessContextVerified,
-        globalContext: isGlobalSuperAdmin,
+        globalContext: isGlobalGovernanceContext,
         tenantAllowed: accessContextVerified && (currentRole === "admin_saas" || allowedTenantIds.includes(currentTenant.id)),
         subscriptionStatus: currentRole === "admin_saas" ? "active" : currentSubscriptionStatus,
         role: currentRole,
@@ -324,7 +324,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         can,
         branchAvailable: Boolean(currentBranch),
       }).allowed),
-    [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, isGlobalSuperAdmin],
+    [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, isGlobalGovernanceContext],
   );
 
   const refreshSession = useCallback(async () => {

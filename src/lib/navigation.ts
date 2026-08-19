@@ -77,7 +77,7 @@ export type RouteAccessContext = { sessionValid: boolean; tenantAllowed: boolean
 export type RouteAccessDecision = { allowed: boolean; code: "ALLOWED" | "AUTH_REQUIRED" | "TENANT_ACCESS_DENIED" | "SUBSCRIPTION_BLOCKED" | "MODULE_NOT_ENABLED" | "FEATURE_NOT_ENABLED" | "ROUTE_NOT_READY" | "ROLE_NOT_ALLOWED" | "PERMISSION_DENIED" | "BRANCH_REQUIRED"; reason: string; requestId?: string };
 export function evaluateRouteAccess(policy: NavItem, context: RouteAccessContext): RouteAccessDecision {
   if (!context.sessionValid) return { allowed: false, code: "AUTH_REQUIRED", reason: "Tu sesión terminó o no pudo verificarse." };
-  if (context.role === "admin_saas" && context.globalContext) {
+  if ((context.role === "admin_saas" || context.role === "admin_plataforma") && context.globalContext) {
     if (policy.audience === "tenant" || policy.branchRequired) {
       return { allowed: false, code: policy.branchRequired ? "BRANCH_REQUIRED" : "ROLE_NOT_ALLOWED", reason: "Selecciona un contexto de empresa autorizado para acceder a esta sección." };
     }

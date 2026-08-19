@@ -337,6 +337,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     currentRole,
     currentSubscriptionStatus,
     subscriptionGraceEndsAt,
+    canAccessGlobalGovernance,
     can,
     hasModule,
     hasFeature,
@@ -347,7 +348,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!routePolicy) return { allowed: false, code: "PERMISSION_DENIED" as const, reason: "Esta ruta no está registrada en la política de acceso." };
     const decision = evaluateRouteAccess(routePolicy, {
       sessionValid: accessContextVerified,
-      globalContext: currentRole === "admin_saas" && !impersonation?.active,
+      globalContext: canAccessGlobalGovernance && !impersonation?.active && !currentTenant.id,
       tenantAllowed: accessContextVerified && (currentRole === "admin_saas" || allowedTenantIds.includes(currentTenant.id)),
       subscriptionStatus: currentRole === "admin_saas" ? "active" : currentSubscriptionStatus,
       role: currentRole,

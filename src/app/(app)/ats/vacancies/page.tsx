@@ -42,6 +42,12 @@ function sameVacancySetup<T>(current: T, initialValue: T) {
   return JSON.stringify(current) === JSON.stringify(initialValue);
 }
 
+function changedVacancyFields(current: CreateVacancyInput, initialValue: CreateVacancyInput): Partial<CreateVacancyInput> {
+  return Object.fromEntries(
+    Object.entries(current).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(initialValue[key as keyof CreateVacancyInput])),
+  ) as Partial<CreateVacancyInput>;
+}
+
 function responsibleInput(responsible: VacancyResponsibleDto) {
   return { userId: responsible.userId, role: responsible.role };
 }
@@ -54,6 +60,7 @@ export function VacanciesPage({ editId }: { editId?: string }) {
   const [responsibles, setResponsibles] = useState<VacancyResponsibleDto[]>([]);
   const [initialStagesForEdit, setInitialStagesForEdit] = useState<VacancyStageDto[]>([]);
   const [initialResponsiblesForEdit, setInitialResponsiblesForEdit] = useState<VacancyResponsibleDto[]>([]);
+  const [initialFormForEdit, setInitialFormForEdit] = useState<CreateVacancyInput | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -73,11 +80,11 @@ export function VacanciesPage({ editId }: { editId?: string }) {
       ...(sameVacancySetup(responsibleSetup, initialResponsibleSetup) ? {} : { responsibles }),
     };
     const vacancy = editingId
-      ? await updateVacancy(editingId, { ...input, imageUrl: undefined }, updateSetup)
+      ? await updateVacancy(editingId, changedVacancyFields(input, initialFormForEdit ?? input), updateSetup)
       : await createVacancy({ ...input, imageUrl: undefined }, { stages: stageInput, responsibles });
     if (imageFile) await uploadVacancyImage(vacancy.id, imageFile);
     return vacancy;
-  }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setImageFile(null); setImagePreview(""); if (editId) router.push("/ats/vacancies"); } });
+  }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); if (draftScope) await removeScopedDraft(draftScope); setOpen(false); setEditingId(null); setStep(0); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setInitialFormForEdit(null); setImageFile(null); setImagePreview(""); if (editId) router.push("/ats/vacancies"); } });
   const clone = useMutation({ mutationFn: (id: string) => cloneVacancy(id, "Clonación administrada desde ATS"), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
   const archive = useMutation({ mutationFn: () => archiveVacancy(archiveTarget!.id, archiveReason), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setArchiveTarget(null); setArchiveReason(""); } });
   const restore = useMutation({ mutationFn: (vacancy: PublicVacancyDto) => updateVacancy(vacancy.id, { ...vacancyToInput(vacancy), status: "PAUSED" }, { stages: (vacancy.stages ?? []).map(toVacancyStageInput), responsibles: vacancy.responsibles ?? [] }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
@@ -93,11 +100,12 @@ export function VacanciesPage({ editId }: { editId?: string }) {
   const next = () => { const nextErrors = errorsForStep(step); setErrors(nextErrors); if (!nextErrors.length) setStep((value) => Math.min(steps.length - 1, value + 1)); };
   const submit = (status: CreateVacancyInput["status"]) => { const nextErrors = (status === "PUBLISHED" || status === "OPEN" ? validateAll() : []).filter((item) => !(editingId && item.fieldId === "vacancy-image")); setErrors(nextErrors); if (!nextErrors.length) save.mutate({ ...form, status }); };
   const draftScope = useMemo(() => currentUser && currentTenant && currentBranch && !editingId ? { namespace: "vacancy", tenantId: currentTenant.id, userId: currentUser.id, resourceId: currentBranch.id } : null, [currentBranch, currentTenant, currentUser, editingId]);
-  const openWizard = () => { setEditingId(null); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setImageFile(null); setImagePreview(""); setErrors([]); setDraftReady(false); setOpen(true); };
+  const openWizard = () => { setEditingId(null); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setInitialFormForEdit(null); setImageFile(null); setImagePreview(""); setErrors([]); setDraftReady(false); setOpen(true); };
   const editVacancy = (vacancy: PublicVacancyDto) => {
     const vacancyStages = vacancy.stages ?? initialStages();
     const vacancyResponsibles = vacancy.responsibles ?? [];
-    setEditingId(vacancy.id); setForm(vacancyToInput(vacancy)); setStages(vacancyStages); setResponsibles(vacancyResponsibles);
+    const vacancyForm = vacancyToInput(vacancy);
+    setEditingId(vacancy.id); setForm(vacancyForm); setInitialFormForEdit(vacancyForm); setStages(vacancyStages); setResponsibles(vacancyResponsibles);
     setInitialStagesForEdit(vacancyStages); setInitialResponsiblesForEdit(vacancyResponsibles);
     setImageFile(null); setImagePreview(vacancy.imageUrl ?? ""); setErrors([]); setStep(0); setOpen(true);
   };

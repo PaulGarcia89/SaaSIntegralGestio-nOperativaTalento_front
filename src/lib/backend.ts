@@ -359,6 +359,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code?: string,
     public readonly details?: unknown,
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -1125,7 +1126,7 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
       "error" in payload &&
       typeof (payload as { error?: unknown }).error === "object" &&
       (payload as { error?: unknown }).error !== null
-        ? ((payload as { error: { message?: string; code?: string; details?: unknown } }).error)
+        ? ((payload as { error: { message?: string; code?: string; details?: unknown; requestId?: string } }).error)
         : null;
     const message =
       nestedError?.message
@@ -1143,7 +1144,11 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
       : typeof payload === "object" && payload && "details" in payload
         ? (payload as { details?: unknown }).details
         : undefined;
-    throw new ApiError(message, response.status, code, details);
+    const responseRequestId = response.headers.get("x-request-id");
+    const errorRequestId = nestedError?.requestId
+      ? String(nestedError.requestId)
+      : responseRequestId ?? undefined;
+    throw new ApiError(message, response.status, code, details, errorRequestId);
   }
 
   if (response.status === 204) {
@@ -1977,23 +1982,30 @@ export function createVacancy(
 
 export function updateVacancy(
   vacancyId: string,
-  input: CreateVacancyInput,
+  input: Partial<CreateVacancyInput>,
   setup?: { stages?: VacancyStageInput[]; responsibles?: VacancyResponsibleDto[] },
 ): Promise<VacancySetupDto> {
+  const changes = { ...input };
+  delete changes.imageUrl;
+  const applicationFormSchema = changes.applicationFormSchema;
+  const workMode = changes.workMode;
+  const status = changes.status;
+  delete changes.applicationFormSchema;
+  delete changes.workMode;
+  delete changes.status;
   return request<VacancySetupDto>(`/vacancies/${encodeURIComponent(vacancyId)}`, {
     method: "PATCH",
     body: JSON.stringify({
-      ...input,
-      imageUrl: undefined,
+      ...changes,
       // Updating copy or compensation must not replace the pipeline or owners.
       // Those collections are only sent when the user changed them in the wizard.
       ...(setup?.stages !== undefined ? { stages: setup.stages } : {}),
       ...(setup?.responsibles !== undefined
         ? { responsibles: setup.responsibles.map(({ userId, role }) => ({ userId, role })) }
         : {}),
-      applicationFormSchema: applicationFormSchemaForApi(input.applicationFormSchema),
-      workMode: input.workMode === "ONSITE" ? "ON_SITE" : input.workMode,
-      status: input.status === "PUBLISHED" ? "OPEN" : input.status === "DRAFT" ? "PAUSED" : input.status,
+      ...(applicationFormSchema !== undefined ? { applicationFormSchema: applicationFormSchemaForApi(applicationFormSchema) } : {}),
+      ...(workMode !== undefined ? { workMode: workMode === "ONSITE" ? "ON_SITE" : workMode } : {}),
+      ...(status !== undefined ? { status: status === "PUBLISHED" ? "OPEN" : status === "DRAFT" ? "PAUSED" : status } : {}),
     }),
   });
 }

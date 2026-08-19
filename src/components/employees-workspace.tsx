@@ -14,13 +14,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
+import { ApiError, assignEmployeeBranches, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
 type EmployeeStatus = NonNullable<CreateEmployeeInput["status"]>;
 type ImportRow = CreateEmployeeInput & { row: number; branchLabel: string; errors: string[] };
-type EmployeeEditorState = { id: string; name: string; email: string; status: EmployeeStatus; primaryBranchId: string; primaryRole: string } | null;
+type EmployeeEditorState = { id: string; name: string; email: string; status: EmployeeStatus; primaryBranchId: string; primaryRole: string; initialPrimaryBranchId: string; initialPrimaryRole: string } | null;
 type EmployeeWithSoftDelete = EmployeeDirectoryItem & { deletedAt?: string | null };
 type EmployeeStatusFilter = "all" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "DELETED";
 
@@ -187,13 +187,22 @@ export function EmployeesDirectoryPage() {
   });
   const editEmployee = useMutation({
     mutationFn: async (input: NonNullable<EmployeeEditorState>) => {
-      await updateEmployee(input.id, {
+      const updated = await updateEmployee(input.id, {
         name: input.name,
         email: input.email,
         jobTitle: input.primaryRole,
         status: input.status,
       });
-      return transferEmployee(input.id, { branchId: input.primaryBranchId, role: input.primaryRole });
+      if (!input.initialPrimaryBranchId) {
+        return assignEmployeeBranches(input.id, [input.primaryBranchId], input.primaryBranchId, input.primaryRole);
+      }
+      if (input.primaryBranchId !== input.initialPrimaryBranchId) {
+        return transferEmployee(input.id, { branchId: input.primaryBranchId, role: input.primaryRole });
+      }
+      if (input.primaryRole !== input.initialPrimaryRole) {
+        return updateEmployeeRole(input.id, input.primaryRole);
+      }
+      return updated;
     },
     onSuccess: async (updated) => {
       setLoadedEmployees((current) => current.map((employee) => (employee.id === updated.id ? updated : employee)));
@@ -561,7 +570,7 @@ export function EmployeesDirectoryPage() {
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setEditingEmployee(null)}>Cancelar</Button>
-            <Button onClick={() => editingEmployee && editEmployee.mutate(editingEmployee)} disabled={!editingEmployee || editEmployee.isPending}>{editEmployee.isPending ? "Guardando..." : "Guardar cambios"}</Button>
+            <Button onClick={() => editingEmployee && editEmployee.mutate(editingEmployee)} disabled={!isEmployeeEditorValid(editingEmployee) || editEmployee.isPending}>{editEmployee.isPending ? "Guardando..." : "Guardar cambios"}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1188,7 +1197,19 @@ function buildEmployeeEditorState(employee: EmployeeDirectoryItem): NonNullable<
     status: employee.status as EmployeeStatus,
     primaryBranchId: primary?.branch.id ?? "",
     primaryRole: primary?.role ?? "",
+    initialPrimaryBranchId: primary?.branch.id ?? "",
+    initialPrimaryRole: primary?.role ?? "",
   };
+}
+
+function isEmployeeEditorValid(employee: EmployeeEditorState): employee is NonNullable<EmployeeEditorState> {
+  return Boolean(
+    employee
+    && employee.name.trim().length >= 2
+    && /^\S+@\S+\.\S+$/.test(employee.email)
+    && employee.primaryBranchId
+    && employee.primaryRole.trim().length >= 2,
+  );
 }
 
 function Summary({ label, value }: { label: string; value: string }) {

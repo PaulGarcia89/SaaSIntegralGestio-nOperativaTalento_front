@@ -100,12 +100,15 @@ export function VacanciesPage({ editId }: { editId?: string }) {
     mutationFn: ({ vacancyId, file }: { vacancyId: string; file: File }) => uploadVacancyImage(vacancyId, file),
     onSuccess: async (uploaded) => {
       setImageFile(null);
-      setImagePreview(uploaded.url);
+      // Keep the selected local image visible while the persisted asset becomes available.
+      setImagePreview((currentPreview) => currentPreview.startsWith("blob:") ? currentPreview : uploaded.url);
       setStoredImagePreview(uploaded.url);
       setImageUploadMessage("Imagen actualizada y guardada.");
       await queryClient.invalidateQueries({ queryKey: ["vacancies"] });
     },
-    onError: () => setImageUploadMessage(null),
+    onError: () => {
+      setImageUploadMessage("No se pudo guardar la imagen. La vista previa se conserva para que puedas intentarlo nuevamente.");
+    },
   });
   const clone = useMutation({ mutationFn: (id: string) => cloneVacancy(id, "Clonación administrada desde ATS"), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vacancies"] }) });
   const archive = useMutation({ mutationFn: () => archiveVacancy(archiveTarget!.id, archiveReason), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["vacancies"] }); setArchiveTarget(null); setArchiveReason(""); } });

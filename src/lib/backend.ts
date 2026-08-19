@@ -192,10 +192,25 @@ function normalizeSignedAssetUrl(url?: string | null) {
   if (!url) return url;
   try {
     const assetUrl = new URL(url);
-    if (assetUrl.hostname !== "localhost" && assetUrl.hostname !== "127.0.0.1") return url;
-    const apiUrl = new URL(API_BASE_URL);
-    assetUrl.protocol = apiUrl.protocol;
-    assetUrl.host = apiUrl.host;
+    const apiUrl = new URL(
+      API_BASE_URL,
+      typeof window === "undefined" ? "http://localhost" : window.location.origin,
+    );
+
+    if (assetUrl.hostname === "localhost" || assetUrl.hostname === "127.0.0.1") {
+      assetUrl.protocol = apiUrl.protocol;
+      assetUrl.host = apiUrl.host;
+    }
+
+    const apiPathPrefix = apiUrl.pathname.replace(/\/$/, "");
+    if (
+      apiPathPrefix &&
+      assetUrl.pathname.startsWith("/public/ats-files/") &&
+      !assetUrl.pathname.startsWith(`${apiPathPrefix}/public/ats-files/`)
+    ) {
+      assetUrl.pathname = `${apiPathPrefix}${assetUrl.pathname}`;
+    }
+
     return assetUrl.toString();
   } catch {
     return url;

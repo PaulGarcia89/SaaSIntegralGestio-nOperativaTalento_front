@@ -13,7 +13,7 @@ import { FormSelect } from "@/components/ui/form-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { type AtsAnalyticsQuery, downloadTextFile, fetchAtsAnalytics, fetchAtsAnalyticsDashboards, fetchAtsAnalyticsExport, fetchAtsHiringQuality, fetchAtsSourceCosts, fetchVacancies, saveAtsAnalyticsDashboard, saveAtsHiringQuality, saveAtsSourceCost } from "@/lib/backend";
+import { type AtsAnalyticsQuery, downloadTextFile, fetchAtsAnalytics, fetchAtsAnalyticsDashboards, fetchAtsAnalyticsExport, fetchAtsHiringQuality, fetchAtsSourceCosts, fetchCandidateConversionMetrics, fetchVacancies, saveAtsAnalyticsDashboard, saveAtsHiringQuality, saveAtsSourceCost } from "@/lib/backend";
 import type { AtsAnalyticsDto } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 
@@ -30,6 +30,7 @@ export default function AtsAnalyticsPage() {
     staleTime: 30_000,
   });
   const dashboards = useQuery({ queryKey: ["ats-analytics-dashboards"], queryFn: fetchAtsAnalyticsDashboards });
+  const candidateJourney = useQuery({ queryKey: ["candidate-conversion-metrics", currentTenant.id], queryFn: fetchCandidateConversionMetrics, staleTime: 30_000 });
   const saveDashboard = useMutation({ mutationFn: () => saveAtsAnalyticsDashboard({ ...filters, name: dashboardName.trim(), widgets: ["summary", "funnel", "sources", "recruiters", "sla", "interviews", "offers"] }), onSuccess: async () => { setDashboardName(""); await dashboards.refetch(); toast.success("Dashboard guardado"); }, onError: () => toast.error("No fue posible guardar el dashboard") });
   const exporter = useMutation({
     mutationFn: () => fetchAtsAnalyticsExport(filters),
@@ -74,13 +75,13 @@ export default function AtsAnalyticsPage() {
 
     {analytics.isPending ? <AsyncState state="loading" title="Calculando el desempeño ATS" description="Estamos reconstruyendo embudos, tiempos, SLA, entrevistas y ofertas." /> : null}
     {analytics.isError ? <AsyncState state="error" title="No fue posible calcular la analítica ATS" description={analytics.error instanceof Error ? analytics.error.message : "Revisa el alcance y vuelve a intentarlo."} onRetry={() => analytics.refetch()} /> : null}
-    {analytics.data ? <AnalyticsContent data={analytics.data} /> : null}
+    {analytics.data ? <AnalyticsContent data={analytics.data} candidateJourney={candidateJourney.data} /> : null}
     <SourceCostDialog open={costOpen} onOpenChange={setCostOpen} />
     <HiringQualityDialog open={qualityOpen} onOpenChange={setQualityOpen} />
   </div>;
 }
 
-function AnalyticsContent({ data }: { data: AtsAnalyticsDto }) {
+function AnalyticsContent({ data, candidateJourney }: { data: AtsAnalyticsDto; candidateJourney?: Awaited<ReturnType<typeof fetchCandidateConversionMetrics>> }) {
   return <div className="space-y-7">
     <section className="flex flex-col gap-2 rounded-2xl border bg-surface-section p-4 text-sm text-text-secondary lg:flex-row lg:items-center lg:justify-between">
       <span><strong className="text-text-primary">Periodo:</strong> {formatDate(data.period.from)} – {formatDate(data.period.to)}</span>
@@ -103,6 +104,8 @@ function AnalyticsContent({ data }: { data: AtsAnalyticsDto }) {
       <Card level={2}><CardHeader><CardTitle>Volumen y decisiones</CardTitle><p className="text-sm text-text-secondary">Evolución {granularityLabel(data.filters.granularity).toLocaleLowerCase()} de nuevas postulaciones.</p></CardHeader><CardContent><Trend rows={data.trends} /></CardContent></Card>
     </section>
 
+    <CandidateJourneyCard data={candidateJourney} />
+
     <section className="grid gap-5 xl:grid-cols-3">
       <OperationalCard title="Entrevistas" value={`${data.interviews.completionRate}%`} label="completadas" rows={[["Sesiones", data.interviews.total], ["Ausencias", `${data.interviews.noShowRate}%`], ["Calificación media", data.interviews.averageScore || "—"], ["Anticipación", duration(data.interviews.averageSchedulingLeadHours)]]} />
       <OperationalCard title="Ofertas" value={`${data.offers.acceptanceRate}%`} label="aceptadas" rows={[["Emitidas", data.offers.total], ["Aceptadas", data.offers.accepted], ["Contrapropuestas", `${data.offers.counterOfferRate}%`], ["Tiempo de aprobación", duration(data.offers.averageApprovalHours)]]} />
@@ -117,6 +120,19 @@ function AnalyticsContent({ data }: { data: AtsAnalyticsDto }) {
       <TableCard title="Carga por reclutador" headers={["Responsable", "Activas", "Fuera de SLA", "Conversión", "Edad media"]} rows={data.recruiters.map((item) => [item.name, item.active, item.overdue, `${item.conversionRate}%`, duration(item.averageActiveStageHours)])} />
     </section>
   </div>;
+}
+
+function CandidateJourneyCard({ data }: { data?: Awaited<ReturnType<typeof fetchCandidateConversionMetrics>> }) {
+  if (!data) return <Card level={2}><CardHeader><CardTitle>Conversión de postulación</CardTitle></CardHeader><CardContent><p className="text-sm text-text-secondary">Cargando inicios, pausas y reanudaciones persistidas…</p></CardContent></Card>;
+  const { totals } = data;
+  const stages = [
+    ["Iniciaron", totals.started, "bg-primary"],
+    ["Pausaron", totals.paused, "bg-status-warning"],
+    ["Reanudaron", totals.resumed, "bg-status-info"],
+    ["Enviaron", totals.submitted, "bg-status-success"],
+  ] as const;
+  const max = Math.max(1, ...stages.map(([, value]) => value));
+  return <section className="grid gap-5 xl:grid-cols-[1.35fr_1fr]"><Card level={2}><CardHeader><CardTitle>Conversión de postulación</CardTitle><p className="text-sm text-text-secondary">Comportamiento real desde el primer dato ingresado hasta el envío.</p></CardHeader><CardContent className="space-y-4">{stages.map(([label, value, color]) => <div key={label} className="grid grid-cols-[7rem_1fr_4rem] items-center gap-3 text-sm"><span className="font-medium">{label}</span><div className="h-7 overflow-hidden rounded-lg bg-surface-section"><div className={`flex h-full min-w-8 items-center justify-end rounded-lg px-2 text-xs font-semibold text-white ${color}`} style={{ width: `${Math.max(5, value / max * 100)}%` }}>{value}</div></div><span className="text-right tabular-nums text-text-secondary">{totals.started ? `${Math.round(value / totals.started * 100)}%` : "0%"}</span></div>)}</CardContent></Card><Card level={2}><CardHeader><CardTitle>Señal de abandono</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1"><div className="rounded-xl bg-surface-section p-4"><p className="text-sm text-text-secondary">Finalización</p><p className="mt-1 text-3xl font-semibold">{totals.completionRate}%</p><p className="mt-1 text-xs text-text-secondary">del inicio al envío</p></div><div className="rounded-xl bg-surface-section p-4"><p className="text-sm text-text-secondary">Recuperación</p><p className="mt-1 text-3xl font-semibold">{totals.resumeRate}%</p><p className="mt-1 text-xs text-text-secondary">de borradores pausados</p></div>{totals.paused > totals.resumed ? <p className="sm:col-span-2 xl:col-span-1 text-sm text-status-warning">Hay {totals.paused - totals.resumed} borrador(es) pausados sin reanudación. Revisa claridad, longitud y campos obligatorios de las vacantes con mayor volumen.</p> : <p className="sm:col-span-2 xl:col-span-1 text-sm text-status-success">La reanudación cubre todos los abandonos registrados hasta ahora.</p>}</CardContent></Card></section>;
 }
 
 function Metric({ icon: Icon, label, value, change, detail, inverse, points, tone }: { icon: typeof Users; label: string; value: string | number; change?: number; detail: string; inverse?: boolean; points?: boolean; tone?: "success" | "warning" | "danger" }) {

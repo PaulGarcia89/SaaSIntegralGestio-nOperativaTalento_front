@@ -27,6 +27,7 @@ import {
   decideApplicationTransition,
   createAutomationRule,
   fetchRejectionReasons,
+  undoApplicationTransition,
   updateApplication,
 } from "@/lib/backend";
 import type { VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
@@ -52,6 +53,7 @@ function PipelineContent() {
   } | null>(null);
   const [preview, setPreview] = useState<VacancyApplicationDto | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [mobileDropStageId, setMobileDropStageId] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
   const [automationStage, setAutomationStage] = useState<VacancyStageDto | null>(null);
   const [automationTitle, setAutomationTitle] = useState("");
@@ -100,8 +102,9 @@ function PipelineContent() {
         reason,
         rejectionReasonId,
         notes: application.notes ?? undefined,
+        expectedUpdatedAt: application.updatedAt,
       }),
-    onSuccess: async (_, variables) => {
+    onSuccess: async (updated, variables) => {
       trackProductEvent({
         name: "candidate_stage_changed",
         from: variables.application.currentStage?.name ?? variables.application.status,
@@ -109,7 +112,22 @@ function PipelineContent() {
       });
       setStageChange(null);
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
+      toast.success(`Movido a ${variables.stage.name}`, {
+        action: {
+          label: "Deshacer",
+          onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }),
+        },
+      });
     },
+  });
+
+  const undo = useMutation({
+    mutationFn: ({ applicationId, expectedUpdatedAt }: { applicationId: string; expectedUpdatedAt: string }) => undoApplicationTransition(applicationId, expectedUpdatedAt),
+    onSuccess: async () => {
+      toast.success("Cambio deshecho y registrado en el historial");
+      await queryClient.invalidateQueries({ queryKey: ["applications"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No fue posible deshacer el cambio"),
   });
 
   const decide = useMutation({
@@ -177,11 +195,27 @@ function PipelineContent() {
           onDragEnd={() => setDraggingId(null)}
           onTouchStart={(event) => {
             touchStartX.current = event.touches[0]?.clientX ?? null;
+            if (compact && can("applications.change_stage")) setDraggingId(application.id);
+          }}
+          onTouchMove={(event) => {
+            if (!compact || draggingId !== application.id) return;
+            const touch = event.touches[0];
+            const targetId = touch
+              ? (document.elementFromPoint(touch.clientX, touch.clientY)?.closest("[data-mobile-stage-id]") as HTMLElement | null)?.dataset.mobileStageId ?? null
+              : null;
+            setMobileDropStageId(targetId);
           }}
           onTouchEnd={(event) => {
             const startX = touchStartX.current;
             touchStartX.current = null;
             const endX = event.changedTouches[0]?.clientX;
+            const droppedStage = stages.find((stage) => stage.id === mobileDropStageId);
+            setDraggingId(null);
+            setMobileDropStageId(null);
+            if (compact && droppedStage && droppedStage.id !== currentStageId && movableStages.some((stage) => stage.id === droppedStage.id)) {
+              setStageChange({ application, target: droppedStage });
+              return;
+            }
             if (!compact || startX === null || endX === undefined || Math.abs(endX - startX) < 72 || !can("applications.change_stage")) return;
             const currentIndex = stages.findIndex((stage) => stage.id === currentStageId);
             const direction = endX > startX ? 1 : -1;
@@ -201,7 +235,7 @@ function PipelineContent() {
             <p><span className="font-medium text-text-primary">Siguiente:</span> {applicationNextAction(application.status)}</p>
             {application.stageDueAt ? <p className={application.isStageOverdue ? "font-medium text-status-danger" : ""}><Clock3 className="mr-1 inline size-3.5" />{application.isStageOverdue ? "SLA vencido" : `SLA: ${formatApplicationDate(application.stageDueAt)}`}</p> : null}
           </div>
-          {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">Desliza la tarjeta hacia la siguiente etapa para moverla.</p> : null}
+          {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">Arrastra hacia una etapa resaltada o desliza para avanzar.</p> : null}
           {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && pendingTransition.requestedByUserId !== currentUser.id ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>La solicitud debe resolverla otro responsable.</p>}</div> : null}
           {can("applications.change_stage") && application.status !== "HIRED" && movableStages.length ? (
             <FilterField label="Mover a">
@@ -306,7 +340,7 @@ function PipelineContent() {
             {stages.map((stage) => {
               const items = filtered.filter((item) => currentApplicationStage(item, stages)?.id === stage.id);
               return (
-                <section key={stage.id} aria-labelledby={`mobile-stage-${stage.id}`}>
+                <section key={stage.id} data-mobile-stage-id={stage.id} aria-labelledby={`mobile-stage-${stage.id}`} className={`rounded-2xl transition-colors ${mobileDropStageId === stage.id ? "bg-primary/10 ring-2 ring-primary/40" : ""}`}>
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 id={`mobile-stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
                     <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="icon" variant="ghost" aria-label={`Automatizar ${stage.name}`} onClick={() => openStageAutomation(stage)}><Zap className="size-4" /></Button> : null}</div>

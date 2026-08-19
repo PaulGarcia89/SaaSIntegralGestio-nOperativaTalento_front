@@ -2087,8 +2087,8 @@ export function exportApplications(filters: import("./contracts").ApplicationFil
   return request<{ generatedAt: string; count: number; data: VacancyApplicationDto[] }>(`/applications/export?${query.toString()}`);
 }
 
-export function bulkUpdateApplications(input: { ids: string[]; status?: string; currentStageId?: string; assignedRecruiterId?: string; rejectionReasonId?: string; reason?: string; notes?: string }) {
-  return request<{ updated: number }>("/applications/bulk/status", { method: "PATCH", body: JSON.stringify(input) });
+export function bulkUpdateApplications(input: { ids: string[]; status?: string; currentStageId?: string; assignedRecruiterId?: string; rejectionReasonId?: string; reason?: string; notes?: string; onlyUnassigned?: boolean; onlyOverdue?: boolean }) {
+  return request<{ updated: number; skipped?: number }>("/applications/bulk/status", { method: "PATCH", body: JSON.stringify(input) });
 }
 
 export function fetchApplicationSavedViews(): Promise<import("./contracts").ApplicationSavedViewDto[]> {
@@ -2111,6 +2111,10 @@ export function fetchApplication(applicationId: string): Promise<VacancyApplicat
   return request<VacancyApplicationDto>(`/applications/${encodeURIComponent(applicationId)}`);
 }
 
+export function fetchApplicationDecisionEvidence(applicationId: string) {
+  return request<Record<string, unknown>>(`/applications/${encodeURIComponent(applicationId)}/decision-evidence`);
+}
+
 export function fetchResumeAccess(applicationId: string) {
   return request<{
     fileId: string;
@@ -2125,6 +2129,10 @@ export function fetchResumeAccess(applicationId: string) {
 
 export function updateApplication(applicationId: string, input: UpdateApplicationInput): Promise<VacancyApplicationDto> {
   return request<VacancyApplicationDto>(`/applications/${encodeURIComponent(applicationId)}/status`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function undoApplicationTransition(applicationId: string, expectedUpdatedAt: string): Promise<VacancyApplicationDto> {
+  return request<VacancyApplicationDto>(`/applications/${encodeURIComponent(applicationId)}/transitions/undo`, { method: "POST", body: JSON.stringify({ expectedUpdatedAt }) });
 }
 
 export function decideApplicationTransition(
@@ -2590,6 +2598,14 @@ export function markCandidateCommunicationRead(id: string) {
   return candidateRequest<{ id: string; readAt: string }>(`/candidate/applications/communications/${encodeURIComponent(id)}/read`, { method: "POST" });
 }
 
+export function replyCandidateCommunication(id: string, message: string) {
+  return candidateRequest<{ id: string; applicationId: string; subject: string; body: string; direction: string; createdAt: string }>(`/candidate/applications/communications/${encodeURIComponent(id)}/reply`, { method: "POST", body: JSON.stringify({ message }) });
+}
+
+export function requestCandidateInterviewReschedule(id: string) {
+  return candidateRequest<{ url: string }>(`/candidate/applications/interviews/${encodeURIComponent(id)}/reschedule`, { method: "POST" });
+}
+
 export function createCandidateSupportRequest(input: { subject: string; message: string }) {
   return candidateRequest<{ id: string; subject: string; message: string; status: string; requestedAt: string }>("/candidate/applications/support-requests", { method: "POST", body: JSON.stringify(input) });
 }
@@ -2622,6 +2638,7 @@ export function submitCandidateApplication(
   input: PublicApplicationInput,
   resume: File | null,
   consent: boolean,
+  antiFraud?: { website?: string; formStartedAt?: string },
 ) {
   const body = new FormData();
   Object.entries(input).forEach(([key, value]) => {
@@ -2630,6 +2647,8 @@ export function submitCandidateApplication(
   });
   body.append("resumeConsent", String(consent));
   body.append("resumeConsentVersion", "candidate-privacy-v1");
+  if (antiFraud?.website) body.append("website", antiFraud.website);
+  if (antiFraud?.formStartedAt) body.append("formStartedAt", antiFraud.formStartedAt);
   if (resume) body.append("resume", resume);
   return candidateRequest<PublicApplicationReceipt>(`/public/vacancies/${encodeURIComponent(vacancyId)}/applications`, {
     method: "POST",
@@ -2647,6 +2666,14 @@ export type PublicApplicationDraftResponse = {
 
 export function fetchPublicApplicationDraft(vacancyId: string) {
   return request<PublicApplicationDraftResponse>(`/public/vacancies/${encodeURIComponent(vacancyId)}/applications/draft`, {}, { auth: false });
+}
+
+export function fetchCandidateApplicationDraft(vacancyId: string) {
+  return candidateRequest<PublicApplicationDraftResponse>(`/candidate/applications/drafts/${encodeURIComponent(vacancyId)}`);
+}
+
+export function saveCandidateApplicationDraft(vacancyId: string, value: PublicApplicationDraftPayload) {
+  return candidateRequest<{ expiresAt: string }>(`/candidate/applications/drafts/${encodeURIComponent(vacancyId)}`, { method: "PUT", body: JSON.stringify({ value }) });
 }
 
 export function savePublicApplicationDraft(vacancyId: string, value: PublicApplicationDraftPayload) {

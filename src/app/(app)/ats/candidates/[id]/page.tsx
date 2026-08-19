@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarClock, ExternalLink, Mail, MapPin, Phone, RotateCcw, UserCheck } from "lucide-react";
+import { ArrowLeft, CalendarClock, Download, ExternalLink, Mail, MapPin, Phone, RotateCcw, UserCheck } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
 import { DecisionCommitteeCard } from "@/components/decision-committee-card";
 import { ApplicantDecisionGovernance } from "@/components/applicant-decision-governance";
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TIMELINE_LABELS, applicationStageLabel, formatApplicationDate } from "@/lib/applications";
-import { fetchApplication, fetchAtsCommunicationHistory, fetchHiringContext, fetchInterviewScorecardComparison, fetchRejectionReasons, fetchResumeAccess, hireCandidate, retryAtsCommunication, updateApplication } from "@/lib/backend";
+import { fetchApplication, fetchApplicationDecisionEvidence, fetchAtsCommunicationHistory, fetchHiringContext, fetchInterviewScorecardComparison, fetchRejectionReasons, fetchResumeAccess, hireCandidate, retryAtsCommunication, updateApplication } from "@/lib/backend";
 import type { AtsMessageDto, ScorecardComparisonDto, VacancyApplicationDto } from "@/lib/contracts";
 import { technicalLabel } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
@@ -45,6 +45,17 @@ function CandidateProfile({ application }: { application: VacancyApplicationDto 
   const communications = useQuery({ queryKey: ["ats-communications", application.id], queryFn: () => fetchAtsCommunicationHistory(application.id) });
   const rejectionReasons = useQuery({ queryKey: ["application-rejection-reasons"], queryFn: fetchRejectionReasons });
   const resumeAccess = useMutation({ mutationFn: () => fetchResumeAccess(application.id), onSuccess: (access) => window.open(access.url, "_blank", "noopener,noreferrer") });
+  const decisionEvidence = useMutation({
+    mutationFn: () => fetchApplicationDecisionEvidence(application.id),
+    onSuccess: (evidence) => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(evidence, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `expediente-decision-${application.candidate.fullName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    },
+  });
   const save = useMutation({ mutationFn: () => updateApplication(application.id, { currentStageId: currentStageId || undefined, reason: rejectionReason.trim() || undefined, rejectionReasonId: rejectionReasonId || undefined, notes: notes.trim() || undefined, interview: application.interview?.type ? { type: application.interview.type, scheduledAt: application.interview.scheduledAt, followUpAt: application.interview.followUpAt, observations: application.interview.observations } : undefined }), onSuccess: async (updated) => { queryClient.setQueryData(["application", application.id], updated); setCurrentStageId(updated.currentStageId ?? updated.currentStage?.id ?? ""); setRejectionReason(""); setRejectionReasonId(""); await queryClient.invalidateQueries({ queryKey: ["applications"] }); } });
   const hire = useMutation({ mutationFn: () => hireCandidate({ applicationId: application.id, branchId: application.vacancy.branchId, employeeName: application.candidate.fullName, employeeEmail: application.candidate.email, jobTitle: jobTitle.trim(), supervisorUserId: supervisorUserId || undefined, onboardingTemplateId: onboardingTemplateId || hiringContext.data?.onboardingTemplates.find((template) => template.isDefault)?.id || hiringContext.data?.onboardingTemplates[0]?.id, employmentStartDate: employmentStartDate ? new Date(`${employmentStartDate}T12:00:00`).toISOString() : undefined, metadata: { source: "candidate-360" } }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["application", application.id] }); await queryClient.invalidateQueries({ queryKey: ["applications"] }); await queryClient.invalidateQueries({ queryKey: ["onboarding-flows"] }); } });
   const retryMessage = useMutation({ mutationFn: retryAtsCommunication, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["ats-communications", application.id] }); } });
@@ -59,7 +70,7 @@ function CandidateProfile({ application }: { application: VacancyApplicationDto 
   const links = [{ label: "LinkedIn", href: application.candidate.linkedinUrl }, { label: "Portafolio", href: application.candidate.portfolioUrl }].filter((item): item is { label: string; href: string } => Boolean(item.href));
   const scorecards = (application.interviews ?? []).flatMap((interview) => (interview.scorecards ?? []).map((scorecard) => ({ interview, scorecard })));
 
-  return <div className="space-y-6"><PageHeader eyebrow="Perfil 360°" title={application.candidate.fullName} description={`${application.vacancy.title} · ${application.vacancy.branch?.name ?? "Sin sucursal"}`} actions={<div className="flex flex-wrap gap-2"><Badge variant="secondary">{currentStageLabel}</Badge>{application.status === "APPROVED" && can("applications.change_stage") ? <Button asChild variant="secondary"><a href="#job-offers">Gestionar oferta</a></Button> : null}{application.status === "APPROVED" && can("applications.hire") ? <Button onClick={() => setHireOpen(true)}><UserCheck className="size-4" />Contratar candidato</Button> : null}</div>} />
+  return <div className="space-y-6"><PageHeader eyebrow="Perfil 360°" title={application.candidate.fullName} description={`${application.vacancy.title} · ${application.vacancy.branch?.name ?? "Sin sucursal"}`} actions={<div className="flex flex-wrap gap-2"><Badge variant="secondary">{currentStageLabel}</Badge>{can("reports.export") ? <Button variant="secondary" onClick={() => decisionEvidence.mutate()} disabled={decisionEvidence.isPending}><Download className="size-4" />{decisionEvidence.isPending ? "Preparando evidencia…" : "Exportar expediente"}</Button> : null}{application.status === "APPROVED" && can("applications.change_stage") ? <Button asChild variant="secondary"><a href="#job-offers">Gestionar oferta</a></Button> : null}{application.status === "APPROVED" && can("applications.hire") ? <Button onClick={() => setHireOpen(true)}><UserCheck className="size-4" />Contratar candidato</Button> : null}</div>} />
     <nav aria-label="Secciones del candidato" className="flex gap-1 overflow-x-auto border-b border-border-default"><a href="#perfil" className="min-h-11 whitespace-nowrap border-b-2 border-primary px-4 py-3 text-sm font-medium">Perfil</a><a href="#proceso" className="min-h-11 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-sm text-text-secondary hover:text-text-primary">Proceso</a><a href="#entrevistas" className="min-h-11 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-sm text-text-secondary hover:text-text-primary">Entrevistas</a><a href="#mensajes" className="min-h-11 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-sm text-text-secondary hover:text-text-primary">Mensajes</a><a href="#decision" className="min-h-11 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-sm text-text-secondary hover:text-text-primary">Decisión</a></nav>
     <JobOfferManager applicationId={application.id} jobTitle={application.vacancy.title} canManage={can("applications.change_stage")} />
     {save.isSuccess ? <InlineFeedback tone="success" title="Cambios guardados">{save.data.pendingTransitions?.length ? "El cambio de etapa quedó pendiente de aprobación." : "La etapa y las notas se actualizaron correctamente."}</InlineFeedback> : null}{save.isError ? <InlineFeedback tone="danger" title="No fue posible guardar">{save.error instanceof Error ? save.error.message : "Los cambios no se aplicaron. Intenta nuevamente."}</InlineFeedback> : null}

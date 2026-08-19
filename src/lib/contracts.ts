@@ -2290,7 +2290,7 @@ export interface CandidatePortalProfileDto {
 }
 
 export interface CandidatePortalOverviewDto {
-  communications: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; readAt?: string | null; createdAt: string }>;
+  communications: Array<{ id: string; applicationId: string; type: string; direction?: "INBOUND" | "OUTBOUND" | string; subject: string; body: string; status: string; deliveredAt?: string | null; readAt?: string | null; createdAt: string }>;
   offers: Array<{ id: string; applicationId: string; type: string; subject: string; body: string; status: string; deliveredAt?: string | null; createdAt: string }>;
   resumes: Array<{ id: string; applicationId?: string | null; version: number; status: string; originalName: string; mimeType: string; sizeBytes: number; createdAt: string }>;
   signatureDocuments: Array<{ id: string; status: string; signedAt?: string | null; tokenExpiresAt?: string | null; createdAt: string; signaturePackage: { id: string; title: string; status: string; dueDate?: string | null; sentAt?: string | null } }>;
@@ -2374,6 +2374,7 @@ export interface UpdateApplicationInput {
   reason?: string;
   rejectionReasonId?: string;
   notes?: string;
+  expectedUpdatedAt?: string;
   interview?: { type: ApplicationInterviewType; scheduledAt?: string | null; followUpAt?: string | null; observations?: string | null } | null;
 }
 

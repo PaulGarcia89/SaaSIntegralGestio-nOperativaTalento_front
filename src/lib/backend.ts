@@ -2587,7 +2587,7 @@ export function fetchCandidatePortalOverview() {
   return candidateRequest<CandidatePortalOverviewDto>("/candidate/applications/portal");
 }
 
-export function fetchCandidatePreboarding() { return candidateRequest<CandidatePreboardingDto>("/candidate/preboarding"); }
+export function fetchCandidatePreboarding() { return candidateRequest<CandidatePreboardingDto | null>("/candidate/preboarding"); }
 export function completeCandidatePreboardingTask(taskId: string) { return candidateRequest<CandidatePreboardingDto>(`/candidate/preboarding/tasks/${encodeURIComponent(taskId)}/complete`, { method: "PATCH" }); }
 export function uploadCandidatePreboardingDocument(input: { file: File; taskId?: string; category?: string }) { const body = new FormData(); body.append("file", input.file); if (input.taskId) body.append("taskId", input.taskId); body.append("category", input.category ?? "OTHER"); return candidateRequest("/candidate/preboarding/documents", { method: "POST", body }); }
 

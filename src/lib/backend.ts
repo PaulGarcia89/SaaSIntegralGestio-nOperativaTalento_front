@@ -1725,6 +1725,17 @@ export type CreateEmployeeInput = {
   primaryRole: string;
 };
 
+export type EmployeeRegistrationInput = {
+  personal: { legalFirstName: string; middleName?: string; legalLastName: string; preferredName?: string; dateOfBirth?: string };
+  contact: { workEmail: string; personalEmail?: string; phone?: string; addressLine1?: string; addressLine2?: string; city?: string; state?: string; postalCode?: string; country?: string };
+  employment: { primaryBranchId: string; jobTitle: string; department?: string; supervisorUserId?: string; hireDate?: string; startDate?: string; workerClassification?: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED" };
+  payroll?: { payType?: string; payRate?: string; payFrequency?: string; overtimeEligible?: boolean; regularHourlyRate?: string; workweekStartDay?: string; workweekStartTime?: string; paymentMethod?: string; payrollProvider?: string; payrollEmployeeId?: string; externalPayrollReference?: string };
+  tax?: { ssn?: string; ssnLast4?: string; w4Status?: string; w2Reference?: string };
+  eligibility?: { i9Status?: string; firstDayOfEmployment?: string; reverificationRequired?: boolean; eVerifyRequired?: boolean; eVerifyStatus?: string };
+  floridaNewHire?: { required?: boolean; status?: string; dueDate?: string };
+  emergencyContact?: { name?: string; relationship?: string; phone?: string };
+};
+
 export type UpdateEmployeeInput = {
   name: string;
   email: string;
@@ -1732,7 +1743,7 @@ export type UpdateEmployeeInput = {
   status?: "ACTIVE" | "INACTIVE" | "TERMINATED";
 };
 
-export function createEmployee(input: CreateEmployeeInput) {
+export function createEmployee(input: CreateEmployeeInput | EmployeeRegistrationInput) {
   return request<EmployeeApiItem>("/employees", {
     method: "POST",
     body: JSON.stringify(input),
@@ -1740,7 +1751,8 @@ export function createEmployee(input: CreateEmployeeInput) {
     .then(normalizeEmployeeDirectoryItem)
     .catch(async (error) => {
       if (!shouldUseMockBackend(error)) throw error;
-      return createMockEmployee(input);
+      const legacy = "name" in input ? input : { name: `${input.personal.legalFirstName} ${input.personal.legalLastName}`, email: input.contact.workEmail, primaryBranchId: input.employment.primaryBranchId, primaryRole: input.employment.jobTitle, status: input.employment.status };
+      return createMockEmployee(legacy);
     });
 }
 

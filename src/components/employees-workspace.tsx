@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView, Wizard } from "@/components/design-system";
-import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
+import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -672,31 +672,34 @@ export function EmployeesDirectoryPage() {
 export function EmployeeCreatePage() {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { can } = useAppStore();
+  const { can, tenantUsers } = useAppStore();
   const branches = useQuery({ queryKey: ["employee-import-branches"], queryFn: () => fetchBranches(), enabled: can("employees.create") });
-  const [form, setForm] = useState<CreateEmployeeInput>(initialEmployee);
+  const [form, setForm] = useState<EmployeeRegistrationInput>(() => employeeRegistrationInitial());
   const [step, setStep] = useState(0);
   const create = useMutation({
     mutationFn: () => createEmployee(form),
     onSuccess: async (employee) => {
       toast.success("Empleado agregado al directorio");
-      setForm(initialEmployee);
+      setForm(employeeRegistrationInitial());
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       router.push(`/employees/${employee.id}`);
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible crear el empleado.")),
   });
-  const valid = form.name.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(form.email) && Boolean(form.primaryBranchId) && form.primaryRole.trim().length >= 2;
-  const basicValid = form.name.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(form.email);
-  const employmentValid = Boolean(form.primaryBranchId) && form.primaryRole.trim().length >= 2;
+  const valid = form.personal.legalFirstName.trim().length >= 2 && form.personal.legalLastName.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(form.contact.workEmail) && Boolean(form.employment.primaryBranchId) && form.employment.jobTitle.trim().length >= 2;
+  const basicValid = form.personal.legalFirstName.trim().length >= 2 && form.personal.legalLastName.trim().length >= 2;
+  const contactValid = /^\S+@\S+\.\S+$/.test(form.contact.workEmail);
+  const employmentValid = Boolean(form.employment.primaryBranchId) && form.employment.jobTitle.trim().length >= 2;
   const activeBranches = branches.data?.filter((branch) => branch.status === "active") ?? [];
+  const updateSection = <T extends keyof EmployeeRegistrationInput>(section: T, values: Partial<EmployeeRegistrationInput[T]>) => setForm((current) => ({ ...current, [section]: { ...current[section], ...values } }));
+  const steps = ["Personal", "Contacto", "Empleo", "Nómina", "Tax & elegibilidad", "Documentos y compliance", "Capacitación y activos", "Revisión"];
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Personas"
         title="Registrar empleado"
-        description="Registra a las personas que ya trabajan en la empresa y construye una base documental lista para auditorías y gestión continua."
+        description="Registra a una persona que ya trabaja en la empresa y crea su expediente laboral, payroll, elegibilidad y cumplimiento inicial."
         actions={
           <Button asChild type="button" variant="secondary">
             <Link href="/employees">
@@ -709,16 +712,16 @@ export function EmployeeCreatePage() {
       <section aria-labelledby="employee-hiring-flow" className="rounded-2xl border border-border-default bg-surface-section p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 id="employee-hiring-flow" className="font-semibold">Base documental del empleado</h2>
-            <p className="mt-1 text-sm text-text-secondary">Consolida datos, documentos y asignaciones de personas que ya forman parte de la empresa.</p>
+            <h2 id="employee-hiring-flow" className="font-semibold">Expediente central del empleado</h2>
+            <p className="mt-1 text-sm text-text-secondary">Los campos se organizan por dominio para que nómina, elegibilidad y evidencia permanezcan trazables.</p>
           </div>
           <Badge variant="outline">Objetivo: gestión continua</Badge>
         </div>
         <ol className="mt-5 grid gap-3 md:grid-cols-4">
-          <HiringStep number="1" title="Identificación" description="Nombre, correo, contacto, sucursal principal y cargo actual de la persona." />
-          <HiringStep number="2" title="Perfil laboral" description="Rol, estado, asignaciones y datos útiles para mantener el directorio actualizado." />
-          <HiringStep current number="3" title="Documentación" description="Centraliza contratos, identificaciones, soportes y archivos necesarios para auditoría." />
-          <HiringStep number="4" title="Historial" description="Consulta cambios, movimientos, archivos cargados y trazabilidad de gestión." />
+          <HiringStep number="1" title="Datos y empleo" description="Identidad, contacto, sucursal, cargo y supervisor." />
+          <HiringStep current number="2" title="Payroll y elegibilidad" description="Nómina, W-4, I-9, E-Verify y Florida New Hire." />
+          <HiringStep number="3" title="Evidencia" description="Checklist para documentos, capacitación, licencias y seguridad." />
+          <HiringStep number="4" title="Auditoría" description="La creación y cada actualización quedan trazables por el backend." />
         </ol>
       </section>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
@@ -738,21 +741,26 @@ export function EmployeeCreatePage() {
               className="mt-5 space-y-4"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (step < 2) {
-                  if ((step === 0 && basicValid) || (step === 1 && employmentValid)) setStep((current) => current + 1);
+                if (step < steps.length - 1) {
+                  if ((step === 0 && basicValid) || (step === 1 && contactValid) || (step === 2 && employmentValid) || step > 2) setStep((current) => current + 1);
                   return;
                 }
                 if (valid) create.mutate();
               }}
             >
-              <Wizard steps={["Datos básicos", "Relación laboral", "Revisar"]} current={step} onStepChange={setStep}>
-                {step === 0 ? <div className="space-y-4"><FormField id="employee-name" label="Nombre legal" required>{(field) => <Input {...field} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}</FormField><FormField id="employee-email" label="Correo electrónico" description="Este correo se usará para contacto y trazabilidad interna." required>{(field) => <Input {...field} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</FormField><InlineFeedback tone="info" title="Datos personales adicionales">Teléfono, dirección, nombre preferido y fecha de nacimiento se habilitarán cuando estén disponibles en el contrato seguro del empleado.</InlineFeedback></div> : null}
-                {step === 1 ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><FormField id="employee-branch" label="Sucursal principal" required>{(field) => <Select value={form.primaryBranchId} onValueChange={(primaryBranchId) => setForm({ ...form, primaryBranchId })}><SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger><SelectContent>{activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}</FormField><FormField id="employee-role" label="Cargo o función" required>{(field) => <Input {...field} placeholder="Ej. Supervisor de tienda" value={form.primaryRole} onChange={(event) => setForm({ ...form, primaryRole: event.target.value })} />}</FormField></div><FormField id="employee-status" label="Estado inicial">{(field) => <Select value={form.status ?? "ACTIVE"} onValueChange={(status) => setForm({ ...form, status: status as EmployeeStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACTIVE">Activo</SelectItem><SelectItem value="INACTIVE">Inactivo</SelectItem></SelectContent></Select>}</FormField></div> : null}
-                {step === 2 ? <div className="space-y-4"><InlineFeedback tone="success" title="Revisa antes de crear">El expediente se creará con los datos que se muestran a continuación.</InlineFeedback><dl className="grid gap-4 rounded-2xl border border-border-default p-4 sm:grid-cols-2"><ReviewDatum label="Nombre" value={form.name} /><ReviewDatum label="Correo" value={form.email} /><ReviewDatum label="Sucursal" value={activeBranches.find((branch) => branch.id === form.primaryBranchId)?.name ?? "Sin seleccionar"} /><ReviewDatum label="Cargo" value={form.primaryRole} /><ReviewDatum label="Estado" value={form.status === "INACTIVE" ? "Inactivo" : "Activo"} /></dl></div> : null}
+              <Wizard steps={steps} current={step} onStepChange={(target) => target <= step && setStep(target)}>
+                {step === 0 ? <div className="grid gap-4 sm:grid-cols-2"><CreateField label="Nombre legal" required value={form.personal.legalFirstName} onChange={(value) => updateSection("personal", { legalFirstName: value })} /><CreateField label="Segundo nombre" value={form.personal.middleName ?? ""} onChange={(value) => updateSection("personal", { middleName: value })} /><CreateField label="Apellidos legales" required value={form.personal.legalLastName} onChange={(value) => updateSection("personal", { legalLastName: value })} /><CreateField label="Nombre preferido" value={form.personal.preferredName ?? ""} onChange={(value) => updateSection("personal", { preferredName: value })} /><CreateField label="Fecha de nacimiento" type="date" value={form.personal.dateOfBirth ?? ""} onChange={(value) => updateSection("personal", { dateOfBirth: value })} /><InlineFeedback tone="info" title="Identificación protegida">El Employee ID se genera automáticamente por empresa al crear el expediente.</InlineFeedback></div> : null}
+                {step === 1 ? <div className="grid gap-4 sm:grid-cols-2"><CreateField label="Email laboral" type="email" required value={form.contact.workEmail} onChange={(value) => updateSection("contact", { workEmail: value })} /><CreateField label="Email personal" type="email" value={form.contact.personalEmail ?? ""} onChange={(value) => updateSection("contact", { personalEmail: value })} /><CreateField label="Teléfono" type="tel" value={form.contact.phone ?? ""} onChange={(value) => updateSection("contact", { phone: value })} /><CreateField label="Dirección" value={form.contact.addressLine1 ?? ""} onChange={(value) => updateSection("contact", { addressLine1: value })} /><CreateField label="Ciudad" value={form.contact.city ?? ""} onChange={(value) => updateSection("contact", { city: value })} /><CreateField label="Estado" value={form.contact.state ?? "FL"} onChange={(value) => updateSection("contact", { state: value })} /><CreateField label="ZIP" value={form.contact.postalCode ?? ""} onChange={(value) => updateSection("contact", { postalCode: value })} /><CreateField label="País" value={form.contact.country ?? "US"} onChange={(value) => updateSection("contact", { country: value })} /></div> : null}
+                {step === 2 ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="employee-branch" label="Sucursal principal" required>{(field) => <Select value={form.employment.primaryBranchId} onValueChange={(primaryBranchId) => updateSection("employment", { primaryBranchId })}><SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger><SelectContent>{activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}</FormField><CreateField label="Cargo" required value={form.employment.jobTitle} onChange={(value) => updateSection("employment", { jobTitle: value })} /><CreateField label="Departamento" value={form.employment.department ?? ""} onChange={(value) => updateSection("employment", { department: value })} /><FormField id="employee-supervisor" label="Supervisor">{(field) => <Select value={form.employment.supervisorUserId ?? "none"} onValueChange={(value) => updateSection("employment", { supervisorUserId: value === "none" ? undefined : value })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin supervisor</SelectItem>{tenantUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select>}</FormField><CreateField label="Fecha de contratación" type="date" value={form.employment.hireDate ?? ""} onChange={(value) => updateSection("employment", { hireDate: value })} /><CreateField label="Fecha de inicio" type="date" value={form.employment.startDate ?? ""} onChange={(value) => updateSection("employment", { startDate: value })} /><FormField id="employee-status" label="Estado de empleo">{(field) => <Select value={form.employment.status ?? "ACTIVE"} onValueChange={(status) => updateSection("employment", { status: status as EmployeeStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACTIVE">Activo</SelectItem><SelectItem value="INACTIVE">Inactivo</SelectItem><SelectItem value="TERMINATED">Finalizado</SelectItem></SelectContent></Select>}</FormField></div> : null}
+                {step === 3 ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="pay-type" label="Tipo de pago">{(field) => <Select value={form.payroll?.payType ?? "SALARY"} onValueChange={(payType) => updateSection("payroll", { payType })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SALARY">Salario</SelectItem><SelectItem value="HOURLY">Por hora</SelectItem><SelectItem value="COMMISSION">Comisión</SelectItem><SelectItem value="TIP_BASED">Propinas</SelectItem></SelectContent></Select>}</FormField><CreateField label="Salario o tarifa" type="number" value={form.payroll?.payRate ?? ""} onChange={(value) => updateSection("payroll", { payRate: value })} /><FormField id="pay-frequency" label="Frecuencia de pago">{(field) => <Select value={form.payroll?.payFrequency ?? "BIWEEKLY"} onValueChange={(payFrequency) => updateSection("payroll", { payFrequency })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="WEEKLY">Semanal</SelectItem><SelectItem value="BIWEEKLY">Quincenal</SelectItem><SelectItem value="SEMIMONTHLY">Dos veces al mes</SelectItem><SelectItem value="MONTHLY">Mensual</SelectItem></SelectContent></Select>}</FormField><FormField id="payment-method" label="Método de pago">{(field) => <Select value={form.payroll?.paymentMethod ?? "DIRECT_DEPOSIT"} onValueChange={(paymentMethod) => updateSection("payroll", { paymentMethod })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="DIRECT_DEPOSIT">Direct deposit</SelectItem><SelectItem value="CHECK">Cheque</SelectItem><SelectItem value="PAY_CARD">Tarjeta de pago</SelectItem></SelectContent></Select>}</FormField><CreateField label="Proveedor de nómina" value={form.payroll?.payrollProvider ?? ""} onChange={(value) => updateSection("payroll", { payrollProvider: value })} /><CreateField label="Payroll Employee ID" value={form.payroll?.payrollEmployeeId ?? ""} onChange={(value) => updateSection("payroll", { payrollEmployeeId: value })} /><label className="flex min-h-11 items-center gap-3 text-sm font-medium sm:col-span-2"><input type="checkbox" checked={Boolean(form.payroll?.overtimeEligible)} onChange={(event) => updateSection("payroll", { overtimeEligible: event.target.checked })} />Elegible para overtime</label></div> : null}
+                {step === 4 ? <div className="space-y-5"><InlineFeedback tone="warning" title="Información fiscal protegida">El SSN se cifra en el servidor y nunca vuelve a mostrarse completo. No lo incluyas en notas o archivos no protegidos.</InlineFeedback><div className="grid gap-4 sm:grid-cols-2"><CreateField label="SSN" type="password" value={form.tax?.ssn ?? ""} onChange={(value) => updateSection("tax", { ssn: value })} /><FormField id="w4-status" label="Form W-4">{(field) => <Select value={form.tax?.w4Status ?? "PENDING"} onValueChange={(w4Status) => updateSection("tax", { w4Status })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="COMPLETE">Completado</SelectItem><SelectItem value="NOT_REQUIRED">No requerido</SelectItem></SelectContent></Select>}</FormField><FormField id="i9-status" label="Form I-9">{(field) => <Select value={form.eligibility?.i9Status ?? "PENDING"} onValueChange={(i9Status) => updateSection("eligibility", { i9Status })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="VERIFIED">Verificado</SelectItem><SelectItem value="NOT_REQUIRED">No requerido</SelectItem></SelectContent></Select>}</FormField><FormField id="everify-status" label="E-Verify">{(field) => <Select value={form.eligibility?.eVerifyStatus ?? "NOT_REQUIRED"} onValueChange={(eVerifyStatus) => updateSection("eligibility", { eVerifyStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NOT_REQUIRED">No requerido</SelectItem><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="AUTHORIZED">Autorizado</SelectItem></SelectContent></Select>}</FormField><FormField id="florida-new-hire" label="Florida New Hire">{(field) => <Select value={form.floridaNewHire?.status ?? "PENDING"} onValueChange={(status) => updateSection("floridaNewHire", { status, required: status !== "NOT_REQUIRED" })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="SUBMITTED">Reportado</SelectItem><SelectItem value="CONFIRMED">Confirmado</SelectItem><SelectItem value="NOT_REQUIRED">No requerido</SelectItem></SelectContent></Select>}</FormField></div></div> : null}
+                {step === 5 ? <InitialChecklist /> : null}
+                {step === 6 ? <div className="grid gap-5 sm:grid-cols-2"><div className="space-y-4"><h3 className="font-semibold">Capacitación, licencias y activos</h3><p className="text-sm text-text-secondary">Al crear el expediente, el checklist deja pendientes las capacitaciones obligatorias, licencias profesionales y activos requeridos. Se asignan desde sus módulos especializados.</p><InlineFeedback tone="info" title="Documentos laborales">Offer letter, agreement, NDA, handbook y documentos de seguridad se cargan después desde la pestaña Documentos del expediente.</InlineFeedback></div><div className="space-y-4"><h3 className="font-semibold">Contacto de emergencia</h3><CreateField label="Nombre" value={form.emergencyContact?.name ?? ""} onChange={(value) => updateSection("emergencyContact", { name: value })} /><CreateField label="Relación" value={form.emergencyContact?.relationship ?? ""} onChange={(value) => updateSection("emergencyContact", { relationship: value })} /><CreateField label="Teléfono" type="tel" value={form.emergencyContact?.phone ?? ""} onChange={(value) => updateSection("emergencyContact", { phone: value })} /></div></div> : null}
+                {step === 7 ? <div className="space-y-4"><InlineFeedback tone="success" title="Revisa antes de crear">El backend generará un Employee ID, los perfiles protegidos y el checklist inicial auditable.</InlineFeedback><dl className="grid gap-4 rounded-2xl border border-border-default p-4 sm:grid-cols-2"><ReviewDatum label="Empleado" value={`${form.personal.legalFirstName} ${form.personal.legalLastName}`} /><ReviewDatum label="Email laboral" value={form.contact.workEmail} /><ReviewDatum label="Sucursal" value={activeBranches.find((branch) => branch.id === form.employment.primaryBranchId)?.name ?? "Sin seleccionar"} /><ReviewDatum label="Cargo" value={form.employment.jobTitle} /><ReviewDatum label="Nómina" value={`${form.payroll?.payType ?? "Sin definir"} · ${form.payroll?.payFrequency ?? "Sin definir"}`} /><ReviewDatum label="Elegibilidad" value={`I-9 ${form.eligibility?.i9Status ?? "PENDING"} · W-4 ${form.tax?.w4Status ?? "PENDING"}`} /></dl></div> : null}
               </Wizard>
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 {step === 0 ? <Button asChild type="button" variant="secondary"><Link href="/employees">Cancelar</Link></Button> : <Button type="button" variant="secondary" onClick={() => setStep((current) => current - 1)}>Anterior</Button>}
-                <Button type="submit" disabled={create.isPending || (step === 0 && !basicValid) || (step === 1 && !employmentValid) || (step === 2 && !valid)}>{step < 2 ? "Continuar" : create.isPending ? "Creando..." : "Crear empleado"}</Button>
+                <Button type="submit" disabled={create.isPending || (step === 0 && !basicValid) || (step === 1 && !contactValid) || (step === 2 && !employmentValid) || (step === 7 && !valid)}>{step < steps.length - 1 ? "Continuar" : create.isPending ? "Creando..." : "Crear empleado"}</Button>
               </div>
             </form>
           </CardContent>
@@ -817,6 +825,29 @@ export function EmployeeCreatePage() {
       </div>
     </div>
   );
+}
+
+function employeeRegistrationInitial(): EmployeeRegistrationInput {
+  return {
+    personal: { legalFirstName: "", legalLastName: "" },
+    contact: { workEmail: "", state: "FL", country: "US" },
+    employment: { primaryBranchId: "", jobTitle: "", status: "ACTIVE" },
+    payroll: { payType: "SALARY", payFrequency: "BIWEEKLY", paymentMethod: "DIRECT_DEPOSIT" },
+    tax: { w4Status: "PENDING" },
+    eligibility: { i9Status: "PENDING", eVerifyStatus: "NOT_REQUIRED", eVerifyRequired: false },
+    floridaNewHire: { required: true, status: "PENDING" },
+    emergencyContact: {},
+  };
+}
+
+function CreateField({ label, onChange, required = false, type = "text", value }: { label: string; onChange: (value: string) => void; required?: boolean; type?: string; value: string }) {
+  const id = `employee-registration-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
+  return <FormField id={id} label={label} required={required}>{(field) => <Input {...field} type={type} value={value} onChange={(event) => onChange(event.target.value)} />}</FormField>;
+}
+
+function InitialChecklist() {
+  const requirements = ["I-9", "W-4", "Identidad de nómina / SSN", "Florida New Hire", "E-Verify", "Employment Agreement", "Capacitación obligatoria", "Licencia profesional"];
+  return <div className="space-y-4"><InlineFeedback tone="info" title="Checklist generado automáticamente">La creación del empleado registra estos requisitos como pendientes o no requeridos según las opciones elegidas. La evidencia se administra desde el expediente.</InlineFeedback><div className="grid gap-3 sm:grid-cols-2">{requirements.map((requirement) => <div key={requirement} className="flex items-center justify-between rounded-xl border border-border-default bg-surface-elevated p-4"><span className="font-medium">{requirement}</span><Badge variant="secondary">Pendiente</Badge></div>)}</div></div>;
 }
 
 function HiringStep({ current = false, description, number, title }: { current?: boolean; description: string; number: string; title: string }) {

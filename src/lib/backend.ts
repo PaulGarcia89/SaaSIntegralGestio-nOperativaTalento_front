@@ -188,6 +188,24 @@ const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "15000")
 const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
 const AUTH_API_BASE_URL = STATIC_HOSTING ? API_BASE_URL : "/api";
 
+function normalizeSignedAssetUrl(url?: string | null) {
+  if (!url) return url;
+  try {
+    const assetUrl = new URL(url);
+    if (assetUrl.hostname !== "localhost" && assetUrl.hostname !== "127.0.0.1") return url;
+    const apiUrl = new URL(API_BASE_URL);
+    assetUrl.protocol = apiUrl.protocol;
+    assetUrl.host = apiUrl.host;
+    return assetUrl.toString();
+  } catch {
+    return url;
+  }
+}
+
+function normalizeVacancyImageUrl<T extends { imageUrl?: string | null }>(vacancy: T): T {
+  return { ...vacancy, imageUrl: normalizeSignedAssetUrl(vacancy.imageUrl) };
+}
+
 // This legacy registration is not backed by the production database. Keep it
 // out of administrative selectors until its original data source is reconciled.
 const HIDDEN_LEGACY_TENANT_SLUGS = new Set(["superiortech"]);
@@ -1947,11 +1965,12 @@ export async function updateModuleAssignment(
 export async function fetchPublicVacancies(search = ""): Promise<PublicVacancyListDto> {
   const query = new URLSearchParams({ page: "1", pageSize: "100" });
   if (search.trim()) query.set("search", search.trim());
-  return request<PublicVacancyListDto>(`/public/vacancies?${query.toString()}`, {}, { auth: false, retryOnUnauthorized: false });
+  const result = await request<PublicVacancyListDto>(`/public/vacancies?${query.toString()}`, {}, { auth: false, retryOnUnauthorized: false });
+  return { ...result, data: result.data.map(normalizeVacancyImageUrl) };
 }
 
-export function fetchPublicVacancy(vacancyId: string): Promise<PublicVacancyDto> {
-  return request<PublicVacancyDto>(`/public/vacancies/${encodeURIComponent(vacancyId)}`, {}, { auth: false, retryOnUnauthorized: false });
+export async function fetchPublicVacancy(vacancyId: string): Promise<PublicVacancyDto> {
+  return normalizeVacancyImageUrl(await request<PublicVacancyDto>(`/public/vacancies/${encodeURIComponent(vacancyId)}`, {}, { auth: false, retryOnUnauthorized: false }));
 }
 
 export function submitPublicApplication(vacancyId: string, input: PublicApplicationInput): Promise<PublicApplicationReceipt> {
@@ -2046,17 +2065,19 @@ export function decidePersonnelRequisition(id: string, approved: boolean, note?:
   });
 }
 
-export function uploadVacancyImage(vacancyId: string, image: File) {
+export async function uploadVacancyImage(vacancyId: string, image: File) {
   const body = new FormData();
   body.append("image", image);
-  return request<{ id: string; version: number; url: string; expiresAt: string }>(
+  const result = await request<{ id: string; version: number; url: string; expiresAt: string }>(
     `/vacancies/${encodeURIComponent(vacancyId)}/image`,
     { method: "POST", body },
   );
+  return { ...result, url: normalizeSignedAssetUrl(result.url) ?? result.url };
 }
 
-export function fetchVacancies(): Promise<PublicVacancyListDto> {
-  return request<PublicVacancyListDto>("/vacancies?page=1&pageSize=100");
+export async function fetchVacancies(): Promise<PublicVacancyListDto> {
+  const result = await request<PublicVacancyListDto>("/vacancies?page=1&pageSize=100");
+  return { ...result, data: result.data.map(normalizeVacancyImageUrl) };
 }
 
 export function fetchApplications(filters: import("./contracts").ApplicationFilters = {}): Promise<VacancyApplicationListDto> {

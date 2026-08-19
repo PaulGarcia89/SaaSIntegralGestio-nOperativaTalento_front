@@ -4225,15 +4225,15 @@ export function mapAuthUserToUi(authUser: BackendAuthUser): {
   impersonation: { active: boolean; tenantId?: string | null; startedAt?: string | null } | null;
   tenant: TenantDto;
 } {
+  const role = roleCodesToRoleKey(authUser.roles, authUser.isSuperAdmin);
   const canAccessGlobalGovernance = Boolean(
-    authUser.canAccessGlobalGovernance ?? (authUser.isSuperAdmin && authUser.isGlobalContext),
+    authUser.canAccessGlobalGovernance ??
+      (authUser.isGlobalContext && (role === "admin_saas" || role === "admin_plataforma")),
   );
   const enabledModules = deriveEnabledModules(
     authUser.tenant?.enabledModules ?? authUser.enabledModules,
     canAccessGlobalGovernance,
   );
-  const role = roleCodesToRoleKey(authUser.roles, authUser.isSuperAdmin);
-
   return {
     user: {
       id: authUser.id,

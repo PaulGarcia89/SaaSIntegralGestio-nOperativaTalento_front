@@ -1660,6 +1660,12 @@ export type CreateEmployeeInput = {
   primaryRole: string;
 };
 
+export type UpdateEmployeeInput = {
+  name: string;
+  email: string;
+  status?: "ACTIVE" | "INACTIVE" | "TERMINATED";
+};
+
 export function createEmployee(input: CreateEmployeeInput) {
   return request<EmployeeDirectoryItem>("/employees", {
     method: "POST",
@@ -1700,7 +1706,7 @@ export function fetchEmployees(input: { search?: string; status?: string; branch
   });
 }
 
-export function updateEmployee(id: string, input: CreateEmployeeInput) {
+export function updateEmployee(id: string, input: UpdateEmployeeInput) {
   return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(input),

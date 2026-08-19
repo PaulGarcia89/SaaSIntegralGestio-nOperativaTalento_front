@@ -384,15 +384,16 @@ function syncHiringMasterFlow(employeeName: string) {
   }
 }
 
-function mapEmployeeFromInput(input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId: string; primaryRole: string }) {
+function mapEmployeeFromInput(input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId?: string; primaryRole?: string }) {
   const branch = branchesDb.find((item) => item.id === input.primaryBranchId);
-  if (!branch) throw new Error("Sucursal no encontrada");
   return {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     status: input.status ?? "ACTIVE",
     deletedAt: null,
-    branchAssignments: [{ id: makeId("emp-asg"), role: input.primaryRole.trim(), isPrimary: true, branch: { id: branch.id, name: branch.name } }],
+    branchAssignments: branch && input.primaryRole
+      ? [{ id: makeId("emp-asg"), role: input.primaryRole.trim(), isPrimary: true, branch: { id: branch.id, name: branch.name } }]
+      : [],
   };
 }
 
@@ -444,9 +445,9 @@ export async function bulkCreateEmployees(employees: Array<{ name: string; email
   return { created: createdEmployees.length, employees: createdEmployees.map((employee) => ({ id: employee.id, email: employee.email })) };
 }
 
-export async function updateEmployee(id: string, input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED"; primaryBranchId: string; primaryRole: string }) {
+export async function updateEmployee(id: string, input: { name: string; email: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED" }) {
   await wait();
-  employeesDb = employeesDb.map((employee) => (employee.id === id ? { id, ...mapEmployeeFromInput(input), documentSummary: employee.documentSummary } : employee));
+  employeesDb = employeesDb.map((employee) => (employee.id === id ? { ...employee, name: input.name.trim(), email: input.email.trim().toLowerCase(), status: input.status ?? employee.status } : employee));
   const updated = employeesDb.find((employee) => employee.id === id);
   if (!updated) throw new Error("Empleado no encontrado");
   return updated;

@@ -191,8 +191,6 @@ export function EmployeesDirectoryPage() {
       name: input.name,
       email: input.email,
       status: input.status,
-      primaryBranchId: input.primaryBranchId,
-      primaryRole: input.primaryRole,
     }),
     onSuccess: async () => {
       toast.success("Empleado actualizado");

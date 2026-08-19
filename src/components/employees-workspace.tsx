@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, assignEmployeeBranches, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem } from "@/lib/backend";
+import { ApiError, assignEmployeeBranches, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -35,6 +35,7 @@ const statusChips: Array<{ value: EmployeeStatusFilter; label: string }> = [
 ];
 
 export function EmployeesDirectoryPage() {
+  const queryClient = useQueryClient();
   const { can, currentTenant, currentBranch, tenantBranches } = useAppStore();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<EmployeeStatusFilter>("all");
@@ -192,9 +193,21 @@ export function EmployeesDirectoryPage() {
       email: input.email,
       status: input.status,
     }),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
+      queryClient.setQueryData<EmployeeDirectoryResponse | undefined>(["employees", search, status, branchFilter, page, pageSize], (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          data: current.data.map((employee) => (employee.id === updated.id ? updated : employee)),
+        };
+      });
+      queryClient.setQueriesData<{ employee: EmployeeDirectoryItem } | undefined>({ queryKey: ["employee-detail", updated.id] }, (current) => {
+        if (!current) return current;
+        return { ...current, employee: updated };
+      });
       toast.success("Empleado actualizado");
       setEditingEmployee(null);
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
       await employees.refetch();
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el empleado.")),

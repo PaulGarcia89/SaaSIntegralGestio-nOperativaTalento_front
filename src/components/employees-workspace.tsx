@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Filter, LayoutList, MapPin, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, ChevronRight, Download, FileSpreadsheet, Filter, LayoutList, MapPin, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -29,6 +29,10 @@ export function EmployeesDirectoryPage() {
   const [branchFilter, setBranchFilter] = useState(currentBranch?.id ?? "");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [sortField, setSortField] = useState<"name" | "email" | "status" | "documents" | "assignments">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const employees = useQuery({
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status, branchId: branchFilter || undefined, page, pageSize }),
@@ -61,6 +65,31 @@ export function EmployeesDirectoryPage() {
   const canCreate = can("employees.create");
   const totalItems = meta?.total ?? data.length;
   const totalPages = meta?.totalPages ?? 1;
+  const selectionCount = selectedIds.length;
+  const sortedData = [...data].sort((left, right) => compareEmployees(left, right, sortField, sortDirection));
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [search, status, branchFilter, page, pageSize, viewMode, sortField, sortDirection]);
+
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortField(field);
+    setSortDirection("asc");
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  };
+
+  const toggleSelectAll = () => {
+    if (!sortedData.length) return;
+    const allSelected = sortedData.every((employee) => selectedIds.includes(employee.id));
+    setSelectedIds(allSelected ? [] : sortedData.map((employee) => employee.id));
+  };
 
   return (
     <div className="space-y-5">
@@ -79,6 +108,7 @@ export function EmployeesDirectoryPage() {
               <Badge variant="secondary">{currentBranch?.name ?? "Sucursal activa"}</Badge>
               <Badge variant="outline">{totalItems} expedientes</Badge>
               <Badge variant="outline">{totalPages} páginas</Badge>
+              {selectionCount ? <Badge variant="outline">{selectionCount} seleccionados</Badge> : null}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3 lg:w-[420px]">
@@ -113,7 +143,8 @@ export function EmployeesDirectoryPage() {
       />
       <Card level={2}>
         <CardContent className="space-y-4 p-4">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_220px_220px_180px]">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div className="grid flex-1 gap-3 xl:grid-cols-[minmax(0,1.1fr)_220px_220px_180px]">
             <label className="space-y-2">
               <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 <Search className="size-4" />
@@ -153,7 +184,7 @@ export function EmployeesDirectoryPage() {
                 </SelectContent>
               </Select>
             </label>
-            <label className="space-y-2">
+              <label className="space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Por página</span>
               <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
                 <SelectTrigger>
@@ -167,6 +198,17 @@ export function EmployeesDirectoryPage() {
                 </SelectContent>
               </Select>
             </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant={viewMode === "table" ? "default" : "secondary"} onClick={() => setViewMode("table")}>
+                <LayoutList className="size-4" />
+                Tabla
+              </Button>
+              <Button type="button" variant={viewMode === "cards" ? "default" : "secondary"} onClick={() => setViewMode("cards")}>
+                <UsersRound className="size-4" />
+                Tarjetas
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-default pt-4 text-sm">
             <p className="text-text-secondary">
@@ -174,15 +216,61 @@ export function EmployeesDirectoryPage() {
             </p>
             <p className="text-text-secondary">La vista muestra resultados paginados para mantener la pantalla rápida.</p>
           </div>
+          {selectionCount ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-text-secondary">
+                {selectionCount} empleados seleccionados para acciones masivas.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={() => setSelectedIds([])}>
+                  Limpiar selección
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => void copySelectedEmails(sortedData, selectedIds)}>
+                  Copiar correos
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
-      <ResponsiveDataView
-        data={data}
-        getKey={(employee) => employee.id}
-        desktop={<div className="overflow-hidden rounded-2xl border border-border-default bg-card shadow-sm"><div className="grid grid-cols-[minmax(0,1.3fr)_180px_180px_120px_1fr_130px] gap-4 border-b border-border-default bg-surface-section px-4 py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary"><span>Empleado</span><span>Sucursal</span><span>Rol</span><span>Docs</span><span>Asignaciones</span><span>Estado</span></div><div>{data.map((employee, index) => <EmployeeRow key={employee.id} employee={employee} compact={index >= 10} />)}</div></div>}
-        mobile={(employee) => <EmployeeCard employee={employee} />}
-        empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
-      />
+      {viewMode === "table" ? (
+        <Card level={2}>
+          <CardContent className="p-0">
+            <div className="overflow-hidden rounded-2xl border border-border-default bg-card shadow-sm">
+              <div className="grid grid-cols-[52px_minmax(0,1.3fr)_180px_180px_120px_1fr_130px] gap-4 border-b border-border-default bg-surface-section px-4 py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                <button type="button" className="flex items-center justify-center" onClick={toggleSelectAll} aria-label="Seleccionar todas">
+                  {sortedData.length && sortedData.every((employee) => selectedIds.includes(employee.id)) ? "☑" : "☐"}
+                </button>
+                <SortHeader label="Empleado" active={sortField === "name"} direction={sortDirection} onClick={() => toggleSort("name")} />
+                <SortHeader label="Correo" active={sortField === "email"} direction={sortDirection} onClick={() => toggleSort("email")} />
+                <SortHeader label="Sucursal" active={sortField === "assignments"} direction={sortDirection} onClick={() => toggleSort("assignments")} />
+                <SortHeader label="Docs" active={sortField === "documents"} direction={sortDirection} onClick={() => toggleSort("documents")} />
+                <SortHeader label="Asignaciones" active={sortField === "assignments"} direction={sortDirection} onClick={() => toggleSort("assignments")} />
+                <SortHeader label="Estado" active={sortField === "status"} direction={sortDirection} onClick={() => toggleSort("status")} />
+              </div>
+              <div>
+                {sortedData.map((employee, index) => (
+                  <EmployeeRow
+                    key={employee.id}
+                    employee={employee}
+                    compact={index >= 10}
+                    selected={selectedIds.includes(employee.id)}
+                    onToggleSelect={() => toggleSelection(employee.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <ResponsiveDataView
+          data={sortedData}
+          getKey={(employee) => employee.id}
+          desktop={<div className="grid gap-3 lg:grid-cols-2">{sortedData.map((employee) => <EmployeeCard key={employee.id} employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} />)}</div>}
+          mobile={(employee) => <EmployeeCard employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} />}
+          empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
+        />
+      )}
       {meta ? (
         <div className="rounded-2xl border border-border-default bg-card p-4 shadow-sm">
           <Pagination
@@ -605,17 +693,26 @@ export function EmployeeImportPage() {
   );
 }
 
-function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
+function EmployeeCard({ employee, selected = false, onToggleSelect }: { employee: EmployeeDirectoryItem; selected?: boolean; onToggleSelect?: () => void }) {
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
   const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
   const documentSummary = (employee as EmployeeDirectoryWithDocuments).documentSummary;
   return (
-    <Card level={2}>
+    <Card level={2} className={cn(selected && "ring-2 ring-primary/35")}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
+              {onToggleSelect ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-border-default bg-surface-section px-2 py-1 text-[11px] font-semibold text-text-secondary"
+                  onClick={onToggleSelect}
+                >
+                  {selected ? "Seleccionada" : "Seleccionar"}
+                </button>
+              ) : null}
               <UsersRound className="size-4 text-primary" />
               <h2 className="truncate font-semibold">{employee.name}</h2>
             </div>
@@ -648,14 +745,17 @@ function EmployeeCard({ employee }: { employee: EmployeeDirectoryItem }) {
   );
 }
 
-function EmployeeRow({ employee, compact = false }: { employee: EmployeeDirectoryItem; compact?: boolean }) {
+function EmployeeRow({ employee, compact = false, selected = false, onToggleSelect }: { employee: EmployeeDirectoryItem; compact?: boolean; selected?: boolean; onToggleSelect?: () => void }) {
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
   const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
   const documentSummary = (employee as EmployeeDirectoryWithDocuments).documentSummary;
 
   return (
-    <div className={cn("grid grid-cols-1 gap-3 border-b border-border-default px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1.3fr)_180px_180px_120px_1fr_130px] md:items-center", compact && "opacity-95")}>
+    <div className={cn("grid grid-cols-1 gap-3 border-b border-border-default px-4 py-4 last:border-b-0 md:grid-cols-[52px_minmax(0,1.3fr)_180px_180px_120px_1fr_130px] md:items-center", selected && "bg-primary/5", compact && "opacity-95")}>
+      <button type="button" className="flex items-center justify-center rounded-full border border-border-default bg-surface-section p-2 text-xs font-semibold" onClick={onToggleSelect} aria-label={`Seleccionar ${employee.name}`}>
+        {selected ? "☑" : "☐"}
+      </button>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <UsersRound className="size-4 shrink-0 text-primary" />
@@ -681,6 +781,15 @@ function EmployeeRow({ employee, compact = false }: { employee: EmployeeDirector
   );
 }
 
+function SortHeader({ label, active, direction, onClick }: { label: string; active: boolean; direction: "asc" | "desc"; onClick: () => void }) {
+  return (
+    <button type="button" className="flex items-center gap-1 text-left transition hover:text-text-primary" onClick={onClick}>
+      <span>{label}</span>
+      {active ? direction === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" /> : <ArrowUpDown className="size-3.5 opacity-60" />}
+    </button>
+  );
+}
+
 function ImportMetric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "danger" }) {
   return (
     <div className="rounded-xl border border-border-default p-3">
@@ -688,6 +797,30 @@ function ImportMetric({ label, value, tone = "default" }: { label: string; value
       <p className={tone === "success" ? "text-xl font-semibold text-status-success" : tone === "danger" ? "text-xl font-semibold text-status-danger" : "text-xl font-semibold"}>{value}</p>
     </div>
   );
+}
+
+async function copySelectedEmails(data: EmployeeDirectoryItem[], selectedIds: string[]) {
+  const emails = data.filter((employee) => selectedIds.includes(employee.id)).map((employee) => employee.email);
+  if (!emails.length) return;
+  await navigator.clipboard.writeText(emails.join("\n"));
+  toast.success(`${emails.length} correos copiados`);
+}
+
+function compareEmployees(left: EmployeeDirectoryItem, right: EmployeeDirectoryItem, field: "name" | "email" | "status" | "documents" | "assignments", direction: "asc" | "desc") {
+  const factor = direction === "asc" ? 1 : -1;
+  const leftAssignments = Array.isArray(left.branchAssignments) ? left.branchAssignments : [];
+  const rightAssignments = Array.isArray(right.branchAssignments) ? right.branchAssignments : [];
+  const leftPrimary = leftAssignments.find((assignment) => assignment.isPrimary) ?? leftAssignments[0];
+  const rightPrimary = rightAssignments.find((assignment) => assignment.isPrimary) ?? rightAssignments[0];
+  const leftDocs = (left as EmployeeDirectoryWithDocuments).documentSummary?.totalDocuments ?? 0;
+  const rightDocs = (right as EmployeeDirectoryWithDocuments).documentSummary?.totalDocuments ?? 0;
+  const compareText = (a: string, b: string) => a.localeCompare(b, "es");
+
+  if (field === "email") return compareText(left.email, right.email) * factor;
+  if (field === "status") return compareText(left.status, right.status) * factor;
+  if (field === "documents") return (leftDocs - rightDocs) * factor;
+  if (field === "assignments") return ((leftAssignments.length - rightAssignments.length) || compareText(leftPrimary?.branch?.name ?? "", rightPrimary?.branch?.name ?? "")) * factor;
+  return compareText(left.name, right.name) * factor;
 }
 
 async function parseEmployeeFile(file: File, branches: Awaited<ReturnType<typeof fetchBranches>>): Promise<ImportRow[]> {

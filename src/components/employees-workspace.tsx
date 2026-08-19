@@ -194,17 +194,7 @@ export function EmployeesDirectoryPage() {
       status: input.status,
     }),
     onSuccess: async (updated) => {
-      queryClient.setQueryData<EmployeeDirectoryResponse | undefined>(["employees", search, status, branchFilter, page, pageSize], (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          data: current.data.map((employee) => (employee.id === updated.id ? updated : employee)),
-        };
-      });
-      queryClient.setQueriesData<{ employee: EmployeeDirectoryItem } | undefined>({ queryKey: ["employee-detail", updated.id] }, (current) => {
-        if (!current) return current;
-        return { ...current, employee: updated };
-      });
+      setLoadedEmployees((current) => current.map((employee) => (employee.id === updated.id ? updated : employee)));
       toast.success("Empleado actualizado");
       setEditingEmployee(null);
       await queryClient.invalidateQueries({ queryKey: ["employees"] });

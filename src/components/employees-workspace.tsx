@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, FileText, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Trash2, Undo2, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
+import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView, Wizard } from "@/components/design-system";
 import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
@@ -670,19 +671,24 @@ export function EmployeesDirectoryPage() {
 
 export function EmployeeCreatePage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { can } = useAppStore();
   const branches = useQuery({ queryKey: ["employee-import-branches"], queryFn: () => fetchBranches(), enabled: can("employees.create") });
   const [form, setForm] = useState<CreateEmployeeInput>(initialEmployee);
+  const [step, setStep] = useState(0);
   const create = useMutation({
     mutationFn: () => createEmployee(form),
-    onSuccess: async () => {
+    onSuccess: async (employee) => {
       toast.success("Empleado agregado al directorio");
       setForm(initialEmployee);
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      router.push(`/employees/${employee.id}`);
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible crear el empleado.")),
   });
   const valid = form.name.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(form.email) && Boolean(form.primaryBranchId) && form.primaryRole.trim().length >= 2;
+  const basicValid = form.name.trim().length >= 2 && /^\S+@\S+\.\S+$/.test(form.email);
+  const employmentValid = Boolean(form.primaryBranchId) && form.primaryRole.trim().length >= 2;
   const activeBranches = branches.data?.filter((branch) => branch.status === "active") ?? [];
 
   return (
@@ -732,50 +738,21 @@ export function EmployeeCreatePage() {
               className="mt-5 space-y-4"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (step < 2) {
+                  if ((step === 0 && basicValid) || (step === 1 && employmentValid)) setStep((current) => current + 1);
+                  return;
+                }
                 if (valid) create.mutate();
               }}
             >
-              <FormField id="employee-name" label="Nombre completo" required>
-                {(field) => <Input {...field} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}
-              </FormField>
-              <FormField id="employee-email" label="Correo electrónico" description="Usaremos este correo como dato de contacto y para trazabilidad interna." required>
-                {(field) => <Input {...field} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}
-              </FormField>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField id="employee-branch" label="Sucursal principal" required>
-                  {(field) => (
-                    <Select value={form.primaryBranchId} onValueChange={(primaryBranchId) => setForm({ ...form, primaryBranchId })}>
-                      <SelectTrigger {...field}>
-                        <SelectValue placeholder="Selecciona una sucursal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </FormField>
-                <FormField id="employee-role" label="Cargo o función" required>
-                  {(field) => <Input {...field} placeholder="Ej. Supervisor de tienda" value={form.primaryRole} onChange={(event) => setForm({ ...form, primaryRole: event.target.value })} />}
-                </FormField>
-              </div>
-              <FormField id="employee-status" label="Estado inicial" description="Por defecto queda activo si la persona ya trabaja contigo.">
-                {(field) => (
-                  <Select value={form.status ?? "ACTIVE"} onValueChange={(status) => setForm({ ...form, status: status as EmployeeStatus })}>
-                    <SelectTrigger {...field}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ACTIVE">Activo</SelectItem>
-                      <SelectItem value="INACTIVE">Inactivo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </FormField>
+              <Wizard steps={["Datos básicos", "Relación laboral", "Revisar"]} current={step} onStepChange={setStep}>
+                {step === 0 ? <div className="space-y-4"><FormField id="employee-name" label="Nombre legal" required>{(field) => <Input {...field} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}</FormField><FormField id="employee-email" label="Correo electrónico" description="Este correo se usará para contacto y trazabilidad interna." required>{(field) => <Input {...field} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</FormField><InlineFeedback tone="info" title="Datos personales adicionales">Teléfono, dirección, nombre preferido y fecha de nacimiento se habilitarán cuando estén disponibles en el contrato seguro del empleado.</InlineFeedback></div> : null}
+                {step === 1 ? <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><FormField id="employee-branch" label="Sucursal principal" required>{(field) => <Select value={form.primaryBranchId} onValueChange={(primaryBranchId) => setForm({ ...form, primaryBranchId })}><SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger><SelectContent>{activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}</FormField><FormField id="employee-role" label="Cargo o función" required>{(field) => <Input {...field} placeholder="Ej. Supervisor de tienda" value={form.primaryRole} onChange={(event) => setForm({ ...form, primaryRole: event.target.value })} />}</FormField></div><FormField id="employee-status" label="Estado inicial">{(field) => <Select value={form.status ?? "ACTIVE"} onValueChange={(status) => setForm({ ...form, status: status as EmployeeStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACTIVE">Activo</SelectItem><SelectItem value="INACTIVE">Inactivo</SelectItem></SelectContent></Select>}</FormField></div> : null}
+                {step === 2 ? <div className="space-y-4"><InlineFeedback tone="success" title="Revisa antes de crear">El expediente se creará con los datos que se muestran a continuación.</InlineFeedback><dl className="grid gap-4 rounded-2xl border border-border-default p-4 sm:grid-cols-2"><ReviewDatum label="Nombre" value={form.name} /><ReviewDatum label="Correo" value={form.email} /><ReviewDatum label="Sucursal" value={activeBranches.find((branch) => branch.id === form.primaryBranchId)?.name ?? "Sin seleccionar"} /><ReviewDatum label="Cargo" value={form.primaryRole} /><ReviewDatum label="Estado" value={form.status === "INACTIVE" ? "Inactivo" : "Activo"} /></dl></div> : null}
+              </Wizard>
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                <Button asChild type="button" variant="secondary">
-                  <Link href="/employees">Cancelar</Link>
-                </Button>
-                <Button type="submit" disabled={!valid || create.isPending}>{create.isPending ? "Guardando..." : "Registrar empleado"}</Button>
+                {step === 0 ? <Button asChild type="button" variant="secondary"><Link href="/employees">Cancelar</Link></Button> : <Button type="button" variant="secondary" onClick={() => setStep((current) => current - 1)}>Anterior</Button>}
+                <Button type="submit" disabled={create.isPending || (step === 0 && !basicValid) || (step === 1 && !employmentValid) || (step === 2 && !valid)}>{step < 2 ? "Continuar" : create.isPending ? "Creando..." : "Crear empleado"}</Button>
               </div>
             </form>
           </CardContent>
@@ -850,6 +827,10 @@ function HiringStep({ current = false, description, number, title }: { current?:
       <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
     </li>
   );
+}
+
+function ReviewDatum({ label, value }: { label: string; value: string }) {
+  return <div><dt className="text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</dt><dd className="mt-1 font-medium">{value || "Sin definir"}</dd></div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -1096,7 +1077,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
                 </button>
               ) : null}
               <UsersRound className="size-4 text-primary" />
-              <h2 className="truncate font-semibold">{employee.name}</h2>
+              <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-primary hover:underline">{employee.name}</Link>
             </div>
             <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
           </div>
@@ -1144,7 +1125,7 @@ function EmployeeRow({ employee, compact = false, selected = false, onToggleSele
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <UsersRound className="size-4 shrink-0 text-primary" />
-          <p className="truncate font-semibold">{employee.name}</p>
+          <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-primary hover:underline">{employee.name}</Link>
         </div>
         <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
       </div>

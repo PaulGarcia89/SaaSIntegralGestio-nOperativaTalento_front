@@ -1642,8 +1642,21 @@ export type EmployeeDirectoryItem = {
   name: string;
   email: string;
   status: string;
+  jobTitle?: string | null;
+  recordSource?: string;
   branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
   documentSummary?: { totalDocuments: number };
+};
+
+export type EmployeeHistoryResponse = {
+  employeeId: string;
+  name: string;
+  email: string;
+  status: string;
+  jobTitle?: string | null;
+  assignments: Array<{ id: string; branchId: string; role: string; isPrimary: boolean; active: boolean; assignedAt: string; unassignedAt?: string | null; branch: { id: string; name: string } }>;
+  documents: Array<{ id: string; originalName: string; status: string; updatedAt: string }>;
+  auditTrail: Array<{ id: string; action: string; email?: string | null; actorRole?: string | null; createdAt: string }>;
 };
 
 type EmployeeApiItem = Omit<EmployeeDirectoryItem, "branchAssignments"> & {
@@ -1776,11 +1789,14 @@ export function restoreEmployee(id: string) {
 }
 
 export function fetchEmployeeDetail(id: string) {
-  return request<{
-    employee: EmployeeDirectoryItem;
-    documents: Array<{ id: string; title: string; status: string; updatedAt: string }>;
-    history: Array<{ id: string; title: string; detail: string; at: string }>;
-  }>(`/employees/${encodeURIComponent(id)}`).catch(async (error) => {
+  return Promise.all([
+    request<EmployeeApiItem>(`/employees/${encodeURIComponent(id)}`).then(normalizeEmployeeDirectoryItem),
+    request<EmployeeHistoryResponse>(`/employees/${encodeURIComponent(id)}/history`),
+  ]).then(([employee, history]) => ({
+    employee,
+    documents: history.documents.map((document) => ({ id: document.id, title: document.originalName, status: document.status, updatedAt: document.updatedAt })),
+    history: history.auditTrail.map((entry) => ({ id: entry.id, title: entry.action, detail: entry.email ?? entry.actorRole ?? "Actualización registrada", at: entry.createdAt })),
+  })).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;
     return fetchMockEmployeeDetail(id);
   });

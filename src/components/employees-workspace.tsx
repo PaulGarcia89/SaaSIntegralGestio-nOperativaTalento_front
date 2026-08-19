@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
+import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -186,14 +186,15 @@ export function EmployeesDirectoryPage() {
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aplicar la acción masiva.")),
   });
   const editEmployee = useMutation({
-    mutationFn: (input: NonNullable<EmployeeEditorState>) => updateEmployee(input.id, {
-      name: input.name,
-      email: input.email,
-      jobTitle: input.primaryRole,
-      primaryBranchId: input.primaryBranchId,
-      primaryRole: input.primaryRole,
-      status: input.status,
-    }),
+    mutationFn: async (input: NonNullable<EmployeeEditorState>) => {
+      await updateEmployee(input.id, {
+        name: input.name,
+        email: input.email,
+        jobTitle: input.primaryRole,
+        status: input.status,
+      });
+      return transferEmployee(input.id, { branchId: input.primaryBranchId, role: input.primaryRole });
+    },
     onSuccess: async (updated) => {
       setLoadedEmployees((current) => current.map((employee) => (employee.id === updated.id ? updated : employee)));
       toast.success("Empleado actualizado");

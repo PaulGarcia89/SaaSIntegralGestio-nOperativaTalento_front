@@ -1664,8 +1664,6 @@ export type UpdateEmployeeInput = {
   name: string;
   email: string;
   jobTitle?: string;
-  primaryBranchId?: string;
-  primaryRole?: string;
   status?: "ACTIVE" | "INACTIVE" | "TERMINATED";
 };
 

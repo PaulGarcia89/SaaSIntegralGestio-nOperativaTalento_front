@@ -34,8 +34,8 @@ const initialStages = (): VacancyStageDto[] => [
 ];
 interface VacancyDraft { form: CreateVacancyInput; stages: VacancyStageDto[]; responsibles: VacancyResponsibleDto[] }
 function toVacancyStageInput(stage: VacancyStageDto): VacancyStageInput {
-  const { code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours } = stage;
-  return { code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours };
+  const { code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours, slaWarningHoursBefore, slaEscalationHours, autoReassignAfterHours } = stage;
+  return { code, name, position, color, applicationStatus, isTerminal, allowedNextStageCodes, requiredFields, requiresApproval, requiredApprovals, allowReopen, slaHours, slaWarningHoursBefore, slaEscalationHours, autoReassignAfterHours };
 }
 
 export function VacanciesPage({ editId }: { editId?: string }) {

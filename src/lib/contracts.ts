@@ -1620,12 +1620,13 @@ export interface VacancyStageDto {
   autoReassignAfterHours?: number | null;
 }
 
-// Read responses can include persistence metadata; vacancy writes must only use these fields.
+// Read responses can include persistence metadata; vacancy writes must only use editable fields.
 export type VacancyStageInput = Pick<
   VacancyStageDto,
-  "id" | "code" | "name" | "position" | "color" | "applicationStatus" | "isTerminal" |
+  "code" | "name" | "position" | "color" | "applicationStatus" | "isTerminal" |
   "allowedNextStageCodes" | "requiredFields" | "requiresApproval" | "requiredApprovals" |
-  "allowReopen" | "slaHours"
+  "allowReopen" | "slaHours" | "slaWarningHoursBefore" | "slaEscalationHours" |
+  "autoReassignAfterHours"
 >;
 
 export interface ApplicationStageTransitionRequestDto {

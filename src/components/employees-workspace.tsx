@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, assignEmployeeBranches, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
+import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -194,7 +194,7 @@ export function EmployeesDirectoryPage() {
         status: input.status,
       });
       if (!input.initialPrimaryBranchId) {
-        return assignEmployeeBranches(input.id, [input.primaryBranchId], input.primaryBranchId, input.primaryRole);
+        return assignEmployeePrimaryBranch(input.id, input.primaryBranchId, input.primaryRole);
       }
       if (input.primaryBranchId !== input.initialPrimaryBranchId) {
         return transferEmployee(input.id, { branchId: input.primaryBranchId, role: input.primaryRole });

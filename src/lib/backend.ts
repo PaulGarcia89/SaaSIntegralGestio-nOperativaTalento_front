@@ -1762,13 +1762,13 @@ export function updateEmployeeRole(id: string, primaryRole: string) {
   });
 }
 
-export function assignEmployeeBranches(id: string, branchIds: string[], primaryBranchId?: string, primaryRole?: string) {
-  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/branches`, {
-    method: "PUT",
-    body: JSON.stringify({ branchIds, primaryBranchId, primaryRole }),
+export function assignEmployeePrimaryBranch(id: string, branchId: string, role: string) {
+  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/assignments`, {
+    method: "POST",
+    body: JSON.stringify({ branchId, role }),
   }).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;
-    return assignMockEmployeeBranches(id, branchIds, primaryBranchId, primaryRole);
+    return assignMockEmployeeBranches(id, [branchId], branchId, role);
   });
 }
 

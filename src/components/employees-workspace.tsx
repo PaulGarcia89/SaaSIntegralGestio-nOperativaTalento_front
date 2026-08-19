@@ -121,7 +121,7 @@ export function EmployeeCreatePage() {
       <PageHeader
         eyebrow="Personas"
         title="Agregar empleado"
-        description="Crea el perfil laboral de una persona que ya trabaja en tu empresa."
+        description="Registra la oferta aceptada y prepara el alta laboral sin volver a pedir información ya evaluada."
         actions={
           <Button asChild type="button" variant="secondary">
             <Link href="/employees">
@@ -131,10 +131,28 @@ export function EmployeeCreatePage() {
           </Button>
         }
       />
+      <section aria-labelledby="employee-hiring-flow" className="rounded-2xl border border-border-default bg-surface-section p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="employee-hiring-flow" className="font-semibold">Ruta de contratación</h2>
+            <p className="mt-1 text-sm text-text-secondary">Solicita cada dato una sola vez, en el momento en que aporta valor.</p>
+          </div>
+          <Badge variant="outline">Etapa actual: Oferta</Badge>
+        </div>
+        <ol className="mt-5 grid gap-3 md:grid-cols-4">
+          <HiringStep number="1" title="Postulación" description="Nombre, email, teléfono, ciudad, CV, experiencia o certificación esencial y consentimiento." />
+          <HiringStep number="2" title="Entrevista" description="Evaluación de competencias, disponibilidad y evidencia relevante para el cargo." />
+          <HiringStep current number="3" title="Oferta" description="Aquí: datos de contacto, sucursal, cargo y estado inicial del nuevo empleado." />
+          <HiringStep number="4" title="Documentos" description="Después de aceptar: I-9, W-4, SSN/ITIN, nómina, identidad y verificaciones." />
+        </ol>
+      </section>
       <Card level={2}>
         <CardContent className="p-6">
+          <InlineFeedback tone="info" title="Solo datos necesarios para esta etapa">
+            No solicites aquí documentos de identidad, información fiscal, nómina ni verificaciones. Se pedirán de forma segura en Documentos de contratación después de la oferta.
+          </InlineFeedback>
           <form
-            className="space-y-4"
+            className="mt-5 space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
               if (valid) create.mutate();
@@ -143,7 +161,7 @@ export function EmployeeCreatePage() {
             <FormField id="employee-name" label="Nombre completo" required>
               {(field) => <Input {...field} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}
             </FormField>
-            <FormField id="employee-email" label="Correo corporativo" required>
+            <FormField id="employee-email" label="Correo electrónico" description="Usaremos este correo para enviar la oferta y los próximos pasos." required>
               {(field) => <Input {...field} type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -186,6 +204,16 @@ export function EmployeeCreatePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function HiringStep({ current = false, description, number, title }: { current?: boolean; description: string; number: string; title: string }) {
+  return (
+    <li className={current ? "rounded-xl border border-primary/30 bg-primary/5 p-4" : "rounded-xl border border-border-default bg-surface-elevated p-4"}>
+      <span className={current ? "text-xs font-semibold text-primary" : "text-xs font-semibold text-text-secondary"}>Paso {number}</span>
+      <p className="mt-1 font-medium">{title}</p>
+      <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
+    </li>
   );
 }
 

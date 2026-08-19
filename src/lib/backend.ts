@@ -2528,8 +2528,20 @@ async function candidateRequest<T>(path: string, init: RequestInit & { responseT
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...fetchInit, headers, credentials: "include" });
   if (!response.ok) {
     const payload = await readJsonSafe(response);
-    const message = typeof payload === "object" && payload && "message" in payload ? String(payload.message) : `Error ${response.status}`;
-    throw new ApiError(message, response.status);
+    const nestedError =
+      typeof payload === "object" &&
+      payload &&
+      "error" in payload &&
+      typeof (payload as { error?: unknown }).error === "object" &&
+      (payload as { error?: unknown }).error !== null
+        ? (payload as { error: { message?: string; code?: string; details?: unknown } }).error
+        : null;
+    const message = nestedError?.message
+      ? String(nestedError.message)
+      : typeof payload === "object" && payload && "message" in payload
+        ? String((payload as { message?: unknown }).message)
+        : `Error ${response.status}`;
+    throw new ApiError(message, response.status, nestedError?.code, nestedError?.details);
   }
   return (responseType === "blob" ? response.blob() : response.json()) as Promise<T>;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, ChevronRight, Download, FilePenLine, FileSpreadsheet, FileText, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Trash2, Undo2, Upload, UserPlus, UsersRound } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, FileText, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Trash2, Undo2, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView } from "@/components/design-system";
-import { ApiError, assignEmployeeBranches, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateEmployeeRole, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
+import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
@@ -22,7 +22,6 @@ type EmployeeStatus = NonNullable<CreateEmployeeInput["status"]>;
 type ImportRow = CreateEmployeeInput & { row: number; branchLabel: string; errors: string[] };
 type EmployeeEditorState = { id: string; name: string; email: string; status: EmployeeStatus; primaryBranchId: string; primaryRole: string } | null;
 type EmployeeWithSoftDelete = EmployeeDirectoryItem & { deletedAt?: string | null };
-type EmployeeQuickAction = { employee: EmployeeDirectoryItem; mode: "branch" | "role"; primaryBranchId: string; primaryRole: string } | null;
 type EmployeeStatusFilter = "all" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "DELETED";
 
 const initialEmployee: CreateEmployeeInput = { name: "", email: "", primaryBranchId: "", primaryRole: "", status: "ACTIVE" };
@@ -53,10 +52,9 @@ export function EmployeesDirectoryPage() {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeEditorState>(null);
   const [deletingEmployee, setDeletingEmployee] = useState<EmployeeWithSoftDelete | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<EmployeeDirectoryItem | null>(null);
-  const [detailTab, setDetailTab] = useState<"activity" | "documents" | "branches">("activity");
-  const [detailBranchIds, setDetailBranchIds] = useState<string[]>([]);
-  const [quickAction, setQuickAction] = useState<EmployeeQuickAction>(null);
+  const [detailTab, setDetailTab] = useState<"activity" | "documents">("activity");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const editBranches = useQuery({ queryKey: ["employee-edit-branches"], queryFn: () => fetchBranches(), enabled: can("employees.update") });
   const employees = useQuery({
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status: status === "all" ? undefined : status, branchId: branchFilter || undefined, page, pageSize }),
@@ -192,6 +190,8 @@ export function EmployeesDirectoryPage() {
       name: input.name,
       email: input.email,
       jobTitle: input.primaryRole,
+      primaryBranchId: input.primaryBranchId,
+      primaryRole: input.primaryRole,
       status: input.status,
     }),
     onSuccess: async (updated) => {
@@ -229,35 +229,7 @@ export function EmployeesDirectoryPage() {
   useEffect(() => {
     if (!detailEmployee) return;
     setDetailTab("activity");
-    setDetailBranchIds(Array.isArray(detailEmployee.branchAssignments) ? detailEmployee.branchAssignments.map((assignment) => assignment.branch.id) : []);
   }, [detailEmployee]);
-  const branchReassign = useMutation({
-    mutationFn: (input: { id: string; branchIds: string[]; primaryRole: string }) => assignEmployeeBranches(input.id, input.branchIds, input.branchIds[0], input.primaryRole),
-    onSuccess: async () => {
-      toast.success("Sucursales actualizadas");
-      await employees.refetch();
-      await detailQuery.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible reasignar sucursales.")),
-  });
-  const quickTransfer = useMutation({
-    mutationFn: (input: { id: string; branchId: string; role?: string }) => transferEmployee(input.id, { branchId: input.branchId, role: input.role }),
-    onSuccess: async () => {
-      toast.success("Sucursal actualizada");
-      setQuickAction(null);
-      await employees.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar la sucursal.")),
-  });
-  const quickRole = useMutation({
-    mutationFn: (input: { id: string; primaryRole: string }) => updateEmployeeRole(input.id, input.primaryRole),
-    onSuccess: async () => {
-      toast.success("Cargo actualizado");
-      setQuickAction(null);
-      await employees.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar el cargo.")),
-  });
   const exportName = buildEmployeesExportName({ branchName: branchFilter ? tenantBranches.find((branch) => branch.id === branchFilter)?.name : currentBranch?.name, status: status === "all" ? "" : status, pageSize, page });
 
   return (
@@ -520,12 +492,7 @@ export function EmployeesDirectoryPage() {
                     compact={index >= 10}
                     selected={selectedIds.includes(employee.id)}
                     onToggleSelect={() => toggleSelection(employee.id)}
-                    onView={() => setDetailEmployee(employee)}
                     onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))}
-                    onQuickBranch={() => setQuickAction({ employee, mode: "branch", primaryBranchId: primaryBranchIdOf(employee), primaryRole: primaryRoleOf(employee) })}
-                    onQuickRole={() => setQuickAction({ employee, mode: "role", primaryBranchId: primaryBranchIdOf(employee), primaryRole: primaryRoleOf(employee) })}
-                    onToggleStatus={() => setEditingEmployee({ ...buildEmployeeEditorState(employee)!, status: employee.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}
-                    onDelete={() => setDeletingEmployee(employee)}
                   />
                 ))}
               </div>
@@ -536,8 +503,8 @@ export function EmployeesDirectoryPage() {
         <ResponsiveDataView
           data={sortedData}
           getKey={(employee) => employee.id}
-          desktop={<div className="grid gap-3 lg:grid-cols-2">{sortedData.map((employee) => <EmployeeCard key={employee.id} employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onView={() => setDetailEmployee(employee)} onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))} onQuickBranch={() => setQuickAction({ employee, mode: "branch", primaryBranchId: primaryBranchIdOf(employee), primaryRole: primaryRoleOf(employee) })} onQuickRole={() => setQuickAction({ employee, mode: "role", primaryBranchId: primaryBranchIdOf(employee), primaryRole: primaryRoleOf(employee) })} onToggleStatus={() => setEditingEmployee({ ...buildEmployeeEditorState(employee)!, status: employee.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })} onDelete={() => setDeletingEmployee(employee as EmployeeWithSoftDelete)} />)}</div>}
-          mobile={(employee) => <EmployeeCard employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onView={() => setDetailEmployee(employee)} onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))} onQuickBranch={() => setQuickAction({ employee, mode: "branch", primaryBranchId: primaryBranchIdOf(employee), primaryRole: primaryRoleOf(employee) })} onQuickRole={() => setQuickAction({ employee, mode: "role", primaryBranchId: primaryBranchIdOf(employee), primaryRole: primaryRoleOf(employee) })} onToggleStatus={() => setEditingEmployee({ ...buildEmployeeEditorState(employee)!, status: employee.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })} onDelete={() => setDeletingEmployee(employee as EmployeeWithSoftDelete)} />}
+          desktop={<div className="grid gap-3 lg:grid-cols-2">{sortedData.map((employee) => <EmployeeCard key={employee.id} employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))} />)}</div>}
+          mobile={(employee) => <EmployeeCard employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))} />}
           empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
         />
       )}
@@ -554,7 +521,7 @@ export function EmployeesDirectoryPage() {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Editar empleado</DialogTitle>
-            <DialogDescription>Actualiza sucursal, cargo y estado del expediente.</DialogDescription>
+            <DialogDescription>Actualiza nombre, correo, sucursal principal, cargo y estado del expediente.</DialogDescription>
           </DialogHeader>
           {editingEmployee ? (
             <div className="grid gap-4">
@@ -567,9 +534,16 @@ export function EmployeesDirectoryPage() {
               <FormField id="employee-edit-role" label="Cargo o función" required>
                 {(field) => <Input {...field} value={editingEmployee.primaryRole} onChange={(event) => setEditingEmployee({ ...editingEmployee, primaryRole: event.target.value })} />}
               </FormField>
-              <p className="text-xs text-text-secondary">
-                La sucursal principal se gestiona desde la acción rápida o el detalle del expediente.
-              </p>
+              <FormField id="employee-edit-branch" label="Sucursal principal" required>
+                {(field) => (
+                  <Select value={editingEmployee.primaryBranchId} onValueChange={(value) => setEditingEmployee({ ...editingEmployee, primaryBranchId: value })}>
+                    <SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger>
+                    <SelectContent>
+                      {(editBranches.data ?? tenantBranches).map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+              </FormField>
               <FormField id="employee-edit-status" label="Estado">
                 {(field) => (
                   <Select value={editingEmployee.status} onValueChange={(value) => setEditingEmployee({ ...editingEmployee, status: value as EmployeeStatus })}>
@@ -590,7 +564,7 @@ export function EmployeesDirectoryPage() {
           </div>
         </DialogContent>
       </Dialog>
-  <Dialog open={Boolean(detailEmployee)} onOpenChange={(open) => !open && setDetailEmployee(null)}>
+      <Dialog open={Boolean(detailEmployee)} onOpenChange={(open) => !open && setDetailEmployee(null)}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Detalle del empleado</DialogTitle>
@@ -603,14 +577,13 @@ export function EmployeesDirectoryPage() {
                 <Summary label="Empleado" value={detailQuery.data.employee.name} />
                 <Summary label="Correo" value={detailQuery.data.employee.email} />
                 <Summary label="Estado" value={(detailQuery.data.employee as EmployeeWithSoftDelete).deletedAt ? "Eliminado" : detailQuery.data.employee.status} />
-                <Summary label="Sucursal" value={primaryBranchName(detailQuery.data.employee)} />
-                <Summary label="Cargo" value={primaryRoleName(detailQuery.data.employee)} />
+                <Summary label="Sucursal" value={(detailQuery.data.employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? detailQuery.data.employee.branchAssignments[0])?.branch.name ?? "Sin nombre"} />
+                <Summary label="Cargo" value={(detailQuery.data.employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? detailQuery.data.employee.branchAssignments[0])?.role ?? "Sin asignación"} />
                 <Summary label="Asignaciones" value={String(detailQuery.data.employee.branchAssignments.length)} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant={detailTab === "activity" ? "default" : "secondary"} onClick={() => setDetailTab("activity")}>Actividad</Button>
                 <Button type="button" variant={detailTab === "documents" ? "default" : "secondary"} onClick={() => setDetailTab("documents")}>Documentos</Button>
-                <Button type="button" variant={detailTab === "branches" ? "default" : "secondary"} onClick={() => setDetailTab("branches")}>Sucursales</Button>
               </div>
               {detailTab === "activity" ? (
                 <section className="rounded-2xl border border-border-default p-4">
@@ -657,90 +630,8 @@ export function EmployeesDirectoryPage() {
                   </div>
                 </section>
               ) : null}
-              {detailTab === "branches" ? (
-                <section className="rounded-2xl border border-border-default p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold">Reasignación múltiple</h3>
-                    <Badge variant="secondary">{detailBranchIds.length} sucursales</Badge>
-                  </div>
-                  <div className="mt-3 grid gap-2">
-                    {tenantBranches.map((branch) => {
-                      const checked = detailBranchIds.includes(branch.id);
-                      return (
-                        <button
-                          key={branch.id}
-                          type="button"
-                          className={cn("flex items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition", checked ? "border-primary bg-primary/5" : "border-border-default bg-surface-elevated")}
-                          onClick={() => setDetailBranchIds((current) => checked ? current.filter((id) => id !== branch.id) : [...current, branch.id])}
-                        >
-                          <span>
-                            <span className="block font-medium">{branch.name}</span>
-                            <span className="block text-xs text-text-secondary">{branch.city}</span>
-                          </span>
-                          <span className="text-xs font-semibold">{checked ? "Asignada" : "Agregar"}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      type="button"
-                      disabled={!detailQuery.data || !detailBranchIds.length || branchReassign.isPending}
-                      onClick={() => detailQuery.data && branchReassign.mutate({ id: detailQuery.data.employee.id, branchIds: detailBranchIds, primaryRole: primaryRoleOf(detailQuery.data.employee) })}
-                    >
-                      {branchReassign.isPending ? "Guardando..." : "Guardar sucursales"}
-                    </Button>
-                  </div>
-                </section>
-              ) : null}
             </div>
           ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={Boolean(quickAction)} onOpenChange={(open) => !open && setQuickAction(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{quickAction?.mode === "branch" ? "Cambiar sucursal" : "Cambiar cargo"}</DialogTitle>
-            <DialogDescription>{quickAction?.mode === "branch" ? "Actualiza la sede sin abrir el formulario completo." : "Actualiza el cargo sin modificar el resto del expediente."}</DialogDescription>
-          </DialogHeader>
-          {quickAction ? (
-            <div className="grid gap-4">
-              <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
-                <p className="font-medium">{quickAction.employee.name}</p>
-                <p className="text-sm text-text-secondary">{primaryBranchName(quickAction.employee)} · {primaryRoleName(quickAction.employee)}</p>
-              </div>
-              {quickAction.mode === "branch" ? (
-                <FormField id="quick-branch" label="Nueva sucursal" required>
-                  {(field) => (
-                    <Select value={quickAction.primaryBranchId} onValueChange={(primaryBranchId) => setQuickAction({ ...quickAction, primaryBranchId })}>
-                      <SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger>
-                      <SelectContent>{tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )}
-                </FormField>
-              ) : (
-                <FormField id="quick-role" label="Nuevo cargo" required>
-                  {(field) => <Input {...field} value={quickAction.primaryRole} onChange={(event) => setQuickAction({ ...quickAction, primaryRole: event.target.value })} />}
-                </FormField>
-              )}
-            </div>
-          ) : null}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setQuickAction(null)}>Cancelar</Button>
-            <Button
-              disabled={!quickAction || (quickAction.mode === "branch" ? !quickAction.primaryBranchId : quickAction.primaryRole.trim().length < 2)}
-              onClick={() => {
-                if (!quickAction) return;
-                if (quickAction.mode === "branch") {
-                  quickTransfer.mutate({ id: quickAction.employee.id, branchId: quickAction.primaryBranchId, role: quickAction.primaryRole });
-                } else {
-                  quickRole.mutate({ id: quickAction.employee.id, primaryRole: quickAction.primaryRole });
-                }
-              }}
-            >
-              {quickAction?.mode === "branch" ? (quickTransfer.isPending ? "Actualizando..." : "Actualizar sucursal") : quickRole.isPending ? "Actualizando..." : "Actualizar cargo"}
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={Boolean(deletingEmployee)} onOpenChange={(open) => !open && setDeletingEmployee(null)}>
@@ -1177,7 +1068,7 @@ export function EmployeeImportPage() {
   );
 }
 
-function EmployeeCard({ employee, selected = false, onToggleSelect, onView, onEdit, onQuickBranch, onQuickRole, onToggleStatus, onDelete }: { employee: EmployeeDirectoryItem; selected?: boolean; onToggleSelect?: () => void; onView?: () => void; onEdit?: () => void; onQuickBranch?: () => void; onQuickRole?: () => void; onToggleStatus?: () => void; onDelete?: () => void }) {
+function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { employee: EmployeeDirectoryItem; selected?: boolean; onToggleSelect?: () => void; onEdit?: () => void }) {
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
   const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
@@ -1232,7 +1123,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onView, onEd
   );
 }
 
-function EmployeeRow({ employee, compact = false, selected = false, onToggleSelect, onView, onEdit, onQuickBranch, onQuickRole, onToggleStatus, onDelete }: { employee: EmployeeDirectoryItem; compact?: boolean; selected?: boolean; onToggleSelect?: () => void; onView?: () => void; onEdit?: () => void; onQuickBranch?: () => void; onQuickRole?: () => void; onToggleStatus?: () => void; onDelete?: () => void }) {
+function EmployeeRow({ employee, compact = false, selected = false, onToggleSelect, onEdit }: { employee: EmployeeDirectoryItem; compact?: boolean; selected?: boolean; onToggleSelect?: () => void; onEdit?: () => void }) {
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
   const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
@@ -1262,10 +1153,7 @@ function EmployeeRow({ employee, compact = false, selected = false, onToggleSele
       <div className="text-sm text-text-secondary">{activeAssignments.length} asignación{activeAssignments.length === 1 ? "" : "es"}</div>
       <div className="flex items-center justify-between gap-3 md:justify-end">
         <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
-        <div className="hidden items-center gap-1 md:flex">
-          {onEdit ? <Button type="button" size="icon" variant="ghost" onClick={onEdit} aria-label={`Editar ${employee.name}`}><FilePenLine className="size-4" /></Button> : null}
-          <ChevronRight className="size-4 shrink-0 text-text-secondary" />
-        </div>
+        <div className="hidden items-center gap-1 md:flex">{onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}>Editar</Button> : null}</div>
       </div>
     </div>
   );
@@ -1316,18 +1204,9 @@ function primaryBranchIdOf(employee: EmployeeDirectoryItem) {
   return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.branch.id ?? "";
 }
 
-function primaryBranchName(employee: EmployeeDirectoryItem) {
-  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
-  return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.branch.name ?? "Sin nombre";
-}
-
 function primaryRoleOf(employee: EmployeeDirectoryItem) {
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.role ?? "";
-}
-
-function primaryRoleName(employee: EmployeeDirectoryItem) {
-  return primaryRoleOf(employee) || "Sin asignación";
 }
 
 async function copySelectedEmails(data: EmployeeDirectoryItem[], selectedIds: string[]) {

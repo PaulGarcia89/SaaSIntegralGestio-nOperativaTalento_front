@@ -448,8 +448,9 @@ export async function bulkCreateEmployees(employees: Array<{ name: string; email
   return { created: createdEmployees.length, employees: createdEmployees.map((employee) => ({ id: employee.id, email: employee.email })) };
 }
 
-export async function updateEmployee(id: string, input: { name: string; email: string; jobTitle?: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED" }) {
+export async function updateEmployee(id: string, input: { name: string; email: string; jobTitle?: string; primaryBranchId?: string; primaryRole?: string; status?: "ACTIVE" | "INACTIVE" | "TERMINATED" }) {
   await wait();
+  const branch = input.primaryBranchId ? branchesDb.find((item) => item.id === input.primaryBranchId) : undefined;
   employeesDb = employeesDb.map((employee) =>
     employee.id === id
       ? {
@@ -457,9 +458,14 @@ export async function updateEmployee(id: string, input: { name: string; email: s
           name: input.name.trim(),
           email: input.email.trim().toLowerCase(),
           jobTitle: input.jobTitle?.trim() || employee.jobTitle,
-          branchAssignments: input.jobTitle
-            ? employee.branchAssignments.map((assignment) => (assignment.isPrimary ? { ...assignment, role: input.jobTitle?.trim() || assignment.role } : assignment))
-            : employee.branchAssignments,
+          branchAssignments: employee.branchAssignments.map((assignment) => {
+            if (!assignment.isPrimary) return assignment;
+            return {
+              ...assignment,
+              role: input.primaryRole?.trim() || input.jobTitle?.trim() || assignment.role,
+              branch: branch ? { id: branch.id, name: branch.name } : assignment.branch,
+            };
+          }),
           status: input.status ?? employee.status,
         }
       : employee,

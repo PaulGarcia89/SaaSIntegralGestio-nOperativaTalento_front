@@ -110,6 +110,7 @@ type EmployeeRecord = {
   name: string;
   email: string;
   status: "ACTIVE" | "INACTIVE" | "TERMINATED";
+  deletedAt?: string | null;
   branchAssignments: Array<{ id: string; role: string; isPrimary: boolean; branch: { id: string; name: string } }>;
   documentSummary?: { totalDocuments: number };
 };
@@ -120,6 +121,7 @@ let employeesDb: EmployeeRecord[] = [
     name: "Paul Garcia",
     email: "datalinkprotech@gmail.com",
     status: "ACTIVE",
+    deletedAt: null,
     branchAssignments: [
       { id: "emp-1-a1", role: "Administrador de empresa", isPrimary: true, branch: { id: "branch-1", name: "Sede principal de Miami" } },
     ],
@@ -130,6 +132,7 @@ let employeesDb: EmployeeRecord[] = [
     name: "Luis Sosa",
     email: "luissosa@lessa.com",
     status: "ACTIVE",
+    deletedAt: null,
     branchAssignments: [
       { id: "emp-2-a1", role: "Supervisor", isPrimary: true, branch: { id: "branch-1b", name: "Centro operativo de Orlando" } },
     ],
@@ -388,6 +391,7 @@ function mapEmployeeFromInput(input: { name: string; email: string; status?: "AC
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     status: input.status ?? "ACTIVE",
+    deletedAt: null,
     branchAssignments: [{ id: makeId("emp-asg"), role: input.primaryRole.trim(), isPrimary: true, branch: { id: branch.id, name: branch.name } }],
   };
 }
@@ -411,8 +415,9 @@ export async function fetchEmployees(input: { search?: string; status?: string; 
   const search = (input.search ?? "").trim().toLowerCase();
   const filtered = employeesDb.filter((employee) => {
     const primary = employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? employee.branchAssignments[0];
+    const matchesDeleted = input.status === "DELETED" ? Boolean(employee.deletedAt) : !employee.deletedAt;
     const matchesSearch = !search || employee.name.toLowerCase().includes(search) || employee.email.toLowerCase().includes(search);
-    const matchesStatus = !input.status || employee.status === input.status;
+    const matchesStatus = !input.status || (input.status === "DELETED" ? matchesDeleted : employee.status === input.status);
     const matchesBranch = !input.branchId || primary?.branch.id === input.branchId;
     return matchesSearch && matchesStatus && matchesBranch;
   });
@@ -449,8 +454,94 @@ export async function updateEmployee(id: string, input: { name: string; email: s
 
 export async function deleteEmployee(id: string) {
   await wait();
-  employeesDb = employeesDb.filter((employee) => employee.id !== id);
-  return { id };
+  const timestamp = new Date().toISOString();
+  employeesDb = employeesDb.map((employee) => (employee.id === id ? { ...employee, status: "TERMINATED", deletedAt: timestamp } : employee));
+  const deleted = employeesDb.find((employee) => employee.id === id);
+  if (!deleted) throw new Error("Empleado no encontrado");
+  return deleted;
+}
+
+export async function restoreEmployee(id: string) {
+  await wait();
+  employeesDb = employeesDb.map((employee) => (employee.id === id ? { ...employee, status: "ACTIVE", deletedAt: null } : employee));
+  const restored = employeesDb.find((employee) => employee.id === id);
+  if (!restored) throw new Error("Empleado no encontrado");
+  return restored;
+}
+
+export async function fetchEmployeeDetail(id: string) {
+  await wait();
+  const employee = employeesDb.find((item) => item.id === id);
+  if (!employee) throw new Error("Empleado no encontrado");
+  const primary = employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? employee.branchAssignments[0];
+  return {
+    employee,
+    documents: [
+      { id: makeId("doc"), title: "Contrato firmado", status: "Completado", updatedAt: "16 jul 2026" },
+      { id: makeId("doc"), title: "Identificación oficial", status: "Pendiente", updatedAt: "17 jul 2026" },
+      { id: makeId("doc"), title: "Formulario fiscal", status: "Completado", updatedAt: "16 jul 2026" },
+    ],
+    history: [
+      { id: makeId("hist"), title: "Alta en directorio", detail: `Asignado a ${primary?.branch.name ?? "sin sucursal"} como ${primary?.role ?? "sin cargo"}.`, at: "16 jul 2026 · 9:00 AM ET" },
+      { id: makeId("hist"), title: "Actualización de expediente", detail: "Se sincronizó la información laboral y documental.", at: "18 jul 2026 · 11:15 AM ET" },
+    ],
+  };
+}
+
+export async function transferEmployee(id: string, input: { primaryBranchId: string; primaryRole?: string }) {
+  await wait();
+  const branch = branchesDb.find((item) => item.id === input.primaryBranchId);
+  if (!branch) throw new Error("Sucursal no encontrada");
+  employeesDb = employeesDb.map((employee) =>
+    employee.id === id
+      ? {
+          ...employee,
+          branchAssignments: employee.branchAssignments.map((assignment) =>
+            assignment.isPrimary ? { ...assignment, branch: { id: branch.id, name: branch.name }, role: input.primaryRole ?? assignment.role } : assignment,
+          ),
+        }
+      : employee,
+  );
+  const updated = employeesDb.find((employee) => employee.id === id);
+  if (!updated) throw new Error("Empleado no encontrado");
+  return updated;
+}
+
+export async function assignEmployeeBranches(id: string, branchIds: string[], primaryBranchId?: string, primaryRole?: string) {
+  await wait();
+  const uniqueBranchIds = [...new Set(branchIds.filter(Boolean))];
+  if (!uniqueBranchIds.length) throw new Error("Selecciona al menos una sucursal");
+  const assignments = uniqueBranchIds.map((branchId, index) => {
+    const branch = branchesDb.find((item) => item.id === branchId);
+    if (!branch) throw new Error("Sucursal no encontrada");
+    return {
+      id: makeId("emp-asg"),
+      role: index === 0 ? primaryRole?.trim() || "Sin asignación" : "Asignación secundaria",
+      isPrimary: index === 0,
+      branch: { id: branch.id, name: branch.name },
+    };
+  });
+  employeesDb = employeesDb.map((employee) => (employee.id === id ? { ...employee, branchAssignments: assignments } : employee));
+  const updated = employeesDb.find((employee) => employee.id === id);
+  if (!updated) throw new Error("Empleado no encontrado");
+  return updated;
+}
+
+export async function updateEmployeeRole(id: string, primaryRole: string) {
+  await wait();
+  employeesDb = employeesDb.map((employee) =>
+    employee.id === id
+      ? {
+          ...employee,
+          branchAssignments: employee.branchAssignments.map((assignment) =>
+            assignment.isPrimary ? { ...assignment, role: primaryRole } : assignment,
+          ),
+        }
+      : employee,
+  );
+  const updated = employeesDb.find((employee) => employee.id === id);
+  if (!updated) throw new Error("Empleado no encontrado");
+  return updated;
 }
 
 export async function fetchNavigationSchema(tenantId: string, role: RoleKey) {

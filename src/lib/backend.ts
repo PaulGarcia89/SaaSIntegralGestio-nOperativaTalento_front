@@ -163,10 +163,15 @@ import { authenticateUser as authenticateMockUser } from "@/lib/mock-backend";
 import { deleteTrainingCourse as deleteMockTrainingCourse } from "@/lib/mock-backend";
 import {
   bulkCreateEmployees as bulkCreateMockEmployees,
+  assignEmployeeBranches as assignMockEmployeeBranches,
   createEmployee as createMockEmployee,
   deleteEmployee as deleteMockEmployee,
+  fetchEmployeeDetail as fetchMockEmployeeDetail,
   fetchEmployees as fetchMockEmployees,
+  restoreEmployee as restoreMockEmployee,
+  transferEmployee as transferMockEmployee,
   updateEmployee as updateMockEmployee,
+  updateEmployeeRole as updateMockEmployeeRole,
 } from "@/lib/mock-backend";
 import {
   clearStoredAuth,
@@ -1705,6 +1710,54 @@ export function deleteEmployee(id: string) {
   return request(`/employees/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(async (error) => {
     if (!shouldUseMockBackend(error)) throw error;
     return deleteMockEmployee(id);
+  });
+}
+
+export function restoreEmployee(id: string) {
+  return request(`/employees/${encodeURIComponent(id)}/restore`, { method: "POST" }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return restoreMockEmployee(id);
+  });
+}
+
+export function fetchEmployeeDetail(id: string) {
+  return request<{
+    employee: EmployeeDirectoryItem;
+    documents: Array<{ id: string; title: string; status: string; updatedAt: string }>;
+    history: Array<{ id: string; title: string; detail: string; at: string }>;
+  }>(`/employees/${encodeURIComponent(id)}`).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return fetchMockEmployeeDetail(id);
+  });
+}
+
+export function transferEmployee(id: string, input: { primaryBranchId: string; primaryRole?: string }) {
+  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/transfer`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return transferMockEmployee(id, input);
+  });
+}
+
+export function updateEmployeeRole(id: string, primaryRole: string) {
+  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ primaryRole }),
+  }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return updateMockEmployeeRole(id, primaryRole);
+  });
+}
+
+export function assignEmployeeBranches(id: string, branchIds: string[], primaryBranchId?: string, primaryRole?: string) {
+  return request<EmployeeDirectoryItem>(`/employees/${encodeURIComponent(id)}/branches`, {
+    method: "PUT",
+    body: JSON.stringify({ branchIds, primaryBranchId, primaryRole }),
+  }).catch(async (error) => {
+    if (!shouldUseMockBackend(error)) throw error;
+    return assignMockEmployeeBranches(id, branchIds, primaryBranchId, primaryRole);
   });
 }
 

@@ -59,6 +59,17 @@ export function EmployeesDirectoryPage() {
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status: status === "all" ? undefined : status, branchId: branchFilter || undefined, page, pageSize }),
   });
+  const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
+  const meta = employees.data?.meta;
+  const canCreate = can("employees.create");
+  const totalItems = meta?.total ?? data.length;
+  const totalPages = meta?.totalPages ?? 1;
+  const selectionCount = selectedIds.length;
+  const detailQuery = useQuery({
+    queryKey: ["employee-detail", detailEmployee?.id],
+    queryFn: () => fetchEmployeeDetail(detailEmployee!.id),
+    enabled: Boolean(detailEmployee?.id),
+  });
 
   useEffect(() => {
     setPage(1);
@@ -66,30 +77,6 @@ export function EmployeesDirectoryPage() {
     setHasMore(true);
   }, [search, status, branchFilter, pageSize]);
 
-  if (employees.isLoading && page === 1) return <AsyncState state="loading" title="Cargando empleados" />;
-  if (employees.isError) {
-    const apiError = employees.error instanceof ApiError ? employees.error : null;
-    const fallback = "No fue posible cargar el directorio";
-    const description = apiError
-      ? `(${apiError.code ?? `HTTP ${apiError.status}`}) ${getApiErrorMessage(employees.error, fallback)}`
-      : getApiErrorMessage(employees.error, fallback);
-
-    return (
-      <AsyncState
-        state="error"
-        title="No fue posible cargar el directorio"
-        description={description}
-        onRetry={() => void employees.refetch()}
-      />
-    );
-  }
-
-  const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
-  const meta = employees.data?.meta;
-  const canCreate = can("employees.create");
-  const totalItems = meta?.total ?? data.length;
-  const totalPages = meta?.totalPages ?? 1;
-  const selectionCount = selectedIds.length;
   useEffect(() => {
     if (!employees.data) return;
     setLoadedEmployees((current) => {
@@ -104,16 +91,6 @@ export function EmployeesDirectoryPage() {
     setHasMore(Boolean(meta && meta.page < meta.totalPages));
     setIsLoadingMore(false);
   }, [employees.data, meta, page]);
-
-  const visibleEmployees = loadedEmployees.length ? loadedEmployees : data;
-  const sortedData = useMemo(() => [...visibleEmployees].sort((left, right) => compareEmployees(left, right, sortField, sortDirection)), [visibleEmployees, sortField, sortDirection]);
-  const statusCounts = useMemo(() => ({
-    all: visibleEmployees.filter((employee) => !(employee as EmployeeWithSoftDelete).deletedAt).length + visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
-    ACTIVE: visibleEmployees.filter((employee) => employee.status === "ACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
-    INACTIVE: visibleEmployees.filter((employee) => employee.status === "INACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
-    TERMINATED: visibleEmployees.filter((employee) => employee.status === "TERMINATED" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
-    DELETED: visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
-  }), [visibleEmployees]);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -156,6 +133,39 @@ export function EmployeesDirectoryPage() {
     if (!savedFiltersReady) return;
     void updateMyPreference("employees-directory", { search, status, branchFilter, pageSize, viewMode, sortField, sortDirection }).catch(() => undefined);
   }, [savedFiltersReady, search, status, branchFilter, pageSize, viewMode, sortField, sortDirection]);
+
+  useEffect(() => {
+    if (!detailEmployee) return;
+    setDetailTab("activity");
+  }, [detailEmployee]);
+
+  if (employees.isLoading && page === 1) return <AsyncState state="loading" title="Cargando empleados" />;
+  if (employees.isError) {
+    const apiError = employees.error instanceof ApiError ? employees.error : null;
+    const fallback = "No fue posible cargar el directorio";
+    const description = apiError
+      ? `(${apiError.code ?? `HTTP ${apiError.status}`}) ${getApiErrorMessage(employees.error, fallback)}`
+      : getApiErrorMessage(employees.error, fallback);
+
+    return (
+      <AsyncState
+        state="error"
+        title="No fue posible cargar el directorio"
+        description={description}
+        onRetry={() => void employees.refetch()}
+      />
+    );
+  }
+
+  const visibleEmployees = loadedEmployees.length ? loadedEmployees : data;
+  const sortedData = useMemo(() => [...visibleEmployees].sort((left, right) => compareEmployees(left, right, sortField, sortDirection)), [visibleEmployees, sortField, sortDirection]);
+  const statusCounts = useMemo(() => ({
+    all: visibleEmployees.filter((employee) => !(employee as EmployeeWithSoftDelete).deletedAt).length + visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
+    ACTIVE: visibleEmployees.filter((employee) => employee.status === "ACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
+    INACTIVE: visibleEmployees.filter((employee) => employee.status === "INACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
+    TERMINATED: visibleEmployees.filter((employee) => employee.status === "TERMINATED" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
+    DELETED: visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
+  }), [visibleEmployees]);
 
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -203,15 +213,6 @@ export function EmployeesDirectoryPage() {
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible restaurar el empleado.")),
   });
-  const detailQuery = useQuery({
-    queryKey: ["employee-detail", detailEmployee?.id],
-    queryFn: () => fetchEmployeeDetail(detailEmployee!.id),
-    enabled: Boolean(detailEmployee?.id),
-  });
-  useEffect(() => {
-    if (!detailEmployee) return;
-    setDetailTab("activity");
-  }, [detailEmployee]);
   const exportName = buildEmployeesExportName({ branchName: branchFilter ? tenantBranches.find((branch) => branch.id === branchFilter)?.name : currentBranch?.name, status: status === "all" ? "" : status, pageSize, page });
 
   return (

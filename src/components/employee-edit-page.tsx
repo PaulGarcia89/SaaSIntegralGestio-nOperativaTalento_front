@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
 import {
   fetchBranches,
   fetchEmployeeEditor,
@@ -40,12 +41,20 @@ type EditorForm = {
   emergencyContact: Record<string, string>;
 };
 
+type EvidenceDraft = {
+  id: string;
+  section: "tax" | "eligibility" | "floridaNewHire" | "employment";
+  label: string;
+  file: File;
+};
+
 export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
   const { can, tenantUsers } = useAppStore();
   const queryClient = useQueryClient();
   const editor = useQuery({ queryKey: ["employee-editor", employeeId], queryFn: () => fetchEmployeeEditor(employeeId) });
   const branches = useQuery({ queryKey: ["employee-editor-branches"], queryFn: () => fetchBranches(), enabled: can("employees.update") });
   const [form, setForm] = useState<EditorForm | null>(null);
+  const [evidenceDrafts, setEvidenceDrafts] = useState<EvidenceDraft[]>([]);
 
   useEffect(() => {
     if (editor.data) setForm(toEditorForm(editor.data));
@@ -79,6 +88,17 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el expediente.")),
   });
+
+  const addEvidence = async (section: EvidenceDraft["section"], label: string, file: File | null) => {
+    if (!file) return;
+    const validationError = await validateOnboardingDocumentFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    setEvidenceDrafts((current) => [...current.filter((item) => item.label !== label), { id: `${section}-${label}-${file.name}-${file.size}`, section, label, file }]);
+    toast.success(`Archivo preparado para ${label.toLowerCase()}`);
+  };
 
   if (editor.isLoading || !form) return <AsyncState state="loading" title="Cargando expediente editable" description="Preparamos los datos laborales, nómina y cumplimiento del empleado." />;
   if (editor.isError || !editor.data) return <AsyncState state="error" title="No fue posible cargar el editor" description={getApiErrorMessage(editor.error, "El expediente no está disponible.")} onRetry={() => void editor.refetch()} />;
@@ -152,6 +172,42 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
           <SelectField label="Florida New Hire" value={stringValue(form.floridaNewHire.status)} onChange={(value) => update("floridaNewHire", "status", value)} options={floridaOptions} />
           <TextField label="Fecha límite Florida New Hire" type="date" value={stringValue(form.floridaNewHire.dueDate)} onChange={(value) => update("floridaNewHire", "dueDate", value)} />
           <ToggleField label="Florida New Hire requerido" checked={Boolean(form.floridaNewHire.required)} onChange={(value) => update("floridaNewHire", "required", value)} />
+          <div className="sm:col-span-2 rounded-2xl border border-dashed border-border-default bg-surface-elevated p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">Evidencia documental</p>
+                <p className="mt-1 text-sm text-text-secondary">Adjunta foto o PDF para SSN, W-4, I-9 o Florida New Hire. Los archivos quedan preparados para el expediente.</p>
+              </div>
+              <Badge variant="outline">{evidenceDrafts.length} archivo{evidenceDrafts.length === 1 ? "" : "s"}</Badge>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[
+                { key: "tax" as const, label: "W-4 / SSN" },
+                { key: "eligibility" as const, label: "I-9 / E-Verify" },
+                { key: "floridaNewHire" as const, label: "Florida New Hire" },
+              ].map((item) => (
+                <label key={item.label} className="rounded-xl border border-border-default bg-card p-3 text-sm">
+                  <span className="font-medium">{item.label}</span>
+                  <Input
+                    className="mt-2"
+                    type="file"
+                    accept=".pdf,image/jpeg,image/png"
+                    onChange={(event) => void addEvidence(item.key, item.label, event.target.files?.[0] ?? null)}
+                  />
+                </label>
+              ))}
+            </div>
+            {evidenceDrafts.length ? (
+              <ul className="mt-4 space-y-2 text-sm text-text-secondary">
+                {evidenceDrafts.map((draft) => (
+                  <li key={draft.id} className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-card px-3 py-2">
+                    <span>{draft.label}: {draft.file.name}</span>
+                    <span>{Math.round(draft.file.size / 1024)} KB</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </EditorSection>
         <EditorSection title="Contacto de emergencia" description="Información operativa, separada de payroll.">
           <TextField label="Nombre" value={stringValue(form.emergencyContact.name)} onChange={(value) => update("emergencyContact", "name", value)} />

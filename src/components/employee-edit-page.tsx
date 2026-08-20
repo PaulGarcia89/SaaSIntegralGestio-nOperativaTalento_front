@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FileText, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -107,7 +107,10 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
 
   const update = (section: keyof EditorForm, key: string, value: string | boolean) => setForm((current) => current ? { ...current, [section]: { ...current[section], [key]: value } } : current);
   const activeBranches = (branches.data ?? []).filter((branch) => branch.status === "active");
-  const requirements = dossier360.data?.compliance.requirements ?? editor.data.requirements;
+  const requirements = useMemo(
+    () => computeRequirements(editor.data.requirements, form, evidenceDrafts, dossier360.data?.compliance.requirements),
+    [dossier360.data?.compliance.requirements, editor.data.requirements, evidenceDrafts, form],
+  );
 
   return <div className="space-y-6">
     <PageHeader
@@ -219,7 +222,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
       </div>
       <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
         <Card level={2}><CardContent className="p-5"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h2 className="font-semibold">Checklist y evidencia</h2></div><p className="mt-2 text-sm text-text-secondary">Los documentos, licencias, capacitación, seguridad y activos se administran desde el expediente, sin perder su trazabilidad.</p><Button asChild variant="secondary" className="mt-4 w-full"><Link href={`/employees/${employeeId}`}>Gestionar documentos y compliance</Link></Button></CardContent></Card>
-        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Requisitos actuales</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p></div><Badge variant={/complete|verified|approved/i.test(item.status) ? "success" : /pending/i.test(item.status) ? "secondary" : "outline"}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">El checklist aparecerá al crear los requisitos aplicables.</p>}</div><p className="mt-4 text-xs text-text-secondary">Documentos cargados: {dossier360.data?.documents.summary.total ?? editor.data.requirements.length}</p></CardContent></Card>
+        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Requisitos actuales</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p><p className="mt-1 text-xs text-text-secondary">{item.source}</p></div><Badge variant={statusVariant(item.status)}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">El checklist aparecerá al crear los requisitos aplicables.</p>}</div><p className="mt-4 text-xs text-text-secondary">Documentos cargados: {dossier360.data?.documents.summary.total ?? editor.data.requirements.length}</p></CardContent></Card>
         <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? "Guardando..." : "Guardar todos los cambios"}</Button>
       </aside>
     </div>
@@ -236,6 +239,76 @@ function stringValue(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : value;
 }
 function withoutBlankSecrets<T extends Record<string, unknown>>(input: T, sensitive: string[]) { return Object.fromEntries(Object.entries(input).filter(([key, value]) => !sensitive.includes(key) || value !== "")); }
+function computeRequirements(
+  baseline: EmployeeEditorRecord["requirements"],
+  form: EditorForm | null,
+  drafts: EvidenceDraft[],
+  dossierRequirements?: EmployeeEditorRecord["requirements"],
+) {
+  const source = dossierRequirements ?? baseline;
+  const draftLabels = new Set(drafts.map((draft) => draft.label.toLowerCase()));
+  if (!form) return source.map((item) => ({ ...item, source: "Sin cambios del formulario" }));
+
+  return source.map((item) => {
+    const code = item.code.toUpperCase();
+    const title = item.title.toLowerCase();
+    const hasDraft = Array.from(draftLabels).some((label) =>
+      label.includes(code.toLowerCase()) ||
+      title.includes(label) ||
+      (code === "W4" && label.includes("w-4")) ||
+      (code === "I9" && label.includes("i-9")) ||
+      (code.includes("EVERIFY") && label.includes("e-verify")) ||
+      (code.includes("FLORIDA") && label.includes("florida")),
+    );
+
+    if (code.includes("W4")) {
+      return {
+        ...item,
+        status: form.tax.w4Status === "COMPLETE" || hasDraft ? "Complete" : "Pendiente",
+        source: `Formulario W-4: ${String(form.tax.w4Status).replaceAll("_", " ").toLowerCase()}`,
+      };
+    }
+
+    if (code.includes("I9")) {
+      return {
+        ...item,
+        status: form.eligibility.i9Status === "VERIFIED" || hasDraft ? "Complete" : "Pendiente",
+        source: `Formulario I-9: ${String(form.eligibility.i9Status).replaceAll("_", " ").toLowerCase()}`,
+      };
+    }
+
+    if (code.includes("EVERIFY")) {
+      return {
+        ...item,
+        status: form.eligibility.eVerifyRequired ? (form.eligibility.eVerifyStatus === "AUTHORIZED" || hasDraft ? "Complete" : "Pendiente") : "NOT REQUIRED",
+        source: `E-Verify: ${form.eligibility.eVerifyRequired ? String(form.eligibility.eVerifyStatus).replaceAll("_", " ").toLowerCase() : "no requerido"}`,
+      };
+    }
+
+    if (code.includes("FLORIDA")) {
+      return {
+        ...item,
+        status: form.floridaNewHire.required ? (form.floridaNewHire.status === "CONFIRMED" || hasDraft ? "Complete" : "Pendiente") : "NOT REQUIRED",
+        source: `Florida New Hire: ${String(form.floridaNewHire.status).replaceAll("_", " ").toLowerCase()}`,
+      };
+    }
+
+    if (hasDraft) {
+      return { ...item, status: "Complete", source: "Evidencia cargada desde el formulario" };
+    }
+
+    if (item.required && /pending/i.test(item.status)) {
+      return { ...item, source: "Sigue pendiente en el formulario" };
+    }
+
+    return { ...item, source: "Sin cambios del formulario" };
+  });
+}
+
+function statusVariant(status: string) {
+  return /complete|verified|approved/i.test(status) ? "success" : /pending/i.test(status) ? "secondary" : "outline";
+}
+
 function toEditorForm(record: EmployeeEditorRecord): EditorForm {
   return {
     personal: strings(record.employee.personal),

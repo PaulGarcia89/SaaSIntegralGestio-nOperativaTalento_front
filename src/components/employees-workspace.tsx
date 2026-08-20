@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, FileText, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Trash2, Undo2, Upload, UserPlus, UsersRound } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView, Wizard } from "@/components/design-system";
+import { InlineFeedback, MobileFilterSheet, PageHeader, ResponsiveDataView, Wizard } from "@/components/design-system";
 import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, uploadEmployeeDocument, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
@@ -25,7 +25,6 @@ type ImportRow = CreateEmployeeInput & { row: number; branchLabel: string; error
 type EmployeeWithSoftDelete = EmployeeDirectoryItem & { deletedAt?: string | null };
 type EmployeeStatusFilter = "all" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "DELETED";
 
-const initialEmployee: CreateEmployeeInput = { name: "", email: "", primaryBranchId: "", primaryRole: "", status: "ACTIVE" };
 const statusChips: Array<{ value: EmployeeStatusFilter; label: string }> = [
   { value: "all", label: "Todos" },
   { value: "ACTIVE", label: "Activos" },
@@ -48,9 +47,6 @@ export function EmployeesDirectoryPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [savedFiltersReady, setSavedFiltersReady] = useState(false);
-  const [loadedEmployees, setLoadedEmployees] = useState<EmployeeDirectoryItem[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [deletingEmployee, setDeletingEmployee] = useState<EmployeeWithSoftDelete | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<EmployeeDirectoryItem | null>(null);
   const [detailTab, setDetailTab] = useState<"activity" | "documents">("activity");
@@ -59,7 +55,7 @@ export function EmployeesDirectoryPage() {
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status: status === "all" ? undefined : status, branchId: branchFilter || undefined, page, pageSize }),
   });
-  const data = Array.isArray(employees.data?.data) ? employees.data.data : [];
+  const data = useMemo(() => (Array.isArray(employees.data?.data) ? employees.data.data : []), [employees.data]);
   const meta = employees.data?.meta;
   const canCreate = can("employees.create");
   const totalItems = meta?.total ?? data.length;
@@ -70,7 +66,24 @@ export function EmployeesDirectoryPage() {
     queryFn: () => fetchEmployeeDetail(detailEmployee!.id),
     enabled: Boolean(detailEmployee?.id),
   });
-  const visibleEmployees = loadedEmployees.length ? loadedEmployees : data;
+  const visibleEmployees = useMemo(() => {
+    const cachedPages: EmployeeDirectoryItem[] = [];
+    for (let currentPage = 1; currentPage <= page; currentPage += 1) {
+      const cached = queryClient.getQueryData<EmployeeDirectoryResponse>(["employees", search, status, branchFilter, currentPage, pageSize]);
+      if (!cached?.data?.length) break;
+      cachedPages.push(...cached.data);
+      if (cached.meta && cached.meta.page >= cached.meta.totalPages) break;
+    }
+    if (cachedPages.length) {
+      const seen = new Set<string>();
+      return cachedPages.filter((employee) => {
+        if (seen.has(employee.id)) return false;
+        seen.add(employee.id);
+        return true;
+      });
+    }
+    return data;
+  }, [branchFilter, data, page, pageSize, queryClient, search, status]);
   const sortedData = useMemo(() => [...visibleEmployees].sort((left, right) => compareEmployees(left, right, sortField, sortDirection)), [visibleEmployees, sortField, sortDirection]);
   const statusCounts = useMemo(() => ({
     all: visibleEmployees.filter((employee) => !(employee as EmployeeWithSoftDelete).deletedAt).length + visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
@@ -107,31 +120,6 @@ export function EmployeesDirectoryPage() {
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible restaurar el empleado.")),
   });
   const exportName = buildEmployeesExportName({ branchName: branchFilter ? tenantBranches.find((branch) => branch.id === branchFilter)?.name : currentBranch?.name, status: status === "all" ? "" : status, pageSize, page });
-
-  useEffect(() => {
-    setPage(1);
-    setLoadedEmployees([]);
-    setHasMore(true);
-  }, [search, status, branchFilter, pageSize]);
-
-  useEffect(() => {
-    if (!employees.data) return;
-    setLoadedEmployees((current) => {
-      const next = page === 1 ? employees.data!.data : [...current, ...employees.data!.data];
-      const seen = new Set<string>();
-      return next.filter((employee) => {
-        if (seen.has(employee.id)) return false;
-        seen.add(employee.id);
-        return true;
-      });
-    });
-    setHasMore(Boolean(meta && meta.page < meta.totalPages));
-    setIsLoadingMore(false);
-  }, [employees.data, meta, page]);
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [search, status, branchFilter, page, pageSize, viewMode, sortField, sortDirection]);
 
   useEffect(() => {
     let active = true;
@@ -171,11 +159,6 @@ export function EmployeesDirectoryPage() {
     void updateMyPreference("employees-directory", { search, status, branchFilter, pageSize, viewMode, sortField, sortDirection }).catch(() => undefined);
   }, [savedFiltersReady, search, status, branchFilter, pageSize, viewMode, sortField, sortDirection]);
 
-  useEffect(() => {
-    if (!detailEmployee) return;
-    setDetailTab("activity");
-  }, [detailEmployee]);
-
   if (employees.isLoading && page === 1) return <AsyncState state="loading" title="Cargando empleados" />;
   if (employees.isError) {
     const apiError = employees.error instanceof ApiError ? employees.error : null;
@@ -201,6 +184,36 @@ export function EmployeesDirectoryPage() {
     }
     setSortField(field);
     setSortDirection("asc");
+  };
+
+  const resetFilters = () => {
+    setSelectedIds([]);
+    setPage(1);
+  };
+
+  const updateSearch = (value: string) => {
+    setSearch(value);
+    resetFilters();
+  };
+
+  const updateStatus = (value: EmployeeStatusFilter) => {
+    setStatus(value);
+    resetFilters();
+  };
+
+  const updateBranchFilter = (value: string) => {
+    setBranchFilter(value);
+    resetFilters();
+  };
+
+  const updatePageSize = (value: number) => {
+    setPageSize(value);
+    resetFilters();
+  };
+
+  const updateViewMode = (value: "table" | "cards") => {
+    setViewMode(value);
+    setSelectedIds([]);
   };
 
   const toggleSelection = (id: string) => {
@@ -295,14 +308,14 @@ export function EmployeesDirectoryPage() {
                 <Search className="size-4" />
                 Buscar
               </span>
-              <Input placeholder="Nombre o correo" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <Input placeholder="Nombre o correo" value={search} onChange={(event) => updateSearch(event.target.value)} />
             </label>
             <label className="space-y-2">
               <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 <Filter className="size-4" />
                 Estado
               </span>
-              <Select value={status} onValueChange={(value) => setStatus(value as EmployeeStatusFilter)}>
+              <Select value={status} onValueChange={(value) => updateStatus(value as EmployeeStatusFilter)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
@@ -320,7 +333,7 @@ export function EmployeesDirectoryPage() {
                 <LayoutList className="size-4" />
                 Sucursal
               </span>
-              <Select value={branchFilter || "all"} onValueChange={(value) => setBranchFilter(value === "all" ? "" : value)}>
+              <Select value={branchFilter || "all"} onValueChange={(value) => updateBranchFilter(value === "all" ? "" : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
@@ -332,7 +345,7 @@ export function EmployeesDirectoryPage() {
             </label>
               <label className="space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Por página</span>
-              <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+              <Select value={String(pageSize)} onValueChange={(value) => updatePageSize(Number(value))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -346,11 +359,11 @@ export function EmployeesDirectoryPage() {
             </label>
             </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant={viewMode === "table" ? "default" : "secondary"} onClick={() => setViewMode("table")}>
+                <Button type="button" variant={viewMode === "table" ? "default" : "secondary"} onClick={() => updateViewMode("table")}>
                   <LayoutList className="size-4" />
                   Tabla
                 </Button>
-              <Button type="button" variant={viewMode === "cards" ? "default" : "secondary"} onClick={() => setViewMode("cards")}>
+              <Button type="button" variant={viewMode === "cards" ? "default" : "secondary"} onClick={() => updateViewMode("cards")}>
                 <UsersRound className="size-4" />
                 Tarjetas
               </Button>
@@ -408,6 +421,8 @@ export function EmployeesDirectoryPage() {
           setStatus("all");
           setBranchFilter("");
           setSearch("");
+          setSelectedIds([]);
+          setPage(1);
         }}
       >
         <div className="space-y-4">
@@ -431,14 +446,14 @@ export function EmployeesDirectoryPage() {
               <Search className="size-4" />
               Buscar
             </span>
-            <Input placeholder="Nombre o correo" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <Input placeholder="Nombre o correo" value={search} onChange={(event) => updateSearch(event.target.value)} />
           </label>
           <label className="space-y-2 text-sm font-medium">
             <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
               <LayoutList className="size-4" />
               Sucursal
             </span>
-            <Select value={branchFilter || "all"} onValueChange={(value) => setBranchFilter(value === "all" ? "" : value)}>
+            <Select value={branchFilter || "all"} onValueChange={(value) => updateBranchFilter(value === "all" ? "" : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
@@ -458,12 +473,12 @@ export function EmployeesDirectoryPage() {
                 <button type="button" className="flex items-center justify-center" onClick={toggleSelectAll} aria-label="Seleccionar todas">
                   {sortedData.length && sortedData.every((employee) => selectedIds.includes(employee.id)) ? "☑" : "☐"}
                 </button>
-                <SortHeader label="Empleado" active={sortField === "name"} direction={sortDirection} onClick={() => toggleSort("name")} />
-                <SortHeader label="Correo" active={sortField === "email"} direction={sortDirection} onClick={() => toggleSort("email")} />
-                <SortHeader label="Sucursal" active={sortField === "assignments"} direction={sortDirection} onClick={() => toggleSort("assignments")} />
-                <SortHeader label="Docs" active={sortField === "documents"} direction={sortDirection} onClick={() => toggleSort("documents")} />
-                <SortHeader label="Asignaciones" active={sortField === "assignments"} direction={sortDirection} onClick={() => toggleSort("assignments")} />
-                <SortHeader label="Estado" active={sortField === "status"} direction={sortDirection} onClick={() => toggleSort("status")} />
+                <SortHeader label="Empleado" active={sortField === "name"} direction={sortDirection} onClick={() => { toggleSort("name"); setSelectedIds([]); }} />
+                <SortHeader label="Correo" active={sortField === "email"} direction={sortDirection} onClick={() => { toggleSort("email"); setSelectedIds([]); }} />
+                <SortHeader label="Sucursal" active={sortField === "assignments"} direction={sortDirection} onClick={() => { toggleSort("assignments"); setSelectedIds([]); }} />
+                <SortHeader label="Docs" active={sortField === "documents"} direction={sortDirection} onClick={() => { toggleSort("documents"); setSelectedIds([]); }} />
+                <SortHeader label="Asignaciones" active={sortField === "assignments"} direction={sortDirection} onClick={() => { toggleSort("assignments"); setSelectedIds([]); }} />
+                <SortHeader label="Estado" active={sortField === "status"} direction={sortDirection} onClick={() => { toggleSort("status"); setSelectedIds([]); }} />
                 <span>Acciones</span>
               </div>
               <div>
@@ -491,9 +506,9 @@ export function EmployeesDirectoryPage() {
         />
       )}
       <div className="flex items-center justify-center py-2">
-        {hasMore ? (
-          <Button type="button" variant="secondary" disabled={isLoadingMore} onClick={() => { setIsLoadingMore(true); setPage((current) => current + 1); }}>
-            {isLoadingMore ? "Cargando más..." : "Cargar más empleados"}
+        {meta && page < meta.totalPages ? (
+          <Button type="button" variant="secondary" onClick={() => setPage((current) => current + 1)}>
+            {employees.isFetching && page > 1 ? "Cargando más..." : "Cargar más empleados"}
           </Button>
         ) : (
           <p className="text-sm text-text-secondary">No hay más empleados para cargar.</p>
@@ -517,8 +532,8 @@ export function EmployeesDirectoryPage() {
                 <Summary label="Asignaciones" value={String(branchAssignmentsOf(detailQuery.data.employee).length)} />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant={detailTab === "activity" ? "default" : "secondary"} onClick={() => setDetailTab("activity")}>Actividad</Button>
-                <Button type="button" variant={detailTab === "documents" ? "default" : "secondary"} onClick={() => setDetailTab("documents")}>Documentos</Button>
+              <Button type="button" variant={detailTab === "activity" ? "default" : "secondary"} onClick={() => setDetailTab("activity")}>Actividad</Button>
+              <Button type="button" variant={detailTab === "documents" ? "default" : "secondary"} onClick={() => setDetailTab("documents")}>Documentos</Button>
               </div>
               {detailTab === "activity" ? (
                 <section className="rounded-2xl border border-border-default p-4">
@@ -1148,16 +1163,6 @@ function Summary({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-medium">{value}</p>
     </div>
   );
-}
-
-function primaryBranchIdOf(employee: EmployeeDirectoryItem) {
-  const assignments = branchAssignmentsOf(employee);
-  return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.branch.id ?? "";
-}
-
-function primaryRoleOf(employee: EmployeeDirectoryItem) {
-  const assignments = branchAssignmentsOf(employee);
-  return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.role ?? "";
 }
 
 function branchAssignmentsOf(employee: EmployeeDirectoryItem) {

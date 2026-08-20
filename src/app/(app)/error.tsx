@@ -17,24 +17,24 @@ export default function AppError({
   }, [error]);
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-6">
-      <Card className="w-full max-w-lg border-border/70 bg-card/85">
-        <CardContent className="flex flex-col items-center gap-6 px-6 py-12 text-center">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 dark:from-amber-900/30 dark:to-rose-900/30">
+    <div className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-3xl items-start justify-center px-4 py-6 sm:px-6 lg:px-8">
+      <Card className="w-full border-border/70 bg-card/90 shadow-xl shadow-slate-900/5">
+        <CardContent className="grid gap-6 px-6 py-8 text-center sm:px-8 sm:py-10">
+          <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 dark:from-amber-900/30 dark:to-rose-900/30">
             <AlertTriangle className="size-8 text-destructive" />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <h2 className="text-2xl font-semibold tracking-tight">Error en esta sección</h2>
             <p className="text-sm leading-7 text-muted-foreground">
-              Ocurrio un error al cargar esta vista. Puedes intentar recargar o volver al panel principal.
+              Ocurrió un error al cargar esta vista. Puedes intentar recargar o volver al panel principal.
             </p>
             {error.digest ? (
-              <p className="mt-2 rounded-xl bg-secondary/60 px-3 py-2 font-mono text-xs text-muted-foreground">
+              <p className="mx-auto max-w-md rounded-xl bg-secondary/60 px-3 py-2 font-mono text-xs text-muted-foreground">
                 {error.digest}
               </p>
             ) : null}
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button onClick={reset}>
               <RefreshCw className="size-4" />
               Reintentar

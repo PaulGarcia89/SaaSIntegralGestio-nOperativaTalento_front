@@ -15,8 +15,8 @@ export function AsyncState({
 }) {
   const loading = state === "loading";
   return (
-    <Card className="border-dashed border-border/70 bg-card/80" aria-live="polite" aria-busy={loading}>
-      <CardContent className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+    <Card className="w-full border-dashed border-border/70 bg-card/80 shadow-sm" aria-live="polite" aria-busy={loading}>
+      <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-4 px-6 py-10 text-center sm:px-8">
         {loading ? (
           <LoaderCircle className="size-8 animate-spin text-primary" aria-hidden="true" />
         ) : (

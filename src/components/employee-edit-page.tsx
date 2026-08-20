@@ -13,11 +13,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
 import {
   fetchBranches,
   fetchEmployeeEditor,
   getApiErrorMessage,
+  uploadEmployeeDocument,
   updateEmployeeContact,
   updateEmployeeEmergencyContact,
   updateEmployeeEmployment,
@@ -43,7 +43,7 @@ type EditorForm = {
 
 type EvidenceDraft = {
   id: string;
-  section: "tax" | "eligibility" | "floridaNewHire" | "employment";
+  section: "tax" | "eligibility" | "floridaNewHire";
   label: string;
   file: File;
 };
@@ -77,9 +77,13 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
         updateEmployeeFloridaNewHire(employeeId, form.floridaNewHire),
         updateEmployeeEmergencyContact(employeeId, form.emergencyContact),
       ]);
+      if (evidenceDrafts.length) {
+        await Promise.all(evidenceDrafts.map((draft) => uploadEmployeeDocument(employeeId, { file: draft.file, section: draft.section, documentType: draft.label })));
+      }
     },
     onSuccess: async () => {
       toast.success("Expediente del empleado actualizado");
+      setEvidenceDrafts([]);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["employees"] }),
         queryClient.invalidateQueries({ queryKey: ["employee-editor", employeeId] }),
@@ -91,11 +95,6 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
 
   const addEvidence = async (section: EvidenceDraft["section"], label: string, file: File | null) => {
     if (!file) return;
-    const validationError = await validateOnboardingDocumentFile(file);
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
     setEvidenceDrafts((current) => [...current.filter((item) => item.label !== label), { id: `${section}-${label}-${file.name}-${file.size}`, section, label, file }]);
     toast.success(`Archivo preparado para ${label.toLowerCase()}`);
   };

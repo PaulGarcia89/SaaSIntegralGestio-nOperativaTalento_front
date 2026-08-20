@@ -1848,6 +1848,37 @@ export function fetchEmployeeEditor(id: string) {
   return request<EmployeeEditorRecord>(`/employees/${encodeURIComponent(id)}/editor`);
 }
 
+export type EmployeeDocumentUploadResponse = {
+  id: string;
+  employeeId: string;
+  branchId: string;
+  section: string;
+  category: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: string;
+  scanStatus: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function uploadEmployeeDocument(
+  employeeId: string,
+  input: { file: File; section: "tax" | "eligibility" | "floridaNewHire" | "employment"; documentType?: string; notes?: string; expiresAt?: string | null },
+) {
+  const body = new FormData();
+  body.set("file", input.file);
+  body.set("section", input.section);
+  if (input.documentType) body.set("documentType", input.documentType);
+  if (input.notes) body.set("notes", input.notes);
+  if (input.expiresAt !== undefined && input.expiresAt !== null && input.expiresAt !== "") body.set("expiresAt", input.expiresAt);
+  return request<EmployeeDocumentUploadResponse>(`/employees/${encodeURIComponent(employeeId)}/documents`, {
+    method: "POST",
+    body,
+  });
+}
+
 function updateEmployeeSection<T extends Record<string, unknown>>(id: string, section: string, input: T) {
   return request(`/employees/${encodeURIComponent(id)}/${section}`, {
     method: "PATCH",

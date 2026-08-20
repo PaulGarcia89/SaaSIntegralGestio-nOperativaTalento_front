@@ -70,6 +70,15 @@ export function EmployeesDirectoryPage() {
     queryFn: () => fetchEmployeeDetail(detailEmployee!.id),
     enabled: Boolean(detailEmployee?.id),
   });
+  const visibleEmployees = loadedEmployees.length ? loadedEmployees : data;
+  const sortedData = useMemo(() => [...visibleEmployees].sort((left, right) => compareEmployees(left, right, sortField, sortDirection)), [visibleEmployees, sortField, sortDirection]);
+  const statusCounts = useMemo(() => ({
+    all: visibleEmployees.filter((employee) => !(employee as EmployeeWithSoftDelete).deletedAt).length + visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
+    ACTIVE: visibleEmployees.filter((employee) => employee.status === "ACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
+    INACTIVE: visibleEmployees.filter((employee) => employee.status === "INACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
+    TERMINATED: visibleEmployees.filter((employee) => employee.status === "TERMINATED" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
+    DELETED: visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
+  }), [visibleEmployees]);
 
   useEffect(() => {
     setPage(1);
@@ -156,16 +165,6 @@ export function EmployeesDirectoryPage() {
       />
     );
   }
-
-  const visibleEmployees = loadedEmployees.length ? loadedEmployees : data;
-  const sortedData = useMemo(() => [...visibleEmployees].sort((left, right) => compareEmployees(left, right, sortField, sortDirection)), [visibleEmployees, sortField, sortDirection]);
-  const statusCounts = useMemo(() => ({
-    all: visibleEmployees.filter((employee) => !(employee as EmployeeWithSoftDelete).deletedAt).length + visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
-    ACTIVE: visibleEmployees.filter((employee) => employee.status === "ACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
-    INACTIVE: visibleEmployees.filter((employee) => employee.status === "INACTIVE" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
-    TERMINATED: visibleEmployees.filter((employee) => employee.status === "TERMINATED" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
-    DELETED: visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
-  }), [visibleEmployees]);
 
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) {

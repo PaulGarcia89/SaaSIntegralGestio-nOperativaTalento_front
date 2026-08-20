@@ -1671,6 +1671,66 @@ export type EmployeePayrollComplianceSnapshot = {
   alerts: Array<{ type: string; severity: "info" | "warning" | "danger"; message: string }>;
 };
 
+export type EmployeeDossier360Snapshot = {
+  employeeId: string;
+  overview: {
+    employeeId: string;
+    name: string;
+    email: string;
+    status: string;
+    jobTitle?: string | null;
+    documentSummary?: { totalDocuments: number };
+  };
+  compliance: {
+    employeeId: string;
+    requirements: Array<{
+      id: string;
+      code: string;
+      title: string;
+      category: string;
+      jurisdiction: string;
+      status: string;
+      required: boolean;
+      dueDate: string | null;
+      completedAt?: string | null;
+      expiresAt: string | null;
+      source?: string | null;
+    }>;
+    alerts?: Array<{ type: string; severity: "info" | "warning" | "danger"; message: string }>;
+  };
+  documents: {
+    employeeId: string;
+    summary: {
+      total: number;
+      pendingReview: number;
+      approved: number;
+      rejected: number;
+      expired: number;
+      expiringWithin30Days: number;
+      byCategory: Record<string, number>;
+    };
+    documents: Array<{
+      id: string;
+      category: string;
+      originalName: string;
+      mimeType: string;
+      sizeBytes: number;
+      scanStatus: string;
+      status: string;
+      version: number;
+      rejectionReason: string | null;
+      expiresAt: string | null;
+      reviewedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  audit: {
+    employeeId: string;
+    history: Array<{ id: string; title: string; detail: string; at: string }>;
+  };
+};
+
 type EmployeeApiItem = Omit<EmployeeDirectoryItem, "branchAssignments"> & {
   branchAssignments?: EmployeeDirectoryItem["branchAssignments"];
   primaryBranch?: {
@@ -1897,6 +1957,10 @@ export const updateEmployeeEmergencyContact = (id: string, input: Record<string,
 
 export function fetchEmployeePayrollCompliance(id: string) {
   return request<EmployeePayrollComplianceSnapshot>(`/employees/${encodeURIComponent(id)}/payroll-compliance`);
+}
+
+export function fetchEmployeeDossier360(id: string) {
+  return request<EmployeeDossier360Snapshot>(`/employees/${encodeURIComponent(id)}/360`);
 }
 
 export function transferEmployee(id: string, input: { branchId: string; role?: string }) {

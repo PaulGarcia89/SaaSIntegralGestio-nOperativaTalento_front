@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   fetchBranches,
+  fetchEmployeeDossier360,
   fetchEmployeeEditor,
   getApiErrorMessage,
   uploadEmployeeDocument,
@@ -52,6 +53,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
   const { can, tenantUsers } = useAppStore();
   const queryClient = useQueryClient();
   const editor = useQuery({ queryKey: ["employee-editor", employeeId], queryFn: () => fetchEmployeeEditor(employeeId) });
+  const dossier360 = useQuery({ queryKey: ["employee-dossier-360", employeeId], queryFn: () => fetchEmployeeDossier360(employeeId) });
   const branches = useQuery({ queryKey: ["employee-editor-branches"], queryFn: () => fetchBranches(), enabled: can("employees.update") });
   const [form, setForm] = useState<EditorForm | null>(null);
   const [evidenceDrafts, setEvidenceDrafts] = useState<EvidenceDraft[]>([]);
@@ -87,6 +89,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["employees"] }),
         queryClient.invalidateQueries({ queryKey: ["employee-editor", employeeId] }),
+        queryClient.invalidateQueries({ queryKey: ["employee-dossier-360", employeeId] }),
         queryClient.invalidateQueries({ queryKey: ["employee-360", employeeId] }),
       ]);
     },
@@ -104,7 +107,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
 
   const update = (section: keyof EditorForm, key: string, value: string | boolean) => setForm((current) => current ? { ...current, [section]: { ...current[section], [key]: value } } : current);
   const activeBranches = (branches.data ?? []).filter((branch) => branch.status === "active");
-  const requirements = editor.data.requirements;
+  const requirements = dossier360.data?.compliance.requirements ?? editor.data.requirements;
 
   return <div className="space-y-6">
     <PageHeader
@@ -216,7 +219,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
       </div>
       <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
         <Card level={2}><CardContent className="p-5"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h2 className="font-semibold">Checklist y evidencia</h2></div><p className="mt-2 text-sm text-text-secondary">Los documentos, licencias, capacitación, seguridad y activos se administran desde el expediente, sin perder su trazabilidad.</p><Button asChild variant="secondary" className="mt-4 w-full"><Link href={`/employees/${employeeId}`}>Gestionar documentos y compliance</Link></Button></CardContent></Card>
-        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Requisitos actuales</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p></div><Badge variant={/complete|verified|approved/i.test(item.status) ? "success" : "secondary"}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">El checklist aparecerá al crear los requisitos aplicables.</p>}</div></CardContent></Card>
+        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Requisitos actuales</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p></div><Badge variant={/complete|verified|approved/i.test(item.status) ? "success" : /pending/i.test(item.status) ? "secondary" : "outline"}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">El checklist aparecerá al crear los requisitos aplicables.</p>}</div><p className="mt-4 text-xs text-text-secondary">Documentos cargados: {dossier360.data?.documents.summary.total ?? editor.data.requirements.length}</p></CardContent></Card>
         <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? "Guardando..." : "Guardar todos los cambios"}</Button>
       </aside>
     </div>

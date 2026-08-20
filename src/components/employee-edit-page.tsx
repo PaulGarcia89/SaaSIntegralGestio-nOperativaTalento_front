@@ -96,6 +96,11 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el expediente.")),
   });
 
+  const requirements = useMemo(
+    () => computeRequirements(editor.data?.requirements, form, evidenceDrafts, dossier360.data?.compliance.requirements),
+    [dossier360.data?.compliance.requirements, editor.data?.requirements, evidenceDrafts, form],
+  );
+
   const addEvidence = async (section: EvidenceDraft["section"], label: string, file: File | null) => {
     if (!file) return;
     setEvidenceDrafts((current) => [...current.filter((item) => item.label !== label), { id: `${section}-${label}-${file.name}-${file.size}`, section, label, file }]);
@@ -107,10 +112,6 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
 
   const update = (section: keyof EditorForm, key: string, value: string | boolean) => setForm((current) => current ? { ...current, [section]: { ...current[section], [key]: value } } : current);
   const activeBranches = (branches.data ?? []).filter((branch) => branch.status === "active");
-  const requirements = useMemo(
-    () => computeRequirements(editor.data.requirements, form, evidenceDrafts, dossier360.data?.compliance.requirements),
-    [dossier360.data?.compliance.requirements, editor.data.requirements, evidenceDrafts, form],
-  );
 
   return <div className="space-y-6">
     <PageHeader
@@ -240,12 +241,12 @@ function stringValue(value: unknown) {
 }
 function withoutBlankSecrets<T extends Record<string, unknown>>(input: T, sensitive: string[]) { return Object.fromEntries(Object.entries(input).filter(([key, value]) => !sensitive.includes(key) || value !== "")); }
 function computeRequirements(
-  baseline: EmployeeEditorRecord["requirements"],
+  baseline: EmployeeEditorRecord["requirements"] | undefined,
   form: EditorForm | null,
   drafts: EvidenceDraft[],
   dossierRequirements?: EmployeeEditorRecord["requirements"],
 ) {
-  const source = Array.isArray(dossierRequirements) && dossierRequirements.length ? dossierRequirements : baseline;
+  const source = Array.isArray(dossierRequirements) && dossierRequirements.length ? dossierRequirements : (baseline ?? []);
   const draftLabels = new Set(drafts.map((draft) => draft.label.toLowerCase()));
   if (!form) {
     return source.map((item) => ({

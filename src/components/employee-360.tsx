@@ -96,7 +96,8 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
   if (dossier.isError || !dossier.data) return <AsyncState state="error" title="No fue posible cargar el expediente" description={getApiErrorMessage(dossier.error, "El expediente no está disponible en este contexto.")} onRetry={() => void dossier.refetch()} />;
 
   const { employee, documents, history } = dossier.data;
-  const primary = employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? employee.branchAssignments[0];
+  const assignments = branchAssignmentsOf(employee);
+  const primary = primaryAssignmentOf(employee);
   const complianceSnapshot = dossier360.data?.compliance ?? null;
 
   return (
@@ -123,7 +124,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:min-w-64">
             <Metric label="Documentos" value={String(dossier360.data?.documents.summary.total ?? documents.length)} />
-            <Metric label="Asignaciones" value={String(employee.branchAssignments.length)} />
+            <Metric label="Asignaciones" value={String(assignments.length)} />
           </div>
         </CardContent>
       </Card>
@@ -323,7 +324,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
 }
 
 function Overview({ employee, documents, snapshot }: { employee: Awaited<ReturnType<typeof fetchEmployeeDetail>>["employee"]; documents: number; snapshot: EmployeeDossier360Snapshot["compliance"] | null }) {
-  const primary = employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? employee.branchAssignments[0];
+  const primary = primaryAssignmentOf(employee);
   const source = "recordSource" in employee ? employee.recordSource : undefined;
 
   return (
@@ -339,7 +340,8 @@ function Overview({ employee, documents, snapshot }: { employee: Awaited<ReturnT
 }
 
 function Employment({ employee }: { employee: Awaited<ReturnType<typeof fetchEmployeeDetail>>["employee"] }) {
-  return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<BriefcaseBusiness className="size-4" />} title="Asignaciones activas" /><div className="mt-4 divide-y divide-border-default">{employee.branchAssignments.length ? employee.branchAssignments.map((assignment) => <div key={assignment.id} className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{assignment.branch.name}</p><p className="text-sm text-text-secondary">{assignment.role}</p></div><Badge variant={assignment.isPrimary ? "success" : "secondary"}>{assignment.isPrimary ? "Principal" : "Secundaria"}</Badge></div>) : <p className="text-sm text-text-secondary">No hay una sucursal asignada.</p>}</div></CardContent></Card></div>;
+  const assignments = branchAssignmentsOf(employee);
+  return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<BriefcaseBusiness className="size-4" />} title="Asignaciones activas" /><div className="mt-4 divide-y divide-border-default">{assignments.length ? assignments.map((assignment) => <div key={assignment.id} className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{assignment.branch?.name ?? "Sin nombre"}</p><p className="text-sm text-text-secondary">{assignment.role ?? "Sin rol"}</p></div><Badge variant={assignment.isPrimary ? "success" : "secondary"}>{assignment.isPrimary ? "Principal" : "Secundaria"}</Badge></div>) : <p className="text-sm text-text-secondary">No hay una sucursal asignada.</p>}</div></CardContent></Card></div>;
 }
 
 function Payroll({ snapshot, isLoading, error, onRetry }: SnapshotSectionProps) {
@@ -550,3 +552,10 @@ function statusLabel(status: string) { return ({ ACTIVE: "Activo", INACTIVE: "In
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(date); }
 function formatFileSize(bytes: number) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
 function booleanLabel(value: boolean | null) { return value === null ? "Sin configurar" : value ? "Sí" : "No"; }
+function branchAssignmentsOf(employee: Awaited<ReturnType<typeof fetchEmployeeDetail>>["employee"]) {
+  return Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+}
+function primaryAssignmentOf(employee: Awaited<ReturnType<typeof fetchEmployeeDetail>>["employee"]) {
+  const assignments = branchAssignmentsOf(employee);
+  return assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
+}

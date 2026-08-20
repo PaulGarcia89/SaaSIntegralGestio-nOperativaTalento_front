@@ -79,6 +79,34 @@ export function EmployeesDirectoryPage() {
     TERMINATED: visibleEmployees.filter((employee) => employee.status === "TERMINATED" && !(employee as EmployeeWithSoftDelete).deletedAt).length,
     DELETED: visibleEmployees.filter((employee) => Boolean((employee as EmployeeWithSoftDelete).deletedAt)).length,
   }), [visibleEmployees]);
+  const bulkStatus = useMutation({
+    mutationFn: (status: "ACTIVE" | "INACTIVE" | "TERMINATED") => bulkUpdateEmployeeStatus({ employeeIds: selectedIds, status }),
+    onSuccess: async (result) => {
+      toast.success(`${result.updated.length} empleados actualizados`);
+      setSelectedIds([]);
+      await employees.refetch();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aplicar la acción masiva.")),
+  });
+  const removeEmployee = useMutation({
+    mutationFn: (id: string) => deleteEmployee(id),
+    onSuccess: async () => {
+      toast.success("Empleado eliminado");
+      setDeletingEmployee(null);
+      await employees.refetch();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible eliminar el empleado.")),
+  });
+  const restoreEmployeeAction = useMutation({
+    mutationFn: (id: string) => restoreEmployee(id),
+    onSuccess: async () => {
+      toast.success("Empleado restaurado");
+      setDeletingEmployee(null);
+      await employees.refetch();
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible restaurar el empleado.")),
+  });
+  const exportName = buildEmployeesExportName({ branchName: branchFilter ? tenantBranches.find((branch) => branch.id === branchFilter)?.name : currentBranch?.name, status: status === "all" ? "" : status, pageSize, page });
 
   useEffect(() => {
     setPage(1);
@@ -185,34 +213,6 @@ export function EmployeesDirectoryPage() {
     setSelectedIds(allSelected ? [] : sortedData.map((employee) => employee.id));
   };
   const selectionData = sortedData.filter((employee) => selectedIds.includes(employee.id));
-  const bulkStatus = useMutation({
-    mutationFn: (status: "ACTIVE" | "INACTIVE" | "TERMINATED") => bulkUpdateEmployeeStatus({ employeeIds: selectedIds, status }),
-    onSuccess: async (result) => {
-      toast.success(`${result.updated.length} empleados actualizados`);
-      setSelectedIds([]);
-      await employees.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aplicar la acción masiva.")),
-  });
-  const removeEmployee = useMutation({
-    mutationFn: (id: string) => deleteEmployee(id),
-    onSuccess: async () => {
-      toast.success("Empleado eliminado");
-      setDeletingEmployee(null);
-      await employees.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible eliminar el empleado.")),
-  });
-  const restoreEmployeeAction = useMutation({
-    mutationFn: (id: string) => restoreEmployee(id),
-    onSuccess: async () => {
-      toast.success("Empleado restaurado");
-      setDeletingEmployee(null);
-      await employees.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible restaurar el empleado.")),
-  });
-  const exportName = buildEmployeesExportName({ branchName: branchFilter ? tenantBranches.find((branch) => branch.id === branchFilter)?.name : currentBranch?.name, status: status === "all" ? "" : status, pageSize, page });
 
   return (
     <div className="space-y-5">
@@ -512,9 +512,9 @@ export function EmployeesDirectoryPage() {
                 <Summary label="Empleado" value={detailQuery.data.employee.name} />
                 <Summary label="Correo" value={detailQuery.data.employee.email} />
                 <Summary label="Estado" value={(detailQuery.data.employee as EmployeeWithSoftDelete).deletedAt ? "Eliminado" : detailQuery.data.employee.status} />
-                <Summary label="Sucursal" value={(detailQuery.data.employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? detailQuery.data.employee.branchAssignments[0])?.branch.name ?? "Sin nombre"} />
-                <Summary label="Cargo" value={(detailQuery.data.employee.branchAssignments.find((assignment) => assignment.isPrimary) ?? detailQuery.data.employee.branchAssignments[0])?.role ?? "Sin asignación"} />
-                <Summary label="Asignaciones" value={String(detailQuery.data.employee.branchAssignments.length)} />
+                <Summary label="Sucursal" value={primaryAssignmentOf(detailQuery.data.employee)?.branch?.name ?? "Sin nombre"} />
+                <Summary label="Cargo" value={primaryAssignmentOf(detailQuery.data.employee)?.role ?? "Sin asignación"} />
+                <Summary label="Asignaciones" value={String(branchAssignmentsOf(detailQuery.data.employee).length)} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant={detailTab === "activity" ? "default" : "secondary"} onClick={() => setDetailTab("activity")}>Actividad</Button>
@@ -524,7 +524,7 @@ export function EmployeesDirectoryPage() {
                 <section className="rounded-2xl border border-border-default p-4">
                   <h3 className="font-semibold">Actividad real</h3>
                   <div className="mt-4 space-y-4">
-                    {detailQuery.data.history.map((item, index) => {
+                    {(Array.isArray(detailQuery.data.history) ? detailQuery.data.history : []).map((item, index) => {
                       const isFirst = index === 0;
                       const isLast = index === detailQuery.data.history.length - 1;
                       return (
@@ -553,7 +553,7 @@ export function EmployeesDirectoryPage() {
                 <section className="rounded-2xl border border-border-default p-4">
                   <h3 className="font-semibold">Documentos</h3>
                   <div className="mt-3 space-y-2">
-                    {detailQuery.data.documents.map((doc) => (
+                    {(Array.isArray(detailQuery.data.documents) ? detailQuery.data.documents : []).map((doc) => (
                       <div key={doc.id} className="flex items-center justify-between rounded-xl bg-surface-elevated px-3 py-2 text-sm">
                         <div>
                           <p className="font-medium">{doc.title}</p>
@@ -1151,13 +1151,22 @@ function Summary({ label, value }: { label: string; value: string }) {
 }
 
 function primaryBranchIdOf(employee: EmployeeDirectoryItem) {
-  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+  const assignments = branchAssignmentsOf(employee);
   return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.branch.id ?? "";
 }
 
 function primaryRoleOf(employee: EmployeeDirectoryItem) {
-  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+  const assignments = branchAssignmentsOf(employee);
   return (assignments.find((assignment) => assignment.isPrimary) ?? assignments[0])?.role ?? "";
+}
+
+function branchAssignmentsOf(employee: EmployeeDirectoryItem) {
+  return Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
+}
+
+function primaryAssignmentOf(employee: EmployeeDirectoryItem) {
+  const assignments = branchAssignmentsOf(employee);
+  return assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
 }
 
 async function copySelectedEmails(data: EmployeeDirectoryItem[], selectedIds: string[]) {

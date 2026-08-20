@@ -1736,6 +1736,24 @@ export type EmployeeRegistrationInput = {
   emergencyContact?: { name?: string; relationship?: string; phone?: string };
 };
 
+export type EmployeeEditorRecord = {
+  employee: {
+    id: string;
+    employeeNumber: string;
+    name: string;
+    status: "ACTIVE" | "INACTIVE" | "TERMINATED";
+    personal: { legalFirstName: string | null; middleName: string | null; legalLastName: string | null; preferredName: string | null; dateOfBirth: string | null };
+    contact: { workEmail: string | null; personalEmail: string | null; phone: string | null; addressLine1: string | null; addressLine2: string | null; city: string | null; state: string | null; postalCode: string | null; country: string | null };
+    emergencyContact: { name: string | null; relationship: string | null; phone: string | null };
+  };
+  employment: { primaryBranchId: string | null; jobTitle: string | null; department: string | null; supervisorUserId: string | null; employmentType: string | null; employmentStatus: string | null; hireDate: string | null; startDate: string | null; workerClassification: string | null };
+  payroll: { payType: string; payRateMasked: string | null; payFrequency: string; overtimeEligible: boolean | null; regularHourlyRateMasked: string | null; workweekStartDay: string | null; workweekStartTime: string | null; paymentMethod: string; payrollProvider: string | null; payrollEmployeeId: string | null; externalPayrollReference: string | null } | null;
+  tax: { ssnMasked: string | null; w4Status: string; w2Reference: string | null } | null;
+  eligibility: { i9Status: string; firstDayOfEmployment: string | null; reverificationRequired: boolean; eVerifyRequired: boolean; eVerifyStatus: string } | null;
+  floridaNewHire: { required: boolean; status: string; dueDate: string | null } | null;
+  requirements: Array<{ id: string; code: string; title: string; category: string; status: string; required: boolean; dueDate: string | null; expiresAt: string | null }>;
+};
+
 export type UpdateEmployeeInput = {
   name: string;
   email: string;
@@ -1825,6 +1843,26 @@ export function fetchEmployeeDetail(id: string) {
     return fetchMockEmployeeDetail(id);
   });
 }
+
+export function fetchEmployeeEditor(id: string) {
+  return request<EmployeeEditorRecord>(`/employees/${encodeURIComponent(id)}/editor`);
+}
+
+function updateEmployeeSection<T extends Record<string, unknown>>(id: string, section: string, input: T) {
+  return request(`/employees/${encodeURIComponent(id)}/${section}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export const updateEmployeePersonal = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "personal", input);
+export const updateEmployeeContact = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "contact", input);
+export const updateEmployeeEmployment = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "employment", input);
+export const updateEmployeePayroll = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "payroll", input);
+export const updateEmployeeTax = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "tax", input);
+export const updateEmployeeWorkEligibility = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "work-eligibility", input);
+export const updateEmployeeFloridaNewHire = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "florida-new-hire", input);
+export const updateEmployeeEmergencyContact = (id: string, input: Record<string, unknown>) => updateEmployeeSection(id, "emergency-contact", input);
 
 export function fetchEmployeePayrollCompliance(id: string) {
   return request<EmployeePayrollComplianceSnapshot>(`/employees/${encodeURIComponent(id)}/payroll-compliance`);

@@ -15,13 +15,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, PageHeader, Pagination, ResponsiveDataView, Wizard } from "@/components/design-system";
-import { ApiError, assignEmployeePrimaryBranch, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, transferEmployee, updateEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
+import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createEmployee, deleteEmployee, fetchBranches, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 
 type EmployeeStatus = NonNullable<CreateEmployeeInput["status"]>;
 type ImportRow = CreateEmployeeInput & { row: number; branchLabel: string; errors: string[] };
-type EmployeeEditorState = { id: string; name: string; email: string; status: EmployeeStatus; primaryBranchId: string; primaryRole: string; initialPrimaryBranchId: string } | null;
 type EmployeeWithSoftDelete = EmployeeDirectoryItem & { deletedAt?: string | null };
 type EmployeeStatusFilter = "all" | "ACTIVE" | "INACTIVE" | "TERMINATED" | "DELETED";
 
@@ -35,6 +34,7 @@ const statusChips: Array<{ value: EmployeeStatusFilter; label: string }> = [
 ];
 
 export function EmployeesDirectoryPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { can, currentTenant, currentBranch, tenantBranches } = useAppStore();
   const [search, setSearch] = useState("");
@@ -50,12 +50,10 @@ export function EmployeesDirectoryPage() {
   const [loadedEmployees, setLoadedEmployees] = useState<EmployeeDirectoryItem[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<EmployeeEditorState>(null);
   const [deletingEmployee, setDeletingEmployee] = useState<EmployeeWithSoftDelete | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<EmployeeDirectoryItem | null>(null);
   const [detailTab, setDetailTab] = useState<"activity" | "documents">("activity");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const editBranches = useQuery({ queryKey: ["employee-edit-branches"], queryFn: () => fetchBranches(), enabled: can("employees.update") });
   const employees = useQuery({
     queryKey: ["employees", search, status, branchFilter, page, pageSize],
     queryFn: () => fetchEmployees({ search, status: status === "all" ? undefined : status, branchId: branchFilter || undefined, page, pageSize }),
@@ -185,31 +183,6 @@ export function EmployeesDirectoryPage() {
       await employees.refetch();
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible aplicar la acción masiva.")),
-  });
-  const editEmployee = useMutation({
-    mutationFn: async (input: NonNullable<EmployeeEditorState>) => {
-      const updated = await updateEmployee(input.id, {
-        name: input.name,
-        email: input.email,
-        jobTitle: input.primaryRole,
-        status: input.status,
-      });
-      if (!input.initialPrimaryBranchId) {
-        return assignEmployeePrimaryBranch(input.id, input.primaryBranchId, input.primaryRole);
-      }
-      if (input.primaryBranchId !== input.initialPrimaryBranchId) {
-        return transferEmployee(input.id, { branchId: input.primaryBranchId, role: input.primaryRole });
-      }
-      return updated;
-    },
-    onSuccess: async (updated) => {
-      setLoadedEmployees((current) => current.map((employee) => (employee.id === updated.id ? updated : employee)));
-      toast.success("Empleado actualizado");
-      setEditingEmployee(null);
-      await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      await employees.refetch();
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el empleado.")),
   });
   const removeEmployee = useMutation({
     mutationFn: (id: string) => deleteEmployee(id),
@@ -500,7 +473,7 @@ export function EmployeesDirectoryPage() {
                     compact={index >= 10}
                     selected={selectedIds.includes(employee.id)}
                     onToggleSelect={() => toggleSelection(employee.id)}
-                    onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))}
+                    onEdit={() => router.push(`/employees/${employee.id}/edit`)}
                   />
                 ))}
               </div>
@@ -511,8 +484,8 @@ export function EmployeesDirectoryPage() {
         <ResponsiveDataView
           data={sortedData}
           getKey={(employee) => employee.id}
-          desktop={<div className="grid gap-3 lg:grid-cols-2">{sortedData.map((employee) => <EmployeeCard key={employee.id} employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))} />)}</div>}
-          mobile={(employee) => <EmployeeCard employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => setEditingEmployee(buildEmployeeEditorState(employee))} />}
+          desktop={<div className="grid gap-3 lg:grid-cols-2">{sortedData.map((employee) => <EmployeeCard key={employee.id} employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => router.push(`/employees/${employee.id}/edit`)} />)}</div>}
+          mobile={(employee) => <EmployeeCard employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => router.push(`/employees/${employee.id}/edit`)} />}
           empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
         />
       )}
@@ -525,53 +498,6 @@ export function EmployeesDirectoryPage() {
           <p className="text-sm text-text-secondary">No hay más empleados para cargar.</p>
         )}
       </div>
-      <Dialog open={Boolean(editingEmployee)} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Editar empleado</DialogTitle>
-            <DialogDescription>Actualiza nombre, correo, sucursal principal, cargo y estado del expediente.</DialogDescription>
-          </DialogHeader>
-          {editingEmployee ? (
-            <div className="grid gap-4">
-              <FormField id="employee-edit-name" label="Nombre completo" required>
-                {(field) => <Input {...field} value={editingEmployee.name} onChange={(event) => setEditingEmployee({ ...editingEmployee, name: event.target.value })} />}
-              </FormField>
-              <FormField id="employee-edit-email" label="Correo electrónico" required>
-                {(field) => <Input {...field} type="email" value={editingEmployee.email} onChange={(event) => setEditingEmployee({ ...editingEmployee, email: event.target.value })} />}
-              </FormField>
-              <FormField id="employee-edit-role" label="Cargo o función" required>
-                {(field) => <Input {...field} value={editingEmployee.primaryRole} onChange={(event) => setEditingEmployee({ ...editingEmployee, primaryRole: event.target.value })} />}
-              </FormField>
-              <FormField id="employee-edit-branch" label="Sucursal principal" required>
-                {(field) => (
-                  <Select value={editingEmployee.primaryBranchId} onValueChange={(value) => setEditingEmployee({ ...editingEmployee, primaryBranchId: value })}>
-                    <SelectTrigger {...field}><SelectValue placeholder="Selecciona una sucursal" /></SelectTrigger>
-                    <SelectContent>
-                      {(editBranches.data ?? tenantBranches).map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
-              </FormField>
-              <FormField id="employee-edit-status" label="Estado">
-                {(field) => (
-                  <Select value={editingEmployee.status} onValueChange={(value) => setEditingEmployee({ ...editingEmployee, status: value as EmployeeStatus })}>
-                    <SelectTrigger {...field}><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ACTIVE">Activo</SelectItem>
-                      <SelectItem value="INACTIVE">Inactivo</SelectItem>
-                      <SelectItem value="TERMINATED">Finalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </FormField>
-            </div>
-          ) : null}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setEditingEmployee(null)}>Cancelar</Button>
-            <Button onClick={() => editingEmployee && editEmployee.mutate(editingEmployee)} disabled={!isEmployeeEditorValid(editingEmployee) || editEmployee.isPending}>{editEmployee.isPending ? "Guardando..." : "Guardar cambios"}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
       <Dialog open={Boolean(detailEmployee)} onOpenChange={(open) => !open && setDetailEmployee(null)}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
@@ -1193,30 +1119,6 @@ function ImportMetric({ label, value, tone = "default" }: { label: string; value
       <p className="text-xs text-text-secondary">{label}</p>
       <p className={tone === "success" ? "text-xl font-semibold text-status-success" : tone === "danger" ? "text-xl font-semibold text-status-danger" : "text-xl font-semibold"}>{value}</p>
     </div>
-  );
-}
-
-function buildEmployeeEditorState(employee: EmployeeDirectoryItem): NonNullable<EmployeeEditorState> {
-  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
-  const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
-  return {
-    id: employee.id,
-    name: employee.name,
-    email: employee.email,
-    status: employee.status as EmployeeStatus,
-    primaryBranchId: primary?.branch.id ?? "",
-    primaryRole: primary?.role ?? "",
-    initialPrimaryBranchId: primary?.branch.id ?? "",
-  };
-}
-
-function isEmployeeEditorValid(employee: EmployeeEditorState): employee is NonNullable<EmployeeEditorState> {
-  return Boolean(
-    employee
-    && employee.name.trim().length >= 2
-    && /^\S+@\S+\.\S+$/.test(employee.email)
-    && employee.primaryBranchId
-    && employee.primaryRole.trim().length >= 2,
   );
 }
 

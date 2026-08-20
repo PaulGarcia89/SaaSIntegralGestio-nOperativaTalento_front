@@ -1923,6 +1923,20 @@ export type EmployeeDocumentUploadResponse = {
   updatedAt: string;
 };
 
+export type EmployeeDocumentFileResponse = Blob;
+
+export type EmployeeDocumentUpdateInput = {
+  expiresAt?: string | null;
+  notes?: string | null;
+  status?: string;
+};
+
+export type EmployeeDocumentReplaceInput = {
+  file: File;
+  notes?: string;
+  expiresAt?: string | null;
+};
+
 export async function uploadEmployeeDocument(
   employeeId: string,
   input: { file: File; section: "tax" | "eligibility" | "floridaNewHire" | "employment"; documentType?: string; notes?: string; expiresAt?: string | null },
@@ -1937,6 +1951,42 @@ export async function uploadEmployeeDocument(
     method: "POST",
     body,
   });
+}
+
+export function fetchEmployeeDocuments(employeeId: string) {
+  return request<EmployeeDossier360Snapshot["documents"]>(`/employees/${encodeURIComponent(employeeId)}/documents`);
+}
+
+export function fetchEmployeeDocumentFile(employeeId: string, documentId: string) {
+  return request<EmployeeDocumentFileResponse>(
+    `/employees/${encodeURIComponent(employeeId)}/documents/${encodeURIComponent(documentId)}/file`,
+    {},
+    { responseType: "blob" },
+  );
+}
+
+export function updateEmployeeDocument(employeeId: string, documentId: string, input: EmployeeDocumentUpdateInput) {
+  return request(
+    `/employees/${encodeURIComponent(employeeId)}/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function replaceEmployeeDocument(employeeId: string, documentId: string, input: EmployeeDocumentReplaceInput) {
+  const body = new FormData();
+  body.set("file", input.file);
+  if (input.notes) body.set("notes", input.notes);
+  if (input.expiresAt !== undefined && input.expiresAt !== null && input.expiresAt !== "") body.set("expiresAt", input.expiresAt);
+  return request(
+    `/employees/${encodeURIComponent(employeeId)}/documents/${encodeURIComponent(documentId)}/replace`,
+    {
+      method: "POST",
+      body,
+    },
+  );
 }
 
 function updateEmployeeSection<T extends Record<string, unknown>>(id: string, section: string, input: T) {

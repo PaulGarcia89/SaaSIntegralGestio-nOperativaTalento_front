@@ -245,13 +245,20 @@ function computeRequirements(
   drafts: EvidenceDraft[],
   dossierRequirements?: EmployeeEditorRecord["requirements"],
 ) {
-  const source = dossierRequirements ?? baseline;
+  const source = Array.isArray(dossierRequirements) && dossierRequirements.length ? dossierRequirements : baseline;
   const draftLabels = new Set(drafts.map((draft) => draft.label.toLowerCase()));
-  if (!form) return source.map((item) => ({ ...item, source: "Sin cambios del formulario" }));
+  if (!form) {
+    return source.map((item) => ({
+      ...item,
+      status: safeText(item.status),
+      source: "Sin cambios del formulario",
+    }));
+  }
 
   return source.map((item) => {
-    const code = item.code.toUpperCase();
-    const title = item.title.toLowerCase();
+    const code = safeText(item.code).toUpperCase();
+    const title = safeText(item.title).toLowerCase();
+    const currentStatus = safeText(item.status);
     const hasDraft = Array.from(draftLabels).some((label) =>
       label.includes(code.toLowerCase()) ||
       title.includes(label) ||
@@ -265,7 +272,7 @@ function computeRequirements(
       return {
         ...item,
         status: form.tax.w4Status === "COMPLETE" || hasDraft ? "Complete" : "Pendiente",
-        source: `Formulario W-4: ${String(form.tax.w4Status).replaceAll("_", " ").toLowerCase()}`,
+        source: `Formulario W-4: ${safeText(form.tax.w4Status).replaceAll("_", " ").toLowerCase()}`,
       };
     }
 
@@ -273,7 +280,7 @@ function computeRequirements(
       return {
         ...item,
         status: form.eligibility.i9Status === "VERIFIED" || hasDraft ? "Complete" : "Pendiente",
-        source: `Formulario I-9: ${String(form.eligibility.i9Status).replaceAll("_", " ").toLowerCase()}`,
+        source: `Formulario I-9: ${safeText(form.eligibility.i9Status).replaceAll("_", " ").toLowerCase()}`,
       };
     }
 
@@ -281,7 +288,7 @@ function computeRequirements(
       return {
         ...item,
         status: form.eligibility.eVerifyRequired ? (form.eligibility.eVerifyStatus === "AUTHORIZED" || hasDraft ? "Complete" : "Pendiente") : "NOT REQUIRED",
-        source: `E-Verify: ${form.eligibility.eVerifyRequired ? String(form.eligibility.eVerifyStatus).replaceAll("_", " ").toLowerCase() : "no requerido"}`,
+        source: `E-Verify: ${form.eligibility.eVerifyRequired ? safeText(form.eligibility.eVerifyStatus).replaceAll("_", " ").toLowerCase() : "no requerido"}`,
       };
     }
 
@@ -289,7 +296,7 @@ function computeRequirements(
       return {
         ...item,
         status: form.floridaNewHire.required ? (form.floridaNewHire.status === "CONFIRMED" || hasDraft ? "Complete" : "Pendiente") : "NOT REQUIRED",
-        source: `Florida New Hire: ${String(form.floridaNewHire.status).replaceAll("_", " ").toLowerCase()}`,
+        source: `Florida New Hire: ${safeText(form.floridaNewHire.status).replaceAll("_", " ").toLowerCase()}`,
       };
     }
 
@@ -297,16 +304,20 @@ function computeRequirements(
       return { ...item, status: "Complete", source: "Evidencia cargada desde el formulario" };
     }
 
-    if (item.required && /pending/i.test(item.status)) {
+    if (item.required && /pending/i.test(currentStatus)) {
       return { ...item, source: "Sigue pendiente en el formulario" };
     }
 
-    return { ...item, source: "Sin cambios del formulario" };
+    return { ...item, status: currentStatus, source: "Sin cambios del formulario" };
   });
 }
 
 function statusVariant(status: string) {
   return /complete|verified|approved/i.test(status) ? "success" : /pending/i.test(status) ? "secondary" : "outline";
+}
+
+function safeText(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
 
 function toEditorForm(record: EmployeeEditorRecord): EditorForm {

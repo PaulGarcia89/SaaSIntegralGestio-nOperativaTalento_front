@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, BriefcaseBusiness, Clock3, Download, FilePenLine, FileText, MapPin, Pencil, ShieldCheck, Upload, UserRound, WalletCards } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
+import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
 import {
   fetchEmployeeDetail,
   fetchEmployeeDocumentFile,
@@ -27,6 +27,7 @@ import type { EmployeeDossier360Snapshot, EmployeePayrollComplianceSnapshot } fr
 import { useAppStore } from "@/store/app-store";
 
 type DossierDocument = EmployeeDossier360Snapshot["documents"]["documents"][number];
+type DossierRequirement = EmployeeDossier360Snapshot["compliance"]["requirements"][number];
 
 export function Employee360Page({ employeeId }: { employeeId: string }) {
   const { can, currentRole } = useAppStore();
@@ -37,9 +38,18 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
   const [documentNotes, setDocumentNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  const [requirementDialogOpen, setRequirementDialogOpen] = useState(false);
+  const [targetRequirement, setTargetRequirement] = useState<DossierRequirement | null>(null);
+  const [requirementFile, setRequirementFile] = useState<File | null>(null);
+  const [requirementExpiresAt, setRequirementExpiresAt] = useState("");
+  const [requirementNotes, setRequirementNotes] = useState("");
 
   const dossier = useQuery({ queryKey: ["employee-360", employeeId], queryFn: () => fetchEmployeeDetail(employeeId) });
-  const payrollCompliance = useQuery({ queryKey: ["employee-payroll-compliance", employeeId], queryFn: () => fetchEmployeePayrollCompliance(employeeId), enabled: can("employees.read") });
+  const payrollCompliance = useQuery({
+    queryKey: ["employee-payroll-compliance", employeeId],
+    queryFn: () => fetchEmployeePayrollCompliance(employeeId),
+    enabled: can("employees.read"),
+  });
   const dossier360 = useQuery({ queryKey: ["employee-dossier-360", employeeId], queryFn: () => fetchEmployeeDossier360(employeeId) });
   const canManageFiles = currentRole === "admin_empresa";
 
@@ -51,15 +61,15 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
   };
 
   const addDocument = useMutation({
-    mutationFn: ({ file, documentType }: { file: File; documentType: string }) =>
-      uploadEmployeeDocument(employeeId, { file, section: "employment", documentType }),
+    mutationFn: ({ file, documentType, expiresAt, notes }: { file: File; documentType: string; expiresAt?: string | null; notes?: string | null }) =>
+      uploadEmployeeDocument(employeeId, { file, section: "employment", documentType, expiresAt: expiresAt ?? null, notes: notes ?? undefined }),
     onSuccess: refreshDocuments,
     onError: (error) => setDocumentError(getApiErrorMessage(error, "No fue posible cargar el documento.")),
   });
 
   const updateDocument = useMutation({
     mutationFn: ({ documentId, expiresAt, notes }: { documentId: string; expiresAt?: string | null; notes?: string | null }) =>
-      updateEmployeeDocument(employeeId, documentId, { expiresAt, notes }),
+      updateEmployeeDocument(employeeId, documentId, { expiresAt: expiresAt ?? null, notes: notes ?? undefined }),
     onSuccess: () => {
       setDocumentError(null);
       setDocumentDialogOpen(false);
@@ -97,6 +107,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
         description={<span className="flex flex-wrap gap-x-3 gap-y-1"><span>{employee.jobTitle ?? primary?.role ?? "Cargo sin definir"}</span><span>{primary?.branch.name ?? "Sucursal sin asignar"}</span></span>}
         actions={<><Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />Directorio</Link></Button>{can("employees.update") ? <Button asChild><Link href={`/employees/${employeeId}/edit`}><Pencil className="size-4" />Editar</Link></Button> : null}</>}
       />
+
       <Card level={2}>
         <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="flex min-w-0 items-center gap-4">
@@ -116,6 +127,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
           </div>
         </CardContent>
       </Card>
+
       <Tabs defaultValue="overview" className="space-y-5">
         <div className="overflow-x-auto pb-1">
           <TabsList className="min-w-max">
@@ -129,7 +141,9 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
             {can("employees.read") ? <TabsTrigger value="audit">Auditoría</TabsTrigger> : null}
           </TabsList>
         </div>
-        <TabsContent value="overview"><Overview employee={employee} documents={dossier360.data?.documents.summary.total ?? documents.length} snapshot={complianceSnapshot} /></TabsContent>
+        <TabsContent value="overview">
+          <Overview employee={employee} documents={dossier360.data?.documents.summary.total ?? documents.length} snapshot={complianceSnapshot} />
+        </TabsContent>
         <TabsContent value="employment"><Employment employee={employee} /></TabsContent>
         {can("employees.read") ? <TabsContent value="payroll"><Payroll snapshot={payrollCompliance.data} isLoading={payrollCompliance.isLoading} error={payrollCompliance.error} onRetry={() => void payrollCompliance.refetch()} /></TabsContent> : null}
         {can("employees.read") ? <TabsContent value="tax"><TaxEligibility snapshot={payrollCompliance.data} isLoading={payrollCompliance.isLoading} error={payrollCompliance.error} onRetry={() => void payrollCompliance.refetch()} /></TabsContent> : null}
@@ -145,13 +159,36 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
               setDocumentError(null);
               setDocumentDialogOpen(true);
             }}
-            onUpload={(file, documentType) => addDocument.mutate({ file, documentType })}
+            onUpload={(file, documentType, expiresAt, notes) => addDocument.mutate({ file, documentType, expiresAt, notes })}
+            onCompleteRequirement={(requirement) => {
+              setTargetRequirement(requirement);
+              setRequirementFile(null);
+              setRequirementExpiresAt("");
+              setRequirementNotes("");
+              setDocumentError(null);
+              setRequirementDialogOpen(true);
+            }}
           />
         </TabsContent>
-        <TabsContent value="compliance"><Compliance snapshot={complianceSnapshot} isLoading={dossier360.isLoading} canView={can("employees.read")} /></TabsContent>
+        <TabsContent value="compliance">
+          <Compliance
+            snapshot={complianceSnapshot}
+            isLoading={dossier360.isLoading}
+            canView={can("employees.read")}
+            onCompleteRequirement={(requirement) => {
+              setTargetRequirement(requirement);
+              setRequirementFile(null);
+              setRequirementExpiresAt("");
+              setRequirementNotes("");
+              setDocumentError(null);
+              setRequirementDialogOpen(true);
+            }}
+          />
+        </TabsContent>
         <TabsContent value="history"><History events={history} /></TabsContent>
         {can("employees.read") ? <TabsContent value="audit"><Audit snapshot={payrollCompliance.data} isLoading={payrollCompliance.isLoading} error={payrollCompliance.error} onRetry={() => void payrollCompliance.refetch()} /></TabsContent> : null}
       </Tabs>
+
       <Dialog
         open={documentDialogOpen}
         onOpenChange={(open) => {
@@ -214,6 +251,73 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={requirementDialogOpen}
+        onOpenChange={(open) => {
+          setRequirementDialogOpen(open);
+          if (!open) {
+            setTargetRequirement(null);
+            setRequirementFile(null);
+            setRequirementExpiresAt("");
+            setRequirementNotes("");
+            setDocumentError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Completar documento requerido</DialogTitle>
+            <DialogDescription>Sube el archivo asociado al requisito para dejar trazabilidad en el expediente.</DialogDescription>
+          </DialogHeader>
+          {targetRequirement ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
+                <p className="font-medium">{targetRequirement.title}</p>
+                <p className="mt-1 text-sm text-text-secondary">{targetRequirement.category} · {targetRequirement.jurisdiction} · {targetRequirement.required ? "Requerido" : "No requerido"}</p>
+              </div>
+              <div className="space-y-4">
+                <FormField id="requirement-document-file" label="Archivo">{(field) => <Input {...field} type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => setRequirementFile(event.target.files?.[0] ?? null)} />}</FormField>
+                <FormField id="requirement-document-expires" label="Vigencia">{(field) => <Input {...field} type="date" value={requirementExpiresAt} onChange={(event) => setRequirementExpiresAt(event.target.value)} />}</FormField>
+                <FormField id="requirement-document-notes" label="Notas">{(field) => <Input {...field} value={requirementNotes} onChange={(event) => setRequirementNotes(event.target.value)} placeholder="Notas internas del expediente" />}</FormField>
+                {documentError ? <InlineFeedback tone="danger" title="No se pudo completar">{documentError}</InlineFeedback> : null}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="secondary" onClick={() => setRequirementDialogOpen(false)}>Cancelar</Button>
+                  <Button
+                    type="button"
+                    disabled={addDocument.isPending}
+                    onClick={() => {
+                      if (!requirementFile) {
+                        setDocumentError("Selecciona un archivo para continuar.");
+                        return;
+                      }
+                      addDocument.mutate(
+                        {
+                          file: requirementFile,
+                          documentType: targetRequirement.code,
+                          expiresAt: requirementExpiresAt || null,
+                          notes: requirementNotes || null,
+                        },
+                        {
+                          onSuccess: () => {
+                            setRequirementDialogOpen(false);
+                            setTargetRequirement(null);
+                            setRequirementFile(null);
+                            setRequirementExpiresAt("");
+                            setRequirementNotes("");
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    Completar documento
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -245,7 +349,6 @@ function Payroll({ snapshot, isLoading, error, onRetry }: SnapshotSectionProps) 
 
   const payroll = snapshot.payroll;
   const configured = Boolean(payroll.payType || payroll.payrollProvider || payroll.payrollEmployeeId);
-
   return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<WalletCards className="size-4" />} title="Configuración de nómina" />{configured ? <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label="Tipo de pago" value={payroll.payType ?? "Sin configurar"} /><Datum label="Frecuencia" value={payroll.payFrequency ?? "Sin configurar"} /><Datum label="Elegible para horas extra" value={booleanLabel(payroll.overtimeEligible)} /><Datum label="Semana laboral" value={payroll.workweekStartDay ?? "Sin configurar"} /><Datum label="Proveedor" value={payroll.payrollProvider ?? "Sin configurar"} /><Datum label="ID de nómina" value={payroll.payrollEmployeeId ?? "Sin configurar"} /></dl> : <EmptyState title="Nómina aún no configurada" description="El expediente está preparado para enlazar una integración de nómina, pero el proveedor aún no ha registrado datos para este empleado." />}</CardContent></Card><InlineFeedback tone="info" title="Información protegida">Las tasas de pago y referencias externas no se solicitan ni se muestran hasta que el backend publique permisos y operaciones específicas de compensación.</InlineFeedback></div>;
 }
 
@@ -265,7 +368,25 @@ function TaxEligibility({ snapshot, isLoading, error, onRetry }: SnapshotSection
   return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <Card key={item.label} level={2}><CardContent className="p-5"><p className="font-semibold">{item.label}</p><div className="mt-3"><ComplianceBadge status={item.status} /></div><p className="mt-3 text-sm text-text-secondary">{item.detail}</p></CardContent></Card>)}</div><InlineFeedback tone="info" title="Datos fiscales protegidos">El expediente solo muestra valores enmascarados. Las configuraciones y documentos sensibles se gestionan mediante permisos y endpoints específicos.</InlineFeedback></div>;
 }
 
-function Documents({ employeeId, documents, summary, isLoading, canManageFiles, onOpenDocument, onUpload }: { employeeId: string; documents: DossierDocument[]; summary: EmployeeDossier360Snapshot["documents"]["summary"] | null; isLoading: boolean; canManageFiles: boolean; onOpenDocument: (id: string) => void; onUpload: (file: File, documentType: string) => void }) {
+function Documents({
+  employeeId,
+  documents,
+  summary,
+  isLoading,
+  canManageFiles,
+  onOpenDocument,
+  onUpload,
+  onCompleteRequirement,
+}: {
+  employeeId: string;
+  documents: DossierDocument[];
+  summary: EmployeeDossier360Snapshot["documents"]["summary"] | null;
+  isLoading: boolean;
+  canManageFiles: boolean;
+  onOpenDocument: (id: string) => void;
+  onUpload: (file: File, documentType: string, expiresAt?: string | null, notes?: string | null) => void;
+  onCompleteRequirement: (requirement: DossierRequirement) => void;
+}) {
   if (isLoading) return <AsyncState state="loading" title="Cargando documentos" description="Consultamos el expediente documental." />;
 
   return (
@@ -309,7 +430,7 @@ function Documents({ employeeId, documents, summary, isLoading, canManageFiles, 
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {canManageFiles ? <Button variant="secondary" size="sm" onClick={() => onOpenDocument(document.id)}><Download className="size-4" />Ver archivo</Button> : null}
-                  {canManageFiles ? <Button size="sm" variant="secondary" onClick={() => onOpenDocument(document.id)}><FilePenLine className="size-4" />Reemplazar</Button> : null}
+                  {canManageFiles ? <Button variant="secondary" size="sm" onClick={() => onOpenDocument(document.id)}><FilePenLine className="size-4" />Reemplazar</Button> : null}
                 </div>
               </CardContent>
             </Card>
@@ -318,16 +439,79 @@ function Documents({ employeeId, documents, summary, isLoading, canManageFiles, 
       ) : (
         <EmptyState title="Aún no hay documentos" description={canManageFiles ? "Carga el primer archivo para incorporarlo al expediente." : "No hay archivos visibles para este rol."} />
       )}
+      {summary ? (
+        <Card level={2}>
+          <CardContent className="p-5">
+            <SectionTitle icon={<ShieldCheck className="size-4" />} title="Requisitos del expediente" />
+            <div className="mt-4 divide-y divide-border-default">
+              {summary.byCategory ? Object.entries(summary.byCategory).map(([category, count]) => (
+                <div key={category} className="flex items-center justify-between py-3">
+                  <p className="font-medium">{category}</p>
+                  <Badge variant="outline">{count}</Badge>
+                </div>
+              )) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
 
-function Compliance({ snapshot, isLoading, canView }: { snapshot: EmployeeDossier360Snapshot["compliance"] | null; isLoading: boolean; canView: boolean }) {
+function Compliance({
+  snapshot,
+  isLoading,
+  canView,
+  onCompleteRequirement,
+}: {
+  snapshot: EmployeeDossier360Snapshot["compliance"] | null;
+  isLoading: boolean;
+  canView: boolean;
+  onCompleteRequirement: (requirement: DossierRequirement) => void;
+}) {
   if (!canView) return <InlineFeedback tone="info" title="Sin permiso de cumplimiento">No cuentas con acceso al cumplimiento de este empleado.</InlineFeedback>;
   if (isLoading) return <AsyncState state="loading" title="Cargando cumplimiento" description="Calculamos el estado del expediente." />;
   if (!snapshot) return <EmptyState title="Sin datos de cumplimiento" description="El cumplimiento se habilita cuando exista información disponible para este expediente." />;
 
-  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-3"><MetricCard label="Requisitos" value={String(snapshot.requirements.length)} icon={<ShieldCheck className="size-5" />} /><MetricCard label="Alertas" value={String(snapshot.alerts?.length ?? 0)} icon={<AlertTriangle className="size-5" />} /><MetricCard label="Expediente" value="Activo" icon={<FileText className="size-5" />} /></div><Card level={2}><CardContent className="p-5"><SectionTitle icon={<ShieldCheck className="size-4" />} title="Requisitos del expediente" /><div className="mt-4 divide-y divide-border-default">{snapshot.requirements.length ? snapshot.requirements.map((item) => <div key={item.id} className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{item.title}</p><p className="mt-1 text-sm text-text-secondary">{item.category} · {item.jurisdiction}{item.dueDate ? ` · vence ${formatDate(item.dueDate)}` : ""}</p></div><Badge variant={item.required ? "secondary" : "outline"}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">No hay requisitos configurados en este expediente.</p>}</div></CardContent></Card>{snapshot.alerts?.length ? <InlineFeedback tone="warning" title="Alertas del expediente">{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}</div>;
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <MetricCard label="Requisitos" value={String(snapshot.requirements.length)} icon={<ShieldCheck className="size-5" />} />
+        <MetricCard label="Alertas" value={String(snapshot.alerts?.length ?? 0)} icon={<AlertTriangle className="size-5" />} />
+        <MetricCard label="Expediente" value="Activo" icon={<FileText className="size-5" />} />
+      </div>
+      <Card level={2}>
+        <CardContent className="p-5">
+          <SectionTitle icon={<ShieldCheck className="size-4" />} title="Requisitos del expediente" />
+          <div className="mt-4 divide-y divide-border-default">
+            {snapshot.requirements.length ? snapshot.requirements.map((item) => (
+              <div key={item.id} className="flex flex-col gap-3 py-4 first:pt-0 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="font-medium">{item.title}</p>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {item.category} · {item.jurisdiction}
+                    {item.dueDate ? ` · vence ${formatDate(item.dueDate)}` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-text-secondary">Código: {item.code}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={item.required ? "secondary" : "outline"}>{item.status.replaceAll("_", " ")}</Badge>
+                  <Badge variant="outline">{item.expiresAt ? `Expira ${formatDate(item.expiresAt)}` : "Sin expiración"}</Badge>
+                  {item.required && item.status !== "COMPLETE" ? (
+                    <Button type="button" size="sm" variant="secondary" onClick={() => onCompleteRequirement(item)}>
+                      Completar documento
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            )) : <p className="text-sm text-text-secondary">No hay requisitos configurados en este expediente.</p>}
+          </div>
+          <InlineFeedback tone="info" title="Dónde se completan los documentos">Desde aquí se sube el archivo asociado a cada requisito. Si el backend lo mantiene pendiente, el archivo queda guardado en el expediente para su revisión.</InlineFeedback>
+        </CardContent>
+      </Card>
+      {snapshot.alerts?.length ? <InlineFeedback tone="warning" title="Alertas del expediente">{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}
+    </div>
+  );
 }
 
 function History({ events }: { events: Awaited<ReturnType<typeof fetchEmployeeDetail>>["history"] }) {

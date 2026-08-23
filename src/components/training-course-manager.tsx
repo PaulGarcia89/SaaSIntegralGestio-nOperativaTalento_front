@@ -86,6 +86,7 @@ import {
   updateTrainingCertificationPolicy,
   updateTrainingCoursePilotStatus,
   updateTrainingLesson,
+  uploadTrainingVideo,
 } from "@/lib/backend";
 import type {
   TrainingContentBlockDto,
@@ -1344,12 +1345,12 @@ function ModuleEditor({ module, index, total, editable, moving, onMove, onChange
         </div>
         {editable ? <div className="flex flex-wrap justify-end gap-1"><OrderButtons label={module.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(module.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${module.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${module.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${module.title}`} onClick={() => remove.mutate()} disabled={remove.isPending}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       </CardHeader>
-      {expanded ? <CardContent className="space-y-3">{module.lessons.map((lesson, lessonIndex) => <LessonEditor key={lesson.id} lesson={lesson} index={lessonIndex} total={module.lessons.length} editable={editable} moving={reorder.isPending} onMove={moveLesson} onChanged={onChanged} />)}{editable ? <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (lessonTitle.trim()) createLesson.mutate(); }}><Input aria-label="Título de la nueva lección" placeholder="Nueva lección" value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} /><Button type="submit" variant="secondary" disabled={!lessonTitle.trim() || createLesson.isPending}><Plus className="size-4" />Lección</Button></form> : null}</CardContent> : null}
+      {expanded ? <CardContent className="space-y-3">{module.lessons.map((lesson, lessonIndex) => <LessonEditor key={lesson.id} courseId={module.courseId} lesson={lesson} index={lessonIndex} total={module.lessons.length} editable={editable} moving={reorder.isPending} onMove={moveLesson} onChanged={onChanged} />)}{editable ? <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (lessonTitle.trim()) createLesson.mutate(); }}><Input aria-label="Título de la nueva lección" placeholder="Nueva lección" value={lessonTitle} onChange={(event) => setLessonTitle(event.target.value)} /><Button type="submit" variant="secondary" disabled={!lessonTitle.trim() || createLesson.isPending}><Plus className="size-4" />Lección</Button></form> : null}</CardContent> : null}
     </Card>
   );
 }
 
-function LessonEditor({ lesson, index, total, editable, moving, onMove, onChanged }: { lesson: TrainingCourseDto["modules"][number]["lessons"][number]; index: number; total: number; editable: boolean; moving: boolean; onMove: (lessonId: string, direction: -1 | 1) => void; onChanged: () => Promise<void> }) {
+function LessonEditor({ courseId, lesson, index, total, editable, moving, onMove, onChanged }: { courseId: string; lesson: TrainingCourseDto["modules"][number]["lessons"][number]; index: number; total: number; editable: boolean; moving: boolean; onMove: (lessonId: string, direction: -1 | 1) => void; onChanged: () => Promise<void> }) {
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(lesson.title);
@@ -1357,6 +1358,11 @@ function LessonEditor({ lesson, index, total, editable, moving, onMove, onChange
   const [estimatedMinutes, setEstimatedMinutes] = useState(lesson.estimatedMinutes ?? 0);
   const [isRequired, setIsRequired] = useState(lesson.isRequired);
   const [blockOpen, setBlockOpen] = useState(false);
+  const upload = useMutation({
+    mutationFn: async (file: File) => uploadTrainingVideo(courseId, { file, lessonId: lesson.id, title, description: description || undefined, durationSeconds: await readVideoDuration(file), isMandatory: isRequired }),
+    onSuccess: async () => { toast.success("Video cargado en el almacenamiento de Railway"); await onChanged(); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cargar el video.")),
+  });
   const update = useMutation({ mutationFn: () => updateTrainingLesson(lesson.id, { title, description: description || undefined, estimatedMinutes, isRequired }), onSuccess: async () => { setEditing(false); await onChanged(); } });
   const remove = useMutation({ mutationFn: () => deleteTrainingLesson(lesson.id), onSuccess: onChanged });
   const duplicate = useMutation({ mutationFn: () => duplicateTrainingLesson(lesson.id), onSuccess: async () => { toast.success("Lección duplicada"); await onChanged(); } });
@@ -1373,12 +1379,23 @@ function LessonEditor({ lesson, index, total, editable, moving, onMove, onChange
       <div className="flex items-start gap-2">
         <Button type="button" size="icon" variant="ghost" aria-label={expanded ? "Contraer lección" : "Expandir lección"} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronDown /> : <ChevronRight />}</Button>
         <div className="min-w-0 flex-1">{editing ? <div className="grid gap-2 sm:grid-cols-[1fr_9rem]"><Input aria-label="Título de la lección" value={title} onChange={(event) => setTitle(event.target.value)} /><Input aria-label="Duración estimada en minutos" type="number" min={0} value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} /><textarea aria-label="Descripción de la lección" className="min-h-20 rounded-xl border border-border-default bg-surface-elevated p-3 text-sm sm:col-span-2" placeholder="Objetivo y contexto de la lección" value={description} onChange={(event) => setDescription(event.target.value)} /><label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />Lección obligatoria</label></div> : <><p className="font-medium">{lesson.title}</p>{lesson.description ? <p className="text-sm text-text-secondary">{lesson.description}</p> : null}<p className="text-xs text-text-secondary">{lesson.estimatedMinutes || 0} min · {lesson.isRequired ? "Obligatoria" : "Opcional"} · {lesson.blocks.length} bloques</p></>}</div>
-        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
+        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<label className="inline-flex cursor-pointer items-center justify-center rounded-md px-2 text-sm hover:bg-muted" title="Cargar video MP4"><Video className="size-4" /><input className="sr-only" type="file" accept="video/mp4,.mp4" disabled={upload.isPending} onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.currentTarget.value = ""; }} /></label><Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       </div>
       {expanded ? <div className="mt-3 space-y-2 pl-0 sm:pl-12">{lesson.blocks.map((block, blockIndex) => <BlockEditor key={block.id} block={block} index={blockIndex} total={lesson.blocks.length} editable={editable} moving={reorder.isPending} onMove={moveBlock} onChanged={onChanged} />)}{editable ? <Button type="button" size="sm" variant="secondary" onClick={() => setBlockOpen(true)}><Plus className="size-4" />Agregar contenido</Button> : null}</div> : null}
       <BlockFormDialog lessonId={lesson.id} open={blockOpen} onOpenChange={setBlockOpen} onSaved={onChanged} />
     </div>
   );
+}
+
+function readVideoDuration(file: File) {
+  return new Promise<number>((resolve, reject) => {
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    video.preload = "metadata";
+    video.onloadedmetadata = () => { URL.revokeObjectURL(url); const duration = Math.round(video.duration); duration > 0 ? resolve(duration) : reject(new Error("El video no tiene una duración válida.")); };
+    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No fue posible leer el video MP4.")); };
+    video.src = url;
+  });
 }
 
 function BlockEditor({ block, index, total, editable, moving, onMove, onChanged }: { block: TrainingContentBlockDto; index: number; total: number; editable: boolean; moving: boolean; onMove: (blockId: string, direction: -1 | 1) => void; onChanged: () => Promise<void> }) {

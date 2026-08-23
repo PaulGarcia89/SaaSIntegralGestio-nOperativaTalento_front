@@ -200,6 +200,12 @@ const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "15000")
 const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
 const AUTH_API_BASE_URL = STATIC_HOSTING ? API_BASE_URL : "/api";
 
+export function resolveTrainingAssetUrl(url?: string | null) {
+  if (!url) return url;
+  if (!url.startsWith("/api/")) return url;
+  return `${API_BASE_URL}${url.slice("/api".length)}`;
+}
+
 function normalizeSignedAssetUrl(url?: string | null) {
   if (!url) return url;
   try {
@@ -3409,6 +3415,20 @@ export function updateTrainingLesson(
     `/training/admin/lessons/${encodeURIComponent(lessonId)}`,
     { method: "PATCH", body: JSON.stringify(input) },
   );
+}
+
+export function uploadTrainingVideo(
+  courseId: string,
+  input: { file: File; lessonId: string; title: string; description?: string; durationSeconds: number; isMandatory?: boolean },
+) {
+  const body = new FormData();
+  body.append("file", input.file);
+  body.append("lessonId", input.lessonId);
+  body.append("title", input.title);
+  body.append("durationSeconds", String(input.durationSeconds));
+  if (input.description) body.append("description", input.description);
+  if (input.isMandatory !== undefined) body.append("isMandatory", String(input.isMandatory));
+  return request<TrainingLessonDto>(`/training/admin/courses/${encodeURIComponent(courseId)}/video`, { method: "POST", body });
 }
 
 export function deleteTrainingLesson(lessonId: string) {

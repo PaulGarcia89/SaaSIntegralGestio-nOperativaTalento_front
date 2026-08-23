@@ -1455,8 +1455,11 @@ export async function fetchCurrentAuthUser() {
   }
 }
 
-export function updateTenantContext(tenantId: string) {
-  return request<BackendAuthUser>("/auth/context/tenant", { method: "PUT", body: JSON.stringify({ tenantId }) });
+export async function updateTenantContext(tenantId: string) {
+  const user = await request<BackendAuthUser>("/auth/context/tenant", { method: "PUT", body: JSON.stringify({ tenantId }) });
+  const auth = getStoredAuth();
+  if (auth) persistAuth({ ...auth, tenantId: user.tenantId });
+  return user;
 }
 
 export function updateBranchContext(branchId: string) {

@@ -28,7 +28,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
@@ -174,6 +174,10 @@ export function TrainingCourseManager() {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TrainingCourseDto | null>(null);
+
+  useEffect(() => {
+    setPreviewId(null);
+  }, [currentTenant?.id]);
 
   const coursesQuery = useQuery({
     queryKey: ["training-admin-courses", currentTenant?.id, page, search, status, scope, categoryId],
@@ -326,7 +330,9 @@ export function TrainingCourseManager() {
                 canDelete={can("courses.delete")}
                 canDuplicate={canCreate}
                 onEdit={(courseId) => router.push(`/training/content/${encodeURIComponent(courseId)}`)}
-                onPreview={setPreviewId}
+                onPreview={(courseId) => {
+                  if (coursesQuery.data?.items.some((course) => course.id === courseId)) setPreviewId(courseId);
+                }}
                 onDelete={setDeleteTarget}
               />
             }
@@ -337,7 +343,9 @@ export function TrainingCourseManager() {
                 canDelete={can("courses.delete")}
                 canDuplicate={canCreate}
                 onEdit={(courseId) => router.push(`/training/content/${encodeURIComponent(courseId)}`)}
-                onPreview={setPreviewId}
+                onPreview={(courseId) => {
+                  if (coursesQuery.data?.items.some((course) => course.id === courseId)) setPreviewId(courseId);
+                }}
                 onDelete={setDeleteTarget}
               />
             )}

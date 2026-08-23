@@ -3188,6 +3188,14 @@ export function fetchTrainingCoursePreview(courseId: string) {
   );
 }
 
+export function fetchTrainingAdminVideo(courseId: string, lessonId: string) {
+  return request<Blob>(
+    `/training/admin/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}/video`,
+    {},
+    { responseType: "blob" },
+  );
+}
+
 export function fetchTrainingCourseQuality(courseId: string) {
   return request<TrainingCourseQualityDto>(
     `/training/admin/courses/${encodeURIComponent(courseId)}/quality`,

@@ -122,7 +122,7 @@ function FoundationForm({
   onSaved?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [brief, setBrief] = useState<TrainingCourseDesignInput["brief"]>({ ...emptyBrief, ...initial.brief });
+  const [brief, setBrief] = useState<TrainingCourseDesignInput["brief"]>({ ...emptyBrief, ...stripBrief(initial.brief) });
   const [selected, setSelected] = useState<TrainingCourseDesignInput["competencies"]>(
     initial.competencies.map(({ competencyId, targetLevel, isRequired, sortOrder }) => ({ competencyId, targetLevel, isRequired, sortOrder })),
   );
@@ -291,6 +291,21 @@ function FoundationForm({
 
 function stripObjective(objective: TrainingLearningObjectiveDto): TrainingCourseDesignInput["objectives"][number] {
   return { competencyId: objective.competencyId, statement: objective.statement, successCriteria: objective.successCriteria, assessmentMethod: objective.assessmentMethod, targetLevel: objective.targetLevel, isRequired: objective.isRequired, sortOrder: objective.sortOrder };
+}
+
+function stripBrief(brief?: TrainingCourseDesignDto["brief"]): TrainingCourseDesignInput["brief"] {
+  return {
+    businessNeed: brief?.businessNeed ?? "",
+    targetOutcome: brief?.targetOutcome ?? "",
+    successKpi: brief?.successKpi ?? "",
+    audienceDescription: brief?.audienceDescription,
+    baselineMetric: brief?.baselineMetric,
+    targetMetric: brief?.targetMetric,
+    riskIfNotCompleted: brief?.riskIfNotCompleted,
+    contentOwnerId: brief?.contentOwnerId,
+    subjectMatterExpertId: brief?.subjectMatterExpertId,
+    targetDate: brief?.targetDate,
+  };
 }
 
 function stripRule(rule: TrainingAudienceRuleDto): TrainingCourseDesignInput["audienceRules"][number] {

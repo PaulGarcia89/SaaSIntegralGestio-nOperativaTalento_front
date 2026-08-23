@@ -546,6 +546,11 @@ export interface TrainingLessonDto {
   sortOrder: number;
   estimatedMinutes?: number | null;
   isRequired: boolean;
+  type?: "READING" | "VIDEO" | "QUIZ" | "FILE" | "TASK";
+  videoUrl?: string | null;
+  thumbnailUrl?: string | null;
+  durationSeconds?: number | null;
+  requiredCompletionPercentage?: number;
   blocks: TrainingContentBlockDto[];
 }
 
@@ -901,6 +906,22 @@ export interface TrainingOnboardingRuleDto {
 export interface LearnerTrainingLessonDto extends TrainingLessonDto {
   completed: boolean;
   completedAt?: string | null;
+  videoProgress?: {
+    lastPositionSeconds: number;
+    watchedSeconds: number;
+    completionPercentage: number;
+    playbackSessionId?: string | null;
+    completedAt?: string | null;
+  } | null;
+}
+
+export interface TrainingVideoProgressResponse {
+  watchedSeconds: number;
+  completionPercentage: number;
+  lastPositionSeconds?: number;
+  completedAt?: string | null;
+  durationSeconds: number;
+  serverCompletionPercentage?: number;
 }
 
 export interface LearnerTrainingCourseDto extends Omit<TrainingCourseDto, "modules"> {

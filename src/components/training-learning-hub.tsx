@@ -15,7 +15,8 @@ import {
   Users,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { PageHeader, Pagination } from "@/components/design-system";
@@ -53,9 +54,11 @@ import {
   fetchTrainingLaunches,
   fetchUsers,
   getApiErrorMessage,
+  heartbeatTrainingVideo,
+  recordTrainingVideoEvent,
   submitTrainingPilotFeedback,
+  startTrainingVideo,
   updateTrainingLaunchStatus,
-  updateTrainingLessonProgress,
 } from "@/lib/backend";
 import type {
   LearnerTrainingCourseDto,
@@ -85,7 +88,7 @@ const roleTargets = [
 
 export function TrainingLearningHub() {
   const { can } = useAppStore();
-  const [courseId, setCourseId] = useState<string | null>(null);
+  const router = useRouter();
   const canManageAssignments = can("courses.assign");
 
   return (
@@ -106,8 +109,8 @@ export function TrainingLearningHub() {
           ) : null}
         </TabsList>
         <TabsContent value="mine" className="mt-6">
-          <MyPilots onOpen={(id) => setCourseId(id)} />
-          <MyCourses onOpen={(id) => setCourseId(id)} />
+          <MyPilots onOpen={(id) => router.push(`/training/learn/${id}`)} />
+          <MyCourses onOpen={(id) => router.push(`/training/learn/${id}`)} />
         </TabsContent>
         {canManageAssignments ? (
           <TabsContent value="assignments" className="mt-6">
@@ -120,11 +123,6 @@ export function TrainingLearningHub() {
           </TabsContent>
         ) : null}
       </Tabs>
-      <CoursePlayer
-        courseId={courseId}
-        open={Boolean(courseId)}
-        onOpenChange={(open) => !open && setCourseId(null)}
-      />
     </div>
   );
 }
@@ -698,31 +696,104 @@ function CoursePlayer({ courseId, open, onOpenChange }: { courseId: string | nul
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["learner-course", courseId], queryFn: () => fetchLearnerTrainingCourse(courseId!), enabled: Boolean(open && courseId) });
   const mutation = useMutation({
-    mutationFn: ({ lessonId, completed }: { lessonId: string; completed: boolean }) => updateTrainingLessonProgress(lessonId, completed),
+    mutationFn: async ({ event }: { event: VideoProgressEvent }) => {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          if (event.eventType === "PLAY") return await startTrainingVideo(event);
+          if (event.eventType === "HEARTBEAT") return await heartbeatTrainingVideo({ ...event, clientTimestamp: new Date().toISOString(), isPlaying: true });
+          if (event.eventType === "PAUSE" || event.eventType === "SEEK" || event.eventType === "ENDED") return await recordTrainingVideoEvent(event.eventType === "ENDED" ? "ended" : "pause", event);
+          return null;
+        } catch (error) {
+          lastError = error;
+          if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
+        }
+      }
+      throw lastError;
+    },
     onSuccess: async () => {
-      await query.refetch();
       await queryClient.invalidateQueries({ queryKey: ["my-training-assignments"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible guardar tu avance.")),
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible sincronizar tu avance.")),
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader><DialogTitle>{query.data?.title ?? "Curso"}</DialogTitle><DialogDescription>{query.data?.summary ?? "Contenido y progreso del curso."}</DialogDescription></DialogHeader>
-        {query.isLoading ? <AsyncState state="loading" /> : query.isError ? <AsyncState state="error" onRetry={() => query.refetch()} /> : query.data ? <CourseContent course={query.data} onToggle={(lessonId, completed) => mutation.mutate({ lessonId, completed })} /> : null}
+        {query.isLoading ? <AsyncState state="loading" /> : query.isError ? <AsyncState state="error" onRetry={() => query.refetch()} /> : query.data ? <CourseContent course={query.data} onVideoProgress={(event) => mutation.mutate({ event })} /> : null}
       </DialogContent>
     </Dialog>
   );
 }
 
-function CourseContent({ course, onToggle }: { course: LearnerTrainingCourseDto; onToggle: (lessonId: string, completed: boolean) => void }) {
+export type VideoProgressEvent = {
+  assignmentId: string;
+  lessonId: string;
+  playbackSessionId: string;
+  eventType: "PLAY" | "PAUSE" | "SEEK" | "HEARTBEAT" | "ENDED" | "COMPLETED";
+  currentTimeSeconds: number;
+  durationSeconds: number;
+};
+
+export function CourseContent({ course, onVideoProgress }: { course: LearnerTrainingCourseDto; onVideoProgress: (event: VideoProgressEvent) => void }) {
   return (
     <div className="space-y-5">
       <div className="rounded-xl bg-muted p-4"><div className="flex justify-between text-sm"><span>Avance general</span><strong>{course.progress?.progressPercent ?? 0}%</strong></div></div>
-      {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => <div key={lesson.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-4"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div><Button variant={lesson.completed ? "secondary" : "default"} onClick={() => onToggle(lesson.id, !lesson.completed)}>{lesson.completed ? <CheckCircle2 className="size-4"/> : <PlayCircle className="size-4"/>}{lesson.completed ? "Completada" : "Marcar completada"}</Button></div><div className="mt-4 space-y-2">{lesson.blocks.map((block) => <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-primary underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div></div>)}</CardContent></Card>)}
+      {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => <div key={lesson.id} className="rounded-xl border p-4"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div><div className="mt-4 space-y-3">{lesson.blocks.map((block) => block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-primary underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="size-4" />Completada automáticamente</p> : null}</div>)}</CardContent></Card>)}
     </div>
   );
+}
+
+export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const onProgressRef = useRef(onProgress);
+  const sessionRef = useRef<string>(crypto.randomUUID());
+  const lastSentRef = useRef(0);
+  const [syncState, setSyncState] = useState("Listo para reproducir");
+  const savedPosition = lesson.videoProgress?.lastPositionSeconds ?? 0;
+  onProgressRef.current = onProgress;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const send = (eventType: VideoProgressEvent["eventType"]) => {
+      const duration = Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
+      const current = Math.round(video.currentTime);
+      if (eventType === "HEARTBEAT" && current === lastSentRef.current) return;
+      lastSentRef.current = current;
+      setSyncState("Sincronizando…");
+      onProgressRef.current({ assignmentId, lessonId: lesson.id, playbackSessionId: sessionRef.current, eventType, currentTimeSeconds: current, durationSeconds: duration });
+    };
+    const restore = () => { if (savedPosition > 0 && video.currentTime < 1) video.currentTime = savedPosition; };
+    const heartbeat = window.setInterval(() => { if (!video.paused && !video.ended) send("HEARTBEAT"); }, 10_000);
+    const onPlay = () => send("PLAY");
+    const onPause = () => send("PAUSE");
+    const onEnded = () => send("ENDED");
+    const onSeeked = () => send("SEEK");
+    const onVisibilityChange = () => { if (document.hidden && !video.paused) send("PAUSE"); };
+    const onOnline = () => { if (!video.paused && !video.ended) send("HEARTBEAT"); };
+    video.addEventListener("loadedmetadata", restore);
+    video.addEventListener("play", onPlay);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("seeked", onSeeked);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onOnline);
+    return () => {
+      if (!video.ended) send("PAUSE");
+      window.clearInterval(heartbeat);
+      video.removeEventListener("loadedmetadata", restore);
+      video.removeEventListener("play", onPlay);
+      video.removeEventListener("pause", onPause);
+      video.removeEventListener("ended", onEnded);
+      video.removeEventListener("seeked", onSeeked);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [lesson.id, savedPosition]);
+
+  return <div className="rounded-xl bg-black p-2"><video ref={videoRef} className="aspect-video w-full rounded-lg" controls playsInline preload="metadata" src={url} aria-label={`Video de ${lesson.title}`} /><p className="px-2 pb-1 pt-2 text-xs text-white/70">{syncState} · Se completa automáticamente al reproducir el 90%.</p></div>;
 }
 
 function formatDate(value: string) {

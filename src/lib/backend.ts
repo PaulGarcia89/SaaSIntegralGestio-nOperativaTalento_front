@@ -44,6 +44,7 @@ import type {
   TrainingContentBlockDto,
   TrainingCourseDto,
   TrainingCourseInput,
+  TrainingVideoProgressResponse,
   TrainingCourseListDto,
   TrainingCourseModuleDto,
   TrainingCourseTransitionInput,
@@ -1279,7 +1280,7 @@ export async function createPlan(input: Omit<PlanAdminDto, "id" | "subscriptions
 
 export async function updatePlan(id: string, input: Omit<PlanAdminDto, "id" | "subscriptions" | "modules" | "code"> & { code?: PlanAdminDto["code"]; moduleIds: string[] }) {
   const result = await request<BackendPlan>(`/plans/${id}`, {
-    method: "PATCH",
+    method: "POST",
     body: JSON.stringify(input),
   });
   return mapAdminPlan(result);
@@ -1987,6 +1988,20 @@ export function replaceEmployeeDocument(employeeId: string, documentId: string, 
       body,
     },
   );
+}
+
+export type DocuSealTemplateDto = { key: string; label: string; id: number; url?: string };
+export type DocuSealSubmissionDto = { packageId: string; externalPackageId: string; templateKey: string; label: string; signingUrl?: string | null };
+
+export function fetchDocuSealTemplates() {
+  return request<{ configured: boolean; templates: DocuSealTemplateDto[] }>("/signatures/docuseal/templates");
+}
+
+export function createDocuSealSubmission(employeeId: string, templateKey: string) {
+  return request<DocuSealSubmissionDto>("/signatures/docuseal/submissions", {
+    method: "POST",
+    body: JSON.stringify({ employeeId, templateKey }),
+  });
 }
 
 function updateEmployeeSection<T extends Record<string, unknown>>(id: string, section: string, input: T) {
@@ -3503,6 +3518,24 @@ export function updateTrainingLessonProgress(
     `/training/progress/lessons/${encodeURIComponent(lessonId)}`,
     { method: "PATCH", body: JSON.stringify({ completed }) },
   );
+}
+
+export function startTrainingVideo(input: { assignmentId: string; lessonId: string; playbackSessionId: string }) {
+  return request<TrainingVideoProgressResponse>("/training/video/start", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function heartbeatTrainingVideo(input: { assignmentId: string; lessonId: string; playbackSessionId: string; currentTimeSeconds: number; durationSeconds: number; isPlaying: boolean; playbackRate?: number; clientTimestamp: string }) {
+  return request<TrainingVideoProgressResponse>("/training/video/heartbeat", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function recordTrainingVideoEvent(path: "pause" | "ended", input: { assignmentId: string; lessonId: string; playbackSessionId: string; currentTimeSeconds: number; durationSeconds: number }) {
+  return request(`/training/video/${path}`, { method: "POST", body: JSON.stringify(input) });
 }
 
 export function fetchTrainingAdminAssignments(filters: {

@@ -165,7 +165,7 @@ export function TrainingCourseManager() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { can, currentRole } = useAppStore();
+  const { can, currentRole, currentTenant } = useAppStore();
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const search = searchParams.get("search") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -176,7 +176,7 @@ export function TrainingCourseManager() {
   const [deleteTarget, setDeleteTarget] = useState<TrainingCourseDto | null>(null);
 
   const coursesQuery = useQuery({
-    queryKey: ["training-admin-courses", page, search, status, scope, categoryId],
+    queryKey: ["training-admin-courses", currentTenant?.id, page, search, status, scope, categoryId],
     queryFn: () =>
       fetchTrainingCourses({
         page,

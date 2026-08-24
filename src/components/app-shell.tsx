@@ -190,13 +190,13 @@ function SidebarContent({
 
   function toggleGroup(group: string) {
     setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(group)) {
+      if (prev.has(group)) {
+        const next = new Set(prev);
         next.delete(group);
-      } else {
-        next.add(group);
+        return next;
       }
-      return next;
+
+      return new Set(navigationGroups.filter((candidate) => candidate !== group));
     });
   }
 

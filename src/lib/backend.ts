@@ -4322,7 +4322,7 @@ export function fetchInventoryCatalog() {
 export function fetchRestaurantDashboard(filters: { branchId?: string; warehouseId?: string; from?: string; to?: string } = {}) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
-  return request<import("./contracts").RestaurantInventoryDashboardDto>(`/inventory/restaurant/dashboard${query.size ? `?${query}` : ""}`);
+  return request<import("./contracts").RestaurantInventoryDashboardDto>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`);
 }
 export function fetchRestaurantIngredients(filters: { search?: string; status?: string; page?: number; pageSize?: number } = {}) {
   const query = new URLSearchParams();

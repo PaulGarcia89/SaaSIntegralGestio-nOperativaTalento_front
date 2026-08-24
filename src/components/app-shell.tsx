@@ -211,6 +211,8 @@ function SidebarContent({
     !inventoryModuleRoots.has(item.href) &&
     (item.module === "asset_inventory" || item.module === "restaurant_inventory");
 
+  const inventoryModuleGroups = new Set<NavGroup>(["Inventario de activos", "Inventario de restaurante"]);
+
   return (
     <Card className={cn(
       "flex min-h-0 flex-col border-sidebar-border bg-sidebar text-sidebar-foreground",
@@ -255,6 +257,7 @@ function SidebarContent({
           {navigationGroups.map((group) => {
             const isCollapsed = collapsedGroups.has(group);
             const hasActive = groupHasActiveItem(group);
+            const isInventoryModuleGroup = inventoryModuleGroups.has(group);
 
             return (
               <div key={group} className="space-y-1">
@@ -286,7 +289,7 @@ function SidebarContent({
                           />
                         ))
                       : navigationItems
-                          ?.filter((item) => item.group === group && !isInventorySubmenuItem(item))
+                          ?.filter((item) => item.group === group && (isInventoryModuleGroup ? inventoryModuleRoots.has(item.href) : !isInventorySubmenuItem(item)))
                           .map((item) => {
                             const active = item.href === activeHref;
                             const NavIcon = navigationIcons[item.icon];
@@ -300,7 +303,7 @@ function SidebarContent({
 
                             return (
                               <div key={item.href}>
-                                <Link
+                                {!isInventoryModuleGroup ? <Link
                                   href={item.href}
                                   onClick={onNavigate}
                                   aria-current={active ? "page" : undefined}
@@ -314,7 +317,7 @@ function SidebarContent({
                                 >
                                   <NavIcon className="size-4" aria-hidden="true" />
                                   <span>{item.label}</span>
-                                </Link>
+                                </Link> : null}
                                 {submenuItems.length ? (
                                   <div className="ml-4 space-y-1 border-l border-white/10 pl-2">
                                     {submenuItems.map((submenuItem) => {

@@ -214,10 +214,10 @@ function SidebarContent({
 
   return (
     <Card className={cn(
-      "flex flex-col border-sidebar-border bg-sidebar text-sidebar-foreground",
+      "flex min-h-0 flex-col border-sidebar-border bg-sidebar text-sidebar-foreground",
       mobile ? "min-h-full overflow-visible" : "h-full overflow-hidden",
     )}>
-      <div className="space-y-4 p-6">
+      <div className="shrink-0 space-y-4 p-6">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-xl text-base font-bold text-white" style={{ backgroundColor: brandAccent }}>
             {brandName.charAt(0).toUpperCase()}

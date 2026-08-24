@@ -14,8 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const reportOptions = [
-  ["kardex", "Kardex"], ["valued-stock", "Existencias valorizadas"], ["receipts", "Entradas"], ["consumption", "Consumo"],
-  ["waste", "Desperdicios"], ["expirations", "Vencimientos"], ["count-differences", "Diferencias de conteo"],
+  ["kardex", "Kardex"], ["valued-stock", "Existencias valorizadas"], ["receipts-by-supplier", "Entradas"], ["consumption-by-recipe", "Consumo"],
+  ["waste-by-reason", "Desperdicios"], ["expiry", "Vencimientos"], ["count-variances", "Diferencias de conteo"],
   ["recipe-cost", "Costo por receta"], ["theoretical-margin", "Margen teórico"], ["theoretical-vs-real", "Consumo teórico vs real"], ["purchase-suggestions", "Sugerencias de compra"],
 ] as const;
 

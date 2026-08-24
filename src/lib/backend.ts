@@ -1185,8 +1185,11 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
   }
 
   const requestBaseUrl = options.authBridge ? AUTH_API_BASE_URL : API_BASE_URL;
+  const apiPath = path
+    .replace(/^\/inventory\/restaurant(?=\/|$)/, "/restaurant-inventory")
+    .replace(/^\/restaurant-inventory\/sales-import(?=\/|$)/, "/restaurant-inventory/sales-imports");
   const isSafeRead = (init.method ?? "GET").toUpperCase() === "GET" && options.retrySafe !== false;
-  let response = await fetchSafeRead(`${requestBaseUrl}${path}`, {
+  let response = await fetchSafeRead(`${requestBaseUrl}${apiPath}`, {
     ...init,
     headers,
     credentials: init.credentials ?? "include",
@@ -1196,7 +1199,7 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       headers.set("Authorization", `Bearer ${refreshed.accessToken}`);
-      response = await fetchSafeRead(`${requestBaseUrl}${path}`, {
+      response = await fetchSafeRead(`${requestBaseUrl}${apiPath}`, {
         ...init,
         headers,
         credentials: init.credentials ?? "include",
@@ -4374,11 +4377,11 @@ export function previewRestaurantSalesImport(sessionId: string) { return request
 export function processRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportJobDto>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/process`, { method: "POST" }); }
 export function fetchRestaurantSalesImportJob(jobId: string) { return request<import("./contracts").SalesImportJobDto>(`/inventory/restaurant/sales-import/jobs/${encodeURIComponent(jobId)}`); }
 export function fetchRestaurantSalesImportHistory() { return request<import("./contracts").SalesImportHistoryDto[]>("/inventory/restaurant/sales-import/history"); }
-export function fetchRestaurantAdvancedDashboard(filters: Record<string, string> = {}) { const query = new URLSearchParams(filters); return request<import("./contracts").RestaurantAdvancedDashboardDto>(`/inventory/restaurant/analytics/dashboard${query.size ? `?${query}` : ""}`); }
-export function fetchRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<import("./contracts").RestaurantReportDto>(`/inventory/restaurant/reports/${encodeURIComponent(report)}${query.size ? `?${query}` : ""}`); }
-export async function downloadRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const blob = await request<Blob>(`/inventory/restaurant/reports/${encodeURIComponent(report)}/export${query.size ? `?${query}` : ""}`, {}, { responseType: "blob" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${report}-inventario.csv`; anchor.click(); URL.revokeObjectURL(url); }
-export function fetchRestaurantRecipeCost(recipeId: string) { return request<import("./contracts").RestaurantRecipeCostDto>(`/inventory/restaurant/reports/recipe-cost/${encodeURIComponent(recipeId)}`); }
-export function fetchRestaurantAudit(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<{ items: import("./contracts").RestaurantAuditEntryDto[]; page: number; pageSize: number; total: number; totalPages: number; generatedAt: string }>(`/inventory/restaurant/audit${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantAdvancedDashboard(filters: Record<string, string> = {}) { const query = new URLSearchParams(filters); return request<import("./contracts").RestaurantAdvancedDashboardDto>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<import("./contracts").RestaurantReportDto>(`/restaurant-inventory/reports/${encodeURIComponent(report)}${query.size ? `?${query}` : ""}`); }
+export async function downloadRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const blob = await request<Blob>(`/restaurant-inventory/reports/${encodeURIComponent(report)}/export${query.size ? `?${query}` : ""}`, {}, { responseType: "blob" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${report}-inventario.csv`; anchor.click(); URL.revokeObjectURL(url); }
+export function fetchRestaurantRecipeCost(recipeId: string) { return request<import("./contracts").RestaurantRecipeCostDto>(`/restaurant-inventory/reports/recipe-cost/${encodeURIComponent(recipeId)}`); }
+export function fetchRestaurantAudit(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<{ items: import("./contracts").RestaurantAuditEntryDto[]; page: number; pageSize: number; total: number; totalPages: number; generatedAt: string }>(`/restaurant-inventory/reports/audit${query.size ? `?${query}` : ""}`); }
 export function fetchProductivityOverview(branchId?: string) { return request<{ totalEvents:number; activeSeconds:number; idleSeconds:number; taskCount:number; camerasOnline:number; zonesActive:number; alertsOpen:number }>(`/productivity/overview${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
 export function fetchProductivityAlerts(branchId?: string) { return request<Array<{ id: string; status: string; title: string; description: string; createdAt: string }>>(`/productivity/alerts${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
 export function fetchProductivityInsights(branchId?: string) { return request<{ period: { from: string; to: string }; zones: Array<{ zone: { id: string; name: string }; events: number; activeSeconds: number; idleSeconds: number; confidence: number }>; recommendations: Array<{ zoneId: string; title: string; explanation: string; suggestedAction: string }> }>(`/productivity/insights${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }

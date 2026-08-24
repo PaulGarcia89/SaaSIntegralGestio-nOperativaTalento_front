@@ -94,7 +94,7 @@ export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
 
 export function getRoutePolicy(pathname: string) { return [...appNavigation].sort((a, b) => b.href.length - a.href.length).find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)); }
 export function getInventoryModuleFromPath(pathname: string) {
-  if (pathname === "/inventory" || pathname.startsWith("/inventory/assets")) return "asset_inventory";
+  if (pathname.startsWith("/inventory/assets")) return "asset_inventory";
   if (pathname.startsWith("/inventory/restaurant")) return "restaurant_inventory";
   return null;
 }

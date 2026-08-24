@@ -117,7 +117,7 @@ function SidebarNavigationViewport({ children, mobile }: { children: React.React
     );
   }
 
-  return <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 [scrollbar-color:rgba(148,163,184,0.65)_transparent]">{children}</div>;
+  return <div className="h-0 min-h-0 flex-1 overflow-y-scroll px-4 pb-4 [scrollbar-color:rgba(148,163,184,0.65)_transparent]">{children}</div>;
 }
 
 function isActivePath(itemHref: string, pathname: string) {
@@ -558,7 +558,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <AccessibleCommandPalette open={searchOpen} onOpenChange={setSearchOpen} items={navigationForContext.map((route) => ({ id: route.href.replaceAll("/", "-") || "inicio", label: route.label, group: route.group, href: route.href }))} onNavigate={(href) => router.push(href)} />
 
       <div className="mx-auto grid min-h-screen max-w-[1600px] gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="order-2 xl:order-1 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
+        <aside className="order-2 min-h-0 xl:order-1 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
           <div className="hidden xl:block">
             <SidebarContent
               currentBranch={workspaceBranch}

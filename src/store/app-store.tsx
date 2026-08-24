@@ -312,8 +312,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const allowedNav = useMemo(
-    () =>
-      appNavigation.filter((item) => item.showInNavigation !== false && evaluateRouteAccess(item, {
+    () => {
+      const inventoryCount = Number(hasModule("asset_inventory")) + Number(hasModule("restaurant_inventory"));
+      return appNavigation.filter((item) => item.showInNavigation !== false && evaluateRouteAccess(item, {
         sessionValid: accessContextVerified,
         globalContext: isGlobalGovernanceContext,
         tenantAllowed: accessContextVerified && (currentRole === "admin_saas" || allowedTenantIds.includes(currentTenant.id)),
@@ -323,7 +324,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         hasFeature,
         can,
         branchAvailable: Boolean(currentBranch),
-      }).allowed),
+      }).allowed).map((item) => {
+        if (item.href === "/inventory/assets") return { ...item, label: inventoryCount > 1 ? "Activos" : "Inventario de activos" };
+        if (item.href === "/inventory/restaurant") return { ...item, label: inventoryCount > 1 ? "Restaurante" : "Inventario de restaurante" };
+        return item;
+      });
+    },
     [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, isGlobalGovernanceContext],
   );
 

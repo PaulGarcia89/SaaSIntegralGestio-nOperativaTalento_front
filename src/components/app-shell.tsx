@@ -167,7 +167,7 @@ function SidebarContent({
 
   const collapsedGroupsForRoute = useMemo(
     () => {
-      const groups: NavGroup[] = ["Inicio", "Personas", "Reclutamiento", "Aprendizaje", "Operaciones", "Analítica", "Administración", "Gobierno de plataforma"];
+      const groups: NavGroup[] = ["Inicio", "Personas", "Reclutamiento", "Aprendizaje", "Operaciones", "Inventario de activos", "Inventario de restaurante", "Analítica", "Administración", "Gobierno de plataforma"];
       const initial = new Set<string>();
       const activeGroup = groups.find((group) =>
         navigationItems?.some(
@@ -406,7 +406,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigationForContext = allowedNav;
   const groups = useMemo(
     () =>
-      (["Inicio", "Personas", "Reclutamiento", "Aprendizaje", "Operaciones", "Analítica", "Administración", "Gobierno de plataforma"] as const).filter((group) =>
+      (["Inicio", "Personas", "Reclutamiento", "Aprendizaje", "Operaciones", "Inventario de activos", "Inventario de restaurante", "Analítica", "Administración", "Gobierno de plataforma"] as const).filter((group) =>
         navigationForContext.some((item) => item.group === group),
       ),
     [navigationForContext],

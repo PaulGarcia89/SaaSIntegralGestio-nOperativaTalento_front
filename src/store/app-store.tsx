@@ -324,8 +324,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         can,
         branchAvailable: Boolean(currentBranch),
       }).allowed).map((item) => {
-        if (item.href === "/inventory/assets") return { ...item, label: "Inventario de activos" };
-        if (item.href === "/inventory/restaurant") return { ...item, label: "Inventario de restaurante" };
+        if (item.module === "asset_inventory") return { ...item, group: "Inventario de activos" as const, ...(item.href === "/inventory/assets" ? { label: "Inventario de activos" } : {}) };
+        if (item.module === "restaurant_inventory") return { ...item, group: "Inventario de restaurante" as const, ...(item.href === "/inventory/restaurant" ? { label: "Inventario de restaurante" } : {}) };
         return item;
       });
     },

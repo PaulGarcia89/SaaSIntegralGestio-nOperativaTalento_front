@@ -1,6 +1,6 @@
 import type { ModuleKey, PermissionKey, RoleKey, SubscriptionAccessState } from "@/lib/contracts";
 
-export type NavGroup = "Inicio" | "Personas" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Analítica" | "Administración" | "Gobierno de plataforma";
+export type NavGroup = "Inicio" | "Personas" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Inventario de activos" | "Inventario de restaurante" | "Analítica" | "Administración" | "Gobierno de plataforma";
 export type NavItem = { href: string; label: string; group: NavGroup; module: ModuleKey; permission: PermissionKey; requiredPermissions: PermissionKey[]; audience: "shared" | "saas" | "tenant"; featureFlag: string; available: boolean; requiresCommercialModule?: boolean; showInNavigation?: boolean; subscriptionStates?: SubscriptionAccessState[]; branchRequired?: boolean; roles?: RoleKey[]; strictRoles?: boolean; icon: "dashboard" | "notifications" | "reports" | "profile" | "vacancies" | "candidates" | "interviews" | "documents" | "signatures" | "training" | "evaluations" | "productivity" | "inventory" | "admin" | "users" | "roles" | "company" | "tenants" | "branches" | "modules" | "subscription" | "queues" };
 const live: SubscriptionAccessState[] = ["active", "trial", "grace_period"];
 

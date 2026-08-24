@@ -41,7 +41,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AccessibleCommandPalette, MobileDrawer } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -118,7 +117,7 @@ function SidebarNavigationViewport({ children, mobile }: { children: React.React
     );
   }
 
-  return <ScrollArea className="min-h-0 flex-1 px-4 pb-4">{children}</ScrollArea>;
+  return <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 [scrollbar-color:rgba(148,163,184,0.65)_transparent]">{children}</div>;
 }
 
 function isActivePath(itemHref: string, pathname: string) {

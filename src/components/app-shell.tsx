@@ -97,14 +97,14 @@ type SidebarContentProps = {
   brandAccent: string;
   navigationGroups: readonly NavGroup[];
   navigationLoading: boolean;
-  navigationItems:
-    | Array<{ href: string; label: string; group: NavGroup; icon: NavItem["icon"] }>
-    | undefined;
+  navigationItems: SidebarNavigationItem[] | undefined;
   pathname: string;
   supportEmail: string;
   onNavigate?: () => void;
   mobile?: boolean;
 };
+
+type SidebarNavigationItem = Pick<NavItem, "href" | "label" | "group" | "icon" | "module">;
 
 function SidebarNavigationViewport({ children, mobile }: { children: React.ReactNode; mobile: boolean }) {
   if (mobile) {
@@ -139,6 +139,8 @@ function getMobileQuickNavigation(items: readonly NavItem[], pathname: string) {
 
   return priority.filter((item, index) => priority.findIndex((candidate) => candidate.href === item.href) === index).slice(0, 3);
 }
+
+const inventoryModuleRoots = new Set(["/inventory/assets", "/inventory/restaurant"]);
 
 function SidebarContent({
   currentBranch,
@@ -205,6 +207,10 @@ function SidebarContent({
         item.group === group &&
         item.href === activeHref,
     );
+
+  const isInventorySubmenuItem = (item: SidebarNavigationItem) =>
+    !inventoryModuleRoots.has(item.href) &&
+    (item.module === "asset_inventory" || item.module === "restaurant_inventory");
 
   return (
     <Card className={cn(
@@ -281,28 +287,62 @@ function SidebarContent({
                           />
                         ))
                       : navigationItems
-                          ?.filter((item) => item.group === group)
+                          ?.filter((item) => item.group === group && !isInventorySubmenuItem(item))
                           .map((item) => {
                             const active = item.href === activeHref;
                             const NavIcon = navigationIcons[item.icon];
+                            const submenuItems = inventoryModuleRoots.has(item.href)
+                              ? navigationItems.filter(
+                                  (candidate) =>
+                                    candidate.module === item.module &&
+                                    isInventorySubmenuItem(candidate),
+                                )
+                              : [];
 
                             return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={onNavigate}
-                                aria-current={active ? "page" : undefined}
-                                style={active ? { backgroundColor: brandAccent } : undefined}
-                                className={cn(
-                                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
-                                  active
-                                    ? "text-sidebar-primary-foreground shadow-lg shadow-cyan-900/20"
-                                    : "text-sidebar-foreground/75 hover:bg-white/7 hover:text-sidebar-foreground",
-                                )}
-                              >
-                                <NavIcon className="size-4" aria-hidden="true" />
-                                <span>{item.label}</span>
-                              </Link>
+                              <div key={item.href}>
+                                <Link
+                                  href={item.href}
+                                  onClick={onNavigate}
+                                  aria-current={active ? "page" : undefined}
+                                  style={active ? { backgroundColor: brandAccent } : undefined}
+                                  className={cn(
+                                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
+                                    active
+                                      ? "text-sidebar-primary-foreground shadow-lg shadow-cyan-900/20"
+                                      : "text-sidebar-foreground/75 hover:bg-white/7 hover:text-sidebar-foreground",
+                                  )}
+                                >
+                                  <NavIcon className="size-4" aria-hidden="true" />
+                                  <span>{item.label}</span>
+                                </Link>
+                                {submenuItems.length ? (
+                                  <div className="ml-4 space-y-1 border-l border-white/10 pl-2">
+                                    {submenuItems.map((submenuItem) => {
+                                      const submenuActive = submenuItem.href === activeHref;
+                                      const SubmenuIcon = navigationIcons[submenuItem.icon];
+                                      return (
+                                        <Link
+                                          key={submenuItem.href}
+                                          href={submenuItem.href}
+                                          onClick={onNavigate}
+                                          aria-current={submenuActive ? "page" : undefined}
+                                          style={submenuActive ? { backgroundColor: brandAccent } : undefined}
+                                          className={cn(
+                                            "flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition",
+                                            submenuActive
+                                              ? "text-sidebar-primary-foreground shadow-lg shadow-cyan-900/20"
+                                              : "text-sidebar-foreground/75 hover:bg-white/7 hover:text-sidebar-foreground",
+                                          )}
+                                        >
+                                          <SubmenuIcon className="size-4" aria-hidden="true" />
+                                          <span>{submenuItem.label}</span>
+                                        </Link>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
+                              </div>
                             );
                           })}
                   </div>

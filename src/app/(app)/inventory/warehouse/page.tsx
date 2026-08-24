@@ -1,5 +1,5 @@
-import { InventoryWarehousePanel } from "@/components/inventory-warehouse-panel";
+import { redirect } from "next/navigation";
 
 export default function InventoryWarehousePage() {
-  return <InventoryWarehousePanel />;
+  redirect("/inventory");
 }

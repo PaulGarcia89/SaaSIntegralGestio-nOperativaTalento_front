@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { InventoryWorkspace } from "@/components/inventory-workspace";
 
 export default function InventoryAssetsEntry() {
-  redirect("/inventory/warehouse");
+  return <InventoryWorkspace title="Inventario de activos" />;
 }

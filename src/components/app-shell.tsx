@@ -526,7 +526,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="order-2 xl:order-1 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
           <div className="hidden xl:block">
             <SidebarContent
-              key={pathname}
               currentBranch={workspaceBranch}
               brandName={isGlobalView ? "TalentOS" : currentTenant.branding.productName ?? currentTenant.name}
               brandAccent={tenantTheme.hex}
@@ -817,7 +816,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
       <MobileDrawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen} title="Menú principal">
         <SidebarContent
-              key={pathname}
               currentBranch={workspaceBranch}
               brandName={isGlobalView ? "TalentOS" : currentTenant.branding.productName ?? currentTenant.name}
               brandAccent={tenantTheme.hex}

@@ -3,6 +3,7 @@ import {
   appNavigation,
   candidateNavigation,
   evaluateRouteAccess,
+  getInventoryModuleFromPath,
   getRoutePolicy,
   isAudienceAllowed,
   isRoleAllowed,
@@ -17,6 +18,14 @@ describe("navigation policy", () => {
 
   it("does not resolve unknown protected routes", () => {
     expect(getRoutePolicy("/internal/unknown")).toBeUndefined();
+  });
+
+  it("keeps asset operations on canonical routes without redirecting the sidebar", () => {
+    for (const href of ["/inventory/scan", "/inventory/my-assets", "/inventory/deliveries", "/inventory/returns"]) {
+      expect(getInventoryModuleFromPath(href)).toBe("asset_inventory");
+      expect(getRoutePolicy(href)?.href).toBe(href);
+      expect(appNavigation.find((item) => item.href === href)?.module).toBe("asset_inventory");
+    }
   });
 
   it("restricts SaaS and tenant audiences", () => {

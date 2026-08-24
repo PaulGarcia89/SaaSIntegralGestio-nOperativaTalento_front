@@ -33,12 +33,12 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/inventory/assets/warehouse", label: "Almacén y stock", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/assets/purchases", label: "Compras y proveedores", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/assets/maintenance", label: "Mantenimiento", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
-  { href: "/inventory/assets/scan", label: "Escanear activo", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
-  { href: "/inventory/assets/my-assets", label: "Mis activos", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario", "empleado"] },
+  { href: "/inventory/scan", label: "Escanear activo", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
+  { href: "/inventory/my-assets", label: "Mis activos", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario", "empleado"] },
   { href: "/inventory/assets/analytics", label: "Analítica de inventario", group: "Analítica", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "reports", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
   { href: "/inventory/assets/audit", label: "Auditoría de inventario", group: "Analítica", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "reports", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
-  { href: "/inventory/assets/deliveries", label: "Entregas", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
-  { href: "/inventory/assets/returns", label: "Devoluciones", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
+  { href: "/inventory/deliveries", label: "Entregas", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
+  { href: "/inventory/returns", label: "Devoluciones", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/restaurant", label: "Restaurante", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
   { href: "/inventory/restaurant/dashboard", label: "Dashboard", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "dashboard", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
   { href: "/inventory/restaurant/ingredients", label: "Ingredientes", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
@@ -94,7 +94,12 @@ export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
 
 export function getRoutePolicy(pathname: string) { return [...appNavigation].sort((a, b) => b.href.length - a.href.length).find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)); }
 export function getInventoryModuleFromPath(pathname: string) {
-  if (pathname.startsWith("/inventory/assets")) return "asset_inventory";
+  if (
+    pathname.startsWith("/inventory/assets") ||
+    ["/inventory/scan", "/inventory/my-assets", "/inventory/deliveries", "/inventory/returns"].some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    )
+  ) return "asset_inventory";
   if (pathname.startsWith("/inventory/restaurant")) return "restaurant_inventory";
   return null;
 }

@@ -55,7 +55,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AppBreadcrumb } from "@/components/breadcrumb";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AccessDenied, AccessLoading } from "@/components/access-state";
-import { evaluateRouteAccess, getRoutePolicy } from "@/lib/navigation";
+import { evaluateRouteAccess, getInventoryModuleFromPath, getRoutePolicy } from "@/lib/navigation";
 import type { NavGroup, NavItem } from "@/lib/navigation";
 import { createTenantTheme } from "@/lib/tenant-branding";
 import { ImpersonationBanner } from "@/components/design-system";
@@ -362,12 +362,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return { ...decision, reason: `${decision.reason} El periodo de gracia finaliza el ${graceDate}.` };
   }, [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, impersonation?.active, routePolicy, subscriptionGraceEndsAt]);
 
+  const inventoryModule = getInventoryModuleFromPath(pathname);
+  const navigationForContext = useMemo(
+    () => inventoryModule
+      ? allowedNav.filter((item) => !["asset_inventory", "restaurant_inventory"].includes(item.module) || item.module === inventoryModule)
+      : allowedNav,
+    [allowedNav, inventoryModule],
+  );
   const groups = useMemo(
     () =>
       (["Inicio", "Personas", "Reclutamiento", "Aprendizaje", "Operaciones", "Analítica", "Administración", "Gobierno de plataforma"] as const).filter((group) =>
-        allowedNav.some((item) => item.group === group),
+        navigationForContext.some((item) => item.group === group),
       ),
-    [allowedNav],
+    [navigationForContext],
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -404,7 +411,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const workspaceBranch = isGlobalView
     ? "Todas las empresas"
     : currentBranch?.name ?? "Sin sucursal asignada";
-  const mobileQuickNavigation = useMemo(() => getMobileQuickNavigation(allowedNav, pathname), [allowedNav, pathname]);
+  const mobileQuickNavigation = useMemo(() => getMobileQuickNavigation(navigationForContext, pathname), [navigationForContext, pathname]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -513,7 +520,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         Saltar al contenido
       </a>
-      <AccessibleCommandPalette open={searchOpen} onOpenChange={setSearchOpen} items={allowedNav.map((route) => ({ id: route.href.replaceAll("/", "-") || "inicio", label: route.label, group: route.group, href: route.href }))} onNavigate={(href) => router.push(href)} />
+      <AccessibleCommandPalette open={searchOpen} onOpenChange={setSearchOpen} items={navigationForContext.map((route) => ({ id: route.href.replaceAll("/", "-") || "inicio", label: route.label, group: route.group, href: route.href }))} onNavigate={(href) => router.push(href)} />
 
       <div className="mx-auto grid min-h-screen max-w-[1600px] gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="order-2 xl:order-1 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)]">
@@ -528,7 +535,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               currentTenantPlan={isGlobalView ? "global" : currentTenant.plan}
               currentUserName={currentUser.fullName}
               navigationGroups={groups}
-              navigationItems={allowedNav}
+              navigationItems={navigationForContext}
               navigationLoading={isBootstrapping}
               pathname={pathname}
               supportEmail={currentTenant.branding.supportEmail}
@@ -794,7 +801,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </Card>
-          <TaskNavigation routes={allowedNav} pathname={pathname} role={currentRole} onSearch={() => setSearchOpen(true)} />
+          <TaskNavigation routes={navigationForContext} pathname={pathname} role={currentRole} onSearch={() => setSearchOpen(true)} />
 
           <main id="main-content" className="space-y-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-8 xl:space-y-12 xl:pb-0">{children}</main>
         </div>
@@ -819,7 +826,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               currentTenantPlan={isGlobalView ? "global" : currentTenant.plan}
               currentUserName={currentUser.fullName}
               navigationGroups={groups}
-              navigationItems={allowedNav}
+              navigationItems={navigationForContext}
               navigationLoading={isBootstrapping}
               onNavigate={closeMobileSidebar}
               mobile

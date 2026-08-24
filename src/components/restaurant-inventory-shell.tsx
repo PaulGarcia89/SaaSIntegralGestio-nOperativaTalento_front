@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ClipboardList, Eye, Plus, RefreshCw, X } from "lucide-react";
+import { Check, ClipboardList, Eye, Plus, X } from "lucide-react";
 import {
   cancelRestaurantReceipt, confirmRestaurantReceipt, createRestaurantConsumption,
   createRestaurantIngredient, createRestaurantWaste, fetchRestaurantDashboard,
@@ -43,7 +43,7 @@ function RestaurantInventoryInner() {
   const section = sections.find(([key]) => pathname.endsWith(`/${key}`))?.[0] ?? "dashboard";
   const { currentBranch } = useAppStore();
   return <div className="space-y-6">
-    <PageHeader eyebrow="Operaciones" title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." actions={<Button asChild variant="secondary"><Link href="/inventory"><RefreshCw className="size-4" />Cambiar módulo</Link></Button>} />
+    <PageHeader eyebrow="Operaciones" title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." />
     <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Secciones de inventario de restaurante">{sections.map(([key, label]) => <Button key={key} asChild size="sm" variant={section === key ? "default" : "secondary"}><Link href={`/inventory/restaurant/${key}`}>{label}</Link></Button>)}</nav>
     <Card level={1}><CardContent className="flex flex-wrap gap-4 p-4 text-sm text-text-secondary"><span>Empresa: contexto actual</span><span>Sucursal: {currentBranch?.name ?? "Sin sucursal"}</span><span>Stock y costos: fuente de verdad del backend</span></CardContent></Card>
     {section === "dashboard" ? <DashboardScreen branchId={currentBranch?.id} /> : null}

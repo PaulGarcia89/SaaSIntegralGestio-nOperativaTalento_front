@@ -55,7 +55,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AppBreadcrumb } from "@/components/breadcrumb";
 import { Tooltip } from "@/components/ui/tooltip";
 import { AccessDenied, AccessLoading } from "@/components/access-state";
-import { evaluateRouteAccess, getInventoryModuleFromPath, getRoutePolicy } from "@/lib/navigation";
+import { evaluateRouteAccess, getRoutePolicy } from "@/lib/navigation";
 import type { NavGroup, NavItem } from "@/lib/navigation";
 import { createTenantTheme } from "@/lib/tenant-branding";
 import { ImpersonationBanner } from "@/components/design-system";
@@ -362,13 +362,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return { ...decision, reason: `${decision.reason} El periodo de gracia finaliza el ${graceDate}.` };
   }, [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, impersonation?.active, routePolicy, subscriptionGraceEndsAt]);
 
-  const inventoryModule = getInventoryModuleFromPath(pathname);
-  const navigationForContext = useMemo(
-    () => inventoryModule
-      ? allowedNav.filter((item) => !["asset_inventory", "restaurant_inventory"].includes(item.module) || item.module === inventoryModule)
-      : allowedNav,
-    [allowedNav, inventoryModule],
-  );
+  // Keep both inventory modules visible when the tenant has access to both.
+  // RBAC and enabled-module checks have already been applied in allowedNav.
+  const navigationForContext = allowedNav;
   const groups = useMemo(
     () =>
       (["Inicio", "Personas", "Reclutamiento", "Aprendizaje", "Operaciones", "Analítica", "Administración", "Gobierno de plataforma"] as const).filter((group) =>

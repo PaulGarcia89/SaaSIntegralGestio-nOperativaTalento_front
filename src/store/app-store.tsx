@@ -313,7 +313,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const allowedNav = useMemo(
     () => {
-      const inventoryCount = Number(hasModule("asset_inventory")) + Number(hasModule("restaurant_inventory"));
       return appNavigation.filter((item) => item.showInNavigation !== false && evaluateRouteAccess(item, {
         sessionValid: accessContextVerified,
         globalContext: isGlobalGovernanceContext,
@@ -325,8 +324,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         can,
         branchAvailable: Boolean(currentBranch),
       }).allowed).map((item) => {
-        if (item.href === "/inventory/assets") return { ...item, label: inventoryCount > 1 ? "Activos" : "Inventario de activos" };
-        if (item.href === "/inventory/restaurant") return { ...item, label: inventoryCount > 1 ? "Restaurante" : "Inventario de restaurante" };
+        if (item.href === "/inventory/assets") return { ...item, label: "Inventario de activos" };
+        if (item.href === "/inventory/restaurant") return { ...item, label: "Inventario de restaurante" };
         return item;
       });
     },

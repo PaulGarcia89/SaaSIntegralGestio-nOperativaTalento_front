@@ -319,7 +319,7 @@ function SidebarContent({
                                   <span>{item.label}</span>
                                 </Link> : null}
                                 {submenuItems.length ? (
-                                  <div className="ml-4 space-y-1 border-l border-white/10 pl-2">
+                                  <div className="space-y-1">
                                     {submenuItems.map((submenuItem) => {
                                       const submenuActive = submenuItem.href === activeHref;
                                       const SubmenuIcon = navigationIcons[submenuItem.icon];

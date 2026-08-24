@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   fetchBranches,
+  fetchDocuSealTemplates,
+  createDocuSealSubmission,
   fetchEmployeeDossier360,
   fetchEmployeeEditor,
   getApiErrorMessage,
@@ -57,6 +59,12 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
   const branches = useQuery({ queryKey: ["employee-editor-branches"], queryFn: () => fetchBranches(), enabled: can("employees.update") });
   const [form, setForm] = useState<EditorForm | null>(null);
   const [evidenceDrafts, setEvidenceDrafts] = useState<EvidenceDraft[]>([]);
+  const docuSealTemplates = useQuery({ queryKey: ["docuseal-templates"], queryFn: fetchDocuSealTemplates, enabled: can("employees.update") });
+  const sendDocuSeal = useMutation({
+    mutationFn: (templateKey: string) => createDocuSealSubmission(employeeId, templateKey),
+    onSuccess: (result) => { toast.success("Solicitud enviada a DocuSeal"); if (result.signingUrl) window.open(result.signingUrl, "_blank", "noopener,noreferrer"); },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible enviar el documento a DocuSeal.")),
+  });
 
   useEffect(() => {
     if (editor.data) setForm(toEditorForm(editor.data));
@@ -222,6 +230,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
         </EditorSection>
       </div>
       <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
+        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Firma con DocuSeal</h2><p className="mt-2 text-sm text-text-secondary">Envía documentos laborales a {stringValue(editor.data.employee.contact.workEmail)} y recibe el PDF firmado en el expediente.</p>{docuSealTemplates.data?.templates?.length ? <div className="mt-4 grid gap-2">{docuSealTemplates.data.templates.map((template) => <Button key={template.key} type="button" variant="secondary" className="w-full justify-start" onClick={() => sendDocuSeal.mutate(template.key)} disabled={sendDocuSeal.isPending}>{template.label}</Button>)}</div> : <p className="mt-3 text-xs text-text-secondary">DocuSeal no está configurado todavía en el backend.</p>}</CardContent></Card>
         <Card level={2}><CardContent className="p-5"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /><h2 className="font-semibold">Checklist y evidencia</h2></div><p className="mt-2 text-sm text-text-secondary">Los documentos, licencias, capacitación, seguridad y activos se administran desde el expediente, sin perder su trazabilidad.</p><Button asChild variant="secondary" className="mt-4 w-full"><Link href={`/employees/${employeeId}`}>Gestionar documentos y compliance</Link></Button></CardContent></Card>
         <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Requisitos actuales</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p><p className="mt-1 text-xs text-text-secondary">{item.source}</p></div><Badge variant={statusVariant(item.status)}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">El checklist aparecerá al crear los requisitos aplicables.</p>}</div><p className="mt-4 text-xs text-text-secondary">Documentos cargados: {dossier360.data?.documents.summary.total ?? editor.data.requirements.length}</p></CardContent></Card>
         <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? "Guardando..." : "Guardar todos los cambios"}</Button>

@@ -18,7 +18,8 @@ export type ModuleKey =
   | "onboarding"
   | "training"
   | "productivity"
-  | "inventory"
+  | "asset_inventory"
+  | "restaurant_inventory"
   | "admin"
   | "reports"
   | "notifications"
@@ -35,8 +36,10 @@ export type PermissionKey =
   | "training.integrations.manage"
   | "productivity.view"
   | "productivity.manage"
-  | "inventory.view"
-  | "inventory.manage"
+  | "asset_inventory.view"
+  | "asset_inventory.manage"
+  | "restaurant_inventory.view"
+  | "restaurant_inventory.manage"
   | "admin.view"
   | "admin.users"
   | "admin.roles"
@@ -146,7 +149,8 @@ export const MODULE_KEYS = [
   "onboarding",
   "training",
   "productivity",
-  "inventory",
+  "asset_inventory",
+  "restaurant_inventory",
   "admin",
   "reports",
   "notifications",
@@ -163,8 +167,10 @@ export const PERMISSION_KEYS = [
   "training.integrations.manage",
   "productivity.view",
   "productivity.manage",
-  "inventory.view",
-  "inventory.manage",
+  "asset_inventory.view",
+  "asset_inventory.manage",
+  "restaurant_inventory.view",
+  "restaurant_inventory.manage",
   "admin.view",
   "admin.users",
   "admin.roles",
@@ -3251,6 +3257,168 @@ export interface InventoryWarehousePageDto {
   pageSize: number;
   totalPages: number;
 }
+
+export type RestaurantDocumentStatus = "DRAFT" | "CONFIRMED" | "CANCELLED";
+
+export interface RestaurantIngredientDto {
+  id: string;
+  sku: string;
+  name: string;
+  category?: string | null;
+  purchaseUnit: string;
+  inventoryUnit: string;
+  conversionFactor: number;
+  stock: number;
+  minimumStock: number;
+  averageCost: number;
+  status: "ACTIVE" | "INACTIVE";
+}
+
+export interface RestaurantRecipeLineDto {
+  id: string;
+  ingredientId: string;
+  ingredientName: string;
+  quantity: number;
+  unit: string;
+  conversion: number;
+  wastePercent: number;
+  cost: number;
+  sortOrder: number;
+}
+
+export interface RestaurantRecipeDto {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  yieldQuantity: number;
+  salePrice?: number | null;
+  stockPolicy: string;
+  status: "ACTIVE" | "INACTIVE";
+  totalCost: number;
+  costPerPortion: number;
+  estimatedMargin?: number | null;
+  lines: RestaurantRecipeLineDto[];
+}
+
+export interface RestaurantInventoryDashboardDto {
+  totalValue: number;
+  activeIngredients: number;
+  belowMinimum: number;
+  recentReceipts: Array<{ id: string; reference: string; status: RestaurantDocumentStatus; date: string; total: number }>;
+  recentConsumption: Array<{ id: string; date: string; totalCost: number; status: RestaurantDocumentStatus }>;
+  recentWaste: Array<{ id: string; date: string; reason: string; totalCost: number; status: RestaurantDocumentStatus }>;
+}
+
+export interface RestaurantReceiptDto {
+  id: string;
+  reference: string;
+  supplierName?: string | null;
+  branchName?: string | null;
+  warehouseName?: string | null;
+  date: string;
+  invoice?: string | null;
+  notes?: string | null;
+  status: RestaurantDocumentStatus;
+  total: number;
+  lines: Array<{ id: string; ingredientId: string; ingredientName: string; quantityPurchased: number; purchaseUnit: string; conversion: number; quantityReceived: number; unitCost: number; total: number }>;
+}
+
+export interface RestaurantConsumptionPreviewDto {
+  ingredients: Array<{ ingredientId: string; ingredientName: string; currentStock: number; requiredQuantity: number; resultingStock: number; sufficient: boolean; unit: string }>;
+  insufficientIngredients: string[];
+  totalCost: number;
+}
+
+export interface RestaurantMovementDto {
+  id: string;
+  date: string;
+  ingredientName: string;
+  type: string;
+  entry: number;
+  exit: number;
+  balance: number;
+  cost: number;
+  reference?: string | null;
+  userName?: string | null;
+}
+
+export interface RestaurantLotDto {
+  id: string;
+  ingredientName: string;
+  lotCode: string;
+  receivedAt: string;
+  expiresAt: string;
+  remainingQuantity: number;
+  unit: string;
+  cost: number;
+  warehouseName: string;
+  status: "AVAILABLE" | "EXPIRED" | "BLOCKED" | "DEPLETED";
+}
+
+export interface RestaurantProductionDto {
+  id: string;
+  preparationName: string;
+  plannedQuantity: number;
+  expectedYield: number;
+  actualYield?: number | null;
+  consumedCost: number;
+  status: RestaurantDocumentStatus;
+  ingredients: Array<{ ingredientName: string; requiredQuantity: number; availableQuantity: number; unit: string; sufficient: boolean }>;
+}
+
+export interface RestaurantStockCountDto {
+  id: string;
+  warehouseName: string;
+  createdAt: string;
+  status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "CANCELLED";
+  blind: boolean;
+  differences: number;
+  lines: Array<{ ingredientId: string; ingredientName: string; theoreticalQuantity?: number | null; physicalQuantity?: number | null; difference?: number | null; reason?: string | null; unit: string }>;
+}
+
+export interface RestaurantTransferDto {
+  id: string;
+  originWarehouse: string;
+  destinationWarehouse: string;
+  status: "DRAFT" | "SENT" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
+  createdAt: string;
+  notes?: string | null;
+  lines: Array<{ ingredientName: string; quantity: number; unit: string; lotCode?: string | null }>;
+}
+
+export interface RestaurantPhase2DashboardDto {
+  expiredProducts: number;
+  expiringSoon: number;
+  pendingCounts: number;
+  inventoryDifferences: number;
+  transfersInTransit: number;
+  recentProductions: RestaurantProductionDto[];
+}
+
+export type SalesImportStatus = "VALIDATING" | "READY" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED";
+export interface SalesImportColumnExample { key: string; label: string; examples: string[]; required: boolean; }
+export interface SalesImportValidationDto {
+  sessionId: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  productsWithoutRecipe: number;
+  insufficientInventory: number;
+  errors: Array<{ row: number; column?: string; message: string; code: string }>;
+  columns: SalesImportColumnExample[];
+  status: SalesImportStatus;
+}
+export interface SalesImportMappingDto { id: string; externalCode: string; externalName?: string | null; recipeId?: string | null; recipeName?: string | null; status: "MAPPED" | "UNMAPPED" | "IGNORED"; }
+export interface SalesImportPreviewDto { recipes: Array<{ recipeName: string; quantity: number }>; ingredients: Array<{ ingredientName: string; requiredQuantity: number; currentStock: number; resultingStock: number; unit: string; warning?: string | null }>; warnings: string[]; estimatedCost: number; }
+export interface SalesImportJobDto { id: string; sessionId: string; status: SalesImportStatus; progressPercent: number; processedRows: number; validRows: number; errorRows: number; message?: string | null; consumptionUrl?: string | null; movementsUrl?: string | null; errorsUrl?: string | null; }
+export interface SalesImportHistoryDto { id: string; fileName: string; createdAt: string; branchName: string; dateFrom: string; dateTo: string; validRows: number; errorRows: number; status: SalesImportStatus; userName: string; }
+
+export interface RestaurantReportDto { report: string; generatedAt: string; columns: Array<{ key: string; label: string }>; rows: Array<Record<string, string | number | null>>; summary: Array<{ label: string; value: string | number }>; page: number; pageSize: number; total: number; totalPages: number; exportUrl?: string | null; }
+export interface RestaurantAdvancedDashboardDto { inventoryValue: number; periodConsumption: number; waste: number; inventoryDifference: number; criticalIngredients: Array<{ name: string; stock: number; minimum: number }>; upcomingExpirations: Array<{ name: string; lot: string; expiresAt: string; quantity: number }>; highestCostRecipes: Array<{ name: string; cost: number }>; lowestMarginRecipes: Array<{ name: string; margin: number }>; consumptionTrend: Array<{ label: string; value: number }>; purchaseSuggestions: Array<{ ingredientName: string; suggestedQuantity: number; unit: string; reason: string }>; }
+export interface RestaurantRecipeCostDto { recipeId: string; recipeName: string; ingredients: Array<{ ingredientName: string; quantity: number; unit: string; unitCost: number; ingredientCost: number }>; totalCost: number; costPerPortion: number; salePrice?: number | null; marginAmount?: number | null; marginPercent?: number | null; history: Array<{ changedAt: string; changedBy: string; previousCost: number; newCost: number; reason?: string | null }>; }
+export interface RestaurantAuditEntryDto { id: string; date: string; userName: string; action: string; document: string; previousStatus?: string | null; nextStatus?: string | null; justification?: string | null; companyName: string; branchName: string; }
 
 export interface AppDatasetsDto {
   vacancies: VacancyDto[];

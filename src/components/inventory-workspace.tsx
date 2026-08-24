@@ -35,7 +35,7 @@ export function InventoryWorkspace({ initialStatus = "", title = "Inventario y a
   const requestedFlowId = searchParams.get("flowId") ?? "";
   const queryClient = useQueryClient();
   const { can, currentBranch } = useAppStore();
-  const canManage = can("inventory.manage");
+  const canManage = can("asset_inventory.manage");
   const [status, setStatus] = useState<string>(initialStatus);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState("");

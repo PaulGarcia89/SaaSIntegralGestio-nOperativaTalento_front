@@ -25,7 +25,7 @@ export function InventoryWarehousePanel() {
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [selected, setSelected] = useState<InventoryWarehouseStockDto | null>(null);
-  const canManage = can("inventory.manage");
+  const canManage = can("asset_inventory.manage");
   const context = useQuery({ queryKey: ["inventory-context"], queryFn: fetchInventoryContext });
   const warehouse = useQuery({ queryKey: ["inventory-warehouse", currentBranch?.id, search, page], queryFn: () => fetchInventoryWarehouse({ branchId: currentBranch?.id, search: search || undefined, page, pageSize: 12 }) });
   const locations = useQuery({ queryKey: ["inventory-locations", currentBranch?.id], queryFn: () => fetchInventoryLocations(currentBranch?.id) });

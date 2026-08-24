@@ -18,6 +18,8 @@ import {
   fetchEmployeeDocumentFile,
   fetchEmployeeDossier360,
   fetchEmployeePayrollCompliance,
+  fetchDocuSealTemplates,
+  createDocuSealSubmission,
   getApiErrorMessage,
   replaceEmployeeDocument,
   updateEmployeeDocument,
@@ -51,6 +53,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
     enabled: can("employees.read"),
   });
   const dossier360 = useQuery({ queryKey: ["employee-dossier-360", employeeId], queryFn: () => fetchEmployeeDossier360(employeeId) });
+  const docuSealTemplates = useQuery({ queryKey: ["docuseal-templates"], queryFn: fetchDocuSealTemplates, enabled: can("employees.update") });
   const canManageFiles = currentRole === "admin_empresa";
 
   const selectedDocument = dossier360.data?.documents.documents.find((document) => document.id === selectedDocumentId) ?? null;
@@ -90,6 +93,12 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
       refreshDocuments();
     },
     onError: (error) => setDocumentError(getApiErrorMessage(error, "No fue posible reemplazar el documento.")),
+  });
+
+  const sendDocuSeal = useMutation({
+    mutationFn: (templateKey: string) => createDocuSealSubmission(employeeId, templateKey),
+    onSuccess: (result) => window.open(result.signingUrl ?? "", "_blank", "noopener,noreferrer"),
+    onError: (error) => setDocumentError(getApiErrorMessage(error, "No fue posible enviar el documento a DocuSeal.")),
   });
 
   if (dossier.isLoading) return <AsyncState state="loading" title="Cargando expediente" description="Preparamos la información laboral y la trazabilidad del empleado." />;
@@ -155,6 +164,9 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
             summary={dossier360.data?.documents.summary ?? null}
             isLoading={dossier360.isLoading}
             canManageFiles={canManageFiles}
+            docuSealTemplates={docuSealTemplates.data?.templates ?? []}
+            docuSealConfigured={Boolean(docuSealTemplates.data?.configured)}
+            onSendDocuSeal={(templateKey) => sendDocuSeal.mutate(templateKey)}
             onOpenDocument={(id) => {
               setSelectedDocumentId(id);
               setDocumentError(null);
@@ -376,6 +388,9 @@ function Documents({
   summary,
   isLoading,
   canManageFiles,
+  docuSealTemplates,
+  docuSealConfigured,
+  onSendDocuSeal,
   onOpenDocument,
   onUpload,
   onCompleteRequirement,
@@ -385,6 +400,9 @@ function Documents({
   summary: EmployeeDossier360Snapshot["documents"]["summary"] | null;
   isLoading: boolean;
   canManageFiles: boolean;
+  docuSealTemplates: Array<{ key: string; label: string }>;
+  docuSealConfigured: boolean;
+  onSendDocuSeal: (templateKey: string) => void;
   onOpenDocument: (id: string) => void;
   onUpload: (file: File, documentType: string, expiresAt?: string | null, notes?: string | null) => void;
   onCompleteRequirement: (requirement: DossierRequirement) => void;
@@ -416,6 +434,7 @@ function Documents({
         ) : null}
       </div>
       {!canManageFiles ? <InlineFeedback tone="warning" title="Acceso restringido">Solo el administrador de empresa puede ver o reemplazar archivos sensibles.</InlineFeedback> : null}
+      {canManageFiles ? <Card level={2}><CardContent className="p-5"><SectionTitle icon={<FilePenLine className="size-4" />} title="Solicitudes de firma DocuSeal" /><p className="mt-1 text-sm text-text-secondary">Envía un documento al correo del empleado y guarda el PDF firmado automáticamente al completarse.</p>{docuSealConfigured && docuSealTemplates.length ? <div className="mt-4 flex flex-wrap gap-2">{docuSealTemplates.map((template) => <Button key={template.key} type="button" variant="secondary" size="sm" onClick={() => onSendDocuSeal(template.key)}>{template.label}</Button>)}</div> : <p className="mt-3 text-sm text-text-secondary">DocuSeal aún no está configurado en el backend.</p>}</CardContent></Card> : null}
       {documents.length ? (
         <div className="grid gap-3">
           {documents.map((document) => (

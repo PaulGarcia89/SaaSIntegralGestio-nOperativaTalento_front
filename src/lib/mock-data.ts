@@ -48,8 +48,10 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "employees.read",
     "employees.create",
     "employees.update",
-    "inventory.view",
-    "inventory.manage",
+    "asset_inventory.view",
+    "asset_inventory.manage",
+    "restaurant_inventory.view",
+    "restaurant_inventory.manage",
     "admin.view",
     "admin.users",
     "admin.roles",
@@ -84,8 +86,10 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "employees.read",
     "employees.create",
     "employees.update",
-    "inventory.view",
-    "inventory.manage",
+    "asset_inventory.view",
+    "asset_inventory.manage",
+    "restaurant_inventory.view",
+    "restaurant_inventory.manage",
     "admin.view",
     "admin.users",
     "admin.roles",
@@ -115,13 +119,13 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "ats.view",
     "training.view",
     "productivity.view",
-    "inventory.view",
+    "asset_inventory.view",
     "reports.view",
     "notifications.view",
     "profile.view",
   ],
-  encargado_inventario: ["dashboard.view", "inventory.view", "inventory.manage", "reports.view", "notifications.view", "profile.view"],
-  empleado: ["dashboard.view", "onboarding.view", "training.view", "inventory.view", "notifications.view", "profile.view"],
+  encargado_inventario: ["dashboard.view", "asset_inventory.view", "asset_inventory.manage", "restaurant_inventory.view", "restaurant_inventory.manage", "reports.view", "notifications.view", "profile.view"],
+  empleado: ["dashboard.view", "onboarding.view", "training.view", "asset_inventory.view", "notifications.view", "profile.view"],
   candidato: ["profile.view", "notifications.view"],
 };
 
@@ -132,7 +136,7 @@ export const mockTenants: TenantDto[] = [
     name: "TalentOS Cloud USA",
     plan: "enterprise",
     status: "active",
-    enabledModules: ["dashboard", "ats", "onboarding", "training", "productivity", "inventory", "admin", "reports", "notifications", "profile"],
+    enabledModules: ["dashboard", "ats", "onboarding", "training", "productivity", "asset_inventory", "restaurant_inventory", "admin", "reports", "notifications", "profile"],
     branding: { accent: "#0EA5B7", supportEmail: "ops@talentoscloud.com" },
   },
   {
@@ -150,7 +154,7 @@ export const mockTenants: TenantDto[] = [
     name: "Gulfshore Logistics",
     plan: "starter",
     status: "active",
-    enabledModules: ["dashboard", "inventory", "notifications", "profile"],
+    enabledModules: ["dashboard", "asset_inventory", "notifications", "profile"],
     branding: { accent: "#14B8A6", supportEmail: "hello@gulfshorelogistics.com" },
   },
 ];
@@ -270,7 +274,7 @@ export const mockSubscriptions: SubscriptionDto[] = [
 ];
 
 export const mockModuleAssignments: ModuleAssignmentDto[] = mockTenants.flatMap((tenant) =>
-  (["dashboard", "ats", "onboarding", "training", "productivity", "inventory", "admin", "reports", "notifications", "profile"] as ModuleKey[]).map(
+  (["dashboard", "ats", "onboarding", "training", "productivity", "asset_inventory", "restaurant_inventory", "admin", "reports", "notifications", "profile"] as ModuleKey[]).map(
     (module) => ({
       id: `${tenant.id}-${module}`,
       tenantId: tenant.id,

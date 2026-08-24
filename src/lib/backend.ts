@@ -483,8 +483,10 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "training.integrations.manage": ["training.integrations.manage"],
   "productivity.view": [],
   "productivity.manage": ["productivity.manage"],
-  "inventory.view": [],
-  "inventory.manage": [],
+  "asset_inventory.view": [],
+  "asset_inventory.manage": [],
+  "restaurant_inventory.view": [],
+  "restaurant_inventory.manage": [],
   "employees.read": ["employees.read"],
   "employees.create": ["employees.create"],
   "employees.update": ["employees.update"],
@@ -615,8 +617,10 @@ function buildMockAuthUser(userId: string): BackendAuthUser {
           return "ONBOARDING";
         case "training":
           return "TRAINING";
-        case "inventory":
-          return "INVENTORY";
+        case "asset_inventory":
+          return "ASSET_INVENTORY";
+        case "restaurant_inventory":
+          return "RESTAURANT_INVENTORY";
         case "productivity":
           return "AI_PRODUCTIVITY";
         case "reports":
@@ -644,8 +648,12 @@ function moduleCodeToModuleKey(code: string): ModuleKey | null {
       return "onboarding";
     case "TRAINING":
       return "training";
+    case "ASSET_INVENTORY":
+      return "asset_inventory";
+    case "RESTAURANT_INVENTORY":
+      return "restaurant_inventory";
     case "INVENTORY":
-      return "inventory";
+      return "asset_inventory";
     case "AI_PRODUCTIVITY":
     case "PRODUCTIVITY":
       return "productivity";
@@ -858,8 +866,11 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
   ) {
     mapped.add("training.manage");
   }
-  if (enabledModules.includes("inventory")) {
-    mapped.add("inventory.view");
+  if (enabledModules.includes("asset_inventory")) {
+    mapped.add("asset_inventory.view");
+  }
+  if (enabledModules.includes("restaurant_inventory")) {
+    mapped.add("restaurant_inventory.view");
   }
   if (enabledModules.includes("productivity")) {
     mapped.add("productivity.view");
@@ -1351,8 +1362,10 @@ async function syncTenantModules(tenantId: string, modules: ModuleKey[]) {
             return "ONBOARDING";
           case "training":
             return "TRAINING";
-          case "inventory":
-            return "INVENTORY";
+          case "asset_inventory":
+            return "ASSET_INVENTORY";
+          case "restaurant_inventory":
+            return "RESTAURANT_INVENTORY";
           case "productivity":
             return "AI_PRODUCTIVITY";
           case "reports":
@@ -2340,8 +2353,10 @@ export async function updateModuleAssignment(
         ? ["ONBOARDING", "DOCUMENTS"]
         : input.module === "training"
           ? ["TRAINING"]
-          : input.module === "inventory"
-            ? ["INVENTORY"]
+          : input.module === "asset_inventory"
+          ? ["ASSET_INVENTORY"]
+          : input.module === "restaurant_inventory"
+            ? ["RESTAURANT_INVENTORY"]
             : input.module === "productivity"
               ? ["AI_PRODUCTIVITY"]
               : input.module === "reports"
@@ -4264,6 +4279,67 @@ export function downloadOnboardingDocument(id: string) {
 export function fetchInventoryCatalog() {
   return request<import("./contracts").InventoryCatalogItemDto[]>("/inventory/catalog");
 }
+
+export function fetchRestaurantDashboard(filters: { branchId?: string; warehouseId?: string; from?: string; to?: string } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
+  return request<import("./contracts").RestaurantInventoryDashboardDto>(`/inventory/restaurant/dashboard${query.size ? `?${query}` : ""}`);
+}
+export function fetchRestaurantIngredients(filters: { search?: string; status?: string; page?: number; pageSize?: number } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  return request<{ items: import("./contracts").RestaurantIngredientDto[]; total: number }>(`/inventory/restaurant/ingredients${query.size ? `?${query}` : ""}`);
+}
+export function createRestaurantIngredient(input: Record<string, unknown>) { return request<import("./contracts").RestaurantIngredientDto>("/inventory/restaurant/ingredients", { method: "POST", body: JSON.stringify(input) }); }
+export function updateRestaurantIngredient(id: string, input: Record<string, unknown>) { return request<import("./contracts").RestaurantIngredientDto>(`/inventory/restaurant/ingredients/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function fetchRestaurantRecipes(search?: string) { return request<import("./contracts").RestaurantRecipeDto[]>(`/inventory/restaurant/recipes${search ? `?search=${encodeURIComponent(search)}` : ""}`); }
+export function createRestaurantRecipe(input: Record<string, unknown>) { return request<import("./contracts").RestaurantRecipeDto>("/inventory/restaurant/recipes", { method: "POST", body: JSON.stringify(input) }); }
+export function updateRestaurantRecipe(id: string, input: Record<string, unknown>) { return request<import("./contracts").RestaurantRecipeDto>(`/inventory/restaurant/recipes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function fetchRestaurantReceipts(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantReceiptDto[]>(`/inventory/restaurant/receipts${query.size ? `?${query}` : ""}`); }
+export function createRestaurantReceipt(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { return request<import("./contracts").RestaurantReceiptDto>(`/inventory/restaurant/receipts?action=${action}`, { method: "POST", body: JSON.stringify(input) }); }
+export function confirmRestaurantReceipt(id: string) { return request<import("./contracts").RestaurantReceiptDto>(`/inventory/restaurant/receipts/${encodeURIComponent(id)}/confirm`, { method: "POST" }); }
+export function cancelRestaurantReceipt(id: string, reason: string) { return request<import("./contracts").RestaurantReceiptDto>(`/inventory/restaurant/receipts/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
+export function previewRestaurantConsumption(input: Record<string, unknown>) { return request<import("./contracts").RestaurantConsumptionPreviewDto>("/inventory/restaurant/consumption/preview", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantConsumption(input: Record<string, unknown>) { return request("/inventory/restaurant/consumption", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantWaste(input: Record<string, unknown>) { return request("/inventory/restaurant/waste", { method: "POST", body: JSON.stringify(input) }); }
+export function fetchRestaurantStock(filters: { branchId?: string; warehouseId?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantIngredientDto[]>(`/inventory/restaurant/stock${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantMovements(filters: { branchId?: string; warehouseId?: string; ingredientId?: string; from?: string; to?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantMovementDto[]>(`/inventory/restaurant/movements${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantPhase2Dashboard(filters: { branchId?: string; warehouseId?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantPhase2DashboardDto>(`/inventory/restaurant/dashboard/phase-2${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantProductions(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantProductionDto[]>(`/inventory/restaurant/productions${query.size ? `?${query}` : ""}`); }
+export function previewRestaurantProduction(input: Record<string, unknown>) { return request<import("./contracts").RestaurantProductionDto>("/inventory/restaurant/productions/preview", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantProduction(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { return request<import("./contracts").RestaurantProductionDto>(`/inventory/restaurant/productions?action=${action}`, { method: "POST", body: JSON.stringify(input) }); }
+export function confirmRestaurantProduction(id: string) { return request<import("./contracts").RestaurantProductionDto>(`/inventory/restaurant/productions/${encodeURIComponent(id)}/confirm`, { method: "POST" }); }
+export function cancelRestaurantProduction(id: string, reason: string) { return request<import("./contracts").RestaurantProductionDto>(`/inventory/restaurant/productions/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
+export function fetchRestaurantLots(filters: { branchId?: string; warehouseId?: string; expiry?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantLotDto[]>(`/inventory/restaurant/lots${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantStockCounts(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantStockCountDto[]>(`/inventory/restaurant/stock-counts${query.size ? `?${query}` : ""}`); }
+export function createRestaurantStockCount(input: Record<string, unknown>) { return request<import("./contracts").RestaurantStockCountDto>("/inventory/restaurant/stock-counts", { method: "POST", body: JSON.stringify(input) }); }
+export function submitRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/inventory/restaurant/stock-counts/${encodeURIComponent(id)}/submit`, { method: "POST" }); }
+export function approveRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/inventory/restaurant/stock-counts/${encodeURIComponent(id)}/approve`, { method: "POST" }); }
+export function fetchRestaurantTransfers(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantTransferDto[]>(`/inventory/restaurant/transfers${query.size ? `?${query}` : ""}`); }
+export function createRestaurantTransfer(input: Record<string, unknown>) { return request<import("./contracts").RestaurantTransferDto>("/inventory/restaurant/transfers", { method: "POST", body: JSON.stringify(input) }); }
+export function sendRestaurantTransfer(id: string) { return request<import("./contracts").RestaurantTransferDto>(`/inventory/restaurant/transfers/${encodeURIComponent(id)}/send`, { method: "POST" }); }
+export function receiveRestaurantTransfer(id: string) { return request<import("./contracts").RestaurantTransferDto>(`/inventory/restaurant/transfers/${encodeURIComponent(id)}/receive`, { method: "POST" }); }
+export function cancelRestaurantTransfer(id: string, reason: string) { return request<import("./contracts").RestaurantTransferDto>(`/inventory/restaurant/transfers/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
+export function createRestaurantAdjustment(input: Record<string, unknown>) { return request("/inventory/restaurant/adjustments", { method: "POST", body: JSON.stringify(input) }); }
+export async function downloadRestaurantSalesImportTemplate() {
+  const blob = await request<Blob>("/inventory/restaurant/sales-import/template", {}, { responseType: "blob" });
+  const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "plantilla-importacion-ventas.xlsx"; anchor.click(); URL.revokeObjectURL(url);
+}
+export function validateRestaurantSalesImport(input: { file: File; branchId?: string }) { const body = new FormData(); body.set("file", input.file); if (input.branchId) body.set("branchId", input.branchId); return request<import("./contracts").SalesImportValidationDto>("/inventory/restaurant/sales-import/validate", { method: "POST", body }); }
+export function configureRestaurantSalesImport(sessionId: string, input: Record<string, unknown>) { return request<import("./contracts").SalesImportValidationDto>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/configure`, { method: "PATCH", body: JSON.stringify(input) }); }
+export function saveRestaurantSalesImportColumnMap(sessionId: string, columnMap: Record<string, string>) { return request<import("./contracts").SalesImportValidationDto>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/columns`, { method: "PUT", body: JSON.stringify({ columnMap }) }); }
+export function saveRestaurantSalesImportMappings(sessionId: string, mappings: Array<Record<string, unknown>>) { return request<import("./contracts").SalesImportMappingDto[]>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/mappings`, { method: "PUT", body: JSON.stringify({ mappings }) }); }
+export function fetchRestaurantSalesImportMappings(sessionId: string) { return request<import("./contracts").SalesImportMappingDto[]>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/mappings`); }
+export function fetchRestaurantSalesImportSession(sessionId: string) { return request<import("./contracts").SalesImportValidationDto>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}`); }
+export function previewRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportPreviewDto>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/preview`, { method: "POST" }); }
+export function processRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportJobDto>(`/inventory/restaurant/sales-import/${encodeURIComponent(sessionId)}/process`, { method: "POST" }); }
+export function fetchRestaurantSalesImportJob(jobId: string) { return request<import("./contracts").SalesImportJobDto>(`/inventory/restaurant/sales-import/jobs/${encodeURIComponent(jobId)}`); }
+export function fetchRestaurantSalesImportHistory() { return request<import("./contracts").SalesImportHistoryDto[]>("/inventory/restaurant/sales-import/history"); }
+export function fetchRestaurantAdvancedDashboard(filters: Record<string, string> = {}) { const query = new URLSearchParams(filters); return request<import("./contracts").RestaurantAdvancedDashboardDto>(`/inventory/restaurant/analytics/dashboard${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<import("./contracts").RestaurantReportDto>(`/inventory/restaurant/reports/${encodeURIComponent(report)}${query.size ? `?${query}` : ""}`); }
+export async function downloadRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const blob = await request<Blob>(`/inventory/restaurant/reports/${encodeURIComponent(report)}/export${query.size ? `?${query}` : ""}`, {}, { responseType: "blob" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${report}-inventario.csv`; anchor.click(); URL.revokeObjectURL(url); }
+export function fetchRestaurantRecipeCost(recipeId: string) { return request<import("./contracts").RestaurantRecipeCostDto>(`/inventory/restaurant/reports/recipe-cost/${encodeURIComponent(recipeId)}`); }
+export function fetchRestaurantAudit(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<{ items: import("./contracts").RestaurantAuditEntryDto[]; page: number; pageSize: number; total: number; totalPages: number; generatedAt: string }>(`/inventory/restaurant/audit${query.size ? `?${query}` : ""}`); }
 export function fetchProductivityOverview(branchId?: string) { return request<{ totalEvents:number; activeSeconds:number; idleSeconds:number; taskCount:number; camerasOnline:number; zonesActive:number; alertsOpen:number }>(`/productivity/overview${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
 export function fetchProductivityAlerts(branchId?: string) { return request<Array<{ id: string; status: string; title: string; description: string; createdAt: string }>>(`/productivity/alerts${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }
 export function fetchProductivityInsights(branchId?: string) { return request<{ period: { from: string; to: string }; zones: Array<{ zone: { id: string; name: string }; events: number; activeSeconds: number; idleSeconds: number; confidence: number }>; recommendations: Array<{ zoneId: string; title: string; explanation: string; suggestedAction: string }> }>(`/productivity/insights${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`); }

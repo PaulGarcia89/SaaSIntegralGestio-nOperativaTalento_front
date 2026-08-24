@@ -273,6 +273,7 @@ type BackendAuthUser = {
   featureFlags?: string[];
   tenantCapabilities?: {
     enabledModules?: string[];
+    inventoryCapabilities?: Array<{ code: string; enabled: boolean }>;
     plan?: {
       code: string;
       name: string;
@@ -293,6 +294,7 @@ type BackendAuthUser = {
       logoUrl?: string | null;
     };
   };
+  inventoryCapabilities?: Array<{ code: string; enabled: boolean }>;
   preferences?: Record<string, unknown>;
 };
 
@@ -314,6 +316,7 @@ type BackendTenant = {
   capabilities?: {
     planModules?: string[];
     enabledModules?: string[];
+    inventoryCapabilities?: Array<{ code: string; enabled: boolean }>;
     featureFlags?: Array<{
       id: string;
       moduleCode: string;
@@ -910,7 +913,7 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
 }
 
 function mapTenant(tenant: BackendTenant): TenantDto {
-  const enabledModules = deriveEnabledModules(tenant.enabledModules, true);
+  const enabledModules = deriveTenantEnabledModules(tenant.enabledModules, true, tenant.capabilities?.inventoryCapabilities);
 
   return {
     id: tenant.id,
@@ -926,6 +929,23 @@ function mapTenant(tenant: BackendTenant): TenantDto {
       supportEmail: `support@${tenant.slug}.com`,
     },
   };
+}
+
+function deriveTenantEnabledModules(
+  source: string[] | undefined,
+  includeAdmin: boolean,
+  inventoryCapabilities?: Array<{ code: string; enabled: boolean }>,
+) {
+  const sourceModules = inventoryCapabilities
+    ? (source ?? []).filter((code) => code.toUpperCase() !== "INVENTORY")
+    : source;
+  const enabled = new Set(deriveEnabledModules(sourceModules, includeAdmin));
+  for (const capability of inventoryCapabilities ?? []) {
+    if (!capability.enabled) continue;
+    const moduleKey = moduleCodeToModuleKey(capability.code);
+    if (moduleKey) enabled.add(moduleKey);
+  }
+  return [...enabled];
 }
 
 function mapBranch(branch: BackendBranch): BranchDto {
@@ -1352,7 +1372,11 @@ async function resolvePlanId(plan: PlanTier) {
 }
 
 async function syncTenantModules(tenantId: string, modules: ModuleKey[]) {
-  const moduleCodes = new Set(
+  const inventoryModules = {
+    asset_inventory: modules.includes("asset_inventory"),
+    restaurant_inventory: modules.includes("restaurant_inventory"),
+  };
+  const moduleCodes = new Set<string>(
     modules
       .map((module) => {
         switch (module) {
@@ -1363,9 +1387,8 @@ async function syncTenantModules(tenantId: string, modules: ModuleKey[]) {
           case "training":
             return "TRAINING";
           case "asset_inventory":
-            return "ASSET_INVENTORY";
           case "restaurant_inventory":
-            return "RESTAURANT_INVENTORY";
+            return "INVENTORY";
           case "productivity":
             return "AI_PRODUCTIVITY";
           case "reports":
@@ -1383,6 +1406,12 @@ async function syncTenantModules(tenantId: string, modules: ModuleKey[]) {
       body: JSON.stringify({ enabled: moduleCodes.has(moduleCode) }),
     }, { tenantId });
   }
+  await Promise.all(Object.entries(inventoryModules).map(([module, enabled]) =>
+    request(`/inventory-capabilities/global/${tenantId}/${module === "asset_inventory" ? "ASSET_INVENTORY" : "RESTAURANT_INVENTORY"}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }),
+  ));
 }
 
 export async function authenticateUser(input: {
@@ -2258,16 +2287,19 @@ export async function fetchModuleAssignments(): Promise<ModuleAssignmentDto[]> {
       ...planModules,
       ...enabledModules,
       ...flagsByCode.keys(),
+      ...(tenant.capabilities?.inventoryCapabilities?.map((capability) => capability.code) ?? []),
     ]);
     const modules = new Map<ModuleKey, ModuleAssignmentDto>();
 
     for (const code of moduleCodes) {
+      if (code === "INVENTORY" && tenant.capabilities?.inventoryCapabilities) continue;
       const moduleKey = moduleCodeToModuleKey(code);
       if (!moduleKey) continue;
 
       const previous = modules.get(moduleKey);
       const belongsToPlan = planModules.has(code);
-      const enabled = enabledModules.has(code) || flagsByCode.get(code)?.enabled === true;
+      const enabled = enabledModules.has(code) || flagsByCode.get(code)?.enabled === true ||
+        tenant.capabilities?.inventoryCapabilities?.some((capability) => capability.code === code && capability.enabled) === true;
       modules.set(moduleKey, {
         id: previous?.id ?? flagsByCode.get(code)?.id ?? `${tenant.id}-${moduleKey}`,
         tenantId: tenant.id,
@@ -2346,6 +2378,17 @@ export async function updateModuleAssignment(
   _id: string,
   input: Omit<ModuleAssignmentDto, "id">,
 ) {
+  if (input.module === "asset_inventory" || input.module === "restaurant_inventory") {
+    await request(`/feature-flags/global/${input.tenantId}/INVENTORY`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled: true }),
+    });
+    await request(`/inventory-capabilities/global/${input.tenantId}/${input.module === "asset_inventory" ? "ASSET_INVENTORY" : "RESTAURANT_INVENTORY"}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled: input.enabled }),
+    });
+    return { ...input, id: `${input.tenantId}-${input.module}` };
+  }
   const moduleCodes =
     input.module === "ats"
       ? ["ATS"]
@@ -2353,11 +2396,7 @@ export async function updateModuleAssignment(
         ? ["ONBOARDING", "DOCUMENTS"]
         : input.module === "training"
           ? ["TRAINING"]
-          : input.module === "asset_inventory"
-          ? ["ASSET_INVENTORY"]
-          : input.module === "restaurant_inventory"
-            ? ["RESTAURANT_INVENTORY"]
-            : input.module === "productivity"
+          : input.module === "productivity"
               ? ["AI_PRODUCTIVITY"]
               : input.module === "reports"
                 ? ["REPORTS"]
@@ -4801,9 +4840,10 @@ export function mapAuthUserToUi(authUser: BackendAuthUser): {
     authUser.canAccessGlobalGovernance ??
       (authUser.isGlobalContext && (role === "admin_saas" || role === "admin_plataforma")),
   );
-  const enabledModules = deriveEnabledModules(
+  const enabledModules = deriveTenantEnabledModules(
     authUser.tenant?.enabledModules ?? authUser.enabledModules,
     canAccessGlobalGovernance,
+    authUser.inventoryCapabilities ?? authUser.tenantCapabilities?.inventoryCapabilities,
   );
   return {
     user: {

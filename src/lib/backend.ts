@@ -4417,7 +4417,27 @@ export function fetchRestaurantWastes(filters: { branchId?: string; warehouseId?
 export function confirmRestaurantWaste(id: string, justification?: string) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }); }
 export function cancelRestaurantWaste(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
 export function fetchRestaurantStock(filters: { branchId?: string; warehouseId?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantIngredientDto[]>(`/restaurant-inventory/balances${query.size ? `?${query}` : ""}`); }
-export function fetchRestaurantMovements(filters: { branchId?: string; warehouseId?: string; ingredientId?: string; from?: string; to?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantMovementDto[]>(`/restaurant-inventory/movements${query.size ? `?${query}` : ""}`); }
+export async function fetchRestaurantMovements(filters: { branchId?: string; warehouseId?: string; ingredientId?: string; from?: string; to?: string } = {}) {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
+  const rows = await request<Array<Record<string, unknown>>>(`/restaurant-inventory/movements${query.size ? `?${query}` : ""}`);
+  return rows.map((row) => {
+    const quantity = Number(row.quantity ?? 0);
+    const direction = String(row.direction ?? "").toUpperCase();
+    return {
+      id: String(row.id ?? ""),
+      date: String(row.occurredAt ?? row.date ?? ""),
+      ingredientName: String(row.ingredientName ?? row.ingredientId ?? "Ingrediente"),
+      type: String(row.movementType ?? row.type ?? ""),
+      entry: direction === "IN" ? quantity : 0,
+      exit: direction === "OUT" ? quantity : 0,
+      balance: Number(row.balance ?? 0),
+      cost: Number(row.totalCost ?? row.cost ?? 0),
+      reference: row.reference == null ? (row.referenceType == null ? null : String(row.referenceType)) : String(row.reference),
+      userName: row.userName == null ? (row.createdBy == null ? null : String(row.createdBy)) : String(row.userName),
+    } satisfies import("./contracts").RestaurantMovementDto;
+  });
+}
 export function fetchRestaurantPhase2Dashboard(filters: { branchId?: string; warehouseId?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantPhase2DashboardDto>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`); }
 export function fetchRestaurantProductions(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantProductionDto[]>(`/restaurant-inventory/productions${query.size ? `?${query}` : ""}`); }
 export function previewRestaurantProduction(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular la producción"); return request<import("./contracts").RestaurantProductionDto>("/restaurant-inventory/productions/preview", { method: "POST", body: JSON.stringify(input) }); }

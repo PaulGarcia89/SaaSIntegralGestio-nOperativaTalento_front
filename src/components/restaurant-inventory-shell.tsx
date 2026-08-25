@@ -27,6 +27,7 @@ import { RestaurantReportsView } from "@/components/restaurant-reports";
 import { RestaurantInventoryCatalog } from "@/components/restaurant-inventory-catalog";
 import { RestaurantReceiptsScreen } from "@/components/restaurant-receipts";
 import { RestaurantOperations } from "@/components/restaurant-operations";
+import { RestaurantRecipesWorkspace } from "@/components/restaurant-recipes-workspace";
 
 const sections = [
   ["dashboard", "Dashboard"], ["ingredients", "Ingredientes"], ["categories", "Categorías"], ["units", "Unidades"],
@@ -43,7 +44,7 @@ export function RestaurantInventoryShell() {
 
 function RestaurantInventoryInner() {
   const pathname = usePathname();
-  const section = sections.find(([key]) => pathname.endsWith(`/${key}`))?.[0] ?? "dashboard";
+  const section = pathname.includes("/recipes") ? "recipes" : sections.find(([key]) => pathname.endsWith(`/${key}`))?.[0] ?? "dashboard";
   const { currentBranch } = useAppStore();
   return <div className="space-y-6">
     <PageHeader eyebrow="Operaciones" title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." />
@@ -52,7 +53,7 @@ function RestaurantInventoryInner() {
     {section === "dashboard" ? <DashboardScreen branchId={currentBranch?.id} /> : null}
     {section === "ingredients" ? <RestaurantInventoryCatalog kind="ingredients" /> : null}
     {section === "receipts" ? <RestaurantReceiptsScreen /> : null}
-    {section === "recipes" ? <RestaurantOperations section="recipes" /> : null}
+    {section === "recipes" ? <RestaurantRecipesWorkspace /> : null}
     {section === "consumption" ? <RestaurantOperations section="consumption" /> : null}
     {section === "waste" ? <RestaurantOperations section="waste" /> : null}
     {section === "stock" ? <StockScreen branchId={currentBranch?.id} /> : null}

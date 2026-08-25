@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RestaurantDecisionDashboard } from "@/components/restaurant-decision-dashboard";
+import { RestaurantReportsWorkspace } from "@/components/restaurant-reports-workspace";
 
 const reportOptions = [
   ["kardex", "Kardex"], ["valued-stock", "Existencias valorizadas"], ["receipts-by-supplier", "Entradas"], ["consumption-by-recipe", "Consumo"],
@@ -25,10 +27,10 @@ const initialFilters: Filters = { companyId: "", branchId: "", warehouseId: "", 
 
 export function RestaurantReportsView({ section }: { section: string }) {
   const { can } = useAppStore();
-  if (section === "analytics") return <AdvancedDashboard />;
+  if (section === "analytics") return <RestaurantDecisionDashboard />;
   if (section === "costs") return <RecipeCostScreen />;
-  if (section === "audit") return can("restaurant_inventory.manage") ? <ReportsScreen initialReport="audit" /> : <InlineFeedback tone="warning" title="Permiso de auditoría requerido">Tu perfil no puede consultar la auditoría detallada.</InlineFeedback>;
-  return <ReportsScreen initialReport={section === "purchase-suggestions" ? "purchase-suggestions" : undefined} />;
+  if (section === "audit") return can("restaurant_inventory.manage") ? <RestaurantReportsWorkspace initialReport="audit" /> : <InlineFeedback tone="warning" title="Permiso de auditoría requerido">Tu perfil no puede consultar la auditoría detallada.</InlineFeedback>;
+  return <RestaurantReportsWorkspace initialReport={section === "purchase-suggestions" ? "purchase-suggestions" : undefined} />;
 }
 
 function AdvancedDashboard() { const { currentBranch } = useAppStore(); const query = useQuery({ queryKey: ["restaurant-advanced-dashboard", currentBranch?.id], queryFn: () => fetchRestaurantAdvancedDashboard({ branchId: currentBranch?.id ?? "" }) }); const data = query.data; return <div className="space-y-5"><PageHeader eyebrow="Análisis" title="Dashboard avanzado" description="Indicadores calculados con stock, costos y movimientos confirmados por el backend." /><ReportQueryState query={query}>{data ? <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[["Valor del inventario", `$${data.inventoryValue.toFixed(2)}`], ["Consumo del periodo", `$${data.periodConsumption.toFixed(2)}`], ["Desperdicio", `$${data.waste.toFixed(2)}`], ["Diferencia", `$${data.inventoryDifference.toFixed(2)}`], ["Ingredientes críticos", data.criticalIngredients.length]].map(([label, value]) => <Metric key={String(label)} label={String(label)} value={value} />)}</div><div className="grid gap-5 lg:grid-cols-2"><ListCard title="Próximos vencimientos" items={data.upcomingExpirations.map((item) => `${item.name} · lote ${item.lot} · ${item.expiresAt} · ${item.quantity}`)} /><ListCard title="Recetas de mayor costo" items={data.highestCostRecipes.map((item) => `${item.name} · $${item.cost.toFixed(2)}`)} /><ListCard title="Recetas de menor margen" items={data.lowestMarginRecipes.map((item) => `${item.name} · ${item.margin}%`)} /><ListCard title="Sugerencias de compra" items={data.purchaseSuggestions.map((item) => `${item.ingredientName} · ${item.suggestedQuantity} ${item.unit} · ${item.reason}`)} /></div><Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Tendencia de consumo</h2><div className="mt-5 flex h-44 items-end gap-2 border-b border-border-default">{data.consumptionTrend.map((point) => <div key={point.label} className="flex min-w-0 flex-1 flex-col items-center gap-2" title={`${point.label}: ${point.value}`}><div className="w-full rounded-t bg-primary/75" style={{ height: `${Math.max(6, Math.min(100, point.value))}%` }} /><span className="max-w-full truncate text-[10px] text-text-secondary">{point.label}</span></div>)}</div></CardContent></Card></> : null}</ReportQueryState></div>; }

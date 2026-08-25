@@ -13,6 +13,7 @@
     "test:e2e:roles": "playwright test tests/e2e/role-navigation.spec.ts",
     "test:e2e:ats:staging": "playwright test --config=playwright.ats-staging.config.ts",
     "test:integration:onboarding": "playwright test --config=playwright.integration.config.ts tests/integration",
+    "test:integration:restaurant": "playwright test --config=playwright.integration.config.ts tests/integration/restaurant-inventory-transactions.spec.ts",
     "test:certify:critical": "playwright test --config=playwright.critical-certification.config.ts",
     "test:a11y": "playwright test tests/e2e/public-accessibility.spec.ts",
     "test:a11y:internal": "playwright test tests/e2e/authenticated-accessibility.spec.ts",

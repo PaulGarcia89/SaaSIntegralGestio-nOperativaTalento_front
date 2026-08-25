@@ -46,3 +46,14 @@ Contracts are still required for:
 
 Each endpoint must define validation errors, idempotency/double-submit behavior, tenant and branch
 scope, upload limits, and the applicable `401`, `403`, `409`, `422`, `429` and `500` responses.
+
+## Restaurant inventory Phase 1
+
+The restaurant inventory API must enforce these rules server-side; hiding a button in the frontend is not an authorization control:
+
+- Every request must validate that the authenticated tenant owns the selected branch and warehouse, and that the warehouse belongs to that branch.
+- Mutating endpoints must accept `Idempotency-Key` and return the original result for a repeated key instead of applying a second inventory movement.
+- Create, confirm, cancel and approve actions must have separate permission checks. At minimum: receipt create/confirm, recipe manage, operation create/confirm, count approve, adjustment create, transfer manage and inventory settings manage.
+- Confirmed or approved documents must be immutable except through an explicit reversal workflow that creates a compensating movement.
+- The API must expose the complete sales-import lifecycle: configure, column mapping, product mapping, preview, process and history. Current frontend adapters intentionally fail with `404` until these endpoints exist.
+- Transactional operations must update the document, balances, lots and movements atomically, with a conflict response for stale previews or duplicate state transitions.

@@ -406,6 +406,7 @@ type RequestOptions = {
   responseType?: "json" | "blob";
   retrySafe?: boolean;
   timeoutMs?: number;
+  idempotencyKey?: string;
 };
 
 export class ApiError extends Error {
@@ -491,6 +492,15 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "asset_inventory.manage": [],
   "restaurant_inventory.view": [],
   "restaurant_inventory.manage": [],
+  "restaurant_inventory.receipts.create": ["restaurant_inventory.receipts.create"],
+  "restaurant_inventory.receipts.confirm": ["restaurant_inventory.receipts.confirm"],
+  "restaurant_inventory.recipes.manage": ["restaurant_inventory.recipes.manage"],
+  "restaurant_inventory.operations.create": ["restaurant_inventory.operations.create"],
+  "restaurant_inventory.operations.confirm": ["restaurant_inventory.operations.confirm"],
+  "restaurant_inventory.counts.approve": ["restaurant_inventory.counts.approve"],
+  "restaurant_inventory.adjustments.create": ["restaurant_inventory.adjustments.create"],
+  "restaurant_inventory.transfers.manage": ["restaurant_inventory.transfers.manage"],
+  "restaurant_inventory.settings.manage": ["restaurant_inventory.settings.manage"],
   "employees.read": ["employees.read"],
   "employees.create": ["employees.create"],
   "employees.update": ["employees.update"],
@@ -1219,6 +1229,9 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
 
   if (options.auth !== false && branchId) {
     headers.set("x-branch-id", branchId);
+  }
+  if (options.idempotencyKey) {
+    headers.set("Idempotency-Key", options.idempotencyKey);
   }
 
   const requestBaseUrl = options.authBridge ? AUTH_API_BASE_URL : API_BASE_URL;
@@ -4402,19 +4415,19 @@ export function activateRestaurantRecipe(id: string) { return request<Record<str
 export function archiveRestaurantRecipe(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/recipes/${encodeURIComponent(id)}/archive`, { method: "PATCH" }); }
 export function fetchRestaurantReceipts(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantReceiptDto[]>(`/restaurant-inventory/receipts${query.size ? `?${query}` : ""}`); }
 export function previewRestaurantReceipt(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular una entrada"); return request<{ branchId: string; warehouseId: string; items: Array<{ ingredientId: string; purchaseQuantity: number; purchaseUnitId: string; conversionFactor: number; inventoryQuantity: number; unitCost: number; totalCost: number; lotNumber: string | null; expirationDate: string | null }>; totalCost: number; totalInventoryQuantity: number }>("/restaurant-inventory/receipts/preview", { method: "POST", body: JSON.stringify(input) }); }
-export function createRestaurantReceipt(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { requireRestaurantContext(input, "crear una entrada"); void action; return request<import("./contracts").RestaurantReceiptDto>("/restaurant-inventory/receipts", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantReceipt(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { requireRestaurantContext(input, "crear una entrada"); void action; return request<import("./contracts").RestaurantReceiptDto>("/restaurant-inventory/receipts", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function updateRestaurantReceipt(id: string, input: Record<string, unknown>) { requireRestaurantContext(input, "editar una entrada"); return request<import("./contracts").RestaurantReceiptDto>(`/restaurant-inventory/receipts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
-export function confirmRestaurantReceipt(id: string) { return request<import("./contracts").RestaurantReceiptDto>(`/restaurant-inventory/receipts/${encodeURIComponent(id)}/confirm`, { method: "POST" }); }
+export function confirmRestaurantReceipt(id: string, idempotencyKey = requestId()) { return request<import("./contracts").RestaurantReceiptDto>(`/restaurant-inventory/receipts/${encodeURIComponent(id)}/confirm`, { method: "POST" }, { idempotencyKey }); }
 export function cancelRestaurantReceipt(id: string, reason: string) { return request<import("./contracts").RestaurantReceiptDto>(`/restaurant-inventory/receipts/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
 export function previewRestaurantConsumption(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular el consumo"); return request<import("./contracts").RestaurantConsumptionPreviewDto>("/restaurant-inventory/consumptions/preview", { method: "POST", body: JSON.stringify(input) }); }
-export function createRestaurantConsumption(input: Record<string, unknown>) { requireRestaurantContext(input, "registrar el consumo"); return request("/restaurant-inventory/consumptions", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantConsumption(input: Record<string, unknown>) { requireRestaurantContext(input, "registrar el consumo"); return request("/restaurant-inventory/consumptions", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function fetchRestaurantConsumptions(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<Record<string, unknown>[]>(`/restaurant-inventory/consumptions${query.size ? `?${query}` : ""}`); }
-export function confirmRestaurantConsumption(id: string, justification?: string) { return request<Record<string, unknown>>(`/restaurant-inventory/consumptions/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }); }
+export function confirmRestaurantConsumption(id: string, justification?: string, idempotencyKey = requestId()) { return request<Record<string, unknown>>(`/restaurant-inventory/consumptions/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }, { idempotencyKey }); }
 export function cancelRestaurantConsumption(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/consumptions/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
-export function createRestaurantWaste(input: Record<string, unknown>) { requireRestaurantContext(input, "registrar el desperdicio"); return request("/restaurant-inventory/wastes", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantWaste(input: Record<string, unknown>) { requireRestaurantContext(input, "registrar el desperdicio"); return request("/restaurant-inventory/wastes", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function previewRestaurantWaste(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular el desperdicio"); return request<Record<string, unknown>>("/restaurant-inventory/wastes/preview", { method: "POST", body: JSON.stringify(input) }); }
 export function fetchRestaurantWastes(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<Record<string, unknown>[]>(`/restaurant-inventory/wastes${query.size ? `?${query}` : ""}`); }
-export function confirmRestaurantWaste(id: string, justification?: string) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }); }
+export function confirmRestaurantWaste(id: string, justification?: string, idempotencyKey = requestId()) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }, { idempotencyKey }); }
 export function cancelRestaurantWaste(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
 export function fetchRestaurantStock(filters: { branchId?: string; warehouseId?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantIngredientDto[]>(`/restaurant-inventory/balances${query.size ? `?${query}` : ""}`); }
 export async function fetchRestaurantMovements(filters: { branchId?: string; warehouseId?: string; ingredientId?: string; from?: string; to?: string } = {}) {
@@ -4441,15 +4454,15 @@ export async function fetchRestaurantMovements(filters: { branchId?: string; war
 export function fetchRestaurantPhase2Dashboard(filters: { branchId?: string; warehouseId?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantPhase2DashboardDto>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`); }
 export function fetchRestaurantProductions(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantProductionDto[]>(`/restaurant-inventory/productions${query.size ? `?${query}` : ""}`); }
 export function previewRestaurantProduction(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular la producción"); return request<import("./contracts").RestaurantProductionDto>("/restaurant-inventory/productions/preview", { method: "POST", body: JSON.stringify(input) }); }
-export function createRestaurantProduction(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { requireRestaurantContext(input, "crear una producción"); void action; return request<import("./contracts").RestaurantProductionDto>("/restaurant-inventory/productions", { method: "POST", body: JSON.stringify(input) }); }
-export function confirmRestaurantProduction(id: string) { return request<import("./contracts").RestaurantProductionDto>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/confirm`, { method: "POST" }); }
+export function createRestaurantProduction(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { requireRestaurantContext(input, "crear una producción"); void action; return request<import("./contracts").RestaurantProductionDto>("/restaurant-inventory/productions", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
+export function confirmRestaurantProduction(id: string, idempotencyKey = requestId()) { return request<import("./contracts").RestaurantProductionDto>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/confirm`, { method: "POST" }, { idempotencyKey }); }
 export function cancelRestaurantProduction(id: string, reason: string) { return request<import("./contracts").RestaurantProductionDto>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
-export function confirmRestaurantProductionWithJustification(id: string, justification?: string) { return request<Record<string, unknown>>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }); }
+export function confirmRestaurantProductionWithJustification(id: string, justification?: string, idempotencyKey = requestId()) { return request<Record<string, unknown>>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }, { idempotencyKey }); }
 export function fetchRestaurantLots(filters: { branchId?: string; warehouseId?: string; expiry?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantLotDto[]>(`/restaurant-inventory/lots${query.size ? `?${query}` : ""}`); }
 export function fetchRestaurantStockCounts(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantStockCountDto[]>(`/restaurant-inventory/stock-counts${query.size ? `?${query}` : ""}`); }
-export function createRestaurantStockCount(input: Record<string, unknown>) { requireRestaurantContext(input, "crear un conteo"); return request<import("./contracts").RestaurantStockCountDto>("/restaurant-inventory/stock-counts", { method: "POST", body: JSON.stringify(input) }); }
+export function createRestaurantStockCount(input: Record<string, unknown>) { requireRestaurantContext(input, "crear un conteo"); return request<import("./contracts").RestaurantStockCountDto>("/restaurant-inventory/stock-counts", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function submitRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/submit`, { method: "POST" }); }
-export function approveRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/approve`, { method: "POST" }); }
+export function approveRestaurantStockCount(id: string, idempotencyKey = requestId()) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/approve`, { method: "POST" }, { idempotencyKey }); }
 export function cancelRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
 export function fetchRestaurantTransfers(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantTransferDto[]>(`/restaurant-inventory/transfers${query.size ? `?${query}` : ""}`); }
 export function createRestaurantTransfer(input: Record<string, unknown>) { requireRestaurantContext({ branchId: input.sourceBranchId, warehouseId: input.sourceWarehouseId }, "crear una transferencia"); return request<import("./contracts").RestaurantTransferDto>("/restaurant-inventory/transfers", { method: "POST", body: JSON.stringify(input) }); }

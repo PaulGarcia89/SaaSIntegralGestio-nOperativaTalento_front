@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RestaurantProductionWorkflow } from "@/components/restaurant-production-workflow";
 
 type Option = { id: string; label: string };
 type Line = { ingredientId: string; unitId: string; quantity: string; wastePercentage: string };
@@ -39,6 +40,7 @@ export function RestaurantOperations({ section, warehouseId }: { section: "recip
   const unitOptions = (units.data?.data ?? []).map((item) => ({ id: item.id, label: `${item.name} (${item.abbreviation ?? ""})` }));
   const recipeOptions = (recipes.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; return { id: String(record.id), label: `${String(record.code ?? "")} · ${String(record.name ?? "")}` }; });
   if (section === "recipes") return <RecipesView canManage={canManage} ingredientOptions={ingredientOptions} unitOptions={unitOptions} />;
+  if (section === "production") return <RestaurantProductionWorkflow branchId={currentBranch.id} warehouseId={warehouseId} recipeOptions={recipeOptions} canManage={canManage} />;
   return <DocumentOperationView section={section} canManage={canManage} branchId={currentBranch.id} warehouseId={warehouseId} ingredientOptions={ingredientOptions} unitOptions={unitOptions} recipeOptions={recipeOptions} />;
 }
 

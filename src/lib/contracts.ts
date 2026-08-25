@@ -3312,6 +3312,9 @@ export interface RestaurantInventoryDashboardDto {
 
 export interface RestaurantReceiptDto {
   id: string;
+  branchId: string;
+  warehouseId: string;
+  supplierId?: string | null;
   reference: string;
   supplierName?: string | null;
   branchName?: string | null;
@@ -3321,7 +3324,7 @@ export interface RestaurantReceiptDto {
   notes?: string | null;
   status: RestaurantDocumentStatus;
   total: number;
-  lines: Array<{ id: string; ingredientId: string; ingredientName: string; quantityPurchased: number; purchaseUnit: string; conversion: number; quantityReceived: number; unitCost: number; total: number }>;
+  lines: Array<{ id: string; ingredientId: string; ingredientName: string; purchaseUnitId: string; quantityPurchased: number; purchaseUnit: string; conversion: number; quantityReceived: number; unitCost: number; total: number; lotNumber?: string | null; expirationDate?: string | null }>;
 }
 
 export interface RestaurantConsumptionPreviewDto {

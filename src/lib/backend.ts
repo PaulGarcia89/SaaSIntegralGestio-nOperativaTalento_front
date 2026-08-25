@@ -872,9 +872,29 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
   }
   if (enabledModules.includes("asset_inventory")) {
     mapped.add("asset_inventory.view");
+    if (
+      hasCode("asset_inventory.manage") ||
+      hasCode("inventory.manage") ||
+      codes.some((code) => code.startsWith("asset_inventory.") && !code.endsWith(".read"))
+    ) {
+      mapped.add("asset_inventory.manage");
+    }
   }
   if (enabledModules.includes("restaurant_inventory")) {
     mapped.add("restaurant_inventory.view");
+    if (
+      hasCode("restaurant_inventory.manage") ||
+      hasCode("inventory.manage") ||
+      codes.some((code) =>
+        code.startsWith("restaurant_inventory.") && !code.endsWith(".read"),
+      ) ||
+      codes.some((code) =>
+        code.startsWith("inventory.") &&
+        !["inventory.read", "inventory.view", "inventory.report.view", "inventory.movement.view", "inventory.lot.view", "inventory.sales_import.view"].includes(code),
+      )
+    ) {
+      mapped.add("restaurant_inventory.manage");
+    }
   }
   if (enabledModules.includes("productivity")) {
     mapped.add("productivity.view");

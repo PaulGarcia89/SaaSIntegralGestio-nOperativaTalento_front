@@ -62,6 +62,15 @@ describe("navigation policy", () => {
     }
   });
 
+  it("separates restaurant inventory read and management routes", () => {
+    expect(getRoutePolicy("/inventory/restaurant")?.permission).toBe("restaurant_inventory.view");
+    expect(getRoutePolicy("/inventory/restaurant/dashboard")?.permission).toBe("restaurant_inventory.view");
+    expect(getRoutePolicy("/inventory/restaurant/ingredients")?.permission).toBe("restaurant_inventory.manage");
+    expect(isRoleAllowed(getRoutePolicy("/inventory/restaurant")?.roles, "supervisor")).toBe(true);
+    expect(isRoleAllowed(getRoutePolicy("/inventory/restaurant/ingredients")?.roles, "supervisor")).toBe(false);
+    expect(isRoleAllowed(getRoutePolicy("/inventory/restaurant/ingredients")?.roles, "encargado_inventario")).toBe(true);
+  });
+
   it("centralizes the candidate portal navigation", () => {
     expect(candidateNavigation.filter((item) => item.available).map((item) => item.href)).toEqual(["/", "/jobs", "/apply", "/application-status", "/candidate/portal", "/candidate/profile"]);
   });

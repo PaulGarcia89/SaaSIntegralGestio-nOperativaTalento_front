@@ -40,3 +40,5 @@ Leyenda: **C** controla, **E** edita, **V** ve, **P** propio, **A** asignado, **
 3. Incluir `tenantId`/`branchId` en cada consulta que requiera scope y hacer que el backend lo valide.
 4. Refrescar permisos al cambiar de rol, plan, módulo, feature flag o sucursal.
 5. Probar matriz por rol contra Railway antes de publicar cambios de política.
+
+Nota: el rol `supervisor` también debe conservar acceso de solo lectura al inventario de restaurante (`restaurant_inventory.view`) para que la navegación y el guard de módulo sean consistentes.

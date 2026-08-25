@@ -120,6 +120,7 @@ export const rolePermissions: Record<RoleKey, PermissionKey[]> = {
     "training.view",
     "productivity.view",
     "asset_inventory.view",
+    "restaurant_inventory.view",
     "reports.view",
     "notifications.view",
     "profile.view",

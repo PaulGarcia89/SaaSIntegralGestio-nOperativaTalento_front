@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RestaurantStockCountWorkflow } from "@/components/restaurant-stock-count-workflow";
+import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
 
 type Line = { ingredientId: string; quantity: string; lotId?: string; reason?: string };
 
@@ -20,7 +21,7 @@ export function RestaurantPhase2View({ section }: { section: string }) {
   const { currentBranch, can } = useAppStore();
   if (!currentBranch) return <InlineFeedback tone="warning" title="Sucursal requerida">Selecciona una sucursal para operar este módulo.</InlineFeedback>;
   if (["stock-counts", "transfers", "adjustments"].includes(section) && !can("restaurant_inventory.manage")) return <InlineFeedback tone="warning" title="Permiso de gestión requerido">Tu perfil puede consultar, pero no modificar esta sección.</InlineFeedback>;
-  if (section === "lots") return <LotsScreen branchId={currentBranch.id} />;
+  if (section === "lots") return <RestaurantStockControlWorkspace view="lots" />;
   if (section === "stock-counts") return <RestaurantStockCountWorkflow branchId={currentBranch.id} />;
   if (section === "transfers") return <TransfersScreen branchId={currentBranch.id} />;
   if (section === "adjustments") return <AdjustmentsScreen branchId={currentBranch.id} />;

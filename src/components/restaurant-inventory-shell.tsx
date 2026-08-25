@@ -30,6 +30,7 @@ import { RestaurantOperations } from "@/components/restaurant-operations";
 import { RestaurantRecipesWorkspace } from "@/components/restaurant-recipes-workspace";
 import { RestaurantInventoryContextBar, RestaurantInventoryContextProvider, useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
 import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
+import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
 import type { PermissionKey } from "@/lib/contracts";
 
 type InventoryItem = { key: string; label: string; href: string; permission: PermissionKey };
@@ -70,8 +71,8 @@ function RestaurantInventoryInner() {
     {section === "recipes" ? <RestaurantRecipesWorkspace /> : null}
     {section === "consumption" ? <RestaurantOperations section="consumption" warehouseId={warehouseId} /> : null}
     {section === "waste" ? <RestaurantOperations section="waste" warehouseId={warehouseId} /> : null}
-    {section === "stock" ? <StockScreen branchId={currentBranch?.id} warehouseId={warehouseId} /> : null}
-    {section === "movements" ? <MovementsScreen branchId={currentBranch?.id} warehouseId={warehouseId} /> : null}
+    {section === "stock" ? <RestaurantStockControlWorkspace view="stock" /> : null}
+    {section === "movements" ? <RestaurantStockControlWorkspace view="movements" /> : null}
     {["lots", "stock-counts", "adjustments", "transfers"].includes(section) ? <RestaurantPhase2View section={section} /> : null}
     {section === "production" ? <RestaurantOperations section="production" warehouseId={warehouseId} /> : null}
     {section === "sales-import" ? <RestaurantSalesImport /> : null}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { confirmRestaurantWaste, createRestaurantWaste, fetchRestaurantWastes, getApiErrorMessage, previewRestaurantWaste } from "@/lib/backend";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ export function RestaurantWasteWorkflow({ branchId, warehouseId, ingredients, un
   const payload = () => ({ branchId, warehouseId, wasteDate: new Date().toISOString(), reason, notes: notes || undefined, items: lines.map((line) => ({ ingredientId: line.ingredientId, quantity: Number(line.quantity), unitId: line.unitId })) });
   const save = useMutation({ mutationFn: () => createRestaurantWaste(payload()), onSuccess: (data) => setDocumentId(String((data as Record<string, unknown>).id ?? "")) });
   const calculate = useMutation({ mutationFn: () => previewRestaurantWaste(payload()), onSuccess: (data) => setPreview(data as Record<string, unknown>) });
-  const confirm = useMutation({ mutationFn: () => confirmRestaurantWaste(documentId), onSuccess: async () => { setPreview(null); setDocumentId(""); setLines([{ ingredientId: "", unitId: "", quantity: "" }]); setReason(""); setNotes(""); await Promise.all([queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-wastes"] })]); } });
+  const confirm = useMutation({ mutationFn: () => confirmRestaurantWaste(documentId), onSuccess: async () => { setPreview(null); setDocumentId(""); setLines([{ ingredientId: "", unitId: "", quantity: "" }]); setReason(""); setNotes(""); toast.success("Merma confirmada", { description: "La existencia y el costo fueron actualizados." }); await Promise.all([queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-wastes"] })]); } });
   const pending = useQuery({ queryKey: ["restaurant-wastes", branchId, "pending"], queryFn: () => fetchRestaurantWastes({ branchId, status: "DRAFT" }) });
   const invalid = !warehouseId || !reason || !lines.length || lines.some((line) => !line.ingredientId || !line.unitId || Number(line.quantity) <= 0);
   const updateLine = (index: number, key: keyof WasteLine, value: string) => setLines(lines.map((line, current) => current === index ? { ...line, [key]: value } : line));

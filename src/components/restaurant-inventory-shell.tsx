@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ClipboardList, Eye, Plus } from "lucide-react";
+import { Check, ClipboardList, Eye, Plus, Trash2 } from "lucide-react";
 import {
   cancelRestaurantReceipt, confirmRestaurantReceipt, createRestaurantConsumption,
   createRestaurantWaste, fetchRestaurantDashboard, fetchRestaurantIngredients,
@@ -54,15 +54,21 @@ function RestaurantInventoryInner() {
   const pathname = usePathname();
   const section = pathname.includes("/recipes") ? "recipes" : taskGroups.flatMap((task) => task.items).find((item) => item.key !== "dashboard" && pathname.endsWith(`/${item.key}`))?.key ?? "dashboard";
   const { currentBranch, can } = useAppStore();
-  const { warehouseId, warehouseName } = useRestaurantInventoryContext();
+  const { warehouseId, warehouseName, compactMode } = useRestaurantInventoryContext();
   const visibleTasks = taskGroups.map((task) => ({ ...task, items: task.items.filter((item) => can(item.permission)) })).filter((task) => task.items.length);
   const activeTask = visibleTasks.find((task) => task.items.some((item) => item.key === section))?.key ?? "overview";
   const [selectedTask, setSelectedTask] = useState(activeTask);
   const task = visibleTasks.find((item) => item.key === selectedTask) ?? visibleTasks[0];
-  return <div className="space-y-6">
+  return <div className={compactMode ? "space-y-4 text-sm" : "space-y-6"} data-compact={compactMode ? "true" : "false"}>
     <PageHeader eyebrow="Operaciones" title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." />
-    <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Tareas de inventario de restaurante">{visibleTasks.map((item) => <button key={item.key} type="button" onClick={() => setSelectedTask(item.key)} className={`rounded-2xl border px-4 py-3 text-left transition ${selectedTask === item.key ? "border-primary bg-primary/10 shadow-sm" : "border-border-default bg-surface-elevated hover:border-primary/40"}`}><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-xs text-text-secondary">{item.description}</span></button>)}</nav>
-    {task ? <div className="flex flex-wrap gap-2 rounded-2xl border border-border-default bg-surface-elevated p-3" aria-label={`Rutas de ${task.label}`}>{task.items.map((item) => <Button key={item.key} asChild size="sm" variant={section === item.key ? "default" : "secondary"}><Link href={item.href}>{item.label}</Link></Button>)}</div> : null}
+    <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Tareas de inventario de restaurante">{visibleTasks.map((item) => <button key={item.key} type="button" onClick={() => setSelectedTask(item.key)} className={`min-h-14 rounded-2xl border px-4 py-3 text-left transition ${selectedTask === item.key ? "border-primary bg-primary/10 shadow-sm" : "border-border-default bg-surface-elevated hover:border-primary/40"}`}><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-xs text-text-secondary">{item.description}</span></button>)}</nav>
+    {task ? <div className="flex flex-wrap gap-2 rounded-2xl border border-border-default bg-surface-elevated p-3" aria-label={`Rutas de ${task.label}`}>{task.items.map((item) => <Button key={item.key} asChild size="sm" className="min-h-10" variant={section === item.key ? "default" : "secondary"}><Link href={item.href}>{item.label}</Link></Button>)}</div> : null}
+    <div className="flex flex-wrap items-center gap-2" aria-label="Acciones principales">
+      {can("restaurant_inventory.manage") ? <Button asChild className="min-h-11"><Link href="/inventory/restaurant/receipts"><Plus className="size-4" />Nueva entrada</Link></Button> : null}
+      {can("restaurant_inventory.manage") ? <Button asChild variant="secondary" className="min-h-11"><Link href="/inventory/restaurant/production"><ClipboardList className="size-4" />Registrar producción</Link></Button> : null}
+      {can("restaurant_inventory.manage") ? <Button asChild variant="secondary" className="min-h-11"><Link href="/inventory/restaurant/waste"><Trash2 className="size-4" />Registrar merma</Link></Button> : null}
+      <Button asChild variant="ghost" className="min-h-11"><Link href="/inventory/restaurant/stock">Consultar existencias</Link></Button>
+    </div>
     <RestaurantInventoryContextBar />
     <Card level={1}><CardContent className="flex flex-wrap gap-4 p-4 text-sm text-text-secondary"><span>Empresa: contexto actual</span><span>Sucursal: {currentBranch?.name ?? "Sin sucursal"}</span><span>Almacén: {warehouseName}</span><span>Stock y costos: fuente de verdad del backend</span></CardContent></Card>
     {section === "dashboard" ? <DashboardScreen branchId={currentBranch?.id} warehouseId={warehouseId} /> : null}

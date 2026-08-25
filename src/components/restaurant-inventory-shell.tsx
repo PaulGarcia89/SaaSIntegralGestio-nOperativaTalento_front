@@ -31,6 +31,7 @@ import { RestaurantRecipesWorkspace } from "@/components/restaurant-recipes-work
 import { RestaurantInventoryContextBar, RestaurantInventoryContextProvider, useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
 import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
 import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
+import { RestaurantPurchasingWorkspace } from "@/components/restaurant-purchasing-workspace";
 import type { PermissionKey } from "@/lib/contracts";
 
 type InventoryItem = { key: string; label: string; href: string; permission: PermissionKey };
@@ -38,6 +39,7 @@ type InventoryTask = { key: string; label: string; description: string; items: I
 const taskGroups: InventoryTask[] = [
   { key: "overview", label: "Dashboard", description: "Visión general", items: [{ key: "dashboard", label: "Resumen", href: "/inventory/restaurant", permission: "restaurant_inventory.view" }] },
   { key: "supply", label: "Abastecimiento", description: "Compras y catálogos", items: [
+    { key: "purchase-orders", label: "Órdenes de compra", href: "/inventory/restaurant/purchase-orders", permission: "restaurant_inventory.manage" }, { key: "price-history", label: "Precios por proveedor", href: "/inventory/restaurant/price-history", permission: "restaurant_inventory.view" }, { key: "invoices", label: "Facturas OCR", href: "/inventory/restaurant/invoices", permission: "restaurant_inventory.manage" },
     { key: "receipts", label: "Entradas", href: "/inventory/restaurant/receipts", permission: "restaurant_inventory.manage" }, { key: "sales-import", label: "Importar ventas", href: "/inventory/restaurant/sales-import", permission: "restaurant_inventory.manage" }, { key: "ingredients", label: "Ingredientes", href: "/inventory/restaurant/ingredients", permission: "restaurant_inventory.view" }, { key: "suppliers", label: "Proveedores", href: "/inventory/restaurant/suppliers", permission: "restaurant_inventory.view" }, { key: "warehouses", label: "Almacenes", href: "/inventory/restaurant/warehouses", permission: "restaurant_inventory.view" }, { key: "categories", label: "Categorías", href: "/inventory/restaurant/categories", permission: "restaurant_inventory.view" }, { key: "units", label: "Unidades", href: "/inventory/restaurant/units", permission: "restaurant_inventory.view" },
   ] },
   { key: "production", label: "Producción", description: "Recetas y elaboración", items: [{ key: "recipes", label: "Recetas", href: "/inventory/restaurant/recipes", permission: "restaurant_inventory.view" }, { key: "production", label: "Producción", href: "/inventory/restaurant/production", permission: "restaurant_inventory.manage" }] },
@@ -74,6 +76,10 @@ function RestaurantInventoryInner() {
     <Card level={1}><CardContent className="flex flex-wrap gap-4 p-4 text-sm text-text-secondary"><span>Empresa: contexto actual</span><span>Sucursal: {currentBranch?.name ?? "Sin sucursal"}</span><span>Almacén: {warehouseName}</span><span>Stock y costos: fuente de verdad del backend</span></CardContent></Card>
     {section === "dashboard" ? <DashboardScreen branchId={currentBranch?.id} warehouseId={warehouseId} /> : null}
     {section === "ingredients" ? <RestaurantInventoryCatalog kind="ingredients" /> : null}
+    {section === "purchase-orders" ? <RestaurantPurchasingWorkspace initialView="orders" /> : null}
+    {section === "price-history" ? <RestaurantPurchasingWorkspace initialView="prices" /> : null}
+    {section === "purchase-suggestions" ? <RestaurantPurchasingWorkspace initialView="suggestions" /> : null}
+    {section === "invoices" ? <RestaurantPurchasingWorkspace initialView="invoices" /> : null}
     {section === "receipts" ? <RestaurantReceiptsScreen /> : null}
     {section === "recipes" ? <RestaurantRecipesWorkspace /> : null}
     {section === "consumption" ? <RestaurantOperations section="consumption" warehouseId={warehouseId} /> : null}

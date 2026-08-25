@@ -44,6 +44,17 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
     expect(result.violations).toEqual([]);
   });
 
+  test("el modo compacto cocina se conserva al cambiar de pantalla", async ({ page }) => {
+    await login(page);
+    await page.goto("/inventory/restaurant/production");
+    const compact = page.getByRole("button", { name: /Modo compacto cocina|Modo compacto activo/i });
+    await expect(compact).toBeVisible();
+    await compact.click();
+    await expect(page.getByRole("button", { name: /Modo compacto activo/i })).toBeVisible();
+    await page.goto("/inventory/restaurant/waste");
+    await expect(page.getByRole("button", { name: /Modo compacto activo/i })).toBeVisible();
+  });
+
   for (const width of [320, 375, 768, 1024]) {
     test(`las pantallas de operaciones no desbordan a ${width}px`, async ({ page }) => {
       await login(page);
@@ -68,6 +79,14 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
     await page.route("**/restaurant-inventory/reports/**", (route) => route.abort("failed").catch(() => undefined));
     await page.goto("/inventory/restaurant/reports");
     await expect(page.getByText(/No fue posible cargar el reporte|Reintentar/i).first()).toBeVisible();
+  });
+
+  test("redirige a login cuando expira la sesión", async ({ page }) => {
+    await login(page);
+    await page.route("**/api/session", (route) => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Sesión expirada" }) }));
+    await page.goto("/inventory/restaurant/reports");
+    await page.reload();
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test("evita doble envío mientras una operación está pendiente", async ({ page }) => {

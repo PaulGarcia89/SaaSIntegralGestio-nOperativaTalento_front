@@ -4383,7 +4383,7 @@ export function fetchRestaurantDashboard(filters: { branchId?: string; warehouse
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
   return request<import("./contracts").RestaurantInventoryDashboardDto | { data?: import("./contracts").RestaurantInventoryDashboardDto }>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`).then((payload) => {
-    const data = ("data" in payload && payload.data && !Array.isArray(payload.data) ? payload.data : payload) as import("./contracts").RestaurantInventoryDashboardDto;
+    const data = (payload && typeof payload === "object" && "data" in payload && payload.data && !Array.isArray(payload.data) ? payload.data : payload) as import("./contracts").RestaurantInventoryDashboardDto;
     return {
       ...data,
       recentReceipts: Array.isArray(data.recentReceipts) ? data.recentReceipts : [],
@@ -4392,18 +4392,42 @@ export function fetchRestaurantDashboard(filters: { branchId?: string; warehouse
     } satisfies import("./contracts").RestaurantInventoryDashboardDto;
   });
 }
+function normalizeRestaurantAdvancedDashboard(payload: import("./contracts").RestaurantAdvancedDashboardDto | { data?: Partial<import("./contracts").RestaurantAdvancedDashboardDto> } | null | undefined): import("./contracts").RestaurantAdvancedDashboardDto {
+  const value = payload && typeof payload === "object" && "data" in payload && payload.data && typeof payload.data === "object" ? payload.data : payload;
+  const data = (value && typeof value === "object" ? value : {}) as Partial<import("./contracts").RestaurantAdvancedDashboardDto>;
+  return {
+    inventoryValue: Number(data.inventoryValue ?? 0),
+    periodConsumption: Number(data.periodConsumption ?? 0),
+    waste: Number(data.waste ?? 0),
+    inventoryDifference: Number(data.inventoryDifference ?? 0),
+    criticalIngredients: Array.isArray(data.criticalIngredients) ? data.criticalIngredients : [],
+    upcomingExpirations: Array.isArray(data.upcomingExpirations) ? data.upcomingExpirations : [],
+    highestCostRecipes: Array.isArray(data.highestCostRecipes) ? data.highestCostRecipes.map((item) => ({ ...item, cost: Number(item.cost ?? 0) })) : [],
+    lowestMarginRecipes: Array.isArray(data.lowestMarginRecipes) ? data.lowestMarginRecipes : [],
+    consumptionTrend: Array.isArray(data.consumptionTrend) ? data.consumptionTrend.map((item) => ({ ...item, value: Number(item.value ?? 0) })) : [],
+    purchaseSuggestions: Array.isArray(data.purchaseSuggestions) ? data.purchaseSuggestions : [],
+  };
+}
 type RestaurantCatalogPage<T> = { data: T[]; page: number; pageSize: number; total: number; totalPages: number };
 type RestaurantCatalogFilters = { search?: string; status?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: "asc" | "desc" };
 type RestaurantCatalogRecord = Record<string, unknown> & { id: string; name: string; status?: string };
-function normalizeRestaurantCatalogPage<T>(payload: RestaurantCatalogPage<T> | T[] | { data?: T[]; items?: T[] }) {
+function normalizeRestaurantCatalogPage<T>(payload: RestaurantCatalogPage<T> | T[] | { data?: T[]; items?: T[] } | null | undefined) {
   if (Array.isArray(payload)) return { data: payload, page: 1, pageSize: payload.length, total: payload.length, totalPages: payload.length ? 1 : 0 };
   const value = payload as RestaurantCatalogPage<T> & { items?: T[] };
   const data = Array.isArray(value.data) ? value.data : Array.isArray(value.items) ? value.items : [];
   return { data, page: Number(value.page ?? 1), pageSize: Number(value.pageSize ?? data.length), total: Number(value.total ?? data.length), totalPages: Number(value.totalPages ?? (data.length ? 1 : 0)) };
 }
-function normalizeRestaurantList<T>(payload: T[] | { data?: T[]; items?: T[] }) {
-  if (Array.isArray(payload)) return payload;
-  return Array.isArray(payload.data) ? payload.data : Array.isArray(payload.items) ? payload.items : [];
+function normalizeRestaurantList<T>(payload: T[] | { data?: T[]; items?: T[] } | null | undefined) {
+  const rows = Array.isArray(payload) ? payload : !payload ? [] : Array.isArray(payload.data) ? payload.data : Array.isArray(payload.items) ? payload.items : [];
+  return rows.map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const record = row as Record<string, unknown>;
+    const numericFields = ["cost", "averageCost", "total", "unitCost", "totalCost", "entry", "exit", "balance"];
+    return Object.fromEntries(Object.entries(record).map(([key, value]) => [
+      key,
+      numericFields.includes(key) && value == null ? 0 : value,
+    ])) as T;
+  });
 }
 function restaurantCatalogQuery(filters: RestaurantCatalogFilters = {}) {
   const query = new URLSearchParams();
@@ -4539,7 +4563,8 @@ export function previewRestaurantSalesImport(sessionId: string) { void sessionId
 export function processRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportJobDto>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}/process`, { method: "POST" }); }
 export function fetchRestaurantSalesImportJob(jobId: string) { return request<import("./contracts").SalesImportJobDto>(`/restaurant-inventory/sales-imports/${encodeURIComponent(jobId)}`); }
 export function fetchRestaurantSalesImportHistory() { return Promise.reject(new ApiError("El historial de importaciones no está expuesto por el backend.", 404, "SALES_IMPORT_HISTORY_UNAVAILABLE")); }
-export function fetchRestaurantAdvancedDashboard(filters: Record<string, string> = {}) { const query = new URLSearchParams(filters); return request<import("./contracts").RestaurantAdvancedDashboardDto>(`/restaurant-inventory/reports/advanced-dashboard${query.size ? `?${query}` : ""}`); }
+type RestaurantAdvancedDashboardPayload = import("./contracts").RestaurantAdvancedDashboardDto | { data?: Partial<import("./contracts").RestaurantAdvancedDashboardDto> } | null;
+export async function fetchRestaurantAdvancedDashboard(filters: Record<string, string> = {}) { const query = new URLSearchParams(filters); const payload = await request<RestaurantAdvancedDashboardPayload>(`/restaurant-inventory/reports/advanced-dashboard${query.size ? `?${query}` : ""}`); return normalizeRestaurantAdvancedDashboard(payload); }
 export function fetchRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<import("./contracts").RestaurantReportDto>(`/restaurant-inventory/reports/${encodeURIComponent(report)}${query.size ? `?${query}` : ""}`); }
 export async function downloadRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const blob = await request<Blob>(`/restaurant-inventory/reports/${encodeURIComponent(report)}/export${query.size ? `?${query}` : ""}`, {}, { responseType: "blob" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${report}-inventario.csv`; anchor.click(); URL.revokeObjectURL(url); }
 export function fetchRestaurantRecipeCost(recipeId: string) { return request<import("./contracts").RestaurantRecipeCostDto>(`/restaurant-inventory/reports/recipe-cost/${encodeURIComponent(recipeId)}`); }

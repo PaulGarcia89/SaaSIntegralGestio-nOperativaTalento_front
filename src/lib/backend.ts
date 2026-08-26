@@ -4395,31 +4395,38 @@ export function fetchRestaurantDashboard(filters: { branchId?: string; warehouse
 type RestaurantCatalogPage<T> = { data: T[]; page: number; pageSize: number; total: number; totalPages: number };
 type RestaurantCatalogFilters = { search?: string; status?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: "asc" | "desc" };
 type RestaurantCatalogRecord = Record<string, unknown> & { id: string; name: string; status?: string };
+function normalizeRestaurantCatalogPage<T>(payload: RestaurantCatalogPage<T> | T[] | { data?: T[]; items?: T[] }) {
+  if (Array.isArray(payload)) return { data: payload, page: 1, pageSize: payload.length, total: payload.length, totalPages: payload.length ? 1 : 0 };
+  const value = payload as RestaurantCatalogPage<T> & { items?: T[] };
+  const data = Array.isArray(value.data) ? value.data : Array.isArray(value.items) ? value.items : [];
+  return { data, page: Number(value.page ?? 1), pageSize: Number(value.pageSize ?? data.length), total: Number(value.total ?? data.length), totalPages: Number(value.totalPages ?? (data.length ? 1 : 0)) };
+}
 function restaurantCatalogQuery(filters: RestaurantCatalogFilters = {}) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
   return query;
 }
-export function fetchRestaurantCategories(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); return request<RestaurantCatalogPage<RestaurantCatalogRecord>>(`/restaurant-inventory/categories${query.size ? `?${query}` : ""}`); }
+export async function fetchRestaurantCategories(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); const payload = await request<RestaurantCatalogPage<RestaurantCatalogRecord> | RestaurantCatalogRecord[] | { data?: RestaurantCatalogRecord[]; items?: RestaurantCatalogRecord[] }>(`/restaurant-inventory/categories${query.size ? `?${query}` : ""}`); return normalizeRestaurantCatalogPage(payload); }
 export function createRestaurantCategory(input: Record<string, unknown>) { return request<RestaurantCatalogRecord>("/restaurant-inventory/categories", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantCategory(id: string, input: Record<string, unknown>) { return request<{ count: number }>(`/restaurant-inventory/categories/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function deactivateRestaurantCategory(id: string) { return request<{ count: number }>(`/restaurant-inventory/categories/${encodeURIComponent(id)}`, { method: "DELETE" }); }
-export function fetchRestaurantUnits(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); return request<RestaurantCatalogPage<RestaurantCatalogRecord>>(`/restaurant-inventory/units${query.size ? `?${query}` : ""}`); }
+export async function fetchRestaurantUnits(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); const payload = await request<RestaurantCatalogPage<RestaurantCatalogRecord> | RestaurantCatalogRecord[] | { data?: RestaurantCatalogRecord[]; items?: RestaurantCatalogRecord[] }>(`/restaurant-inventory/units${query.size ? `?${query}` : ""}`); return normalizeRestaurantCatalogPage(payload); }
 export function createRestaurantUnit(input: Record<string, unknown>) { return request<RestaurantCatalogRecord>("/restaurant-inventory/units", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantUnit(id: string, input: Record<string, unknown>) { return request<{ count: number }>(`/restaurant-inventory/units/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function deactivateRestaurantUnit(id: string) { return request<{ count: number }>(`/restaurant-inventory/units/${encodeURIComponent(id)}`, { method: "DELETE" }); }
-export function fetchRestaurantSuppliers(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); return request<RestaurantCatalogPage<RestaurantCatalogRecord>>(`/restaurant-inventory/suppliers${query.size ? `?${query}` : ""}`); }
+export async function fetchRestaurantSuppliers(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); const payload = await request<RestaurantCatalogPage<RestaurantCatalogRecord> | RestaurantCatalogRecord[] | { data?: RestaurantCatalogRecord[]; items?: RestaurantCatalogRecord[] }>(`/restaurant-inventory/suppliers${query.size ? `?${query}` : ""}`); return normalizeRestaurantCatalogPage(payload); }
 export function createRestaurantSupplier(input: Record<string, unknown>) { return request<RestaurantCatalogRecord>("/restaurant-inventory/suppliers", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantSupplier(id: string, input: Record<string, unknown>) { return request<{ count: number }>(`/restaurant-inventory/suppliers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function deactivateRestaurantSupplier(id: string) { return request<{ count: number }>(`/restaurant-inventory/suppliers/${encodeURIComponent(id)}`, { method: "DELETE" }); }
-export function fetchRestaurantWarehouses(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); return request<RestaurantCatalogPage<RestaurantCatalogRecord>>(`/restaurant-inventory/warehouses${query.size ? `?${query}` : ""}`); }
+export async function fetchRestaurantWarehouses(filters: RestaurantCatalogFilters = {}) { const query = restaurantCatalogQuery(filters); const payload = await request<RestaurantCatalogPage<RestaurantCatalogRecord> | RestaurantCatalogRecord[] | { data?: RestaurantCatalogRecord[]; items?: RestaurantCatalogRecord[] }>(`/restaurant-inventory/warehouses${query.size ? `?${query}` : ""}`); return normalizeRestaurantCatalogPage(payload); }
 export function createRestaurantWarehouse(input: Record<string, unknown>) { return request<RestaurantCatalogRecord>("/restaurant-inventory/warehouses", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantWarehouse(id: string, input: Record<string, unknown>) { return request<{ count: number }>(`/restaurant-inventory/warehouses/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function deactivateRestaurantWarehouse(id: string) { return request<{ count: number }>(`/restaurant-inventory/warehouses/${encodeURIComponent(id)}`, { method: "DELETE" }); }
-export function fetchRestaurantIngredients(filters: RestaurantCatalogFilters = {}) {
+export async function fetchRestaurantIngredients(filters: RestaurantCatalogFilters = {}) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
-  return request<RestaurantCatalogPage<import("./contracts").RestaurantIngredientDto>>(`/restaurant-inventory/ingredients${query.size ? `?${query}` : ""}`);
+  const payload = await request<RestaurantCatalogPage<import("./contracts").RestaurantIngredientDto> | import("./contracts").RestaurantIngredientDto[] | { data?: import("./contracts").RestaurantIngredientDto[]; items?: import("./contracts").RestaurantIngredientDto[] }>(`/restaurant-inventory/ingredients${query.size ? `?${query}` : ""}`);
+  return normalizeRestaurantCatalogPage(payload);
 }
 export function createRestaurantIngredient(input: Record<string, unknown>) { return request<import("./contracts").RestaurantIngredientDto>("/restaurant-inventory/ingredients", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantIngredient(id: string, input: Record<string, unknown>) { return request<{ count: number }>(`/restaurant-inventory/ingredients/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }

@@ -4382,7 +4382,15 @@ export function fetchInventoryCatalog() {
 export function fetchRestaurantDashboard(filters: { branchId?: string; warehouseId?: string; from?: string; to?: string } = {}) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); });
-  return request<import("./contracts").RestaurantInventoryDashboardDto>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`);
+  return request<import("./contracts").RestaurantInventoryDashboardDto | { data?: import("./contracts").RestaurantInventoryDashboardDto }>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`).then((payload) => {
+    const data = ("data" in payload && payload.data && !Array.isArray(payload.data) ? payload.data : payload) as import("./contracts").RestaurantInventoryDashboardDto;
+    return {
+      ...data,
+      recentReceipts: Array.isArray(data.recentReceipts) ? data.recentReceipts : [],
+      recentConsumption: Array.isArray(data.recentConsumption) ? data.recentConsumption : [],
+      recentWaste: Array.isArray(data.recentWaste) ? data.recentWaste : [],
+    } satisfies import("./contracts").RestaurantInventoryDashboardDto;
+  });
 }
 type RestaurantCatalogPage<T> = { data: T[]; page: number; pageSize: number; total: number; totalPages: number };
 type RestaurantCatalogFilters = { search?: string; status?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: "asc" | "desc" };
@@ -4416,7 +4424,11 @@ export function fetchRestaurantIngredients(filters: RestaurantCatalogFilters = {
 export function createRestaurantIngredient(input: Record<string, unknown>) { return request<import("./contracts").RestaurantIngredientDto>("/restaurant-inventory/ingredients", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantIngredient(id: string, input: Record<string, unknown>) { return request<{ count: number }>(`/restaurant-inventory/ingredients/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function deactivateRestaurantIngredient(id: string) { return request<{ count: number }>(`/restaurant-inventory/ingredients/${encodeURIComponent(id)}`, { method: "DELETE" }); }
-export function fetchRestaurantRecipes(search?: string) { return request<import("./contracts").RestaurantRecipeDto[]>(`/restaurant-inventory/recipes${search ? `?search=${encodeURIComponent(search)}` : ""}`); }
+export async function fetchRestaurantRecipes(search?: string) {
+  const payload = await request<import("./contracts").RestaurantRecipeDto[] | { data?: import("./contracts").RestaurantRecipeDto[]; items?: import("./contracts").RestaurantRecipeDto[] }>(`/restaurant-inventory/recipes${search ? `?search=${encodeURIComponent(search)}` : ""}`);
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.data) ? payload.data : Array.isArray(payload.items) ? payload.items : [];
+}
 export function createRestaurantRecipe(input: Record<string, unknown>) { return request<import("./contracts").RestaurantRecipeDto>("/restaurant-inventory/recipes", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantRecipe(id: string, input: Record<string, unknown>) { return request<import("./contracts").RestaurantRecipeDto>(`/restaurant-inventory/recipes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function activateRestaurantRecipe(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/recipes/${encodeURIComponent(id)}/activate`, { method: "PATCH" }); }

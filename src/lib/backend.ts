@@ -4422,8 +4422,15 @@ function normalizeRestaurantList<T>(payload: T[] | { data?: T[]; items?: T[] } |
   return rows.map((row) => {
     if (!row || typeof row !== "object") return row;
     const record = row as Record<string, unknown>;
+    const normalized = { ...record };
+    const cost = record.cost ?? record.unitCostSnapshot ?? record.unitCost ?? record.averageCost;
+    const averageCost = record.averageCost ?? cost;
+    const total = record.total ?? record.totalCost;
+    if (normalized.cost == null && cost != null) normalized.cost = Number(cost);
+    if (normalized.averageCost == null && averageCost != null) normalized.averageCost = Number(averageCost);
+    if (normalized.total == null && total != null) normalized.total = Number(total);
     const numericFields = ["cost", "averageCost", "total", "unitCost", "totalCost", "entry", "exit", "balance"];
-    return Object.fromEntries(Object.entries(record).map(([key, value]) => [
+    return Object.fromEntries(Object.entries(normalized).map(([key, value]) => [
       key,
       numericFields.includes(key) && value == null ? 0 : value,
     ])) as T;

@@ -32,6 +32,8 @@ import { RestaurantInventoryContextBar, RestaurantInventoryContextProvider, useR
 import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
 import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
 import { RestaurantPurchasingWorkspace } from "@/components/restaurant-purchasing-workspace";
+import { RestaurantAdvancedControlWorkspace } from "@/components/restaurant-advanced-control-workspace";
+import { RestaurantCommercialIntelligenceWorkspace } from "@/components/restaurant-commercial-intelligence-workspace";
 import type { PermissionKey } from "@/lib/contracts";
 
 type InventoryItem = { key: string; label: string; href: string; permission: PermissionKey };
@@ -44,8 +46,8 @@ const taskGroups: InventoryTask[] = [
   ] },
   { key: "production", label: "Producción", description: "Recetas y elaboración", items: [{ key: "recipes", label: "Recetas", href: "/inventory/restaurant/recipes", permission: "restaurant_inventory.view" }, { key: "production", label: "Producción", href: "/inventory/restaurant/production", permission: "restaurant_inventory.manage" }] },
   { key: "daily", label: "Operación diaria", description: "Consumo y merma", items: [{ key: "consumption", label: "Consumo", href: "/inventory/restaurant/consumption", permission: "restaurant_inventory.manage" }, { key: "waste", label: "Desperdicios", href: "/inventory/restaurant/waste", permission: "restaurant_inventory.manage" }] },
-  { key: "control", label: "Control", description: "Existencias y trazabilidad", items: [{ key: "stock", label: "Existencias", href: "/inventory/restaurant/stock", permission: "restaurant_inventory.view" }, { key: "lots", label: "Lotes y vencimientos", href: "/inventory/restaurant/lots", permission: "restaurant_inventory.view" }, { key: "stock-counts", label: "Conteo físico", href: "/inventory/restaurant/stock-counts", permission: "restaurant_inventory.manage" }, { key: "adjustments", label: "Ajustes", href: "/inventory/restaurant/adjustments", permission: "restaurant_inventory.manage" }, { key: "transfers", label: "Transferencias", href: "/inventory/restaurant/transfers", permission: "restaurant_inventory.manage" }, { key: "movements", label: "Movimientos", href: "/inventory/restaurant/movements", permission: "restaurant_inventory.view" }] },
-  { key: "analysis", label: "Análisis", description: "Decisiones y auditoría", items: [{ key: "reports", label: "Reportes", href: "/inventory/restaurant/reports", permission: "restaurant_inventory.view" }, { key: "analytics", label: "Análisis", href: "/inventory/restaurant/analytics", permission: "restaurant_inventory.view" }, { key: "costs", label: "Costos y rentabilidad", href: "/inventory/restaurant/costs", permission: "restaurant_inventory.view" }, { key: "purchase-suggestions", label: "Sugerencias de compra", href: "/inventory/restaurant/purchase-suggestions", permission: "restaurant_inventory.view" }, { key: "audit", label: "Auditoría", href: "/inventory/restaurant/audit", permission: "restaurant_inventory.manage" }] },
+  { key: "control", label: "Control", description: "Existencias y trazabilidad", items: [{ key: "stock", label: "Existencias", href: "/inventory/restaurant/stock", permission: "restaurant_inventory.view" }, { key: "lots", label: "Lotes y vencimientos", href: "/inventory/restaurant/lots", permission: "restaurant_inventory.view" }, { key: "expiry-alerts", label: "Alertas de vencimiento", href: "/inventory/restaurant/expiry-alerts", permission: "restaurant_inventory.expiry_alerts.view" }, { key: "stock-counts", label: "Conteo físico", href: "/inventory/restaurant/stock-counts", permission: "restaurant_inventory.manage" }, { key: "count-schedules", label: "Conteos programados", href: "/inventory/restaurant/count-schedules", permission: "restaurant_inventory.counts.schedule" }, { key: "variance", label: "Teórico vs real", href: "/inventory/restaurant/variance", permission: "restaurant_inventory.variance.view" }, { key: "shrinkage", label: "Shrinkage", href: "/inventory/restaurant/shrinkage", permission: "restaurant_inventory.shrinkage.view" }, { key: "adjustments", label: "Ajustes", href: "/inventory/restaurant/adjustments", permission: "restaurant_inventory.manage" }, { key: "transfers", label: "Transferencias", href: "/inventory/restaurant/transfers", permission: "restaurant_inventory.manage" }, { key: "movements", label: "Movimientos", href: "/inventory/restaurant/movements", permission: "restaurant_inventory.view" }, { key: "audit-log", label: "Auditoría inmutable", href: "/inventory/restaurant/audit-log", permission: "restaurant_inventory.audit.read" }] },
+  { key: "analysis", label: "Análisis", description: "Decisiones y auditoría", items: [{ key: "reports", label: "Reportes", href: "/inventory/restaurant/reports", permission: "restaurant_inventory.view" }, { key: "analytics", label: "Análisis", href: "/inventory/restaurant/analytics", permission: "restaurant_inventory.view" }, { key: "costs", label: "Costos y rentabilidad", href: "/inventory/restaurant/costs", permission: "restaurant_inventory.view" }, { key: "purchase-suggestions", label: "Sugerencias de compra", href: "/inventory/restaurant/purchase-suggestions", permission: "restaurant_inventory.view" }, { key: "forecast", label: "Pronóstico de demanda", href: "/inventory/restaurant/forecast", permission: "restaurant_inventory.commercial.view" }, { key: "branch-costs", label: "Costos por sucursal", href: "/inventory/restaurant/branch-costs", permission: "restaurant_inventory.commercial.view" }, { key: "recipe-margins", label: "Margen por receta", href: "/inventory/restaurant/recipe-margins", permission: "restaurant_inventory.commercial.view" }, { key: "unit-comparison", label: "Comparativo multiunidad", href: "/inventory/restaurant/unit-comparison", permission: "restaurant_inventory.commercial.view" }, { key: "commissary", label: "Comisariato", href: "/inventory/restaurant/commissary", permission: "restaurant_inventory.commissary.manage" }, { key: "purchase-budget", label: "Presupuesto de compras", href: "/inventory/restaurant/purchase-budget", permission: "restaurant_inventory.budgets.manage" }, { key: "audit", label: "Auditoría", href: "/inventory/restaurant/audit", permission: "restaurant_inventory.manage" }] },
   { key: "administration", label: "Administración", description: "Reglas del módulo", items: [{ key: "settings", label: "Configuración", href: "/inventory/restaurant/settings", permission: "restaurant_inventory.manage" }] },
 ];
 
@@ -80,6 +82,17 @@ function RestaurantInventoryInner() {
     {section === "price-history" ? <RestaurantPurchasingWorkspace initialView="prices" /> : null}
     {section === "purchase-suggestions" ? <RestaurantPurchasingWorkspace initialView="suggestions" /> : null}
     {section === "invoices" ? <RestaurantPurchasingWorkspace initialView="invoices" /> : null}
+    {section === "expiry-alerts" ? <RestaurantAdvancedControlWorkspace initialView="fefo" /> : null}
+    {section === "count-schedules" ? <RestaurantAdvancedControlWorkspace initialView="counts" /> : null}
+    {section === "variance" ? <RestaurantAdvancedControlWorkspace initialView="variance" /> : null}
+    {section === "shrinkage" ? <RestaurantAdvancedControlWorkspace initialView="shrinkage" /> : null}
+    {section === "audit-log" ? <RestaurantAdvancedControlWorkspace initialView="audit" /> : null}
+    {section === "forecast" ? <RestaurantCommercialIntelligenceWorkspace initialView="forecast" /> : null}
+    {section === "branch-costs" ? <RestaurantCommercialIntelligenceWorkspace initialView="branches" /> : null}
+    {section === "recipe-margins" ? <RestaurantCommercialIntelligenceWorkspace initialView="margins" /> : null}
+    {section === "unit-comparison" ? <RestaurantCommercialIntelligenceWorkspace initialView="comparison" /> : null}
+    {section === "commissary" ? <RestaurantCommercialIntelligenceWorkspace initialView="commissary" /> : null}
+    {section === "purchase-budget" ? <RestaurantCommercialIntelligenceWorkspace initialView="budget" /> : null}
     {section === "receipts" ? <RestaurantReceiptsScreen /> : null}
     {section === "recipes" ? <RestaurantRecipesWorkspace /> : null}
     {section === "consumption" ? <RestaurantOperations section="consumption" warehouseId={warehouseId} /> : null}
@@ -90,7 +103,7 @@ function RestaurantInventoryInner() {
     {section === "production" ? <RestaurantOperations section="production" warehouseId={warehouseId} /> : null}
     {section === "sales-import" ? <RestaurantSalesImport /> : null}
     {section === "settings" ? <RestaurantInventorySettings /> : null}
-    {["reports", "analytics", "costs", "purchase-suggestions", "audit"].includes(section) ? <RestaurantReportsView section={section} /> : null}
+    {["reports", "analytics", "costs", "audit"].includes(section) ? <RestaurantReportsView section={section} /> : null}
     {["categories", "units", "suppliers", "warehouses"].includes(section) ? <RestaurantInventoryCatalog kind={section as "categories" | "units" | "suppliers" | "warehouses"} /> : null}
   </div>;
 }

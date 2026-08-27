@@ -3309,6 +3309,12 @@ export function parseCandidateResume(resume: File) {
   return candidateRequest<ParsedResumeDto>("/candidate/applications/resume/parse", { method: "POST", body });
 }
 
+export function uploadCandidateResume(resume: File) {
+  const body = new FormData();
+  body.append("resume", resume);
+  return candidateRequest<CandidatePortalOverviewDto["resumes"][number]>("/candidate/applications/resume", { method: "POST", body });
+}
+
 export function fetchCandidateResumeAccess(id: string) {
   return candidateRequest<{ id: string; originalName: string; mimeType: string; sizeBytes: number; url: string; expiresAt: string }>(`/candidate/applications/resume/${encodeURIComponent(id)}/access`);
 }

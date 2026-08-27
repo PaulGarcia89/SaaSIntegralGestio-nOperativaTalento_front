@@ -33,6 +33,7 @@ import {
   updateTenantContext,
   restoreCurrentSession,
 } from "@/lib/backend";
+import { AUTH_SESSION_CHANGED_EVENT } from "@/lib/auth-storage";
 import { appNavigation, evaluateRouteAccess } from "@/lib/navigation";
 import { getFallbackTenant } from "@/lib/ui-labels";
 
@@ -84,6 +85,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setCurrentUserIdState(restoredSession?.userId || "");
       setCurrentBranchIdState("");
     }).finally(() => setHasHydratedSession(true));
+  }, []);
+
+  useEffect(() => {
+    const syncSession = () => {
+      const updatedSession = getStoredSession();
+      setSession(updatedSession);
+      setCurrentTenantIdState(updatedSession?.tenantId || "");
+      setCurrentUserIdState(updatedSession?.userId || "");
+      if (!updatedSession) setCurrentBranchIdState("");
+    };
+
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, syncSession);
+    return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncSession);
   }, []);
 
   const authQuery = useQuery({

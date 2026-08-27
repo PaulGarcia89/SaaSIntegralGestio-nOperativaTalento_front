@@ -4,6 +4,7 @@ const MOCK_AUTH_STORAGE_KEY = "saas-integral.mock-auth";
 // Keep demo sessions local to non-production builds so production only uses
 // credentials and entities issued by the live backend.
 const MOCK_BACKEND_ENABLED = false;
+export const AUTH_SESSION_CHANGED_EVENT = "saas-auth-session-changed";
 
 export type AuthSnapshot = { accessToken: string; tenantId: string; userId: string; role: RoleKey };
 let memoryAuth: AuthSnapshot | null = null;
@@ -27,11 +28,13 @@ export function persistAuth(auth: AuthSnapshot) {
   if (MOCK_BACKEND_ENABLED) {
     window.sessionStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify(auth));
   }
+  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
 }
 export function clearStoredAuth() {
   memoryAuth = null;
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
+  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
 }
 export function getStoredTenantId() { return ""; }
 export function persistSelectedTenantId(_tenantId: string) {}

@@ -154,7 +154,7 @@ function ApplyWizard() {
   const validate = () => {
     if (step === 0 && !authenticated) return "Inicia sesión o crea tu cuenta para continuar.";
     if (step === 2 && (!form.fullName.trim() || !/^\S+@\S+\.\S+$/.test(form.email))) return "Ingresa tu nombre completo y un correo válido.";
-    if (step === 3) { const missing = missingRequiredApplicationFields(vacancyQuery.data?.applicationFormSchema, form.dynamicResponses); if (missing.length) return `Responde los campos obligatorios: ${missing.map((field) => field.label).join(", ")}.`; }
+    if (step === 3) { const missing = missingRequiredApplicationFields(vacancyQuery.data?.applicationFormSchema, form.dynamicResponses); if (missing.length) return `Responde los campos obligatorios: ${missing.map((field) => field.label).join(", ")}.`; if (form.dynamicResponses?.applicationDeclaration !== true) return "Debes aceptar la declaración y autorizar la verificación antes de continuar."; }
     if (step === 5 && !getCandidateSession() && candidatePassword.length < 10) return "La contraseña del portal debe tener al menos 10 caracteres.";
     if (step === 5 && !consent) return "Debes aceptar la declaración y el tratamiento de datos antes de enviar.";
     return "";

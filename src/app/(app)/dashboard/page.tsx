@@ -16,7 +16,6 @@ import type {
   OperationalDashboardItemDto,
   OperationalDashboardTone,
 } from "@/lib/contracts";
-import { roleLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import {
   InlineFeedback,
@@ -79,7 +78,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow={`${t("dashboard.home")} · ${roleLabels[currentRole]}`}
+        eyebrow={`${t("dashboard.home")} · ${t(`role.${currentRole}`)}`}
         title={t(roleTitles[currentRole] ?? "dashboard.operational")}
         description="Tareas, alertas y próximos pasos calculados desde registros reales dentro de tu alcance."
         actions={

@@ -117,6 +117,18 @@ function localizedNavGroup(group: NavGroup, t: (key: string) => string) {
   return translated === `nav.group.${group}` ? group : translated;
 }
 
+function localizedRoleLabel(role: string, t: (key: string) => string) {
+  const key = `role.${role}`;
+  const translated = t(key);
+  return translated === key ? roleLabels[role as keyof typeof roleLabels] ?? role : translated;
+}
+
+function localizedPlanLabel(plan: string, t: (key: string) => string) {
+  const key = `plan.${plan.toLowerCase()}`;
+  const translated = t(key);
+  return translated === key ? plan : translated;
+}
+
 function SidebarNavigationViewport({ children, mobile }: { children: React.ReactNode; mobile: boolean }) {
   if (mobile) {
     return (
@@ -246,7 +258,7 @@ function SidebarContent({
           </div>
           <p className="text-base font-semibold">{currentTenantName}</p>
           <p className="mt-1 text-sm text-sidebar-foreground/70">
-            {currentTenantPlan === "global" ? "Contexto global" : `Plan ${currentTenantPlan}`} {supportEmail ? `· ${supportEmail}` : ""}
+            {currentTenantPlan === "global" ? t("plan.global") : `${t("branches.subscription")} ${localizedPlanLabel(currentTenantPlan, t)}`} {supportEmail ? `· ${supportEmail}` : ""}
           </p>
         </div>
 
@@ -578,7 +590,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               currentBranch={workspaceBranch}
               brandName={isGlobalView ? "TalentOS" : currentTenant.branding.productName ?? currentTenant.name}
               brandAccent={tenantTheme.hex}
-              currentRoleLabel={roleLabels[currentRole]}
+              currentRoleLabel={localizedRoleLabel(currentRole, t)}
               currentTenantName={workspaceName}
               currentTenantPlan={isGlobalView ? "global" : currentTenant.plan}
               currentUserName={currentUser.fullName}
@@ -603,7 +615,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div>
                   <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{workspaceName}</h1>
                   <p className="text-sm text-muted-foreground">
-                    {currentUser.fullName} · {roleLabels[currentRole]}
+                    {currentUser.fullName} · {localizedRoleLabel(currentRole, t)}
                     {!isGlobalView && currentBranch ? ` · ${currentBranch.city}` : ""}
                   </p>
                 </div>
@@ -670,7 +682,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </div>
                       <div className="hidden min-w-0 text-left sm:block">
                         <p className="text-sm font-semibold leading-none">{currentUser.fullName}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{roleLabels[currentRole]}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{localizedRoleLabel(currentRole, t)}</p>
                       </div>
                       <ChevronDown className={cn("size-4 text-muted-foreground transition", userMenuOpen && "rotate-180")} />
                     </button>
@@ -699,7 +711,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate text-2xl font-semibold text-foreground">{currentUser.fullName}</p>
-                                <p className="text-base text-muted-foreground">{roleLabels[currentRole]}</p>
+                                <p className="text-base text-muted-foreground">{localizedRoleLabel(currentRole, t)}</p>
                               </div>
                             </div>
 
@@ -867,7 +879,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               currentBranch={workspaceBranch}
               brandName={isGlobalView ? "TalentOS" : currentTenant.branding.productName ?? currentTenant.name}
               brandAccent={tenantTheme.hex}
-              currentRoleLabel={roleLabels[currentRole]}
+              currentRoleLabel={localizedRoleLabel(currentRole, t)}
               currentTenantName={workspaceName}
               currentTenantPlan={isGlobalView ? "global" : currentTenant.plan}
               currentUserName={currentUser.fullName}

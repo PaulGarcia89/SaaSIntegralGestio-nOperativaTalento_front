@@ -195,8 +195,9 @@ const DIRECT_API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.NODE_ENV === "production" ? DEFAULT_PRODUCTION_API_URL : "/api")
 ).replace(/\/$/, "");
-// Browser requests stay same-origin so Vercel does not depend on the API's CORS allowlist.
-const API_BASE_URL = !STATIC_HOSTING && typeof window !== "undefined" ? "/api" : DIRECT_API_BASE_URL;
+// Browser requests stay same-origin by default; direct calls are opt-in for static hosting.
+const USE_SAME_ORIGIN_PROXY = typeof window !== "undefined" && process.env.NEXT_PUBLIC_USE_API_PROXY !== "false";
+const API_BASE_URL = USE_SAME_ORIGIN_PROXY ? "/api" : DIRECT_API_BASE_URL;
 // Production must always reflect the API. Allowing the mock fallback here can
 // render entities that do not exist in PostgreSQL and make destructive actions fail.
 const MOCK_BACKEND_ENABLED = false;

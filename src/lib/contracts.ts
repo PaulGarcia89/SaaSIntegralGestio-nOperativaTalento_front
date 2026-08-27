@@ -2341,6 +2341,9 @@ export interface CandidatePortalProfileDto {
   offerNotifications: boolean;
   marketingConsent: boolean;
   profileSource: string;
+  applicationProfile?: Record<string, unknown>;
+  socialSecurityNumberMasked?: string | null;
+  updatedAt?: string;
   externalIdentities?: Array<{ provider: string }>;
 }
 

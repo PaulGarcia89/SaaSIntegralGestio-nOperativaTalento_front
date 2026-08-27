@@ -117,7 +117,16 @@ function ApplyWizard() {
 
   useEffect(() => {
     if (!savedProfile.data) return;
-    queueMicrotask(() => setForm((current) => ({ ...current, email: current.email || savedProfile.data.email, fullName: current.fullName || savedProfile.data.fullName || "", phone: current.phone || savedProfile.data.phone || "", city: current.city || savedProfile.data.city || "", linkedinUrl: current.linkedinUrl || savedProfile.data.linkedinUrl || "", portfolioUrl: current.portfolioUrl || savedProfile.data.portfolioUrl || "" })));
+    queueMicrotask(() => setForm((current) => ({
+      ...current,
+      email: current.email || savedProfile.data.email,
+      fullName: current.fullName || savedProfile.data.fullName || "",
+      phone: current.phone || savedProfile.data.phone || "",
+      city: current.city || savedProfile.data.city || "",
+      linkedinUrl: current.linkedinUrl || savedProfile.data.linkedinUrl || "",
+      portfolioUrl: current.portfolioUrl || savedProfile.data.portfolioUrl || "",
+      dynamicResponses: { ...savedProfile.data.applicationProfile, ...current.dynamicResponses },
+    })));
   }, [savedProfile.data]);
 
   useEffect(() => {

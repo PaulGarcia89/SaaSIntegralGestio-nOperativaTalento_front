@@ -100,8 +100,10 @@ export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
   ...item,
   requiredPermissions: [item.permission],
   featureFlag: `module.${item.module}`,
-  // Administración es una agrupación de gobierno del tenant, no un módulo comercial.
-  requiresCommercialModule: item.group === "Administración" ? false : item.requiresCommercialModule,
+  // Inicio, administración y gobierno son capacidades base, no módulos comerciales.
+  requiresCommercialModule: ["Inicio", "Administración", "Gobierno de plataforma"].includes(item.group)
+    ? false
+    : item.requiresCommercialModule,
   available: !unavailableRouteHrefs.has(item.href),
 }));
 

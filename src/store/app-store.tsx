@@ -274,7 +274,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     } satisfies UserDto);
 
   const currentRole = authContext?.role ?? session?.role ?? currentUser.role;
-  const accessContextVerified = Boolean(session?.token) && !authSessionInvalidated;
+  // A refresh token alone is not enough to authorize the workspace. The
+  // backend user/context response must also be present before rendering it.
+  const accessContextVerified = Boolean(session?.token) && !authSessionInvalidated && Boolean(authContext);
   const currentSubscriptionStatus: SubscriptionAccessState =
     authContext?.subscriptionStatus ?? currentTenant.status ?? "suspended";
   const subscriptionGraceEndsAt = authContext?.subscriptionGraceEndsAt ?? null;

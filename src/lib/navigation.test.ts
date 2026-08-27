@@ -124,6 +124,20 @@ describe("navigation policy", () => {
     }).code).toBe("ALLOWED");
   });
 
+  it("does not authorize a workspace before the backend context is verified", () => {
+    const dashboard = getRoutePolicy("/dashboard");
+    expect(evaluateRouteAccess(dashboard!, {
+      sessionValid: false,
+      tenantAllowed: true,
+      subscriptionStatus: "active",
+      role: "admin_empresa",
+      hasModule: () => true,
+      hasFeature: () => true,
+      can: () => true,
+      branchAvailable: true,
+    }).code).toBe("AUTH_REQUIRED");
+  });
+
   it("keeps the global superadministrator out of tenant operations until impersonation", () => {
     const restrictedContext: RouteAccessContext = {
       sessionValid: true,

@@ -235,14 +235,14 @@ function SidebarContent({
           </div>
           <div>
             <p className="font-semibold">{brandName}</p>
-            <p className="text-xs text-sidebar-foreground/70">Suite empresarial</p>
+            <p className="text-xs text-sidebar-foreground/70">{t("workspace.company")}</p>
           </div>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <div className="mb-3 flex items-center gap-2 text-xs text-sidebar-foreground/70">
             <Building2 className="size-4" />
-            Empresa activa
+            {t("branches.company")} {t("branches.active")}
           </div>
           <p className="text-base font-semibold">{currentTenantName}</p>
           <p className="mt-1 text-sm text-sidebar-foreground/70">
@@ -254,7 +254,7 @@ function SidebarContent({
 
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-sidebar-foreground/50">
-            Sesión actual
+            {t("workspace.connection")}
           </p>
           <p className="mt-2 text-sm font-semibold">{currentUserName}</p>
           <p className="mt-1 text-sm text-sidebar-foreground/70">{currentRoleLabel}</p>
@@ -371,6 +371,7 @@ function SidebarContent({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useLocale();
   const {
     allowedNav,
     allowedTenantIds,
@@ -458,7 +459,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const workspaceName = isGlobalView ? "Vista global TalentOS" : currentTenant.name;
   const workspaceBranch = isGlobalView
     ? "Todas las empresas"
-    : currentBranch?.name ?? "Sin sucursal asignada";
+    : currentBranch?.name ?? t("workspace.noBranch");
   const mobileQuickNavigation = useMemo(() => getMobileQuickNavigation(navigationForContext, pathname), [navigationForContext, pathname]);
 
   useEffect(() => {
@@ -566,7 +567,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[999999] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground focus:shadow-lg"
       >
-        Saltar al contenido
+        {t("workspace.skipContent")}
       </a>
       <AccessibleCommandPalette open={searchOpen} onOpenChange={setSearchOpen} items={navigationForContext.map((route) => ({ id: route.href.replaceAll("/", "-") || "inicio", label: route.label, group: route.group, href: route.href }))} onNavigate={(href) => router.push(href)} />
 
@@ -597,9 +598,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="min-w-0 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <ShieldCheck className="size-4 text-primary" />
-                  {currentRole === "admin_saas"
-                    ? "Espacio de trabajo de superadministrador"
-                    : "Espacio de trabajo de la empresa"}
+                  {currentRole === "admin_saas" ? t("workspace.superadmin") : t("workspace.company")}
                 </div>
                 <div>
                   <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{workspaceName}</h1>
@@ -624,15 +623,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </Button>
                   </Tooltip>
                   <div className="min-w-0 flex-1 rounded-xl border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
-                    {isGlobalView ? "Contexto global" : currentBranch ? `${currentBranch.name} · ${currentBranch.city}` : currentTenant.name}
+                    {isGlobalView ? t("workspace.globalContext") : currentBranch ? `${currentBranch.name} · ${currentBranch.city}` : currentTenant.name}
                   </div>
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3 lg:flex-nowrap">
-                    <Tooltip content="Buscar (Ctrl+K)">
+                    <Tooltip content={t("workspace.searchTooltip")}>
                       <div className="relative min-w-0 flex-1 sm:min-w-[240px] lg:max-w-[420px]">
                         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                          placeholder="Buscar... (Ctrl+K)"
+                          placeholder={t("workspace.search")}
                           className="h-11 cursor-pointer pl-9 pr-4 sm:h-12"
                           readOnly
                           onClick={() => setSearchOpen(true)}
@@ -642,7 +641,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center justify-end gap-3">
                       <LanguageSelector compact />
                       <ThemeToggle />
-                      <Tooltip content="Notificaciones">
+                      <Tooltip content={t("workspace.notifications")}>
                         <Button variant="secondary" size="icon" className="relative shrink-0" asChild>
                           <Link
                             href="/notifications"
@@ -682,7 +681,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <div
                           ref={userMenuRef}
                           role="dialog"
-                          aria-label="Menú de usuario"
+                          aria-label={t("workspace.userMenu")}
                           className="fixed z-[99999] w-[min(340px,calc(100vw-2rem))] touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-background/95 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur [-webkit-overflow-scrolling:touch]"
                           style={{
                             top: `${userMenuPosition.top}px`,
@@ -837,7 +836,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               className="mt-4 h-12 w-full rounded-xl"
                               onClick={signOut}
                             >
-                              Cerrar sesión
+                              {t("workspace.signOut")}
                               <LogOut className="size-4" />
                             </Button>
                           </div>
@@ -854,16 +853,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main id="main-content" className="space-y-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-8 xl:space-y-12 xl:pb-0">{children}</main>
         </div>
       </div>
-      <nav aria-label="Accesos principales" className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.18)] backdrop-blur xl:hidden">
+      <nav aria-label={t("workspace.mainAccess")} className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.18)] backdrop-blur xl:hidden">
         {mobileQuickNavigation.map((item) => {
           const Icon = navigationIcons[item.icon];
           const isNotifications = item.href === "/notifications";
           return <Link key={item.href} href={item.href} aria-label={isNotifications && unreadNotifications ? `${item.label}, ${unreadNotifications} sin leer` : item.label} className={cn("relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-medium", isActivePath(item.href, pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Icon className="size-4 shrink-0" /><span className="max-w-full truncate">{item.label}</span>{isNotifications && unreadNotifications ? <span className="absolute right-2 top-1.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[9px] font-bold text-destructive-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span> : null}</Link>;
         })}
         {Array.from({ length: Math.max(0, 3 - mobileQuickNavigation.length) }).map((_, index) => <span key={`mobile-nav-placeholder-${index}`} aria-hidden="true" />)}
-        <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-muted-foreground hover:bg-secondary" aria-label="Abrir menú principal"><Menu className="size-4" />Menú</button>
+        <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-muted-foreground hover:bg-secondary" aria-label={t("workspace.openMenu")}><Menu className="size-4" />{t("workspace.menu")}</button>
       </nav>
-      <MobileDrawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen} title="Menú principal">
+      <MobileDrawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen} title={t("workspace.openMenu")}>
         <SidebarContent
               currentBranch={workspaceBranch}
               brandName={isGlobalView ? "TalentOS" : currentTenant.branding.productName ?? currentTenant.name}

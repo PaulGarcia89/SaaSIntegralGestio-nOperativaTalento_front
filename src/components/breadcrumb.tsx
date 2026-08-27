@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getRoutePolicy } from "@/lib/navigation";
+import { useLocale } from "@/components/locale-provider";
 
 type BreadcrumbSegment = {
   label: string;
@@ -46,6 +47,7 @@ const routeLabels: Record<string, string> = {
 };
 
 export function AppBreadcrumb({ pathname }: { pathname: string }) {
+  const { t } = useLocale();
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) return null;
@@ -55,7 +57,7 @@ export function AppBreadcrumb({ pathname }: { pathname: string }) {
     const exactPolicy = getRoutePolicy(path);
     const policyLabel = exactPolicy?.href === path ? exactPolicy.label : undefined;
     return {
-      label: policyLabel ?? routeLabels[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1),
+      label: localizedLabel(policyLabel ?? routeLabels[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1), t),
       href: index < segments.length - 1 ? path : undefined,
     };
   });
@@ -79,4 +81,10 @@ export function AppBreadcrumb({ pathname }: { pathname: string }) {
       ))}
     </nav>
   );
+}
+
+function localizedLabel(label: string, t: (key: string) => string) {
+  const key = `nav.${label}`;
+  const translated = t(key);
+  return translated === key ? label : translated;
 }

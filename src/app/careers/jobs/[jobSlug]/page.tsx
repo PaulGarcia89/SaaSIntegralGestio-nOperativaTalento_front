@@ -4,5 +4,5 @@ import { CareerVacancyDetailLoader } from "@/components/career-vacancy-detail";
 
 export default async function CareersJobDetailPage({ params }: { params: Promise<{ jobSlug: string }> }) {
   const { jobSlug } = await params;
-  return <PortalContextProvider><PortalThemeProvider><CareerVacancyDetailLoader jobSlug={jobSlug} /></PortalThemeProvider></PortalContextProvider>;
+  return <PortalContextProvider><PortalThemeProvider><CareerVacancyDetailLoader jobSlug={jobSlug} vacanciesHref="/careers/jobs" /></PortalThemeProvider></PortalContextProvider>;
 }

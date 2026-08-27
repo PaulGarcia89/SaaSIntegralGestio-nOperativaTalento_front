@@ -7,18 +7,19 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchPublicVacancy, getCandidateSession } from "@/lib/backend";
 import type { PublicVacancyDto } from "@/lib/contracts";
 import { CandidateAuthCard } from "@/components/candidate-auth-card";
+import { CandidateNav } from "@/components/candidate-nav";
 import { useCareerPortal } from "@/components/portal-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AsyncState } from "@/components/async-state";
 
-export function CareerVacancyDetailLoader({ jobSlug }: { jobSlug: string }) {
+export function CareerVacancyDetailLoader({ jobSlug, vacanciesHref = "/jobs" }: { jobSlug: string; vacanciesHref?: string }) {
   const { portal, isResolving } = useCareerPortal();
   const vacancy = useQuery({ queryKey: ["public-vacancy", portal?.portalId ?? "pending", jobSlug], queryFn: () => fetchPublicVacancy(jobSlug, portal?.slug), enabled: !isResolving && Boolean(portal?.slug), retry: false });
-  if (isResolving || vacancy.isLoading) return <AsyncState state="loading" title="Cargando vacante" />;
-  if (vacancy.isError || !vacancy.data) return <AsyncState state="error" title="No encontramos esta vacante" description="La publicación puede haber cerrado o no pertenece a este portal." />;
-  return <CareerVacancyDetail vacancy={vacancy.data} />;
+  if (isResolving || vacancy.isLoading) return <><CandidateNav vacanciesHref={vacanciesHref} /><AsyncState state="loading" title="Cargando vacante" /></>;
+  if (vacancy.isError || !vacancy.data) return <><CandidateNav vacanciesHref={vacanciesHref} /><AsyncState state="error" title="No encontramos esta vacante" description="La publicación puede haber cerrado o no pertenece a este portal." /></>;
+  return <><CandidateNav vacanciesHref={vacanciesHref} /><CareerVacancyDetail vacancy={vacancy.data} /></>;
 }
 
 export function CareerVacancyDetail({ vacancy }: { vacancy: PublicVacancyDto }) {

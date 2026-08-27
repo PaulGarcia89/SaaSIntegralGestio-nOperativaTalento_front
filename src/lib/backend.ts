@@ -190,15 +190,17 @@ import {
 } from "@/lib/mock-data";
 
 const DEFAULT_PRODUCTION_API_URL = "https://saasintegralgestio-noperativatalentoback-production.up.railway.app/api";
-const API_BASE_URL = (
+const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
+const DIRECT_API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.NODE_ENV === "production" ? DEFAULT_PRODUCTION_API_URL : "/api")
 ).replace(/\/$/, "");
+// Browser requests stay same-origin so Vercel does not depend on the API's CORS allowlist.
+const API_BASE_URL = !STATIC_HOSTING && typeof window !== "undefined" ? "/api" : DIRECT_API_BASE_URL;
 // Production must always reflect the API. Allowing the mock fallback here can
 // render entities that do not exist in PostgreSQL and make destructive actions fail.
 const MOCK_BACKEND_ENABLED = false;
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? "15000");
-const STATIC_HOSTING = process.env.NEXT_PUBLIC_STATIC_HOSTING === "true";
 const AUTH_API_BASE_URL = STATIC_HOSTING ? API_BASE_URL : "/api";
 
 export function resolveTrainingAssetUrl(url?: string | null) {

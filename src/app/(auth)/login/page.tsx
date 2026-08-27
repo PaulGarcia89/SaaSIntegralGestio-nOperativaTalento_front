@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Building2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { authenticateUser } from "@/lib/backend";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -47,10 +49,9 @@ export default function LoginPage() {
           ? requestedPath
           : "/dashboard";
 
-      // Do not block a successful authentication on background workspace
-      // queries. The full navigation bootstraps the verified session and
-      // authorized context from a clean state.
-      window.location.replace(destination);
+      // Keep the in-memory access token through the route transition. A full
+      // browser reload would force an unnecessary refresh-cookie round trip.
+      router.replace(destination);
     },
   });
 

@@ -1,8 +1,6 @@
-import { PortalContextProvider } from "@/components/portal-context";
-import { PortalThemeProvider } from "@/components/portal-theme";
-import { CareerVacancyDetailLoader } from "@/components/career-vacancy-detail";
+import { redirect } from "next/navigation";
 
 export default async function CompanyPrivateJobDetailPage({ params }: { params: Promise<{ companySlug: string; jobSlug: string }> }) {
-  const { jobSlug } = await params;
-  return <PortalContextProvider><PortalThemeProvider><CareerVacancyDetailLoader jobSlug={jobSlug} /></PortalThemeProvider></PortalContextProvider>;
+  const { companySlug, jobSlug } = await params;
+  redirect(`/company/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}`);
 }

@@ -9,6 +9,7 @@ import { ArrowRight, BriefcaseBusiness, Search } from "lucide-react";
 import { fetchPublicVacancies, getCandidateSession } from "@/lib/backend";
 import { useCareerPortal } from "@/components/portal-context";
 import { CandidateAuthCard } from "@/components/candidate-auth-card";
+import { CandidateNav } from "@/components/candidate-nav";
 import { AsyncState } from "@/components/async-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,11 @@ export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string })
 
   return (
     <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 pb-14 pt-2">
+      <CandidateNav vacanciesHref={basePath} />
+      {portal?.branding.logo ? <div className="flex items-center gap-3 px-1" style={{ fontFamily: "var(--career-font-family)" }}><Image src={portal.branding.logo} alt={`Logo de ${portal.company?.name ?? "la empresa"}`} width={48} height={48} unoptimized className="size-12 rounded-xl object-contain" /><span className="text-lg font-semibold">{portal.company?.name}</span></div> : null}
       <section className="space-y-6 rounded-[2rem] border border-border/70 bg-card/92 p-6 shadow-[0_18px_60px_-32px_rgba(15,23,42,0.28)] md:p-10">
         <Badge variant="secondary" className="rounded-full">{portal?.type === "BRANDED" ? "Career site" : portal?.type === "PRIVATE_STANDARD" ? "Portal privado" : "Portal de empleos"}</Badge>
-        <div className="max-w-3xl space-y-3">
+        <div className="max-w-3xl space-y-3" style={{ fontFamily: "var(--career-font-family)" }}>
           <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">{portal?.branding.title ?? "Encuentra una oportunidad que encaje contigo."}</h1>
           <p className="text-base leading-8 text-muted-foreground">{portal?.branding.description ?? "Vacantes reales publicadas por las empresas autorizadas en este portal."}</p>
         </div>

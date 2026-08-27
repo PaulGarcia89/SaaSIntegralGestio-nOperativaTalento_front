@@ -1,8 +1,5 @@
-import { PortalContextProvider } from "@/components/portal-context";
-import { PortalThemeProvider } from "@/components/portal-theme";
-import { CareerPortalShell } from "@/components/career-portal-shell";
+import { redirect } from "next/navigation";
 
 export default function CareersJobsPage() {
-  return <PortalContextProvider><PortalThemeProvider><CareerPortalShell basePath="/careers/jobs" /></PortalThemeProvider></PortalContextProvider>;
+  redirect("/jobs");
 }
-

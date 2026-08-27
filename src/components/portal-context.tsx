@@ -21,18 +21,19 @@ function fallbackPortal(pathname: string): CareerPortalContext {
   };
 }
 
-export function PortalContextProvider({ children }: { children: ReactNode }) {
+export function PortalContextProvider({ children, resolve = true }: { children: ReactNode; resolve?: boolean }) {
   const pathname = usePathname();
   const query = useQuery({
     queryKey: ["career-portal", pathname],
     queryFn: () => resolveCareerPortal(),
+    enabled: resolve,
     retry: false,
     staleTime: 0,
   });
 
   const portal = useMemo(() => query.data ?? fallbackPortal(pathname), [query.data, pathname]);
 
-  return <PortalContext.Provider value={{ portal, isResolving: query.isLoading }}>{children}</PortalContext.Provider>;
+  return <PortalContext.Provider value={{ portal, isResolving: resolve && query.isLoading }}>{children}</PortalContext.Provider>;
 }
 
 export function useCareerPortal() {

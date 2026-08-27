@@ -20,7 +20,8 @@ export function PortalThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--career-accent", sanitizeColor(branding.accent, "#f59e0b"));
     root.style.setProperty("--career-background", sanitizeColor(branding.background, "#f8fafc"));
     root.style.setProperty("--career-text", sanitizeColor(branding.text, "#0f172a"));
+    root.style.setProperty("--career-font-family", branding.fontFamily?.trim() || "inherit");
   }, [portal]);
 
-  return <>{children}</>;
+  return <><style data-career-portal>{portal?.branding.customCss ?? ""}</style>{children}</>;
 }

@@ -45,9 +45,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
     });
 
-    const setCookie = upstream.headers.get("set-cookie");
+    const setCookies =
+      typeof upstream.headers.getSetCookie === "function"
+        ? upstream.headers.getSetCookie()
+        : upstream.headers.get("set-cookie")
+          ? [upstream.headers.get("set-cookie") as string]
+          : [];
+    for (const setCookie of setCookies) {
+      response.headers.append("Set-Cookie", setCookie);
+    }
     const requestId = upstream.headers.get("x-request-id");
-    if (setCookie) response.headers.set("Set-Cookie", setCookie);
     if (requestId) response.headers.set("x-request-id", requestId);
 
     return response;

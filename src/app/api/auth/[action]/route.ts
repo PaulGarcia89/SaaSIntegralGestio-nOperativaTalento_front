@@ -7,32 +7,33 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.NODE_ENV === "production" ? DEFAULT_PRODUCTION_API_URL : "/api")
 ).replace(/\/$/, "");
-const ALLOWED_ACTIONS = new Set(["login", "refresh", "logout"]);
+const ALLOWED_ACTIONS = new Set(["login", "refresh", "logout", "me"]);
 const AUTH_PROXY_TIMEOUT_MS = 15_000;
 
 type RouteContext = {
   params: Promise<{ action: string }>;
 };
 
-export async function POST(request: NextRequest, context: RouteContext) {
+async function proxyAuthRequest(request: NextRequest, context: RouteContext) {
   const { action } = await context.params;
   if (!ALLOWED_ACTIONS.has(action)) {
     return NextResponse.json({ message: "Ruta de autenticación no disponible." }, { status: 404 });
   }
 
-  const headers = new Headers({ "Content-Type": "application/json" });
+  const headers = new Headers();
+  if (request.method !== "GET") headers.set("Content-Type", "application/json");
   const authorization = request.headers.get("authorization");
   const cookie = request.headers.get("cookie");
   if (authorization) headers.set("Authorization", authorization);
   if (cookie) headers.set("Cookie", cookie);
 
-  const body = await request.text();
+  const body = request.method === "GET" ? undefined : await request.text();
 
   try {
     const upstream = await fetch(`${API_BASE_URL}/auth/${action}`, {
-      method: "POST",
+      method: request.method,
       headers,
-      body: body || "{}",
+      ...(body ? { body } : {}),
       cache: "no-store",
       signal: AbortSignal.timeout(AUTH_PROXY_TIMEOUT_MS),
     });
@@ -67,4 +68,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { status: 503 },
     );
   }
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  return proxyAuthRequest(request, context);
+}
+
+export async function POST(request: NextRequest, context: RouteContext) {
+  return proxyAuthRequest(request, context);
 }

@@ -225,7 +225,7 @@ function CandidateProfileFields({ form, onChange }: { form: PublicApplicationInp
 }
 
 function BinaryField({ label, value, onChange }: { label: string; value: unknown; onChange: (value: boolean) => void }) {
-  return <fieldset className="space-y-2"><legend className="text-sm font-medium">{label}</legend><div className="flex gap-4"><label className="flex items-center gap-2 text-sm"><input type="radio" name={label} checked={value === true} onChange={() => onChange(true)} />Sí</label><label className="flex items-center gap-2 text-sm"><input type="radio" name={label} checked={value === false} onChange={() => onChange(false)} />No</label></div></fieldset>;
+  return <fieldset className="space-y-3 rounded-xl border bg-background p-4"><legend className="px-1 text-sm font-medium">{label}</legend><p className="text-xs text-muted-foreground">Selecciona una respuesta</p><div className="flex gap-3"><label className="flex min-h-10 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm"><input type="radio" name={label} checked={value === true} onChange={() => onChange(true)} />Sí</label><label className="flex min-h-10 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm"><input type="radio" name={label} checked={value === false} onChange={() => onChange(false)} />No</label></div></fieldset>;
 }
 
 function DynamicQuestions({ fields, responses, onChange }: { fields: VacancyApplicationField[]; responses: Record<string, unknown>; onChange: (key: string, value: unknown) => void }) {

@@ -3235,7 +3235,12 @@ export function fetchCandidateProfile() {
   return candidateRequest<CandidatePortalProfileDto>("/candidate-auth/profile");
 }
 
-export function updateCandidateProfile(input: Partial<CandidatePortalProfileDto>) {
+type CandidateProfileUpdateInput = Partial<CandidatePortalProfileDto> & {
+  applicationProfile?: Record<string, unknown>;
+  socialSecurityNumber?: string;
+};
+
+export function updateCandidateProfile(input: CandidateProfileUpdateInput) {
   return candidateRequest<CandidatePortalProfileDto>("/candidate-auth/profile", {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -3315,8 +3320,14 @@ export function submitCandidateApplication(
   antiFraud?: { website?: string; formStartedAt?: string },
 ) {
   const body = new FormData();
+  const candidateProfileOnlyKeys = new Set(["lastName", "address", "apartmentNumber", "state", "zipCode", "dateOfBirth", "socialSecurityNumber", "emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone"]);
   Object.entries(input).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === "") return;
+    if (value === undefined || value === null || value === "" || (key === "dynamicResponses" && typeof value === "object" && value !== null && !Array.isArray(value))) {
+      if (key !== "dynamicResponses" || typeof value !== "object" || value === null || Array.isArray(value)) return;
+      const dynamicResponses = Object.fromEntries(Object.entries(value).filter(([responseKey]) => !candidateProfileOnlyKeys.has(responseKey)));
+      if (Object.keys(dynamicResponses).length) body.append(key, JSON.stringify(dynamicResponses));
+      return;
+    }
     body.append(key, key === "dynamicResponses" ? JSON.stringify(value) : String(value));
   });
   body.append("resumeConsent", String(consent));

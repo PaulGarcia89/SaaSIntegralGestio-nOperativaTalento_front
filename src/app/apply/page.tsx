@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { trackProductEvent } from "@/lib/product-analytics";
-import { ApiError, authenticateCandidate, deletePublicApplicationDraft, exchangeCandidateSocialCode, fetchCandidateApplicationDraft, fetchCandidateProfile, fetchPublicApplicationDraft, fetchPublicVacancy, getCandidateSession, parseCandidateResume, saveCandidateApplicationDraft, savePublicApplicationDraft, startCandidateSocialLogin, submitCandidateApplication } from "@/lib/backend";
+import { ApiError, authenticateCandidate, deletePublicApplicationDraft, exchangeCandidateSocialCode, fetchCandidateApplicationDraft, fetchCandidateProfile, fetchPublicApplicationDraft, fetchPublicVacancy, getCandidateSession, parseCandidateResume, saveCandidateApplicationDraft, savePublicApplicationDraft, startCandidateSocialLogin, submitCandidateApplication, updateCandidateProfile } from "@/lib/backend";
 import type { ParsedResumeDto, PublicApplicationInput } from "@/lib/contracts";
 import type { VacancyApplicationField } from "@/lib/contracts";
 import { getApplicationFields, missingRequiredApplicationFields } from "@/lib/application-form";
@@ -27,6 +27,7 @@ const steps = ["Acceso del postulante", "Vacante", "Tu perfil", "Preguntas", "CV
 const builtInQuestionKeys = new Set(["is18OrOlder", "authorizedToWorkInUS", "workedForCompany", "familyWorksForCompany", "felonyConviction", "workedForCompanyExplanation", "familyWorksForCompanyExplanation", "felonyConvictionExplanation", "employmentPreference", "shiftPreference", "employmentType", "desiredHourlyWage", "previousEmployerMayContactSupervisor", "previousEmployerCompany", "previousEmployerPosition", "previousEmployerAddress", "previousEmployerLocation", "previousEmployerStartDate", "previousEmployerEndDate", "previousEmployerEndingSalary", "previousEmployerSupervisor", "previousEmployerPhone", "previousEmployerLeavingReason", "reference1Name", "reference1Relationship", "reference1Phone", "reference2Name", "reference2Relationship", "reference2Phone", "reference3Name", "reference3Relationship", "reference3Phone", "applicationDeclaration", "signatureName"]);
 const normalizeQuestionLabel = (label: string) => label.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const builtInQuestionLabels = new Set(["si respondiste si, explica si has trabajado para esta empresa", "si respondiste si, explica si un familiar trabaja para esta empresa", "si respondiste si, explica la condena", "preferencia de puesto", "preferencia de turno", "tipo de jornada", "salario deseado por hora"]);
+const candidateProfileOnlyKeys = new Set(["lastName", "address", "apartmentNumber", "state", "zipCode", "dateOfBirth", "socialSecurityNumber", "emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone"]);
 const emptyForm: PublicApplicationInput = { fullName: "", email: "", phone: "", city: "", linkedinUrl: "", portfolioUrl: "", coverLetter: "", dynamicResponses: {} };
 type PublicApplicationDraftState = { step: number; form: PublicApplicationInput; flowVersion?: number; pausedAt?: string };
 type PublicApplicationProgress = { step: number; form: PublicApplicationInput; flowVersion: 3; pausedAt?: string; resumedAt?: string };
@@ -154,12 +155,14 @@ function ApplyWizard() {
   const validate = () => {
     if (step === 0 && !authenticated) return "Inicia sesión o crea tu cuenta para continuar.";
     if (step === 2 && (!form.fullName.trim() || !/^\S+@\S+\.\S+$/.test(form.email))) return "Ingresa tu nombre completo y un correo válido.";
+    if (step === 2 && form.dynamicResponses?.socialSecurityNumber && !/^\d{3}-?\d{2}-?\d{4}$/.test(String(form.dynamicResponses.socialSecurityNumber))) return "Ingresa un número de Seguro Social válido (9 dígitos).";
+    if (step === 2 && form.dynamicResponses?.dateOfBirth && Number.isNaN(Date.parse(String(form.dynamicResponses.dateOfBirth)))) return "Ingresa una fecha de nacimiento válida.";
     if (step === 3) { const missing = missingRequiredApplicationFields(vacancyQuery.data?.applicationFormSchema, form.dynamicResponses); if (missing.length) return `Responde los campos obligatorios: ${missing.map((field) => field.label).join(", ")}.`; if (form.dynamicResponses?.applicationDeclaration !== true) return "Debes aceptar la declaración y autorizar la verificación antes de continuar."; }
     if (step === 5 && !getCandidateSession() && candidatePassword.length < 10) return "La contraseña del portal debe tener al menos 10 caracteres.";
     if (step === 5 && !consent) return "Debes aceptar la declaración y el tratamiento de datos antes de enviar.";
     return "";
   };
-  const next = () => { const message = validate(); if (message) return setError(message); setError(""); trackProductEvent({ name: "flow_step_viewed", flow: "vacancy", step: step + 1 }); setStep((value) => Math.min(value + 1, 6)); };
+  const next = async () => { const message = validate(); if (message) return setError(message); if (step === 2 && getCandidateSession()) { try { const dynamicResponses = form.dynamicResponses ?? {}; const applicationProfile = Object.fromEntries(Object.entries(dynamicResponses).filter(([key]) => candidateProfileOnlyKeys.has(key))); await updateCandidateProfile({ fullName: form.fullName, phone: form.phone, city: form.city, applicationProfile, socialSecurityNumber: String(dynamicResponses.socialSecurityNumber ?? "") || undefined }); } catch (cause) { setError(cause instanceof Error ? cause.message : "No fue posible guardar tu perfil. Revisa los datos e intenta nuevamente."); return; } } setError(""); trackProductEvent({ name: "flow_step_viewed", flow: "vacancy", step: step + 1 }); setStep((value) => Math.min(value + 1, 6)); };
   const back = () => { trackProductEvent({ name: "flow_step_back", flow: "vacancy", from: step, to: Math.max(0, step - 1) }); setStep((value) => Math.max(0, value - 1)); };
   const submit = () => {
     const message = validate();

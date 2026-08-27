@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Wizard } from "@/components/design-system";
 import { FileUpload } from "@/components/ui/file-upload";
 import { validateAtsResumeFile } from "@/lib/ats-file-security";
+import { useCareerPortal } from "@/components/portal-context";
 
 const steps = ["Vacante", "Tu perfil", "Preguntas", "CV", "Enviar", "Confirmación"];
 const emptyForm: PublicApplicationInput = { fullName: "", email: "", phone: "", city: "", linkedinUrl: "", portfolioUrl: "", coverLetter: "", dynamicResponses: {} };
@@ -36,6 +37,7 @@ function ApplyWizard() {
   const params = useSearchParams();
   const router = useRouter();
   const vacancyId = params.get("vacancyId") ?? "";
+  const { portal } = useCareerPortal();
   const socialCode = params.get("socialCode");
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<PublicApplicationInput>(emptyForm);
@@ -53,7 +55,7 @@ function ApplyWizard() {
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const draftTimer = useRef<number | null>(null);
   const pausing = useRef(false);
-  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", vacancyId], queryFn: () => fetchPublicVacancy(vacancyId), enabled: Boolean(vacancyId), retry: false });
+  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", portal?.portalId ?? "pending", vacancyId], queryFn: () => fetchPublicVacancy(vacancyId, portal?.slug), enabled: Boolean(vacancyId && portal?.slug), retry: false });
   const savedProfile = useQuery({ queryKey: ["candidate-profile", "apply"], queryFn: fetchCandidateProfile, enabled: Boolean(getCandidateSession()), retry: false });
   const draftQuery = useQuery({ queryKey: ["public-application-draft", vacancyId], queryFn: () => fetchPublicApplicationDraft(vacancyId), enabled: Boolean(vacancyId), retry: false });
   const accountDraft = useQuery({ queryKey: ["candidate-application-draft", vacancyId], queryFn: () => fetchCandidateApplicationDraft(vacancyId), enabled: Boolean(vacancyId && getCandidateSession()), retry: false });
@@ -76,11 +78,10 @@ function ApplyWizard() {
     const source = accountDraft.data?.value ? accountDraft.data : draftQuery.data;
     if (!source?.value) return;
     const draft = source.value as unknown as PublicApplicationDraftState;
-    if (draft.form) setForm(draft.form);
+    if (draft.form) queueMicrotask(() => setForm(draft.form));
     const restoredStep = normalizeDraftStep(draft);
-    if (typeof draft.step === "number") setStep(restoredStep);
-    setDraftLoaded(true);
-    setDraftSavedAt(source.expiresAt);
+    if (typeof draft.step === "number") queueMicrotask(() => setStep(restoredStep));
+    queueMicrotask(() => { setDraftLoaded(true); setDraftSavedAt(source.expiresAt); });
     if (draft.pausedAt) void (getCandidateSession() ? saveCandidateApplicationDraft(vacancyId, { step: restoredStep, form: draft.form, flowVersion: 2, resumedAt: new Date().toISOString() }) : savePublicApplicationDraft(vacancyId, { step: restoredStep, form: draft.form, flowVersion: 2, resumedAt: new Date().toISOString() })).catch(() => undefined);
     trackProductEvent({ name: "flow_step_viewed", flow: "vacancy", step: restoredStep });
   }, [draftQuery.data, accountDraft.data]);
@@ -100,14 +101,16 @@ function ApplyWizard() {
   useEffect(() => {
     if (!socialCode) return;
     void exchangeCandidateSocialCode(socialCode).then((session) => {
-      setForm((current) => ({ ...current, email: session.candidate.email, fullName: session.candidate.fullName ?? current.fullName, phone: session.candidate.phone ?? current.phone, city: session.candidate.city ?? current.city, linkedinUrl: session.candidate.linkedinUrl ?? current.linkedinUrl, portfolioUrl: session.candidate.portfolioUrl ?? current.portfolioUrl }));
-      setAccountMode("login");
+      queueMicrotask(() => {
+        setForm((current) => ({ ...current, email: session.candidate.email, fullName: session.candidate.fullName ?? current.fullName, phone: session.candidate.phone ?? current.phone, city: session.candidate.city ?? current.city, linkedinUrl: session.candidate.linkedinUrl ?? current.linkedinUrl, portfolioUrl: session.candidate.portfolioUrl ?? current.portfolioUrl }));
+        setAccountMode("login");
+      });
     }).catch((cause) => setError(cause instanceof Error ? cause.message : "No fue posible importar el perfil."));
   }, [socialCode]);
 
   useEffect(() => {
     if (!savedProfile.data) return;
-    setForm((current) => ({ ...current, email: current.email || savedProfile.data.email, fullName: current.fullName || savedProfile.data.fullName || "", phone: current.phone || savedProfile.data.phone || "", city: current.city || savedProfile.data.city || "", linkedinUrl: current.linkedinUrl || savedProfile.data.linkedinUrl || "", portfolioUrl: current.portfolioUrl || savedProfile.data.portfolioUrl || "" }));
+    queueMicrotask(() => setForm((current) => ({ ...current, email: current.email || savedProfile.data.email, fullName: current.fullName || savedProfile.data.fullName || "", phone: current.phone || savedProfile.data.phone || "", city: current.city || savedProfile.data.city || "", linkedinUrl: current.linkedinUrl || savedProfile.data.linkedinUrl || "", portfolioUrl: current.portfolioUrl || savedProfile.data.portfolioUrl || "" })));
   }, [savedProfile.data]);
 
   useEffect(() => {

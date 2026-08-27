@@ -178,7 +178,7 @@ export function TrainingCourseManager() {
   const [deleteTarget, setDeleteTarget] = useState<TrainingCourseDto | null>(null);
 
   useEffect(() => {
-    setPreviewId(null);
+    queueMicrotask(() => setPreviewId(null));
   }, [currentTenant?.id]);
 
   const coursesQuery = useQuery({

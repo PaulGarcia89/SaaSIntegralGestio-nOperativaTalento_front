@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -145,7 +145,7 @@ export function VacanciesPage({ createPage = false, editId }: { createPage?: boo
   const errorsForStep = (value: number) => validateAll().filter((item) => editingId && item.fieldId === "vacancy-image" ? false : value === 0 ? ["vacancy-title", "vacancy-branch", "vacancy-image"].includes(item.fieldId) : value === 1 ? item.fieldId === "vacancy-description" : value === 2 ? ["vacancy-openings", "vacancy-salary-max"].includes(item.fieldId) : value === 3 ? item.fieldId.startsWith("question-") : value === 4 ? item.fieldId.startsWith("stage-") : false);
   const next = () => { const nextErrors = errorsForStep(step); setErrors(nextErrors); if (!nextErrors.length) setStep((value) => Math.min(steps.length - 1, value + 1)); };
   const submit = (status: CreateVacancyInput["status"]) => { const nextErrors = (status === "PUBLISHED" || status === "OPEN" ? validateAll() : []).filter((item) => !(editingId && item.fieldId === "vacancy-image")); setErrors(nextErrors); if (!nextErrors.length) save.mutate({ ...form, status }); };
-  const draftScope = useMemo(() => currentUser && currentTenant && currentBranch && !editingId ? { namespace: "vacancy", tenantId: currentTenant.id, userId: currentUser.id, resourceId: currentBranch.id } : null, [currentBranch, currentTenant, currentUser, editingId]);
+  const draftScope = currentUser && currentTenant && currentBranch && !editingId ? { namespace: "vacancy", tenantId: currentTenant.id, userId: currentUser.id, resourceId: currentBranch.id } : null;
   const openWizard = () => { setEditingId(null); setForm(initial(currentBranch?.id ?? "")); setStages(initialStages()); setResponsibles([]); setInitialStagesForEdit([]); setInitialResponsiblesForEdit([]); setInitialFormForEdit(null); setImageFile(null); setImagePreview(""); setStoredImagePreview(""); setImageUploadMessage(null); setErrors([]); setDraftReady(false); setOpen(true); };
   const editVacancy = (vacancy: PublicVacancyDto) => {
     const vacancyStages = vacancy.stages ?? initialStages();
@@ -162,13 +162,13 @@ export function VacanciesPage({ createPage = false, editId }: { createPage?: boo
   useEffect(() => {
     if (!editId || editingId === editId) return;
     const vacancy = items.find((item) => item.id === editId);
-    if (vacancy) editVacancy(vacancy);
+    if (vacancy) queueMicrotask(() => editVacancy(vacancy));
   }, [editId, editingId, items]);
 
   useEffect(() => {
     if (!wizardOpen || editingId || !draftScope) return;
     let cancelled = false;
-    setDraftReady(false);
+    queueMicrotask(() => setDraftReady(false));
     void loadScopedDraft<VacancyDraft>(draftScope).then((draft) => {
       if (cancelled) return;
       if (draft?.value) {

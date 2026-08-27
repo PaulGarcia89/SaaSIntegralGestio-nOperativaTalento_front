@@ -753,7 +753,9 @@ export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson:
   const lastSentRef = useRef(0);
   const [syncState, setSyncState] = useState("Listo para reproducir");
   const savedPosition = lesson.videoProgress?.lastPositionSeconds ?? 0;
-  onProgressRef.current = onProgress;
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
 
   useEffect(() => {
     const video = videoRef.current;

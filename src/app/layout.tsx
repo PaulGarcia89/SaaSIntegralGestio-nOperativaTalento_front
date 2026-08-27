@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
+import { PortalContextProvider } from "@/components/portal-context";
+import { PortalThemeProvider } from "@/components/portal-theme";
 import { PwaRegistration } from "@/components/pwa-registration";
 import "./globals.css";
 
@@ -21,7 +23,14 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body suppressHydrationWarning>
-        <Providers><PwaRegistration />{children}</Providers>
+        <Providers>
+          <PortalContextProvider>
+            <PortalThemeProvider>
+              <PwaRegistration />
+              {children}
+            </PortalThemeProvider>
+          </PortalContextProvider>
+        </Providers>
       </body>
     </html>
   );

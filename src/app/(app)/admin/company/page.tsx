@@ -10,8 +10,8 @@ export default function CompanySettingsPage() {
         title="Marca, dominios, parámetros y plantillas por empresa."
         description="La administración de empresa necesita orden, jerarquía y acciones claras para evitar cambios accidentales."
         actions={
-          <Button asChild>
-            <Link href="/admin/users">Gestionar usuarios</Link>
+            <Button asChild>
+            <Link href="/admin/company/career-portal">Configurar portal de empleos</Link>
           </Button>
         }
         metrics={[

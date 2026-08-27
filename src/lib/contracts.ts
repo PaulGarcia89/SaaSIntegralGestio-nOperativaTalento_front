@@ -1345,6 +1345,7 @@ export interface VacancyDto {
 
 export interface PublicVacancyDto {
   id: string;
+  slug?: string;
   branchId?: string;
   requisitionId?: string | null;
   clonedFromVacancyId?: string | null;

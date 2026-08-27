@@ -67,7 +67,7 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
   });
 
   useEffect(() => {
-    if (editor.data) setForm(toEditorForm(editor.data));
+    if (editor.data) queueMicrotask(() => setForm(toEditorForm(editor.data)));
   }, [editor.data]);
 
   const save = useMutation({

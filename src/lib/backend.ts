@@ -180,6 +180,7 @@ import {
   persistAuth,
   type AuthSnapshot,
 } from "@/lib/auth-storage";
+import type { CareerPortalBackendBranding, CareerPortalChannelConfigInput, CareerPortalConfigResponse, CareerPortalContext } from "@/lib/career-portals";
 export { clearStoredAuth, getStoredSession } from "@/lib/auth-storage";
 import {
   mockBranches,
@@ -2481,15 +2482,41 @@ export async function updateModuleAssignment(
   };
 }
 
-export async function fetchPublicVacancies(search = ""): Promise<PublicVacancyListDto> {
+export async function fetchPublicVacancies(search = "", portalSlug?: string): Promise<PublicVacancyListDto> {
   const query = new URLSearchParams({ page: "1", pageSize: "100" });
   if (search.trim()) query.set("search", search.trim());
-  const result = await request<PublicVacancyListDto>(`/public/vacancies?${query.toString()}`, {}, { auth: false, retryOnUnauthorized: false });
+  const route = portalSlug && portalSlug !== "pending" ? `/career-portals/${encodeURIComponent(portalSlug)}/vacancies` : "/public/vacancies";
+  const result = await request<PublicVacancyListDto>(`${route}?${query.toString()}`, {}, { auth: false, retryOnUnauthorized: false });
   return { ...result, data: result.data.map(normalizeVacancyImageUrl) };
 }
 
-export async function fetchPublicVacancy(vacancyId: string): Promise<PublicVacancyDto> {
-  return normalizeVacancyImageUrl(await request<PublicVacancyDto>(`/public/vacancies/${encodeURIComponent(vacancyId)}`, {}, { auth: false, retryOnUnauthorized: false }));
+export async function fetchPublicVacancy(vacancyId: string, portalSlug?: string): Promise<PublicVacancyDto> {
+  const route = portalSlug && portalSlug !== "pending" ? `/career-portals/${encodeURIComponent(portalSlug)}/vacancies` : "/public/vacancies";
+  return normalizeVacancyImageUrl(await request<PublicVacancyDto>(`${route}/${encodeURIComponent(vacancyId)}`, {}, { auth: false, retryOnUnauthorized: false }));
+}
+
+export async function resolveCareerPortal(input?: { hostname: string; pathname: string }): Promise<CareerPortalContext> {
+  const location = input ?? { hostname: window.location.hostname, pathname: window.location.pathname };
+  const companyMatch = location.pathname.match(/^\/company\/([^/]+)/);
+  const query = new URLSearchParams({ pathname: location.pathname, slug: companyMatch?.[1] ?? "marketplace" });
+  const raw = await request<{ id: string; slug: string; name: string; type: string; access: string; branding?: CareerPortalBackendBranding | null }>(`/career-portals/resolve?${query.toString()}`, {}, { auth: false, retryOnUnauthorized: false });
+  const type = raw.type === "CAREER_SITE" ? "BRANDED" : raw.type === "COMPANY_PORTAL" ? "PRIVATE_STANDARD" : "PUBLIC";
+  const accessType = raw.access === "INVITATION_ONLY" ? "INVITATION_ONLY" : raw.access === "PRIVATE" ? "LOGIN_REQUIRED" : "OPEN";
+  const backendBranding = raw.branding;
+  const branding = { logo: backendBranding?.logoUrl, favicon: backendBranding?.faviconUrl, primary: backendBranding?.primaryColor, secondary: backendBranding?.secondaryColor, accent: backendBranding?.accentColor, background: backendBranding?.backgroundColor, text: backendBranding?.textColor, heroImage: backendBranding?.heroImageUrl, footerText: backendBranding?.footerText, supportEmail: backendBranding?.supportEmail, title: backendBranding?.title ?? backendBranding?.seoTitle, subtitle: backendBranding?.subtitle, description: backendBranding?.seoDescription };
+  return { portalId: raw.id, slug: raw.slug, type, company: { name: raw.name, slug: raw.slug }, accessType, branding, requireLoginToViewJobs: accessType !== "OPEN", requireLoginToApply: accessType !== "OPEN", allowApplicantRegistration: accessType !== "INVITATION_ONLY" };
+}
+
+export function fetchCareerPortalConfig() {
+  return request<CareerPortalConfigResponse>("/career-portals/config");
+}
+
+export function updateCareerPortalConfig(input: {
+  marketplaceEnabled?: boolean;
+  companyPortal?: CareerPortalChannelConfigInput;
+  brandedCareerSite?: CareerPortalChannelConfigInput;
+}) {
+  return request<CareerPortalConfigResponse>("/career-portals/config", { method: "PUT", body: JSON.stringify(input) });
 }
 
 export function submitPublicApplication(vacancyId: string, input: PublicApplicationInput): Promise<PublicApplicationReceipt> {
@@ -3059,6 +3086,28 @@ export function finalizeDecisionCommittee(id: string, input: {
 }
 
 let candidateSession: CandidateSessionDto | null = null;
+let candidateRefreshPromise: Promise<CandidateSessionDto | null> | null = null;
+
+type ApplicantSessionPayload = { accessToken: string; expiresIn: number; applicant: { id: string; email: string; profile?: CandidatePortalProfileDto | null } };
+
+function mapApplicantSession(payload: ApplicantSessionPayload): CandidateSessionDto {
+  const profile = payload.applicant.profile;
+  return {
+    accessToken: payload.accessToken,
+    expiresIn: payload.expiresIn,
+    candidate: profile ? { ...profile, id: payload.applicant.id, email: payload.applicant.email } : {
+      id: payload.applicant.id,
+      email: payload.applicant.email,
+      locale: "es",
+      timezone: "UTC",
+      statusUpdates: true,
+      interviewReminders: true,
+      offerNotifications: true,
+      marketingConsent: false,
+      profileSource: "MANUAL",
+    },
+  };
+}
 
 function getCandidateAccessToken() {
   return candidateSession?.accessToken ?? "";
@@ -3071,17 +3120,51 @@ export function getCandidateSession(): CandidateSessionDto | null {
 export function clearCandidateSession() {
   candidateSession = null;
   if (typeof window !== "undefined") {
-    void fetchWithTimeout(`${API_BASE_URL}/candidate-auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
+    void fetchWithTimeout(`${API_BASE_URL}/applicant-auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
   }
 }
 
-async function candidateRequest<T>(path: string, init: RequestInit & { responseType?: "json" | "blob" } = {}) {
-  const { responseType = "json", ...fetchInit } = init;
+async function refreshCandidateSession() {
+  if (candidateRefreshPromise) return candidateRefreshPromise;
+  candidateRefreshPromise = (async () => {
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/applicant-auth/refresh`, { method: "POST", credentials: "include" });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as ApplicantSessionPayload;
+      candidateSession = mapApplicantSession(payload);
+      return candidateSession;
+    } catch {
+      return null;
+    } finally {
+      candidateRefreshPromise = null;
+    }
+  })();
+  return candidateRefreshPromise;
+}
+
+export function restoreCandidateSession() {
+  return refreshCandidateSession();
+}
+
+async function candidateRequest<T>(path: string, init: RequestInit & { responseType?: "json" | "blob"; retryCandidate?: boolean } = {}) {
+  const { responseType = "json", retryCandidate = true, ...fetchInit } = init;
   const headers = new Headers(init.headers);
+  if (typeof window !== "undefined") {
+    const invitationToken = new URLSearchParams(window.location.search).get("invitationToken");
+    if (invitationToken) headers.set("x-invitation-token", invitationToken);
+  }
   if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const token = getCandidateAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { ...fetchInit, headers, credentials: "include" });
+  if (response.status === 401 && retryCandidate) {
+    const refreshed = await refreshCandidateSession();
+    if (refreshed) {
+      const retryHeaders = new Headers(headers);
+      retryHeaders.set("Authorization", `Bearer ${refreshed.accessToken}`);
+      return candidateRequest<T>(path, { ...fetchInit, headers: retryHeaders, responseType, retryCandidate: false });
+    }
+  }
   if (!response.ok) {
     const payload = await readJsonSafe(response);
     const nestedError =
@@ -3103,10 +3186,13 @@ async function candidateRequest<T>(path: string, init: RequestInit & { responseT
 }
 
 export async function authenticateCandidate(email: string, password: string, mode: "login" | "register" = "login") {
-  const session = await candidateRequest<CandidateSessionDto>(`/candidate-auth/${mode}`, {
+  const portalSlug = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("portal") ?? window.location.pathname.match(/^\/company\/([^/]+)/)?.[1] ?? "marketplace" : undefined;
+  const invitationToken = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invitationToken") ?? undefined : undefined;
+  const raw = await candidateRequest<ApplicantSessionPayload>(`/applicant-auth/${mode}`, {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, portalSlug, invitationToken }),
   });
+  const session = mapApplicantSession(raw);
   candidateSession = session;
   return session;
 }

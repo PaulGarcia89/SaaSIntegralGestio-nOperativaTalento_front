@@ -9,6 +9,7 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("content-length");
+  headers.set("accept-encoding", "identity");
 
   const response = await fetch(upstreamUrl, {
     method: request.method,

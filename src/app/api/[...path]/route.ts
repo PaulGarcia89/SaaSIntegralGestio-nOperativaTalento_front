@@ -18,6 +18,8 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   });
   const responseHeaders = new Headers(response.headers);
   responseHeaders.delete("content-length");
+  responseHeaders.delete("content-encoding");
+  responseHeaders.delete("transfer-encoding");
   return new NextResponse(await response.arrayBuffer(), { status: response.status, headers: responseHeaders });
 }
 

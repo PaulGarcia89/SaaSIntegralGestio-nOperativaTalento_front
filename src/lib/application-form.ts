@@ -1,4 +1,18 @@
 import type { VacancyApplicationField, VacancyApplicationFormSchema } from "@/lib/contracts";
+import type { SupportedLocale } from "@/i18n/types";
+
+export function localizedApplicationFormSchema(schema: VacancyApplicationFormSchema | null | undefined, locale: SupportedLocale): VacancyApplicationFormSchema | null {
+  if (!schema) return null;
+  return {
+    ...schema,
+    sections: schema.sections?.map((section) => ({
+      ...section,
+      ...(section.translations?.[locale] ?? {}),
+      fields: section.fields.map((field) => ({ ...field, ...(field.translations?.[locale] ?? {}) })),
+    })),
+    fields: schema.fields?.map((field) => ({ ...field, ...(field.translations?.[locale] ?? {}) })),
+  };
+}
 
 export function getApplicationFields(schema?: VacancyApplicationFormSchema | null): VacancyApplicationField[] {
   return [...(schema?.fields ?? []), ...(schema?.sections ?? []).flatMap((section) => section.fields ?? [])];

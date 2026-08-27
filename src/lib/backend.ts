@@ -1237,6 +1237,9 @@ export async function restoreCurrentSession() {
 async function request<T>(path: string, init: RequestInit = {}, options: RequestOptions = {}): Promise<T> {
   const auth = getStoredAuth();
   const headers = new Headers(init.headers);
+  if (!headers.has("Accept-Language") && typeof document !== "undefined") {
+    headers.set("Accept-Language", document.documentElement.lang || "es");
+  }
   if (!headers.has("x-request-id")) headers.set("x-request-id", requestId());
   const tenantId = resolveTenantHeader(options.tenantId);
   const branchId = resolveBranchHeader();
@@ -1593,6 +1596,17 @@ export function updateMyPreference(namespace: string, value: unknown) {
   return request("/auth/preferences/" + encodeURIComponent(namespace), {
     method: "PUT",
     body: JSON.stringify({ value }),
+  });
+}
+
+export function fetchPreferredLocale() {
+  return request<{ preferredLocale: "es" | "en" | null }>('/me/preferences/locale');
+}
+
+export function updatePreferredLocale(locale: "es" | "en") {
+  return request<{ preferredLocale: "es" | "en" }>('/me/preferences/locale', {
+    method: 'PATCH',
+    body: JSON.stringify({ locale }),
   });
 }
 

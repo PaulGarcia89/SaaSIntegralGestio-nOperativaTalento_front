@@ -1357,6 +1357,7 @@ export interface PublicVacancyDto {
   requirements?: string | null;
   responsibilities?: string | null;
   benefits?: string | null;
+  translations?: VacancyTranslations | null;
   city?: string | null;
   country?: string | null;
   department?: string | null;
@@ -1377,8 +1378,10 @@ export interface PublicVacancyDto {
 }
 
 export type VacancyApplicationFieldType = "TEXT" | "TEXTAREA" | "URL" | "NUMBER" | "SINGLE_SELECT" | "MULTI_SELECT" | "BOOLEAN";
-export interface VacancyApplicationField { key: string; label: string; type: VacancyApplicationFieldType; required?: boolean; placeholder?: string; helperText?: string; options?: string[]; }
-export interface VacancyApplicationSection { id?: string; title?: string; description?: string; fields: VacancyApplicationField[]; }
+export type VacancyTranslation = { title?: string; summary?: string; description?: string; requirements?: string; responsibilities?: string; benefits?: string };
+export type VacancyTranslations = { es?: VacancyTranslation; en?: VacancyTranslation };
+export interface VacancyApplicationField { key: string; label: string; type: VacancyApplicationFieldType; required?: boolean; placeholder?: string; helperText?: string; options?: string[]; translations?: { es?: Partial<Pick<VacancyApplicationField, "label" | "placeholder" | "helperText" | "options">>; en?: Partial<Pick<VacancyApplicationField, "label" | "placeholder" | "helperText" | "options">> }; }
+export interface VacancyApplicationSection { id?: string; title?: string; description?: string; fields: VacancyApplicationField[]; translations?: { es?: Partial<Pick<VacancyApplicationSection, "title" | "description">>; en?: Partial<Pick<VacancyApplicationSection, "title" | "description">> }; }
 export interface VacancyApplicationFormSchema { version?: number; sections?: VacancyApplicationSection[]; fields?: VacancyApplicationField[]; }
 
 export interface PublicVacancyListDto {
@@ -1416,6 +1419,7 @@ export interface CreateVacancyInput {
   requirements?: string;
   responsibilities?: string;
   benefits?: string;
+  translations?: VacancyTranslations;
   city?: string;
   country?: string;
   department?: string;

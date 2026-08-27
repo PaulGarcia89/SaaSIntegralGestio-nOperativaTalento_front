@@ -4,6 +4,8 @@ import type {
   VacancyApplicationDto,
   VacancyStageDto,
 } from "./contracts";
+import { translate } from "@/i18n";
+import type { SupportedLocale } from "@/i18n/types";
 
 export const APPLICATION_STAGES: Array<{ key: ApplicationStatusKey; label: string; tone: "secondary" | "default" | "destructive" }> = [
   { key: "SUBMITTED", label: "Recibida", tone: "secondary" },
@@ -47,8 +49,9 @@ export const TIMELINE_LABELS: Record<ApplicationTimelineEventType, string> = {
   OFFER_EXPIRED: "Oferta laboral vencida",
 };
 
-export function applicationStageLabel(status: ApplicationStatusKey) {
-  return APPLICATION_STAGES.find((stage) => stage.key === status)?.label ?? status;
+export function applicationStageLabel(status: ApplicationStatusKey, locale: SupportedLocale = "es") {
+  const key = ({ SUBMITTED: "ats.applicationReceived", REVIEWING: "ats.applicationReviewing", INTERVIEW: "ats.applicationInterview", APPROVED: "ats.applicationApproved", TRAINING: "ats.applicationTraining", HIRED: "ats.applicationHired", REJECTED: "ats.applicationRejected", WITHDRAWN: "ats.applicationWithdrawn" } as Record<ApplicationStatusKey, string>)[status];
+  return key ? translate(locale, key) : status;
 }
 
 export function currentApplicationStage(
@@ -61,21 +64,15 @@ export function currentApplicationStage(
     ?? null;
 }
 
-export function formatApplicationDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-  return new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+export function formatApplicationDate(value?: string | null, locale: SupportedLocale = "es") {
+  if (!value) return translate(locale, "ats.noDate");
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export function applicationNextAction(status: ApplicationStatusKey) {
-  const actions: Record<ApplicationStatusKey, string> = {
-    SUBMITTED: "Revisar la postulación",
-    REVIEWING: "Decidir si avanza a entrevista",
-    INTERVIEW: "Programar o completar entrevista",
-    APPROVED: "Preparar decisión de contratación",
-    TRAINING: "Revisar formación requerida",
-    HIRED: "Iniciar incorporación",
-    REJECTED: "Proceso cerrado",
-    WITHDRAWN: "Retirada por el candidato",
+export function applicationNextAction(status: ApplicationStatusKey, locale: SupportedLocale = "es") {
+  const keys: Record<ApplicationStatusKey, string> = {
+    SUBMITTED: "ats.nextReview", REVIEWING: "ats.nextInterview", INTERVIEW: "ats.nextSchedule", APPROVED: "ats.nextHiring",
+    TRAINING: "ats.nextTraining", HIRED: "ats.nextOnboarding", REJECTED: "ats.nextClosed", WITHDRAWN: "ats.nextWithdrawn",
   };
-  return actions[status];
+  return translate(locale, keys[status]);
 }

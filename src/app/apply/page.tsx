@@ -22,6 +22,7 @@ import { Wizard } from "@/components/design-system";
 import { FileUpload } from "@/components/ui/file-upload";
 import { validateAtsResumeFile } from "@/lib/ats-file-security";
 import { useCareerPortal } from "@/components/portal-context";
+import { useLocale } from "@/components/locale-provider";
 
 const steps = ["Acceso del postulante", "Vacante", "Tu perfil", "Preguntas", "CV", "Enviar", "Confirmación"];
 const builtInQuestionKeys = new Set(["is18OrOlder", "authorizedToWorkInUS", "workedForCompany", "familyWorksForCompany", "felonyConviction", "workedForCompanyExplanation", "familyWorksForCompanyExplanation", "felonyConvictionExplanation", "employmentPreference", "shiftPreference", "employmentType", "desiredHourlyWage", "previousEmployerMayContactSupervisor", "previousEmployerCompany", "previousEmployerPosition", "previousEmployerAddress", "previousEmployerLocation", "previousEmployerStartDate", "previousEmployerEndDate", "previousEmployerEndingSalary", "previousEmployerSupervisor", "previousEmployerPhone", "previousEmployerLeavingReason", "reference1Name", "reference1Relationship", "reference1Phone", "reference2Name", "reference2Relationship", "reference2Phone", "reference3Name", "reference3Relationship", "reference3Phone", "applicationDeclaration", "signatureName"]);
@@ -44,6 +45,7 @@ function ApplyWizard() {
   const vacancyId = params.get("vacancyId") ?? "";
   const vacancySlug = params.get("vacancySlug") ?? vacancyId;
   const { portal } = useCareerPortal();
+  const { locale } = useLocale();
   const socialCode = params.get("socialCode");
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));
   const [step, setStep] = useState(0);
@@ -61,7 +63,7 @@ function ApplyWizard() {
   const draftTimer = useRef<number | null>(null);
   const pausing = useRef(false);
   const draftRestored = useRef(false);
-  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", portal?.portalId ?? "pending", vacancySlug], queryFn: () => fetchPublicVacancy(vacancySlug, portal?.slug), enabled: Boolean(vacancySlug && portal?.slug), retry: false });
+  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", portal?.portalId ?? "pending", vacancySlug, locale], queryFn: () => fetchPublicVacancy(vacancySlug, portal?.slug), enabled: Boolean(vacancySlug && portal?.slug), retry: false });
   const savedProfile = useQuery({ queryKey: ["candidate-profile", "apply"], queryFn: fetchCandidateProfile, enabled: authenticated, retry: false });
   const draftQuery = useQuery({ queryKey: ["public-application-draft", vacancyId], queryFn: () => fetchPublicApplicationDraft(vacancyId), enabled: Boolean(vacancyId), retry: false });
   const accountDraft = useQuery({ queryKey: ["candidate-application-draft", vacancyId], queryFn: () => fetchCandidateApplicationDraft(vacancyId), enabled: Boolean(vacancyId && authenticated), retry: false });

@@ -60,6 +60,7 @@ import { createTenantTheme } from "@/lib/tenant-branding";
 import { ImpersonationBanner } from "@/components/design-system";
 import { fetchNotifications } from "@/lib/backend";
 import { TaskNavigation } from "@/components/task-navigation";
+import { LanguageSelector } from "@/components/language-selector";
 
 const navigationIcons: Record<NavItem["icon"], LucideIcon> = {
   dashboard: Gauge,
@@ -399,7 +400,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (decision.code !== "SUBSCRIPTION_BLOCKED" || !subscriptionGraceEndsAt) return decision;
     const graceDate = new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(subscriptionGraceEndsAt));
     return { ...decision, reason: `${decision.reason} El periodo de gracia finaliza el ${graceDate}.` };
-  }, [accessContextVerified, allowedTenantIds, can, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, impersonation?.active, routePolicy, subscriptionGraceEndsAt]);
+  }, [accessContextVerified, allowedTenantIds, can, canAccessGlobalGovernance, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, impersonation?.active, routePolicy, subscriptionGraceEndsAt]);
 
   // Keep both inventory modules visible when the tenant has access to both.
   // RBAC and enabled-module checks have already been applied in allowedNav.
@@ -627,6 +628,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </div>
                     </Tooltip>
                     <div className="flex items-center justify-end gap-3">
+                      <LanguageSelector compact />
                       <ThemeToggle />
                       <Tooltip content="Notificaciones">
                         <Button variant="secondary" size="icon" className="relative shrink-0" asChild>

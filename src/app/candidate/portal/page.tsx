@@ -17,11 +17,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { technicalLabel } from "@/lib/ui-labels";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { useLocale } from "@/components/locale-provider";
 
 function CandidatePortalContent() {
   const queryClient = useQueryClient();
   const params = useSearchParams();
-  const lang = "es" as const;
+  const { locale } = useLocale();
+  const lang = locale;
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));
   const [supportSubject, setSupportSubject] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
@@ -31,10 +33,10 @@ function CandidatePortalContent() {
     if (!socialCode || authenticated) return;
     void exchangeCandidateSocialCode(socialCode).then(() => setAuthenticated(true));
   }, [authenticated, socialCode]);
-  const applications = useQuery({ queryKey: ["candidate-applications", authenticated], queryFn: fetchCandidateApplications, enabled: authenticated });
-  const overview = useQuery({ queryKey: ["candidate-portal", authenticated], queryFn: fetchCandidatePortalOverview, enabled: authenticated });
-  const jobOffers = useQuery({ queryKey: ["candidate-job-offers", authenticated], queryFn: fetchCandidateJobOffers, enabled: authenticated });
-  const preboarding = useQuery({ queryKey: ["candidate-preboarding", authenticated], queryFn: fetchCandidatePreboarding, enabled: authenticated });
+  const applications = useQuery({ queryKey: ["candidate-applications", authenticated, locale], queryFn: fetchCandidateApplications, enabled: authenticated });
+  const overview = useQuery({ queryKey: ["candidate-portal", authenticated, locale], queryFn: fetchCandidatePortalOverview, enabled: authenticated });
+  const jobOffers = useQuery({ queryKey: ["candidate-job-offers", authenticated, locale], queryFn: fetchCandidateJobOffers, enabled: authenticated });
+  const preboarding = useQuery({ queryKey: ["candidate-preboarding", authenticated, locale], queryFn: fetchCandidatePreboarding, enabled: authenticated });
   const portalOverview = overview.data ?? {
     communications: [],
     offers: [],

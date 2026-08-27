@@ -1,14 +1,19 @@
+"use client";
+
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ModuleHeader, SectionCard, InfoList, SplitPanel } from "@/components/ui";
 import { Button } from "@/components/ui/button";
+import { LanguageSelector } from "@/components/language-selector";
+import { useLocale } from "@/components/locale-provider";
 
 export default function ProfilePage() {
+  const { locale, t } = useLocale();
   return (
     <>
       <ModuleHeader
         eyebrow="Perfil del usuario"
-        title="Preferencias, seguridad y sesiónes activas."
+        title="Preferencias, seguridad y sesiones activas."
         description="Control personal de acceso y preferencias."
         actions={
           <Button asChild>
@@ -21,6 +26,16 @@ export default function ProfilePage() {
           { label: "Nivel de seguridad", value: "Alto", detail: "Politica activa" },
         ]}
       />
+      <SectionCard title="Idioma y región" subtitle="Preferencia de interfaz">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-medium">Idioma de la interfaz</p>
+            <p className="mt-1 text-sm text-muted-foreground">El cambio se aplica inmediatamente y se conserva en este dispositivo.</p>
+          </div>
+          <LanguageSelector />
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">{t("language.current")}: {locale === "es" ? t("language.spanish") : t("language.english")}</p>
+      </SectionCard>
       <SplitPanel
         left={
           <SectionCard title="Cuenta personal" subtitle="Identidad y acceso">

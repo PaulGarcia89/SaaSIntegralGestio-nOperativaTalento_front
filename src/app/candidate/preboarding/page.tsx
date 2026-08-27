@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, FileUp, PenLine } from "lucide-react";
@@ -12,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { completeCandidatePreboardingTask, fetchCandidatePreboarding, getCandidateSession, uploadCandidatePreboardingDocument } from "@/lib/backend";
+import { useLocale } from "@/components/locale-provider";
 
 const copy = {
   es: { loading: "Preparando tu incorporación", unavailable: "No hay una incorporación disponible", support: "Inicia sesión con la misma cuenta usada durante tu postulación o contacta a tu equipo de selección.", greeting: "Hola", newHire: "Tu nueva incorporación", completed: "completado", tasks: "Tus tareas", due: "Fecha límite", complete: "Completar", upload: "Cargar documento", file: "Seleccionar documento", association: "Asociar documento a tarea", general: "Documento general", uploading: "Cargando...", uploadAction: "Cargar documento", security: "PDF, JPG o PNG, máximo 15 MB. El archivo queda privado y pasa por escaneo antes de revisión.", signatures: "Firmas", viewSignature: "Ver firma", noSignatures: "No hay firmas pendientes." },
@@ -23,13 +23,14 @@ export default function CandidatePreboardingPage() {
 }
 
 function CandidatePreboardingContent() {
-  const lang = useSearchParams().get("lang") === "en" ? "en" : "es";
+  const { locale } = useLocale();
+  const lang = locale;
   const t = copy[lang];
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));
   const [file, setFile] = useState<File | null>(null);
   const [taskId, setTaskId] = useState("");
   const queryClient = useQueryClient();
-  const preboarding = useQuery({ queryKey: ["candidate-preboarding"], queryFn: fetchCandidatePreboarding, enabled: authenticated, retry: false });
+  const preboarding = useQuery({ queryKey: ["candidate-preboarding", authenticated, locale], queryFn: fetchCandidatePreboarding, enabled: authenticated, retry: false });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["candidate-preboarding"] });
   const complete = useMutation({ mutationFn: completeCandidatePreboardingTask, onSuccess: refresh });
   const upload = useMutation({ mutationFn: () => { if (!file) throw new Error("Selecciona un archivo"); return uploadCandidatePreboardingDocument({ file, taskId: taskId || undefined }); }, onSuccess: () => { setFile(null); void refresh(); } });

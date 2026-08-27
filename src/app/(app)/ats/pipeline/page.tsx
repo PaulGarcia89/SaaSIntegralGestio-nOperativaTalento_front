@@ -33,6 +33,7 @@ import {
 import type { VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { useAppStore } from "@/store/app-store";
+import { useLocale } from "@/components/locale-provider";
 
 const ALL = "ALL";
 
@@ -42,6 +43,7 @@ function PipelineContent() {
   const pathname = usePathname();
   const params = useSearchParams();
   const { currentBranch, currentUser, can } = useAppStore();
+  const { t } = useLocale();
   const search = params.get("q") ?? "";
   const requestedVacancyId = params.get("vacancy") ?? ALL;
   const stageFilter = params.get("stage") ?? ALL;
@@ -116,7 +118,7 @@ function PipelineContent() {
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
       toast.success(`Movido a ${variables.stage.name}`, {
         action: {
-          label: "Deshacer",
+          label: t("actions.back"),
           onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }),
         },
       });
@@ -158,7 +160,7 @@ function PipelineContent() {
       setAutomationTitle("");
       setAutomationMessage("");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No fue posible crear la automatización"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : t("ats.automationCreationError")),
   });
 
   function openStageAutomation(stage: VacancyStageDto) {
@@ -272,21 +274,21 @@ function PipelineContent() {
               trackProductEvent({ name: "candidate_profile_opened", source: "pipeline" });
             }}
           >
-            <Eye className="size-4" />Vista rápida
+            <Eye className="size-4" />{t("ats.quickView")}
           </Button>
         </CardContent>
       </Card>
     );
   };
 
-  if (vacanciesQuery.isLoading) return <AsyncState state="loading" title="Cargando vacantes" />;
+  if (vacanciesQuery.isLoading) return <AsyncState state="loading" title={t("actions.loading")} />;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Reclutamiento"
-        title="Flujo de selección por vacante"
-        description="Opera las etapas personalizadas definidas para cada proceso de selección."
+        title={t("ats.selectionFlowByVacancy")}
+        description={t("ats.selectionFlowDescription")}
       />
       <RecruitmentWorkspaceNav />
       <section aria-label="Filtros del pipeline" className="grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 md:grid-cols-2 xl:grid-cols-4">
@@ -315,29 +317,29 @@ function PipelineContent() {
             </SelectContent>
           </Select>
         </FilterField>
-        <FilterField label="Fecha de postulación">
+        <FilterField label={t("ats.applicationDate")}>
           <Select value={age} onValueChange={(value) => setFilter("age", value)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>Cualquier fecha</SelectItem>
-              <SelectItem value="7">Últimos 7 días</SelectItem>
-              <SelectItem value="30">Últimos 30 días</SelectItem>
-              <SelectItem value="90">Últimos 90 días</SelectItem>
+              <SelectItem value={ALL}>{t("ats.anyDate")}</SelectItem>
+              <SelectItem value="7">{t("ats.lastDays", { count: 7 })}</SelectItem>
+              <SelectItem value="30">{t("ats.lastDays", { count: 30 })}</SelectItem>
+              <SelectItem value="90">{t("ats.lastDays", { count: 90 })}</SelectItem>
             </SelectContent>
           </Select>
         </FilterField>
       </section>
 
-      {!vacancies.length ? <InlineFeedback tone="info" title="No hay vacantes">Crea una vacante para configurar su flujo de selección.</InlineFeedback> : null}
-      {setup.isLoading || applications.isLoading ? <AsyncState state="loading" title="Cargando pipeline" /> : null}
-      {setup.isError || applications.isError ? <AsyncState state="error" title="No fue posible cargar el pipeline" onRetry={() => { void setup.refetch(); void applications.refetch(); }} /> : null}
-      {move.isError ? <InlineFeedback tone="danger" title="No fue posible cambiar la etapa">{move.error instanceof Error ? move.error.message : "La postulación conserva su etapa anterior."}</InlineFeedback> : null}
-      {decide.isError ? <InlineFeedback tone="danger" title="No fue posible registrar la aprobación">{decide.error instanceof Error ? decide.error.message : "Intenta nuevamente."}</InlineFeedback> : null}
-      {setup.isSuccess && !stages.length ? <InlineFeedback tone="warning" title="Vacante sin etapas">Configura las etapas de esta vacante antes de operar candidatos.</InlineFeedback> : null}
+      {!vacancies.length ? <InlineFeedback tone="info" title={t("ats.noVacancies")}>{t("ats.createVacancyForFlow")}</InlineFeedback> : null}
+      {setup.isLoading || applications.isLoading ? <AsyncState state="loading" title={t("ats.loadingPipeline")} /> : null}
+      {setup.isError || applications.isError ? <AsyncState state="error" title={t("ats.pipelineUnavailable")} onRetry={() => { void setup.refetch(); void applications.refetch(); }} /> : null}
+      {move.isError ? <InlineFeedback tone="danger" title="No fue posible cambiar la etapa">{move.error instanceof Error ? move.error.message : t("ats.stageUnchanged")}</InlineFeedback> : null}
+      {decide.isError ? <InlineFeedback tone="danger" title={t("ats.approvalUnavailable")}>{decide.error instanceof Error ? decide.error.message : t("ats.tryAgain")}</InlineFeedback> : null}
+      {setup.isSuccess && !stages.length ? <InlineFeedback tone="warning" title={t("ats.vacancyWithoutStages")}>{t("ats.configureStages")}</InlineFeedback> : null}
 
       {stages.length ? (
         <>
-          <p className="text-sm text-text-secondary" aria-live="polite">{applications.data?.meta.total ?? 0} {(applications.data?.meta.total ?? 0) === 1 ? "postulación encontrada" : "postulaciones encontradas"}</p>
+          <p className="text-sm text-text-secondary" aria-live="polite">{applications.data?.meta.total ?? 0} {(applications.data?.meta.total ?? 0) === 1 ? t("ats.applicationFound") : t("ats.applicationsFound")}</p>
           <div className="space-y-5 lg:hidden">
             {stages.map((stage) => {
               const items = filtered.filter((item) => currentApplicationStage(item, stages)?.id === stage.id);
@@ -345,11 +347,11 @@ function PipelineContent() {
                 <section key={stage.id} data-mobile-stage-id={stage.id} aria-labelledby={`mobile-stage-${stage.id}`} className={`rounded-2xl transition-colors ${mobileDropStageId === stage.id ? "bg-primary/10 ring-2 ring-primary/40" : ""}`}>
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 id={`mobile-stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
-                    <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="icon" variant="ghost" aria-label={`Automatizar ${stage.name}`} onClick={() => openStageAutomation(stage)}><Zap className="size-4" /></Button> : null}</div>
+                    <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="icon" variant="ghost" aria-label={t("ats.automateStage", { stage: stage.name })} onClick={() => openStageAutomation(stage)}><Zap className="size-4" /></Button> : null}</div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {items.map((item) => card(item, true))}
-                    {!items.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-text-secondary">Sin postulaciones</p> : null}
+                    {!items.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-text-secondary">{t("ats.noApplications")}</p> : null}
                   </div>
                 </section>
               );
@@ -388,12 +390,12 @@ function PipelineContent() {
                   >
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <h2 id={`stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
-                      <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="sm" variant="ghost" onClick={() => openStageAutomation(stage)}><Settings2 className="size-4" />Automatizar</Button> : null}</div>
+                      <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="sm" variant="ghost" onClick={() => openStageAutomation(stage)}><Settings2 className="size-4" />{t("ats.automate")}</Button> : null}</div>
                     </div>
-                    <p className="mb-3 text-xs text-text-secondary">Suelta una tarjeta aquí para moverla.</p>
+                    <p className="mb-3 text-xs text-text-secondary">{t("ats.dropCard")}</p>
                     <div className="space-y-3">
                       {items.map((item) => card(item))}
-                      {!items.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-text-secondary">Sin postulaciones</p> : null}
+                      {!items.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-text-secondary">{t("ats.noApplications")}</p> : null}
                     </div>
                   </section>
                 );
@@ -418,8 +420,8 @@ function PipelineContent() {
       <CandidatePreviewDialog application={preview} open={Boolean(preview)} onOpenChange={(open) => { if (!open) setPreview(null); }} />
       <Dialog open={Boolean(automationStage)} onOpenChange={(open) => { if (!open && !createStageAutomation.isPending) setAutomationStage(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Automatizar {automationStage?.name}</DialogTitle><DialogDescription>Al entrar a esta etapa se creará una notificación interna para quien ejecutó el cambio. La regla queda activa y persistida en el motor de automatizaciones.</DialogDescription></DialogHeader>
-          <div className="space-y-4"><label className="block space-y-2 text-sm font-medium">Título<Input value={automationTitle} maxLength={160} onChange={(event) => setAutomationTitle(event.target.value)} /></label><label className="block space-y-2 text-sm font-medium">Instrucción<textarea value={automationMessage} maxLength={1000} rows={4} onChange={(event) => setAutomationMessage(event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label><p className="text-xs text-text-secondary">Puedes administrar, ampliar o desactivar esta regla desde Automatizaciones.</p><Button className="w-full" onClick={() => createStageAutomation.mutate()} disabled={createStageAutomation.isPending || automationTitle.trim().length < 3 || automationMessage.trim().length < 3}>{createStageAutomation.isPending ? "Activando…" : "Activar automatización"}</Button></div>
+          <DialogHeader><DialogTitle>{t("ats.automateStage", { stage: automationStage?.name ?? "" })}</DialogTitle><DialogDescription>{t("ats.automationDescription")}</DialogDescription></DialogHeader>
+          <div className="space-y-4"><label className="block space-y-2 text-sm font-medium">{t("ats.title")}<Input value={automationTitle} maxLength={160} onChange={(event) => setAutomationTitle(event.target.value)} /></label><label className="block space-y-2 text-sm font-medium">{t("ats.instruction")}<textarea value={automationMessage} maxLength={1000} rows={4} onChange={(event) => setAutomationMessage(event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label><p className="text-xs text-text-secondary">{t("ats.manageAutomation")}</p><Button className="w-full" onClick={() => createStageAutomation.mutate()} disabled={createStageAutomation.isPending || automationTitle.trim().length < 3 || automationMessage.trim().length < 3}>{createStageAutomation.isPending ? t("ats.updating") : t("ats.activateAutomation")}</Button></div>
         </DialogContent>
       </Dialog>
     </div>

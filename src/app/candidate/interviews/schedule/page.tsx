@@ -10,11 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { bookPublicInterviewScheduling, fetchPublicInterviewScheduling } from "@/lib/backend";
 import { technicalLabel } from "@/lib/ui-labels";
+import { useLocale } from "@/components/locale-provider";
 
 function SchedulingContent() {
   const token = useSearchParams().get("token") ?? "";
+  const { locale } = useLocale();
   const [selected, setSelected] = useState("");
-  const context = useQuery({ queryKey: ["public-interview-scheduling", token], queryFn: () => fetchPublicInterviewScheduling(token), enabled: Boolean(token), retry: false });
+  const context = useQuery({ queryKey: ["public-interview-scheduling", token, locale], queryFn: () => fetchPublicInterviewScheduling(token), enabled: Boolean(token), retry: false });
   const booking = useMutation({ mutationFn: () => bookPublicInterviewScheduling(token, selected) });
 
   if (!token) return <InlineFeedback tone="danger" title="Enlace incompleto">Solicita un nuevo enlace al equipo de reclutamiento.</InlineFeedback>;

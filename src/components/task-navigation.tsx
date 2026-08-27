@@ -23,7 +23,7 @@ const roleActionLabels: Record<string, string[]> = {
 const glossary = [
   ["Flujo de selección", "Tablero de las etapas configuradas para una vacante y sus postulaciones."],
   ["Talent CRM", "Base reutilizable de candidatos, segmentos, etiquetas y campañas con consentimiento."],
-  ["Scorecard", "Ficha estructurada para evaluar una entrevista con criterios y evidencias."],
+  ["Ficha de evaluación", "Formulario estructurado para evaluar una entrevista con criterios y evidencias."],
   ["SCORM", "Paquete de aprendizaje interoperable que un LMS puede cargar y registrar."],
   ["Firma electrónica", "Evidencia de aceptación asociada a documento, participante y fecha."],
   ["IA asistida", "Sugerencias explicables para apoyar una decisión humana; no descarta candidatos automáticamente."],

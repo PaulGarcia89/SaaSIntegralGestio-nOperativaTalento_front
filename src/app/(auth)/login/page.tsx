@@ -17,9 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { FormField } from "@/components/ui/form-field";
 import { DEMO_MODE_ENABLED } from "@/components/integration-state";
 import { FormErrorSummary } from "@/components/form-error-summary";
+import { LanguageSelector } from "@/components/language-selector";
+import { useLocale } from "@/components/locale-provider";
 
 const loginSchema = z.object({
-  email: z.email("Ingresa un correo corporativo valido"),
+  email: z.email("Ingresa un correo corporativo válido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
@@ -27,6 +29,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -49,14 +52,16 @@ export default function LoginPage() {
           ? requestedPath
           : "/dashboard";
 
-      // Keep the in-memory access token through the route transition. A full
-      // browser reload would force an unnecessary refresh-cookie round trip.
+      // Conserva el token de acceso en memoria durante el cambio de ruta. Un
+      // recargo completo forzaría un intercambio innecesario de la cookie de actualización.
       router.replace(destination);
     },
   });
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-6 md:px-6">
+      <div className="w-full max-w-6xl">
+      <div className="mb-4 flex justify-end"><LanguageSelector /></div>
       <Card className="w-full max-w-6xl overflow-hidden border-border/70 bg-card/85">
         <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
           <div className="space-y-8 bg-[radial-gradient(circle_at_top_left,rgba(14,165,183,0.22),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.97),rgba(20,33,61,0.95))] p-8 text-white md:p-10">
@@ -114,7 +119,7 @@ export default function LoginPage() {
 
               <FormField
                 id="login-email"
-                label="Correo corporativo"
+                label={t("auth.email")}
                 error={form.formState.errors.email?.message}
                 required
               >
@@ -130,7 +135,7 @@ export default function LoginPage() {
 
               <FormField
                 id="login-password"
-                label="Contraseña"
+                label={t("auth.password")}
                 error={form.formState.errors.password?.message}
                 required
               >
@@ -148,7 +153,7 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
-                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
                     >
                       {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
@@ -163,16 +168,16 @@ export default function LoginPage() {
                   className="size-4 rounded border-border accent-primary"
                 />
                 <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground">
-                  Recordar mi sesión en este dispositivo
+                  {t("auth.remember")}
                 </Label>
               </div>
 
               <div className="grid gap-3">
                 <Button size="lg" type="submit" disabled={loginMutation.isPending}>
-                  {loginMutation.isPending ? "Ingresando..." : "Iniciar sesión"}
+                  {loginMutation.isPending ? t("actions.loading") : t("auth.login")}
                 </Button>
                 <Button asChild size="lg" variant="secondary">
-                  <Link href="/forgot-password">Olvidé mi contraseña</Link>
+                  <Link href="/forgot-password">{t("auth.forgotPassword")}</Link>
                 </Button>
               </div>
 
@@ -188,6 +193,7 @@ export default function LoginPage() {
           </CardContent>
         </div>
       </Card>
+      </div>
     </main>
   );
 }

@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLocale } from "@/components/locale-provider";
 
-function candidateAuthErrorMessage(error: unknown, mode: "login" | "register") {
+function candidateAuthErrorMessage(error: unknown, mode: "login" | "register", t: (key: string) => string) {
   if (mode === "register" && error instanceof ApiError && /Applicant account already exists/i.test(error.message)) {
-    return "Este correo ya tiene una cuenta de postulante. Selecciona «Ya tengo una cuenta» para ingresar o recuperar tu contraseña.";
+    return t("candidate.existingAccount");
   }
-  return "No fue posible completar el acceso. Revisa tus credenciales o la configuración del proveedor.";
+  return t("candidate.accessError");
 }
 
 export function CandidateAuthCard({ onAuthenticated, returnPath = "/application-status", portalLabel = "portal del candidato", defaultMode = "login", allowRegistration = true }: { onAuthenticated: () => void; returnPath?: string; portalLabel?: string; defaultMode?: "login" | "register"; allowRegistration?: boolean; lang?: "es" | "en" }) {
@@ -21,20 +22,21 @@ export function CandidateAuthCard({ onAuthenticated, returnPath = "/application-
   const [password, setPassword] = useState("");
   const [recovering, setRecovering] = useState(false);
   const [mode, setMode] = useState<"login" | "register">(defaultMode);
+  const { t } = useLocale();
   const login = useMutation({ mutationFn: () => authenticateCandidate(email, password, mode), onSuccess: onAuthenticated });
   const recovery = useMutation({ mutationFn: () => requestCandidatePasswordReset(email) });
   const social = useMutation({
     mutationFn: (provider: "linkedin" | "indeed") => startCandidateSocialLogin(provider, new URL(returnPath, window.location.origin).toString()),
     onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
   });
-  return <Card className="mx-auto w-full max-w-lg" aria-labelledby="candidate-access-title"><CardHeader><CardTitle id="candidate-access-title">{mode === "register" ? "Crear cuenta de candidato" : "Acceso seguro del candidato"}</CardTitle></CardHeader><CardContent className="space-y-4">
-    <p className="text-sm text-muted-foreground">{mode === "register" ? `Crea tu cuenta para postularte y seguir tus procesos en ${portalLabel}.` : `Entra para ver tus postulaciones, entrevistas, ofertas y documentos en ${portalLabel}.`}</p>
-    <div className="space-y-2"><Label htmlFor="candidate-email">Correo</Label><Input id="candidate-email" autoComplete="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
-    {!recovering ? <div className="space-y-2"><Label htmlFor="candidate-password">Contraseña</Label><Input id="candidate-password" autoComplete={mode === "register" ? "new-password" : "current-password"} type="password" value={password} onChange={(event) => setPassword(event.target.value)} /><p className="text-xs text-muted-foreground">Usa al menos 10 caracteres.</p></div> : null}
-    {login.isError || social.isError ? <p role="alert" className="text-sm text-destructive">{candidateAuthErrorMessage(login.error ?? social.error, mode)}</p> : null}
-    {recovery.isSuccess ? <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Si la cuenta existe, se programó el envío de un enlace de recuperación.</p> : null}
-    {recovering ? <><Button className="w-full" onClick={() => recovery.mutate()} disabled={!email || recovery.isPending}><KeyRound className="size-4" />{recovery.isPending ? "Solicitando…" : "Enviar enlace de recuperación"}</Button><p className="text-xs text-muted-foreground">Revisa tu bandeja y correo no deseado. El enlace es temporal y seguro.</p><Button className="w-full" variant="ghost" onClick={() => setRecovering(false)}>Volver al ingreso</Button></> : <><Button className="w-full" onClick={() => login.mutate()} disabled={!email || password.length < 10 || login.isPending}>{login.isPending ? "Verificando…" : mode === "register" ? "Crear cuenta" : "Ingresar"}</Button>{mode === "login" ? <Button className="w-full" variant="ghost" onClick={() => setRecovering(true)}>¿Olvidaste tu contraseña?</Button> : null}{allowRegistration ? <Button className="w-full" variant="ghost" onClick={() => { setMode((current) => current === "login" ? "register" : "login"); login.reset(); setRecovering(false); }}>{mode === "register" ? "Ya tengo una cuenta" : "Crear una cuenta nueva"}</Button> : null}</>}
+  return <Card className="mx-auto w-full max-w-lg" aria-labelledby="candidate-access-title"><CardHeader><CardTitle id="candidate-access-title">{mode === "register" ? t("candidate.createAccount") : t("candidate.secureAccess")}</CardTitle></CardHeader><CardContent className="space-y-4">
+    <p className="text-sm text-muted-foreground">{t(mode === "register" ? "candidate.createDescription" : "candidate.loginDescription", { portal: portalLabel })}</p>
+    <div className="space-y-2"><Label htmlFor="candidate-email">{t("candidate.email")}</Label><Input id="candidate-email" autoComplete="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
+    {!recovering ? <div className="space-y-2"><Label htmlFor="candidate-password">{t("auth.password")}</Label><Input id="candidate-password" autoComplete={mode === "register" ? "new-password" : "current-password"} type="password" value={password} onChange={(event) => setPassword(event.target.value)} /><p className="text-xs text-muted-foreground">{t("candidate.usePassword")}</p></div> : null}
+    {login.isError || social.isError ? <p role="alert" className="text-sm text-destructive">{candidateAuthErrorMessage(login.error ?? social.error, mode, t)}</p> : null}
+    {recovery.isSuccess ? <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{t("candidate.recoverySuccess")}</p> : null}
+    {recovering ? <><Button className="w-full" onClick={() => recovery.mutate()} disabled={!email || recovery.isPending}><KeyRound className="size-4" />{recovery.isPending ? t("actions.loading") : t("candidate.requestRecovery")}</Button><p className="text-xs text-muted-foreground">{t("candidate.recoveryHint")}</p><Button className="w-full" variant="ghost" onClick={() => setRecovering(false)}>{t("candidate.backToLogin")}</Button></> : <><Button className="w-full" onClick={() => login.mutate()} disabled={!email || password.length < 10 || login.isPending}>{login.isPending ? t("candidate.verifying") : mode === "register" ? t("candidate.create") : t("candidate.signIn")}</Button>{mode === "login" ? <Button className="w-full" variant="ghost" onClick={() => setRecovering(true)}>{t("candidate.forgot")}</Button> : null}{allowRegistration ? <Button className="w-full" variant="ghost" onClick={() => { setMode((current) => current === "login" ? "register" : "login"); login.reset(); setRecovering(false); }}>{mode === "register" ? t("candidate.haveAccount") : t("candidate.newAccount")}</Button> : null}</>}
     <div className="grid gap-2 border-t pt-4 sm:grid-cols-2"><Button variant="secondary" onClick={() => social.mutate("linkedin")} disabled={social.isPending}><Link2 className="size-4" />LinkedIn</Button><Button variant="secondary" onClick={() => social.mutate("indeed")} disabled={social.isPending}>Indeed</Button></div>
-    <p className="text-xs text-muted-foreground">El acceso social se habilita únicamente después de la aprobación y configuración OAuth del proveedor.</p>
+    <p className="text-xs text-muted-foreground">{t("candidate.socialHint")}</p>
   </CardContent></Card>;
 }

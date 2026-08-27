@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { AppStoreProvider } from "@/store/app-store";
 import { DemoModeBanner } from "@/components/integration-state";
 import { UnsavedChangesProvider } from "@/hooks/use-unsaved-changes";
+import { LocaleProvider } from "@/components/locale-provider";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -22,6 +23,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <LocaleProvider>
       <AppStoreProvider>
         <UnsavedChangesProvider>
           <DemoModeBanner />
@@ -39,6 +41,7 @@ export function Providers({ children }: { children: ReactNode }) {
           closeButton
         />
       </AppStoreProvider>
+      </LocaleProvider>
     </QueryClientProvider>
   );
 }

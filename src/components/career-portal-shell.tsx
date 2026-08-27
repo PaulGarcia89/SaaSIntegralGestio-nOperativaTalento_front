@@ -17,14 +17,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { technicalLabel } from "@/lib/ui-labels";
 import type { PublicVacancyDto } from "@/lib/contracts";
+import { useLocale } from "@/components/locale-provider";
 
 export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string }) {
   const { portal, isResolving } = useCareerPortal();
+  const { locale } = useLocale();
   const pathname = usePathname();
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));
   const [search, setSearch] = useState("");
   const requiresAuthentication = Boolean(portal?.requireLoginToViewJobs || portal?.accessType === "LOGIN_REQUIRED" || portal?.accessType === "INVITATION_ONLY");
-  const vacanciesQuery = useQuery({ queryKey: ["public-vacancies", portal?.portalId ?? "pending", search], queryFn: () => fetchPublicVacancies(search, portal?.slug), enabled: !isResolving && (!requiresAuthentication || authenticated) });
+  const vacanciesQuery = useQuery({ queryKey: ["public-vacancies", portal?.portalId ?? "pending", search, locale], queryFn: () => fetchPublicVacancies(search, portal?.slug), enabled: !isResolving && (!requiresAuthentication || authenticated) });
   const vacancies = vacanciesQuery.data?.data ?? [];
   const normalized = search.trim().toLocaleLowerCase("es");
   const visible = useMemo(

@@ -16,8 +16,11 @@ export function CandidateNav({ vacanciesHref = "/jobs" }: { vacanciesHref?: stri
     "/candidate/profile": "Perfil y privacidad",
   };
   return (
-    <nav aria-label="Navegación del candidato" className="mx-auto flex w-full max-w-[1440px] flex-wrap gap-2 px-1 py-3">
-      {candidateNavigation.filter((item) => item.available).map((item) => { const href = item.href === "/jobs" ? vacanciesHref : item.href; return <Link key={item.href} aria-current={pathname === href ? "page" : undefined} href={href} className={`flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${pathname === href ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/70 bg-card/80 hover:bg-secondary"}`}>{item.href === "/" ? <ArrowLeft className="size-4" aria-hidden="true" /> : null}{labels[item.href] ?? item.label}</Link>; })}
+    <nav
+      aria-label="Navegación del candidato"
+      className="relative left-1/2 flex w-screen max-w-none -translate-x-1/2 flex-nowrap gap-2 overflow-x-auto px-[max(1rem,calc((100vw-1440px)/2))] py-3"
+    >
+      {candidateNavigation.filter((item) => item.available).map((item) => { const href = item.href === "/jobs" ? vacanciesHref : item.href; return <Link key={item.href} aria-current={pathname === href ? "page" : undefined} href={href} className={`flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${pathname === href ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/70 bg-card/80 hover:bg-secondary"}`}>{item.href === "/" ? <ArrowLeft className="size-4" aria-hidden="true" /> : null}{labels[item.href] ?? item.label}</Link>; })}
     </nav>
   );
 }

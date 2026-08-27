@@ -109,6 +109,21 @@ describe("navigation policy", () => {
     expect(evaluateRouteAccess(policy, allowed).code).toBe("ALLOWED");
   });
 
+  it("allows the authenticated workspace entry without a synthetic dashboard permission", () => {
+    const dashboard = getRoutePolicy("/dashboard");
+    expect(dashboard).toBeDefined();
+    expect(evaluateRouteAccess(dashboard!, {
+      sessionValid: true,
+      tenantAllowed: true,
+      subscriptionStatus: "suspended",
+      role: "empleado",
+      hasModule: () => false,
+      hasFeature: () => false,
+      can: () => false,
+      branchAvailable: false,
+    }).code).toBe("ALLOWED");
+  });
+
   it("keeps the global superadministrator out of tenant operations until impersonation", () => {
     const restrictedContext: RouteAccessContext = {
       sessionValid: true,

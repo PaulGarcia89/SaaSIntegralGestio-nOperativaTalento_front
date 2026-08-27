@@ -138,6 +138,10 @@ export function evaluateRouteAccess(policy: NavItem, context: RouteAccessContext
   if (policy.requiresCommercialModule !== false && !context.hasFeature(policy.featureFlag)) return { allowed: false, code: "FEATURE_NOT_ENABLED", reason: "Esta función no está habilitada para tu contexto." };
   if (!policy.available) return { allowed: false, code: "ROUTE_NOT_READY", reason: "Esta función todavía no está disponible en el entorno productivo." };
   if (!isAudienceAllowed(policy.audience, context.role) || !isRoleAllowed(policy.roles, context.role, policy.strictRoles)) return { allowed: false, code: "ROLE_NOT_ALLOWED", reason: "Esta sección no está asignada a tu perfil." };
+  // El dashboard es la entrada base del workspace. El endpoint de datos sigue
+  // validando autorización en backend, pero la navegación no debe bloquear la
+  // sesión por una omisión del permiso sintético dashboard.view.
+  if (policy.href === "/dashboard") return { allowed: true, code: "ALLOWED", reason: "" };
   if (!policy.requiredPermissions.every(context.can)) return { allowed: false, code: "PERMISSION_DENIED", reason: "No tienes el permiso necesario para esta acción." };
   if (policy.branchRequired && !context.branchAvailable) return { allowed: false, code: "BRANCH_REQUIRED", reason: "Selecciona una sucursal autorizada para continuar." };
   return { allowed: true, code: "ALLOWED", reason: "" };

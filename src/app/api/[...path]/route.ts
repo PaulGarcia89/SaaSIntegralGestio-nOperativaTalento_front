@@ -21,7 +21,8 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   responseHeaders.delete("content-length");
   responseHeaders.delete("content-encoding");
   responseHeaders.delete("transfer-encoding");
-  return new NextResponse(await response.arrayBuffer(), { status: response.status, headers: responseHeaders });
+  const body = Buffer.from(await response.arrayBuffer());
+  return new NextResponse(body, { status: response.status, headers: responseHeaders });
 }
 
 export const GET = proxy;

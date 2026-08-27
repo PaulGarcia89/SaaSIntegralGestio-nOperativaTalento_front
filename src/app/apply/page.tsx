@@ -23,11 +23,11 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { validateAtsResumeFile } from "@/lib/ats-file-security";
 import { useCareerPortal } from "@/components/portal-context";
 
-const steps = ["Vacante", "Acceso del postulante", "Tu perfil", "Preguntas", "CV", "Enviar", "Confirmación"];
+const steps = ["Acceso del postulante", "Vacante", "Tu perfil", "Preguntas", "CV", "Enviar", "Confirmación"];
 const emptyForm: PublicApplicationInput = { fullName: "", email: "", phone: "", city: "", linkedinUrl: "", portfolioUrl: "", coverLetter: "", dynamicResponses: {} };
 type PublicApplicationDraftState = { step: number; form: PublicApplicationInput; flowVersion?: number; pausedAt?: string };
-type PublicApplicationProgress = { step: number; form: PublicApplicationInput; flowVersion: 2; pausedAt?: string; resumedAt?: string };
-const normalizeDraftStep = (draft: PublicApplicationDraftState) => draft.flowVersion === 2 ? Math.min(Math.max(draft.step, 0), 6) : [0, 2, 3, 4, 5, 6][Math.min(Math.max(draft.step, 0), 5)] ?? 0;
+type PublicApplicationProgress = { step: number; form: PublicApplicationInput; flowVersion: 3; pausedAt?: string; resumedAt?: string };
+const normalizeDraftStep = (draft: PublicApplicationDraftState) => draft.flowVersion === 3 ? Math.min(Math.max(draft.step, 0), 6) : draft.flowVersion === 2 ? [1, 0, 2, 3, 4, 5, 6][Math.min(Math.max(draft.step, 0), 6)] ?? 0 : [1, 2, 3, 4, 5, 6][Math.min(Math.max(draft.step, 0), 5)] ?? 0;
 const candidateAccessError = (cause: unknown, fallback: string) => {
   if (cause instanceof ApiError && cause.status === 401) return "La contraseña no coincide con esta cuenta. Intenta nuevamente o solicita un enlace para restablecerla.";
   if (cause instanceof ApiError && cause.status === 409) return "Ya existe una cuenta con este correo. Selecciona \"Ya tengo cuenta\" e ingresa tu contraseña.";
@@ -83,10 +83,10 @@ function ApplyWizard() {
     draftRestored.current = true;
     const draft = source.value as unknown as PublicApplicationDraftState;
     if (draft.form) queueMicrotask(() => setForm(draft.form));
-    const restoredStep = normalizeDraftStep(draft);
+    const restoredStep = authenticated ? normalizeDraftStep(draft) : 0;
     if (typeof draft.step === "number") queueMicrotask(() => setStep(restoredStep));
     queueMicrotask(() => setDraftLoaded(true));
-    if (draft.pausedAt) void (authenticated ? saveCandidateApplicationDraft(vacancyId, { step: restoredStep, form: draft.form, flowVersion: 2, resumedAt: new Date().toISOString() }) : savePublicApplicationDraft(vacancyId, { step: restoredStep, form: draft.form, flowVersion: 2, resumedAt: new Date().toISOString() })).catch(() => undefined);
+    if (draft.pausedAt) void (authenticated ? saveCandidateApplicationDraft(vacancyId, { step: restoredStep, form: draft.form, flowVersion: 3, resumedAt: new Date().toISOString() }) : savePublicApplicationDraft(vacancyId, { step: restoredStep, form: draft.form, flowVersion: 3, resumedAt: new Date().toISOString() })).catch(() => undefined);
     trackProductEvent({ name: "flow_step_viewed", flow: "vacancy", step: restoredStep });
   }, [draftQuery.data, accountDraft.data]);
 
@@ -94,7 +94,7 @@ function ApplyWizard() {
     if (!vacancyId || !draftQuery.isSuccess || pausing.current) return;
     if (draftTimer.current) window.clearTimeout(draftTimer.current);
     draftTimer.current = window.setTimeout(() => {
-      const progress: PublicApplicationProgress = { step, form, flowVersion: 2 };
+      const progress: PublicApplicationProgress = { step, form, flowVersion: 3 };
       void (authenticated ? saveCandidateApplicationDraft(vacancyId, progress) : savePublicApplicationDraft(vacancyId, progress)).catch(() => undefined);
     }, 300);
     return () => {
@@ -142,7 +142,7 @@ function ApplyWizard() {
     return next;
   });
   const validate = () => {
-    if (step === 1 && !authenticated) return "Inicia sesión o crea tu cuenta para continuar.";
+    if (step === 0 && !authenticated) return "Inicia sesión o crea tu cuenta para continuar.";
     if (step === 2 && (!form.fullName.trim() || !/^\S+@\S+\.\S+$/.test(form.email))) return "Ingresa tu nombre completo y un correo válido.";
     if (step === 3) { const missing = missingRequiredApplicationFields(vacancyQuery.data?.applicationFormSchema, form.dynamicResponses); if (missing.length) return `Responde los campos obligatorios: ${missing.map((field) => field.label).join(", ")}.`; }
     if (step === 5 && !getCandidateSession() && candidatePassword.length < 10) return "La contraseña del portal debe tener al menos 10 caracteres.";
@@ -164,7 +164,7 @@ function ApplyWizard() {
     pausing.current = true;
     if (draftTimer.current) window.clearTimeout(draftTimer.current);
     try {
-      await (authenticated ? saveCandidateApplicationDraft(vacancyId, { step, form, flowVersion: 2, pausedAt: new Date().toISOString() }) : savePublicApplicationDraft(vacancyId, { step, form, flowVersion: 2, pausedAt: new Date().toISOString() }));
+      await (authenticated ? saveCandidateApplicationDraft(vacancyId, { step, form, flowVersion: 3, pausedAt: new Date().toISOString() }) : savePublicApplicationDraft(vacancyId, { step, form, flowVersion: 3, pausedAt: new Date().toISOString() }));
       router.push(`/application-resume?vacancyId=${encodeURIComponent(vacancyId)}`);
     } catch (cause) {
       pausing.current = false;
@@ -183,7 +183,7 @@ function ApplyWizard() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-14 pt-2">
       <CandidateNav />
-      {step === 1 ? <CandidateAuthCard returnPath={`/apply?${params.toString()}`} portalLabel={portal?.company?.name ? `el portal de ${portal.company.name}` : "este portal"} onAuthenticated={() => { setAuthenticated(true); setError(""); setStep(2); }} /> : <>
+      {step === 0 ? <CandidateAuthCard returnPath={`/apply?${params.toString()}`} portalLabel={portal?.company?.name ? `el portal de ${portal.company.name}` : "este portal"} onAuthenticated={() => { setAuthenticated(true); setError(""); setStep(1); }} /> : <>
       <section className="space-y-4 rounded-[2rem] border bg-card p-6 md:p-8">
         <Badge variant="secondary">Postulación segura</Badge><h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{vacancy.title}</h1><p className="text-muted-foreground">{vacancy.tenant?.name}{location ? ` · ${location}` : ""}</p>
         {draftLoaded ? <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-primary">Tu borrador está guardado en Railway y se reanudará automáticamente si vuelves desde este navegador o con el mismo enlace.</div> : null}
@@ -191,7 +191,7 @@ function ApplyWizard() {
       <Wizard steps={steps} current={step} onStepChange={step < 6 ? setStep : undefined}>
       {step === 4 ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Tu CV es opcional. Si lo adjuntas, aceptamos solo PDF o DOCX y lo protegemos con validación y análisis de seguridad.</p> : null}
       <Card><CardHeader><CardTitle>{steps[step]}</CardTitle></CardHeader><CardContent className="space-y-6">
-        {step === 0 ? <div className="space-y-4"><p className="leading-7 text-muted-foreground">{vacancy.description || vacancy.summary || "Revisa la información disponible antes de continuar."}</p>{vacancy.requirements ? <div><h2 className="font-semibold">Requisitos</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{vacancy.requirements}</p></div> : null}</div> : null}
+        {step === 1 ? <div className="space-y-4"><p className="leading-7 text-muted-foreground">{vacancy.description || vacancy.summary || "Revisa la información disponible antes de continuar."}</p>{vacancy.requirements ? <div><h2 className="font-semibold">Requisitos</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{vacancy.requirements}</p></div> : null}</div> : null}
         {step === 2 ? <div className="space-y-5"><div><h2 className="font-semibold">Tu perfil</h2><p className="mt-1 text-sm text-muted-foreground">Después de ingresar, confirma tu nombre y correo. El resto puedes completarlo después.</p></div><div className="grid gap-4 md:grid-cols-2"><Field label="Nombre completo" required value={form.fullName} onChange={(value) => setField("fullName", value)} /><Field label="Correo electrónico" type="email" required value={form.email} onChange={(value) => setField("email", value)} /></div><div className="rounded-xl border p-4"><p className="font-medium">¿Quieres ahorrar tiempo?</p><p className="mt-1 text-sm text-muted-foreground">Importa datos de tu perfil; puedes revisarlos antes de enviar.</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => social.mutate("linkedin")} disabled={social.isPending}>Usar LinkedIn</Button><Button type="button" variant="secondary" onClick={() => social.mutate("indeed")} disabled={social.isPending}>Usar Indeed</Button></div></div><details className="rounded-xl border p-4"><summary className="cursor-pointer font-medium">Añadir información opcional</summary><div className="mt-4 space-y-4"><div className="grid gap-4 md:grid-cols-2"><Field label="Teléfono" value={form.phone || ""} onChange={(value) => setField("phone", value)} /><Field label="Ciudad" value={form.city || ""} onChange={(value) => setField("city", value)} /><Field label="LinkedIn" type="url" value={form.linkedinUrl || ""} onChange={(value) => setField("linkedinUrl", value)} /><Field label="Portafolio" type="url" value={form.portfolioUrl || ""} onChange={(value) => setField("portfolioUrl", value)} /></div><div className="space-y-2"><Label htmlFor="coverLetter">Experiencia o motivación</Label><textarea id="coverLetter" maxLength={4000} value={form.coverLetter || ""} onChange={(event) => setField("coverLetter", event.target.value)} placeholder="Opcional: comparte lo que quieras destacar." className="min-h-32 w-full rounded-xl border bg-background p-3" /></div></div></details></div> : null}
         {step === 3 ? <DynamicQuestions fields={getApplicationFields(vacancy.applicationFormSchema)} responses={form.dynamicResponses ?? {}} onChange={setResponse} /> : null}
         {step === 4 ? <div className="space-y-4"><div><h2 className="font-semibold">Currículum opcional</h2><p className="mt-1 text-sm text-muted-foreground">Puedes enviarlo ahora o continuar sin archivo. Te pediremos información adicional solo si el proceso la requiere.</p></div><FileUpload accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" maxFiles={1} maxSizeBytes={15 * 1024 * 1024} onFiles={(files) => { setResumeFile(files[0] ?? null); setParsedResume(null); setResumeBlockedByScanner(false); }} />{resumeFile ? <div className="space-y-3 rounded-xl border p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-3"><span>{resumeFile.name} · {(resumeFile.size / 1024 / 1024).toFixed(2)} MB</span><Button type="button" size="sm" variant="ghost" onClick={() => { setResumeFile(null); setParsedResume(null); setResumeBlockedByScanner(false); }}>Quitar</Button></div>{!getCandidateSession() ? <div className="space-y-3 border-t pt-3"><p className="text-muted-foreground">Inicia sesión o crea una cuenta solo si quieres analizar y autocompletar desde el CV.</p><div className="flex gap-2"><Button type="button" size="sm" variant={accountMode === "login" ? "default" : "secondary"} onClick={() => setAccountMode("login")}>Ya tengo cuenta</Button><Button type="button" size="sm" variant={accountMode === "register" ? "default" : "secondary"} onClick={() => setAccountMode("register")}>Crear cuenta</Button></div><Field label="Contraseña del portal" type="password" required value={candidatePassword} onChange={setCandidatePassword} /></div> : null}<Button type="button" variant="secondary" disabled={parseResume.isPending || (!getCandidateSession() && candidatePassword.length < 10)} onClick={() => parseResume.mutate()}>{parseResume.isPending ? "Analizando…" : "Autocompletar desde CV"}</Button></div> : null}{parsedResume ? <div role="status" className="space-y-3 rounded-xl bg-secondary/40 p-4"><p className="font-medium">Datos detectados · confianza {parsedResume.confidence}</p><dl className="grid gap-2 text-sm md:grid-cols-2"><div><dt className="text-muted-foreground">Nombre</dt><dd>{parsedResume.fields.fullName || "No detectado"}</dd></div><div><dt className="text-muted-foreground">Correo</dt><dd>{parsedResume.fields.email || "No detectado"}</dd></div><div><dt className="text-muted-foreground">Teléfono</dt><dd>{parsedResume.fields.phone || "No detectado"}</dd></div><div><dt className="text-muted-foreground">LinkedIn</dt><dd className="break-all">{parsedResume.fields.linkedinUrl || "No detectado"}</dd></div></dl><Button type="button" onClick={applyParsedResume}>Completar solo campos vacíos</Button></div> : null}</div> : null}

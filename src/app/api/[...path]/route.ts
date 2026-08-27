@@ -18,7 +18,7 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   });
   const responseHeaders = new Headers(response.headers);
   responseHeaders.delete("content-length");
-  return new NextResponse(response.body, { status: response.status, headers: responseHeaders });
+  return new NextResponse(await response.arrayBuffer(), { status: response.status, headers: responseHeaders });
 }
 
 export const GET = proxy;

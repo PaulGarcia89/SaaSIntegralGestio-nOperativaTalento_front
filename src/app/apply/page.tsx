@@ -37,6 +37,7 @@ function ApplyWizard() {
   const params = useSearchParams();
   const router = useRouter();
   const vacancyId = params.get("vacancyId") ?? "";
+  const vacancySlug = params.get("vacancySlug") ?? vacancyId;
   const { portal } = useCareerPortal();
   const socialCode = params.get("socialCode");
   const [step, setStep] = useState(0);
@@ -55,7 +56,7 @@ function ApplyWizard() {
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const draftTimer = useRef<number | null>(null);
   const pausing = useRef(false);
-  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", portal?.portalId ?? "pending", vacancyId], queryFn: () => fetchPublicVacancy(vacancyId, portal?.slug), enabled: Boolean(vacancyId && portal?.slug), retry: false });
+  const vacancyQuery = useQuery({ queryKey: ["public-vacancy", portal?.portalId ?? "pending", vacancySlug], queryFn: () => fetchPublicVacancy(vacancySlug, portal?.slug), enabled: Boolean(vacancySlug && portal?.slug), retry: false });
   const savedProfile = useQuery({ queryKey: ["candidate-profile", "apply"], queryFn: fetchCandidateProfile, enabled: Boolean(getCandidateSession()), retry: false });
   const draftQuery = useQuery({ queryKey: ["public-application-draft", vacancyId], queryFn: () => fetchPublicApplicationDraft(vacancyId), enabled: Boolean(vacancyId), retry: false });
   const accountDraft = useQuery({ queryKey: ["candidate-application-draft", vacancyId], queryFn: () => fetchCandidateApplicationDraft(vacancyId), enabled: Boolean(vacancyId && getCandidateSession()), retry: false });

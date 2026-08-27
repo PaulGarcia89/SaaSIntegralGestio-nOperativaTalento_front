@@ -61,6 +61,7 @@ import { ImpersonationBanner } from "@/components/design-system";
 import { fetchNotifications } from "@/lib/backend";
 import { TaskNavigation } from "@/components/task-navigation";
 import { LanguageSelector } from "@/components/language-selector";
+import { useLocale } from "@/components/locale-provider";
 
 const navigationIcons: Record<NavItem["icon"], LucideIcon> = {
   dashboard: Gauge,
@@ -105,6 +106,16 @@ type SidebarContentProps = {
 };
 
 type SidebarNavigationItem = Pick<NavItem, "href" | "label" | "group" | "icon" | "module">;
+
+function localizedNavLabel(label: string, t: (key: string) => string) {
+  const translated = t(`nav.${label}`);
+  return translated === `nav.${label}` ? label : translated;
+}
+
+function localizedNavGroup(group: NavGroup, t: (key: string) => string) {
+  const translated = t(`nav.group.${group}`);
+  return translated === `nav.group.${group}` ? group : translated;
+}
 
 function SidebarNavigationViewport({ children, mobile }: { children: React.ReactNode; mobile: boolean }) {
   if (mobile) {
@@ -158,6 +169,7 @@ function SidebarContent({
   pathname,
   supportEmail,
 }: SidebarContentProps) {
+  const { t } = useLocale();
   const activeHref = useMemo(
     () =>
       navigationItems
@@ -269,7 +281,7 @@ function SidebarContent({
                       : "text-sidebar-foreground/50",
                   )}
                 >
-                  <span>{group}</span>
+                  <span>{localizedNavGroup(group, t)}</span>
                   <ChevronRight
                     className={cn(
                       "size-3 transition-transform",
@@ -314,7 +326,7 @@ function SidebarContent({
                                   )}
                                 >
                                   <NavIcon className="size-4" aria-hidden="true" />
-                                  <span>{item.label}</span>
+                                  <span>{localizedNavLabel(item.label, t)}</span>
                                 </Link> : null}
                                 {submenuItems.length ? (
                                   <div className="space-y-1">
@@ -336,7 +348,7 @@ function SidebarContent({
                                           )}
                                         >
                                           <SubmenuIcon className="size-4" aria-hidden="true" />
-                                          <span>{submenuItem.label}</span>
+                                          <span>{localizedNavLabel(submenuItem.label, t)}</span>
                                         </Link>
                                       );
                                     })}

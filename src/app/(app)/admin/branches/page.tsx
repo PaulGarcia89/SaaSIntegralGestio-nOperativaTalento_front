@@ -15,11 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/ui/form-select";
-import { branchStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import { DataTable, InfoList, SectionCard } from "@/components/ui";
 import { AsyncState } from "@/components/async-state";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import { useLocale } from "@/components/locale-provider";
 
 const branchSchema = z.object({
   tenantId: z.string().min(1),
@@ -33,7 +33,12 @@ const branchSchema = z.object({
 type BranchFormValues = z.output<typeof branchSchema>;
 type BranchFormInput = z.input<typeof branchSchema>;
 
+function localizedBranchStatus(status: BranchDto["status"], t: (key: string) => string) {
+  return status === "active" ? t("branches.active") : t("branches.inactive");
+}
+
 export default function BranchesPage() {
+  const { t } = useLocale();
   const { can, currentTenant, currentRole, canAccessGlobalGovernance } = useAppStore();
   const canViewBranches = can("branches.view");
   const canCreateBranch = can("branches.create");
@@ -117,43 +122,43 @@ export default function BranchesPage() {
         : createBranch(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
-      toast.success(editing ? "Sucursal actualizada" : "Sucursal creada");
+      toast.success(editing ? t("branches.updated") : t("branches.created"));
       setOpen(false);
       setEditing(null);
       form.reset();
     },
-    onError: () => toast.error("Error al guardar la sucursal"),
+    onError: () => toast.error(t("branches.saveError")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (branch: BranchDto) => deleteBranch(branch.id, branch.tenantId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
-      toast.success("Sucursal eliminada");
+      toast.success(t("branches.deleted"));
       setDeleting(null);
     },
-    onError: () => toast.error("Error al eliminar la sucursal"),
+    onError: () => toast.error(t("branches.deleteError")),
   });
 
   if (!canViewBranches) {
     return (
       <StateCard
         tone="restricted"
-        title="Sin acceso a sucursales"
-        description="Solo roles administrativos pueden gestionar sedes o sucursales."
+        title={t("branches.noAccess")}
+        description={t("branches.noAccessDescription")}
       />
     );
   }
 
-  if (branchesQuery.isLoading || tenantsQuery.isLoading || subscriptionsQuery.isLoading) return <AsyncState state="loading" title="Cargando sucursales" />;
-  if (branchesQuery.isError || tenantsQuery.isError || subscriptionsQuery.isError) return <AsyncState state="error" title="No fue posible cargar las sucursales" onRetry={() => { void branchesQuery.refetch(); void tenantsQuery.refetch(); if (hasGlobalGovernance) void subscriptionsQuery.refetch(); }} />;
+  if (branchesQuery.isLoading || tenantsQuery.isLoading || subscriptionsQuery.isLoading) return <AsyncState state="loading" title={t("branches.loading")} />;
+  if (branchesQuery.isError || tenantsQuery.isError || subscriptionsQuery.isError) return <AsyncState state="error" title={t("branches.error")} onRetry={() => { void branchesQuery.refetch(); void tenantsQuery.refetch(); if (hasGlobalGovernance) void subscriptionsQuery.refetch(); }} />;
 
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestión de sucursales"
-        description="Alta, edicion y control de sedes operativas."
-        badge="Empresa"
+        title={t("branches.title")}
+        description={t("branches.description")}
+        badge={t("branches.eyebrow")}
         action={
           canCreateBranch ? <Button onClick={() => {
               form.reset({
@@ -165,22 +170,22 @@ export default function BranchesPage() {
                 status: "active",
               });
               setOpen(true);
-            }}>Nueva sucursal</Button> : null
+            }}>{t("branches.new")}</Button> : null
         }
       />
       {open ? (
         <Card level={2}>
           <CardContent className="space-y-4 p-6">
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold">{editing ? "Editar sucursal" : "Crear sucursal"}</h2>
-              <p className="text-sm text-text-secondary">Gestiona la sucursal como una sección de página, no como una ventana emergente.</p>
+              <h2 className="text-lg font-semibold">{editing ? t("branches.edit") : t("branches.create")}</h2>
+              <p className="text-sm text-text-secondary">{t("branches.manageDescription")}</p>
             </div>
             <form id="branch-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
               <div className="space-y-2">
-                <Label>Empresa</Label>
+                <Label>{t("branches.company")}</Label>
                 <FormSelect
                   className="h-11 w-full rounded-2xl"
-                  placeholder="Selecciona empresa"
+                  placeholder={t("branches.selectCompany")}
                   value={selectedTenantId}
                   onValueChange={(v) => form.setValue("tenantId", v)}
                   options={(tenantsQuery.data ?? []).map((tenant) => ({ label: tenant.name, value: tenant.id }))}
@@ -188,31 +193,31 @@ export default function BranchesPage() {
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nombre</Label>
+                  <Label>{t("branches.name")}</Label>
                   <Input {...form.register("name")} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Ciudad</Label>
+                  <Label>{t("branches.city")}</Label>
                   <Input {...form.register("city")} />
                 </div>
                 <div className="space-y-2">
-                <Label>Responsable</Label>
+                <Label>{t("branches.manager")}</Label>
                 <Input {...form.register("manager")} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Empleados</Label>
+                  <Label>{t("branches.employees")}</Label>
                   <Input type="number" {...form.register("employees")} />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Estado</Label>
+                <Label>{t("branches.status")}</Label>
                 <FormSelect
                   className="h-11 w-full rounded-2xl"
                   value={selectedStatus}
                   onValueChange={(v) => form.setValue("status", v as "active" | "inactive")}
                   options={[
-                    { label: "activa", value: "active" },
-                    { label: "inactiva", value: "inactive" },
+                    { label: t("branches.active"), value: "active" },
+                    { label: t("branches.inactive"), value: "inactive" },
                   ]}
                 />
               </div>
@@ -222,10 +227,10 @@ export default function BranchesPage() {
                   setEditing(null);
                   form.reset();
                 }}>
-                  Cancelar
+                  {t("branches.cancel")}
                 </Button>
                 <Button type="submit" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? "Guardando..." : "Guardar"}
+                  {saveMutation.isPending ? t("branches.saving") : t("branches.save")}
                 </Button>
               </div>
             </form>
@@ -234,11 +239,11 @@ export default function BranchesPage() {
       ) : null}
 
       <FilterToolbar
-        searchPlaceholder="Buscar sucursal, ciudad o responsable"
+        searchPlaceholder={t("branches.search")}
         options={[
-          { label: "Todas", value: "" },
-          { label: "Activas", value: "active" },
-          { label: "Inactivas", value: "inactive" },
+          { label: t("branches.all"), value: "" },
+          { label: t("branches.activeFilter"), value: "active" },
+          { label: t("branches.inactiveFilter"), value: "inactive" },
         ]}
         searchValue={query}
         onSearchChange={setQuery}
@@ -250,8 +255,8 @@ export default function BranchesPage() {
         <CrudPanel>
           <StateCard
             tone="empty"
-            title="No hay sucursales visibles"
-            description="Ajusta el filtro o crea una sucursal para comenzar."
+            title={t("branches.empty")}
+            description={t("branches.emptyDescription")}
           />
         </CrudPanel>
       ) : (
@@ -264,19 +269,19 @@ export default function BranchesPage() {
               columns={[
                 {
                   key: "tenant",
-                  header: "Empresa",
+                  header: t("branches.company"),
                   sortable: true,
                   render: (branch) =>
                     tenantsQuery.data?.find((tenant) => tenant.id === branch.tenantId)?.name ?? branch.tenantId,
                 },
-                { key: "name", header: "Sucursal", sortable: true, render: (branch) => branch.name },
-                { key: "city", header: "Ciudad", sortable: true, render: (branch) => branch.city },
-                { key: "manager", header: "Responsable", sortable: true, render: (branch) => branch.manager },
-                { key: "employees", header: "Empleados", sortable: true, render: (branch) => branch.employees },
-                { key: "status", header: "Estado", sortable: true, render: (branch) => branchStatusLabels[branch.status] },
+                { key: "name", header: t("branches.name"), sortable: true, render: (branch) => branch.name },
+                { key: "city", header: t("branches.city"), sortable: true, render: (branch) => branch.city },
+                { key: "manager", header: t("branches.manager"), sortable: true, render: (branch) => branch.manager },
+                { key: "employees", header: t("branches.employees"), sortable: true, render: (branch) => branch.employees },
+                { key: "status", header: t("branches.status"), sortable: true, render: (branch) => localizedBranchStatus(branch.status, t) },
                 {
                   key: "actions",
-                  header: "Acciones",
+                  header: t("branches.actions"),
                   render: (branch) => (
                     <div className="flex gap-2">
                       {canUpdateBranch ? <Button
@@ -288,10 +293,10 @@ export default function BranchesPage() {
                           setOpen(true);
                         }}
                       >
-                        Editar
+                        {t("branches.edit")}
                       </Button> : null}
                       {canDeleteBranch ? <Button size="sm" variant="destructive" onClick={() => setDeleting(branch)}>
-                        Eliminar
+                        {t("branches.delete")}
                       </Button> : null}
                     </div>
                   ),
@@ -301,22 +306,22 @@ export default function BranchesPage() {
           </CrudPanel>
 
           {selectedBranch ? (
-            <SectionCard title={selectedBranch.name} subtitle="Detalle de sucursal" className="self-start">
+            <SectionCard title={selectedBranch.name} subtitle={t("branches.detail")} className="self-start">
               <div className="space-y-4">
                 <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
                   <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Contexto</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("branches.context")}</p>
                     <h3 className="text-xl font-semibold tracking-tight text-foreground">{selectedBranch.name}</h3>
-                    <p className="text-xs text-muted-foreground">{selectedTenant?.name ?? "Sin empresa"} · {selectedBranch.city}</p>
+                    <p className="text-xs text-muted-foreground">{selectedTenant?.name ?? t("branches.noCompany")} · {selectedBranch.city}</p>
                   </div>
                 </div>
 
                 <InfoList
                   items={[
-                    { title: "Responsable", description: selectedBranch.manager, badge: branchStatusLabels[selectedBranch.status] },
-                    { title: "Dotacion", description: `${selectedBranch.employees} personas`, badge: `${tenantEmployees} total` },
-                    { title: "Suscripción", description: selectedSubscription?.plan ?? "Sin suscripción", badge: selectedSubscription?.status ?? "Pendiente" },
-                    { title: "Red", description: `${tenantBranchTotal} sucursales`, badge: `${siblingBranches.length} relacionadas` },
+                    { title: t("branches.manager"), description: selectedBranch.manager, badge: localizedBranchStatus(selectedBranch.status, t) },
+                    { title: t("branches.staffing"), description: t("branches.people", { count: String(selectedBranch.employees) }), badge: t("branches.total", { count: String(tenantEmployees) }) },
+                    { title: t("branches.subscription"), description: selectedSubscription?.plan ?? t("branches.noSubscription"), badge: selectedSubscription?.status ?? t("branches.pending") },
+                    { title: t("branches.network"), description: t("branches.count", { count: String(tenantBranchTotal) }), badge: t("branches.related", { count: String(siblingBranches.length) }) },
                   ]}
                 />
 
@@ -335,18 +340,18 @@ export default function BranchesPage() {
         <Card level={2}>
           <CardContent className="space-y-4 p-6">
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold">Eliminar sucursal</h2>
-              <p className="text-sm text-text-secondary">Se eliminará {deleting.name ?? "la sucursal"}.</p>
+              <h2 className="text-lg font-semibold">{t("branches.deleteTitle")}</h2>
+              <p className="text-sm text-text-secondary">{t("branches.deleteDescription", { name: deleting.name ?? t("branches.branch") })}</p>
             </div>
             <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
-              Esta acción es permanente. No podrás recuperar este registro una vez eliminado.
+              {t("branches.permanent")}
             </div>
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setDeleting(null)} disabled={deleteMutation.isPending}>
-                Cancelar
+                {t("branches.cancel")}
               </Button>
               <Button type="button" variant="destructive" onClick={() => deleting && deleteMutation.mutate(deleting)} disabled={deleteMutation.isPending}>
-                {deleteMutation.isPending ? "Eliminando..." : "Eliminar definitivamente"}
+                {deleteMutation.isPending ? t("branches.deleting") : t("branches.deleteDefinitely")}
               </Button>
             </div>
           </CardContent>

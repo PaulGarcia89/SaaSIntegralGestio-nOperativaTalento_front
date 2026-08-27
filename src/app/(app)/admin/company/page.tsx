@@ -1,44 +1,48 @@
+"use client";
+
 import Link from "next/link";
 import { ModuleHeader, SectionCard, InfoList, SplitPanel } from "@/components/ui";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/components/locale-provider";
 
 export default function CompanySettingsPage() {
+  const { t } = useLocale();
   return (
     <>
       <ModuleHeader
-        eyebrow="Configuración de empresa"
-        title="Marca, dominios, parámetros y plantillas por empresa."
-        description="La administración de empresa necesita orden, jerarquía y acciones claras para evitar cambios accidentales."
+        eyebrow={t("companySettings.eyebrow")}
+        title={t("companySettings.title")}
+        description={t("companySettings.description")}
         actions={
             <Button asChild>
-            <Link href="/admin/company/career-portal">Configurar portal de empleos</Link>
+            <Link href="/admin/company/career-portal">{t("companySettings.portalAction")}</Link>
           </Button>
         }
         metrics={[
-          { label: "Dominios conectados", value: "2", detail: "Portal de empleos y acceso corporativo" },
-          { label: "Plantillas activas", value: "14", detail: "Incorporación, firma y comunicación automatizada" },
-          { label: "Integraciones listas", value: "5", detail: "SSO, correo, firma y productividad" },
+          { label: t("companySettings.domains"), value: "2", detail: t("companySettings.domainsDetail") },
+          { label: t("companySettings.templates"), value: "14", detail: t("companySettings.templatesDetail") },
+          { label: t("companySettings.integrations"), value: "5", detail: t("companySettings.integrationsDetail") },
         ]}
       />
       <SplitPanel
         left={
-          <SectionCard title="Bloques de configuración" subtitle="Base empresarial">
+          <SectionCard title={t("companySettings.blocks")} subtitle={t("companySettings.businessBase")}>
             <InfoList
               items={[
-                { title: "Identidad visual", description: "Logo, colores secundarios y assets de portal de empleos", badge: "Marca" },
-                { title: "Parametros de proceso", description: "Checklists de incorporación y formularios por cargo", badge: "Flujo" },
-                { title: "Integraciones", description: "SSO, correo, firma y sistemas operativos externos", badge: "Conexión" },
+                { title: t("companySettings.identity"), description: t("companySettings.identityDescription"), badge: t("companySettings.brand") },
+                { title: t("companySettings.processParameters"), description: t("companySettings.processDescription"), badge: t("companySettings.flow") },
+                { title: t("companySettings.integrationsTitle"), description: t("companySettings.integrationsDescription"), badge: t("companySettings.connection") },
               ]}
             />
           </SectionCard>
         }
         right={
-          <SectionCard title="Guardrails operativos" subtitle="Gobernanza">
+          <SectionCard title={t("companySettings.guardrails")} subtitle={t("companySettings.governance")}>
             <InfoList
               items={[
-                { title: "Control de cambios", description: "Las modificaciones sensibles deben registrarse en auditoría y notificarse al administrador principal." },
-                { title: "Separación por sucursal", description: "Los formularios y listas de verificación pueden variar por sede sin romper la consistencia central", badge: "Multi-sede" },
-                { title: "Políticas de acceso", description: "Las integraciones críticas se exponen solo a perfiles con permisos administrativos", badge: "RBAC" },
+                { title: t("companySettings.changeControl"), description: t("companySettings.changeDescription") },
+                { title: t("companySettings.branchSeparation"), description: t("companySettings.branchDescription"), badge: t("companySettings.multiBranch") },
+                { title: t("companySettings.accessPolicies"), description: t("companySettings.accessDescription"), badge: "RBAC" },
               ]}
             />
           </SectionCard>

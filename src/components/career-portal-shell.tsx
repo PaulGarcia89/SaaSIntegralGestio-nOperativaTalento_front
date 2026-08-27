@@ -21,43 +21,43 @@ import { useLocale } from "@/components/locale-provider";
 
 export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string }) {
   const { portal, isResolving } = useCareerPortal();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const pathname = usePathname();
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));
   const [search, setSearch] = useState("");
   const requiresAuthentication = Boolean(portal?.requireLoginToViewJobs || portal?.accessType === "LOGIN_REQUIRED" || portal?.accessType === "INVITATION_ONLY");
   const vacanciesQuery = useQuery({ queryKey: ["public-vacancies", portal?.portalId ?? "pending", search, locale], queryFn: () => fetchPublicVacancies(search, portal?.slug), enabled: !isResolving && (!requiresAuthentication || authenticated) });
   const vacancies = vacanciesQuery.data?.data ?? [];
-  const normalized = search.trim().toLocaleLowerCase("es");
+  const normalized = search.trim().toLocaleLowerCase(locale);
   const visible = useMemo(
-    () => vacancies.filter((vacancy) => !normalized || [vacancy.title, vacancy.department, vacancy.city, vacancy.workMode, vacancy.tenant?.name].some((value) => value?.toLocaleLowerCase("es").includes(normalized))),
-    [vacancies, normalized],
+    () => vacancies.filter((vacancy) => !normalized || [vacancy.title, vacancy.department, vacancy.city, vacancy.workMode, vacancy.tenant?.name].some((value) => value?.toLocaleLowerCase(locale).includes(normalized))),
+    [vacancies, normalized, locale],
   );
 
-  if (isResolving) return <AsyncState state="loading" title="Resolviendo portal" />;
-  if (requiresAuthentication && !authenticated) return <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-14 pt-8"><section className="space-y-3 text-center"><Badge variant="secondary">Acceso protegido</Badge><h1 className="text-4xl font-semibold tracking-tight">Inicia sesión para ver las vacantes</h1><p className="mx-auto max-w-2xl text-muted-foreground">Este portal está reservado para candidatos autorizados. Después de autenticarte volverás automáticamente a esta página.</p></section><CandidateAuthCard returnPath={pathname} portalLabel={portal?.company?.name ? `el portal de ${portal.company.name}` : "este portal"} onAuthenticated={() => setAuthenticated(true)} /></div>;
-  if (portal?.accessType === "ACCESS_CODE") return <div className="mx-auto max-w-2xl px-4 py-14 text-center"><Badge variant="warning">Código requerido</Badge><h1 className="mt-4 text-3xl font-semibold">Este portal requiere una invitación</h1><p className="mt-3 text-muted-foreground">Solicita a la empresa un código de acceso válido para continuar.</p></div>;
+  if (isResolving) return <AsyncState state="loading" title={t("jobs.resolvingPortal")} />;
+  if (requiresAuthentication && !authenticated) return <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-14 pt-8"><section className="space-y-3 text-center"><Badge variant="secondary">{t("jobs.protectedAccess")}</Badge><h1 className="text-4xl font-semibold tracking-tight">{t("jobs.loginToView")}</h1><p className="mx-auto max-w-2xl text-muted-foreground">{t("jobs.protectedDescription")}</p></section><CandidateAuthCard returnPath={pathname} portalLabel={portal?.company?.name ?? t("applicant.portalFallback")} onAuthenticated={() => setAuthenticated(true)} /></div>;
+  if (portal?.accessType === "ACCESS_CODE") return <div className="mx-auto max-w-2xl px-4 py-14 text-center"><Badge variant="warning">{t("jobs.codeRequired")}</Badge><h1 className="mt-4 text-3xl font-semibold">{t("jobs.invitationRequired")}</h1><p className="mt-3 text-muted-foreground">{t("jobs.requestCode")}</p></div>;
 
   return (
     <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 pb-14 pt-2">
       <CandidateNav vacanciesHref={basePath} />
       {portal?.branding.logo ? <div className="flex items-center gap-3 px-1" style={{ fontFamily: "var(--career-font-family)" }}><Image src={portal.branding.logo} alt={`Logo de ${portal.company?.name ?? "la empresa"}`} width={48} height={48} unoptimized className="size-12 rounded-xl object-contain" /><span className="text-lg font-semibold">{portal.company?.name}</span></div> : null}
       <section className="space-y-6 rounded-[2rem] border border-border/70 bg-card/92 p-6 shadow-[0_18px_60px_-32px_rgba(15,23,42,0.28)] md:p-10">
-        <Badge variant="secondary" className="rounded-full">{portal?.type === "BRANDED" ? "Career site" : portal?.type === "PRIVATE_STANDARD" ? "Portal privado" : "Portal de empleos"}</Badge>
+        <Badge variant="secondary" className="rounded-full">{portal?.type === "BRANDED" ? t("jobs.careerSite") : portal?.type === "PRIVATE_STANDARD" ? t("jobs.privatePortal") : t("jobs.jobsPortal")}</Badge>
         <div className="max-w-3xl space-y-3" style={{ fontFamily: "var(--career-font-family)" }}>
-          <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">{portal?.branding.title ?? "Encuentra una oportunidad que encaje contigo."}</h1>
-          <p className="text-base leading-8 text-muted-foreground">{portal?.branding.description ?? "Vacantes reales publicadas por las empresas autorizadas en este portal."}</p>
+          <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">{portal?.branding.title ?? t("jobs.defaultTitle")}</h1>
+          <p className="text-base leading-8 text-muted-foreground">{portal?.branding.description ?? t("jobs.defaultDescription")}</p>
         </div>
         <label className="relative block max-w-2xl">
-          <span className="sr-only">Buscar vacantes</span>
+          <span className="sr-only">{t("jobs.searchLabel")}</span>
           <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cargo, área, ciudad, empresa o modalidad" className="h-12 rounded-2xl pl-12" />
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("jobs.searchPlaceholder")} className="h-12 rounded-2xl pl-12" />
         </label>
       </section>
-      {vacanciesQuery.isLoading ? <AsyncState state="loading" title="Consultando vacantes" /> : null}
-      {vacanciesQuery.isError ? <AsyncState state="error" description="No pudimos consultar las vacantes reales." onRetry={() => void vacanciesQuery.refetch()} /> : null}
-      {vacanciesQuery.isSuccess && visible.length === 0 ? <Card className="border-dashed"><CardContent className="py-14 text-center"><h2 className="text-xl font-semibold">No hay vacantes que coincidan</h2><p className="mt-2 text-sm text-muted-foreground">Prueba otra búsqueda o vuelve más tarde.</p></CardContent></Card> : null}
-      {visible.length > 0 ? <section aria-label="Vacantes disponibles" className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{visible.map((vacancy) => <Card key={vacancy.id} className="flex flex-col overflow-hidden border-border/70 bg-card/95"><VacancyImage imageUrl={vacancy.imageUrl} title={vacancy.title} /><CardContent className="flex flex-1 flex-col gap-5 p-6"><div className="flex flex-wrap gap-2"><Badge>{vacancy.department || "Vacante"}</Badge>{vacancy.employmentType ? <Badge variant="secondary">{vacancy.employmentType}</Badge> : null}</div><div className="space-y-2"><h2 className="text-2xl font-semibold tracking-tight">{vacancy.title}</h2><p className="text-sm text-muted-foreground">{vacancy.tenant?.name}</p></div><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{vacancy.summary || vacancy.description || "Consulta el detalle y los requisitos antes de postularte."}</p><div className="mt-auto flex flex-wrap gap-2 text-sm text-muted-foreground"><span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5"><BriefcaseBusiness className="size-4" />{technicalLabel(vacancy.workMode)}</span></div><Button asChild className="w-full"><Link href={`${basePath}/${encodeURIComponent((vacancy as PublicVacancyDto).slug ?? vacancy.id)}`}>Ver y postularme <ArrowRight className="size-4" /></Link></Button></CardContent></Card>)}</section> : null}
+      {vacanciesQuery.isLoading ? <AsyncState state="loading" title={t("jobs.loading")} /> : null}
+      {vacanciesQuery.isError ? <AsyncState state="error" description={t("jobs.error")} onRetry={() => void vacanciesQuery.refetch()} /> : null}
+      {vacanciesQuery.isSuccess && visible.length === 0 ? <Card className="border-dashed"><CardContent className="py-14 text-center"><h2 className="text-xl font-semibold">{t("jobs.noMatches")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("jobs.tryAgain")}</p></CardContent></Card> : null}
+      {visible.length > 0 ? <section aria-label={t("jobs.available")} className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{visible.map((vacancy) => <Card key={vacancy.id} className="flex flex-col overflow-hidden border-border/70 bg-card/95"><VacancyImage imageUrl={vacancy.imageUrl} title={vacancy.title} /><CardContent className="flex flex-1 flex-col gap-5 p-6"><div className="flex flex-wrap gap-2"><Badge>{vacancy.department || t("jobs.job")}</Badge>{vacancy.employmentType ? <Badge variant="secondary">{vacancy.employmentType}</Badge> : null}</div><div className="space-y-2"><h2 className="text-2xl font-semibold tracking-tight">{vacancy.title}</h2><p className="text-sm text-muted-foreground">{vacancy.tenant?.name}</p></div><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{vacancy.summary || vacancy.description || t("jobs.defaultSummary")}</p><div className="mt-auto flex flex-wrap gap-2 text-sm text-muted-foreground"><span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5"><BriefcaseBusiness className="size-4" />{technicalLabel(vacancy.workMode)}</span></div><Button asChild className="w-full"><Link href={`${basePath}/${encodeURIComponent((vacancy as PublicVacancyDto).slug ?? vacancy.id)}`}>{t("jobs.viewAndApply")} <ArrowRight className="size-4" /></Link></Button></CardContent></Card>)}</section> : null}
     </div>
   );
 }

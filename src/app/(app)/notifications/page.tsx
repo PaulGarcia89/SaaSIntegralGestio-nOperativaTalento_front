@@ -39,28 +39,11 @@ import type {
   NotificationPreferenceDto,
 } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
+import { useLocale } from "@/components/locale-provider";
 
-const categoryLabels: Record<NotificationCategory, string> = {
-  GENERAL: "General",
-  ATS: "Reclutamiento",
-  ONBOARDING: "Incorporación",
-  TRAINING: "Capacitación",
-  INVENTORY: "Inventario",
-  AUTOMATION: "Automatizaciones",
-  SECURITY: "Seguridad",
-  BILLING: "Facturación",
-};
-
-const frequencyOptions = [
-  { label: "Inmediata", value: "IMMEDIATE" },
-  { label: "Resumen diario", value: "DAILY" },
-  { label: "Resumen semanal", value: "WEEKLY" },
-  { label: "Desactivada", value: "DISABLED" },
-];
-
-function formatDate(value?: string | null) {
-  if (!value) return "Sin fecha";
-  return new Intl.DateTimeFormat("es", {
+function formatDate(value: string | null | undefined, locale: string) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
@@ -76,6 +59,14 @@ function statusTone(status: NotificationDeliveryDto["status"]) {
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { currentRole } = useAppStore();
+  const { locale, t } = useLocale();
+  const categoryLabel = (category: NotificationCategory) => t(`notifications.category.${category}`);
+  const frequencyOptions = [
+    { label: t("notifications.immediate"), value: "IMMEDIATE" },
+    { label: t("notifications.daily"), value: "DAILY" },
+    { label: t("notifications.weekly"), value: "WEEKLY" },
+    { label: t("notifications.disabled"), value: "DISABLED" },
+  ];
   const [category, setCategory] = useState<NotificationCategory | "ALL">("ALL");
   const [status, setStatus] = useState<"active" | "archived">("active");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -145,7 +136,7 @@ export default function NotificationsPage() {
   }, [deliveries.data]);
 
   if (notifications.isLoading) {
-    return <AsyncState state="loading" title="Cargando tus notificaciones" />;
+    return <AsyncState state="loading" title={t("notifications.loading")} />;
   }
   if (notifications.isError || !notifications.data) {
     const statusCode =
@@ -153,13 +144,13 @@ export default function NotificationsPage() {
     return (
       <AsyncState
         state="error"
-        title="No fue posible cargar la bandeja"
+        title={t("notifications.inboxError")}
         description={
           statusCode === 401
-            ? "Tu sesión expiró. Inicia sesión nuevamente."
+            ? t("notifications.sessionExpired")
             : statusCode === 403
-              ? "Tu cuenta no tiene permiso para consultar notificaciones."
-              : "Conservamos tus filtros. Reintenta la consulta para continuar."
+              ? t("notifications.forbidden")
+              : t("notifications.retryDescription")
         }
         onRetry={() => void notifications.refetch()}
       />
@@ -169,9 +160,9 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Centro de actividad"
-        title="Notificaciones y automatizaciones"
-        description="Consulta eventos importantes, configura cómo deseas recibirlos y supervisa entregas con trazabilidad."
+        eyebrow={t("notifications.eyebrow")}
+        title={t("notifications.title")}
+        description={t("notifications.description")}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -180,7 +171,7 @@ export default function NotificationsPage() {
               onClick={() => void notifications.refetch()}
             >
               <RefreshCw className="size-4" aria-hidden="true" />
-              Actualizar
+              {t("notifications.refresh")}
             </Button>
             <Button
               type="button"
@@ -188,7 +179,7 @@ export default function NotificationsPage() {
               disabled={notifications.data.unread === 0 || markAll.isPending}
             >
               <CheckCheck className="size-4" aria-hidden="true" />
-              Marcar todas como leídas
+              {t("notifications.markAll")}
             </Button>
           </div>
         }
@@ -196,31 +187,31 @@ export default function NotificationsPage() {
 
       <div className="grid gap-5 md:grid-cols-3">
         <MetricCard
-          label="Sin leer"
+          label={t("notifications.unread")}
           value={String(notifications.data.unread)}
-          detail="Requieren tu revisión"
-          period="Ahora"
+          detail={t("notifications.reviewRequired")}
+          period={t("notifications.now")}
         />
         <MetricCard
-          label="En la vista"
+          label={t("notifications.inView")}
           value={String(notifications.data.total)}
-          detail={status === "archived" ? "Notificaciones archivadas" : "Notificaciones activas"}
-          period="Histórico persistente"
+          detail={status === "archived" ? t("notifications.archived") : t("notifications.active")}
+          period={t("notifications.persistentHistory")}
         />
         <MetricCard
-          label="Entregas con incidencia"
+          label={t("notifications.deliveryIssues")}
           value={canOperateDeliveries ? String(deliverySummary.failed) : "—"}
-          detail={canOperateDeliveries ? "Fallidas o en dead letter" : "Visible para administradores"}
-          period="Últimas 100 entregas"
+          detail={canOperateDeliveries ? t("notifications.failedOrDead") : t("notifications.adminOnly")}
+          period={t("notifications.last100")}
         />
       </div>
 
       <Tabs defaultValue="inbox">
-        <TabsList aria-label="Secciones del centro de notificaciones">
-          <TabsTrigger value="inbox">Bandeja</TabsTrigger>
-          <TabsTrigger value="preferences">Preferencias</TabsTrigger>
+        <TabsList aria-label={t("notifications.inboxSections")}>
+          <TabsTrigger value="inbox">{t("notifications.inbox")}</TabsTrigger>
+          <TabsTrigger value="preferences">{t("notifications.preferences")}</TabsTrigger>
           {canOperateDeliveries ? (
-            <TabsTrigger value="deliveries">Entregas</TabsTrigger>
+            <TabsTrigger value="deliveries">{t("notifications.deliveries")}</TabsTrigger>
           ) : null}
         </TabsList>
 
@@ -233,7 +224,7 @@ export default function NotificationsPage() {
                 variant={status === "active" ? "default" : "secondary"}
                 onClick={() => setStatus("active")}
               >
-                Activas
+                {t("notifications.activeFilter")}
               </Button>
               <Button
                 type="button"
@@ -241,7 +232,7 @@ export default function NotificationsPage() {
                 variant={status === "archived" ? "default" : "secondary"}
                 onClick={() => setStatus("archived")}
               >
-                Archivadas
+                {t("notifications.archivedFilter")}
               </Button>
               <Button
                 type="button"
@@ -250,19 +241,19 @@ export default function NotificationsPage() {
                 aria-pressed={unreadOnly}
                 onClick={() => setUnreadOnly((current) => !current)}
               >
-                Solo sin leer
+                {t("notifications.unreadFilter")}
               </Button>
             </div>
             <FormSelect
-              aria-label="Filtrar por categoría"
+              aria-label={t("notifications.categoryFilter")}
               className="min-w-52"
               value={category}
               onValueChange={(value) => setCategory(value as NotificationCategory | "ALL")}
               options={[
-                { label: "Todas las categorías", value: "ALL" },
-                ...Object.entries(categoryLabels).map(([value, label]) => ({
+                { label: t("notifications.allCategories"), value: "ALL" },
+                ...Object.keys({ GENERAL: true, ATS: true, ONBOARDING: true, TRAINING: true, INVENTORY: true, AUTOMATION: true, SECURITY: true, BILLING: true }).map((value) => ({
                   value,
-                  label,
+                  label: categoryLabel(value as NotificationCategory),
                 })),
               ]}
             />
@@ -271,8 +262,8 @@ export default function NotificationsPage() {
           {notifications.data.items.length === 0 ? (
             <StateCard
               tone="empty"
-              title="No hay notificaciones en esta vista"
-              description="Cuando un evento coincida con estos filtros aparecerá aquí."
+              title={t("notifications.empty")}
+              description={t("notifications.emptyDescription")}
             />
           ) : (
             <div className="space-y-3">
@@ -284,6 +275,8 @@ export default function NotificationsPage() {
                   onAction={(action) =>
                     mutateItem.mutate({ action, id: notification.id })
                   }
+                  locale={locale}
+                  t={t}
                 />
               ))}
             </div>
@@ -292,15 +285,15 @@ export default function NotificationsPage() {
 
         <TabsContent value="preferences" className="pt-5">
           <SectionCard
-            title="Cómo quieres recibir avisos"
-            subtitle="Preferencias personales"
+            title={t("notifications.receive")}
+            subtitle={t("notifications.personalPreferences")}
           >
             {preferences.isLoading ? (
-              <AsyncState state="loading" title="Cargando preferencias" />
+              <AsyncState state="loading" title={t("notifications.preferenceLoading")} />
             ) : preferences.isError || !preferences.data ? (
               <AsyncState
                 state="error"
-                title="No fue posible cargar las preferencias"
+                title={t("notifications.preferenceError")}
                 onRetry={() => void preferences.refetch()}
               />
             ) : (
@@ -311,6 +304,9 @@ export default function NotificationsPage() {
                     preference={preference}
                     pending={savePreference.isPending}
                     onSave={(next) => savePreference.mutate(next)}
+                    categoryLabel={categoryLabel}
+                    frequencyOptions={frequencyOptions}
+                    t={t}
                   />
                 ))}
               </div>
@@ -321,34 +317,34 @@ export default function NotificationsPage() {
         {canOperateDeliveries ? (
           <TabsContent value="deliveries" className="space-y-5 pt-5">
             <div className="grid gap-4 md:grid-cols-3">
-              <MetricCard label="Entregadas" value={String(deliverySummary.delivered)} detail="Confirmadas por canal" period="Últimas 100" />
-              <MetricCard label="Pendientes" value={String(deliverySummary.pending)} detail="En cola o procesamiento" period="Últimas 100" />
-              <MetricCard label="Fallidas" value={String(deliverySummary.failed)} detail="Requieren revisión" period="Últimas 100" />
+              <MetricCard label={t("notifications.delivered")} value={String(deliverySummary.delivered)} detail={t("notifications.confirmedByChannel")} period={t("notifications.last100")} />
+              <MetricCard label={t("notifications.pending")} value={String(deliverySummary.pending)} detail={t("notifications.queued")} period={t("notifications.last100")} />
+              <MetricCard label={t("notifications.failed")} value={String(deliverySummary.failed)} detail={t("notifications.needsReview")} period={t("notifications.last100")} />
             </div>
             {deliveries.isLoading ? (
-              <AsyncState state="loading" title="Consultando entregas" />
+              <AsyncState state="loading" title={t("notifications.deliveryLoading")} />
             ) : deliveries.isError || !deliveries.data ? (
               <AsyncState
                 state="error"
-                title="No fue posible cargar las entregas"
+                title={t("notifications.deliveryError")}
                 onRetry={() => void deliveries.refetch()}
               />
             ) : deliveries.data.items.length === 0 ? (
-              <StateCard tone="empty" title="Sin entregas registradas" description="Las entregas aparecerán cuando se generen nuevas notificaciones." />
+              <StateCard tone="empty" title={t("notifications.noDeliveries")} description={t("notifications.deliveryDescription")} />
             ) : (
               <DomainTable
                 data={deliveries.data.items}
                 getKey={(item) => item.id}
                 columns={[
-                  { key: "title", header: "Notificación", render: (item) => item.notification?.title ?? "Notificación" },
-                  { key: "channel", header: "Canal", render: (item) => item.channel === "EMAIL" ? "Correo" : "Interna" },
-                  { key: "status", header: "Estado", render: (item) => <Badge variant={statusTone(item.status)}>{item.status}</Badge>, exportValue: (item) => item.status },
-                  { key: "attempts", header: "Intentos", sortable: true, render: (item) => `${item.attempts}/${item.maxAttempts}`, sortValue: (item) => item.attempts },
-                  { key: "date", header: "Creada", render: (item) => formatDate(item.createdAt), sortValue: (item) => item.createdAt },
-                  { key: "error", header: "Detalle", render: (item) => item.lastError ?? "Sin errores" },
+                  { key: "title", header: t("notifications.notification"), render: (item) => item.notification?.title ?? t("notifications.notification") },
+                  { key: "channel", header: t("notifications.channel"), render: (item) => item.channel === "EMAIL" ? t("notifications.email") : t("notifications.internal") },
+                  { key: "status", header: t("notifications.status"), render: (item) => <Badge variant={statusTone(item.status)}>{item.status}</Badge>, exportValue: (item) => item.status },
+                  { key: "attempts", header: t("notifications.attempts"), sortable: true, render: (item) => `${item.attempts}/${item.maxAttempts}`, sortValue: (item) => item.attempts },
+                  { key: "date", header: t("notifications.created"), render: (item) => formatDate(item.createdAt, locale), sortValue: (item) => item.createdAt },
+                  { key: "error", header: t("notifications.detail"), render: (item) => item.lastError ?? t("notifications.noErrors") },
                   {
                     key: "actions",
-                    header: "Acciones",
+                    header: t("notifications.actions"),
                     excludeFromExport: true,
                     render: (item) =>
                       ["FAILED", "DEAD_LETTER"].includes(item.status) ? (
@@ -359,10 +355,10 @@ export default function NotificationsPage() {
                           disabled={retryDelivery.isPending}
                           onClick={() => retryDelivery.mutate(item.id)}
                         >
-                          Reintentar
+                          {t("notifications.retry")}
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Sin acciones</span>
+                        <span className="text-xs text-muted-foreground">{t("notifications.noActions")}</span>
                       ),
                   },
                 ]}
@@ -379,10 +375,14 @@ function NotificationRow({
   notification,
   pending,
   onAction,
+  locale,
+  t,
 }: {
   notification: NotificationDto;
   pending: boolean;
   onAction: (action: "read" | "archive" | "delete") => void;
+  locale: string;
+  t: (key: string) => string;
 }) {
   return (
     <article
@@ -404,14 +404,14 @@ function NotificationRow({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-semibold">{notification.title}</h2>
-              <Badge variant="secondary">{categoryLabels[notification.category]}</Badge>
-              {!notification.readAt ? <Badge variant="default">Nueva</Badge> : null}
+              <Badge variant="secondary">{t(`notifications.category.${notification.category}`)}</Badge>
+              {!notification.readAt ? <Badge variant="default">{t("notifications.new")}</Badge> : null}
             </div>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
               {notification.message}
             </p>
             <p className="text-xs text-muted-foreground">
-              {formatDate(notification.createdAt)}
+              {formatDate(notification.createdAt, locale)}
               {notification.correlationId
                 ? ` · ID ${notification.correlationId}`
                 : ""}
@@ -422,7 +422,7 @@ function NotificationRow({
           {notification.actionUrl ? (
             <Button asChild size="sm" variant="secondary">
               <Link href={notification.actionUrl}>
-                Abrir
+                {t("notifications.open")}
                 <ExternalLink className="size-4" aria-hidden="true" />
               </Link>
             </Button>
@@ -435,7 +435,7 @@ function NotificationRow({
               disabled={pending}
               onClick={() => onAction("read")}
             >
-              Leída
+              {t("notifications.read")}
             </Button>
           ) : null}
           {!notification.archivedAt ? (
@@ -445,7 +445,7 @@ function NotificationRow({
               variant="secondary"
               disabled={pending}
               onClick={() => onAction("archive")}
-              aria-label={`Archivar ${notification.title}`}
+              aria-label={`${t("notifications.archive")} ${notification.title}`}
             >
               <Archive className="size-4" aria-hidden="true" />
             </Button>
@@ -456,7 +456,7 @@ function NotificationRow({
             variant="secondary"
             disabled={pending}
             onClick={() => onAction("delete")}
-            aria-label={`Eliminar ${notification.title}`}
+            aria-label={`${t("notifications.delete")} ${notification.title}`}
           >
             <Trash2 className="size-4" aria-hidden="true" />
           </Button>
@@ -470,21 +470,27 @@ function PreferenceRow({
   preference,
   pending,
   onSave,
+  categoryLabel,
+  frequencyOptions,
+  t,
 }: {
   preference: NotificationPreferenceDto;
   pending: boolean;
   onSave: (value: NotificationPreferenceDto) => void;
+  categoryLabel: (category: NotificationCategory) => string;
+  frequencyOptions: Array<{ label: string; value: string }>;
+  t: (key: string) => string;
 }) {
   const protectedCategory =
     preference.category === "SECURITY" || preference.category === "BILLING";
   return (
     <div className="grid gap-4 rounded-xl border border-border/70 p-4 lg:grid-cols-[1fr_auto_auto_220px] lg:items-center">
       <div>
-        <p className="font-medium">{categoryLabels[preference.category]}</p>
+        <p className="font-medium">{categoryLabel(preference.category)}</p>
         <p className="text-sm text-muted-foreground">
           {protectedCategory
-            ? "Avisos críticos obligatorios para proteger tu cuenta y servicio."
-            : "Configura los canales para esta categoría."}
+            ? t("notifications.mandatory")
+            : t("notifications.configureChannels")}
         </p>
       </div>
       <label className="flex min-h-11 items-center gap-2">
@@ -496,7 +502,7 @@ function PreferenceRow({
             onSave({ ...preference, internalEnabled: event.target.checked })
           }
         />
-        Interna
+        {t("notifications.internalChannel")}
       </label>
       <label className="flex min-h-11 items-center gap-2">
         <input
@@ -507,10 +513,10 @@ function PreferenceRow({
             onSave({ ...preference, emailEnabled: event.target.checked })
           }
         />
-        Correo
+        {t("notifications.email")}
       </label>
       <FormSelect
-        aria-label={`Frecuencia para ${categoryLabels[preference.category]}`}
+        aria-label={`${t("notifications.frequency")} ${categoryLabel(preference.category)}`}
         value={preference.frequency}
         disabled={pending || protectedCategory}
         onValueChange={(value) =>

@@ -26,6 +26,7 @@ import { AsyncState } from "@/components/async-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocale } from "@/components/locale-provider";
 
 const toneStyles: Record<OperationalDashboardTone, string> = {
   info: "border-status-info/30 bg-status-info/5",
@@ -35,16 +36,16 @@ const toneStyles: Record<OperationalDashboardTone, string> = {
 };
 
 const roleTitles: Record<string, string> = {
-  admin_saas: "Lo que requiere atención en la plataforma",
-  admin_plataforma: "Lo que requiere atención en la plataforma",
-  admin_empresa: "Lo que requiere atención en tu empresa",
-  rrhh: "Prioridades de personas y reclutamiento",
-  reclutador: "Prioridades de reclutamiento",
-  entrevistador: "Tu agenda y decisiones pendientes",
-  instructor: "Prioridades de aprendizaje",
-  supervisor: "Prioridades de tu equipo",
-  inventario: "Prioridades de inventario",
-  empleado: "Lo que requiere tu atención",
+  admin_saas: "dashboard.attentionPlatform",
+  admin_plataforma: "dashboard.attentionPlatform",
+  admin_empresa: "dashboard.attentionCompany",
+  rrhh: "dashboard.peopleRecruitment",
+  reclutador: "dashboard.recruitment",
+  entrevistador: "dashboard.scheduleDecisions",
+  instructor: "dashboard.learning",
+  supervisor: "dashboard.team",
+  inventario: "dashboard.inventory",
+  empleado: "dashboard.yourAttention",
 };
 
 export default function DashboardPage() {
@@ -54,6 +55,7 @@ export default function DashboardPage() {
     currentRole,
     currentTenant,
   } = useAppStore();
+  const { locale, t } = useLocale();
   const dashboard = useQuery({
     queryKey: [
       "operational-dashboard",
@@ -77,8 +79,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow={`Inicio · ${roleLabels[currentRole]}`}
-        title={roleTitles[currentRole] ?? "Tus prioridades operativas"}
+        eyebrow={`${t("dashboard.home")} · ${roleLabels[currentRole]}`}
+        title={t(roleTitles[currentRole] ?? "dashboard.operational")}
         description="Tareas, alertas y próximos pasos calculados desde registros reales dentro de tu alcance."
         actions={
           <Button
@@ -91,42 +93,42 @@ export default function DashboardPage() {
               className={`size-4 ${dashboard.isFetching ? "animate-spin" : ""}`}
               aria-hidden="true"
             />
-            Actualizar ahora
+            {t("dashboard.refresh")}
           </Button>
         }
       />
 
       {dashboard.isPending ? (
-        <AsyncState state="loading" title="Preparando tus prioridades" />
+        <AsyncState state="loading" title={t("dashboard.loading")} />
       ) : dashboard.isError || !dashboard.data ? (
         <AsyncState
           state="error"
-          title="No pudimos cargar el resumen operativo"
-          description="Tus módulos siguen disponibles. Reintenta para recuperar las prioridades actualizadas."
+          title={t("dashboard.error")}
+          description={t("dashboard.errorDescription")}
           onRetry={() => dashboard.refetch()}
         />
       ) : (
         <>
           <section
-            aria-label="Procedencia del resumen"
+            aria-label={t("dashboard.sourceLabel")}
             className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-section p-4 text-sm text-text-secondary sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               <span>
-                <strong className="text-text-primary">Periodo:</strong>{" "}
+                    <strong className="text-text-primary">{t("dashboard.period")}:</strong>{" "}
                 {dashboard.data.period.label}
               </span>
               <span>
-                <strong className="text-text-primary">Fuente:</strong>{" "}
+                    <strong className="text-text-primary">{t("dashboard.source")}:</strong>{" "}
                 {dashboard.data.source}
               </span>
               <span>
-                <strong className="text-text-primary">Alcance:</strong>{" "}
-                {scopeLabel(dashboard.data.scope, currentBranch?.name)}
+                    <strong className="text-text-primary">{t("dashboard.scope")}:</strong>{" "}
+                    {scopeLabel(dashboard.data.scope, currentBranch?.name, t)}
               </span>
             </div>
             <span className="shrink-0">
-              Actualizado {formatDateTime(dashboard.data.generatedAt)}
+                {t("dashboard.updated")} {formatDateTime(dashboard.data.generatedAt, locale)}
             </span>
           </section>
 
@@ -143,7 +145,7 @@ export default function DashboardPage() {
                     </span>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                        Próxima acción recomendada
+                        {t("dashboard.nextAction")}
                       </p>
                       <h2 id="next-action-title" className="mt-1 text-xl font-semibold">
                         {dashboard.data.nextAction.title}
@@ -151,13 +153,13 @@ export default function DashboardPage() {
                       <p className="mt-1 text-sm text-text-secondary">
                         {dashboard.data.nextAction.description}
                       </p>
-                      <ItemMetadata item={dashboard.data.nextAction} />
+                      <ItemMetadata item={dashboard.data.nextAction} locale={locale} t={t} />
                     </div>
                   </div>
                   {canOpen(dashboard.data.nextAction.href) ? (
                     <Button asChild className="shrink-0">
                       <Link href={dashboard.data.nextAction.href}>
-                        Abrir registro
+                        {t("dashboard.openRecord")}
                         <ArrowRight className="size-4" aria-hidden="true" />
                       </Link>
                     </Button>
@@ -166,14 +168,13 @@ export default function DashboardPage() {
               </Card>
             </section>
           ) : (
-            <InlineFeedback tone="success" title="No tienes acciones urgentes">
-              No encontramos tareas pendientes ni alertas críticas dentro de tu
-              alcance actual.
+            <InlineFeedback tone="success" title={t("dashboard.noUrgent")}>
+              {t("dashboard.noUrgentDescription")}
             </InlineFeedback>
           )}
 
           <section
-            aria-label="Indicadores operativos"
+            aria-label={t("dashboard.indicators")}
             className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
           >
             {dashboard.data.metrics.map((metric) => (
@@ -198,7 +199,7 @@ export default function DashboardPage() {
                   {canOpen(metric.href) ? (
                     <Button asChild variant="secondary" className="w-full">
                       <Link href={metric.href}>
-                        Ver registros
+                        {t("dashboard.viewRecords")}
                         <ArrowRight className="size-4" aria-hidden="true" />
                       </Link>
                     </Button>
@@ -210,18 +211,26 @@ export default function DashboardPage() {
 
           <div className="grid gap-5 xl:grid-cols-2">
             <OperationalList
-              title="Tareas pendientes"
-              emptyTitle="No hay tareas pendientes"
+              title={t("dashboard.pendingTasks")}
+              emptyTitle={t("dashboard.noPendingTasks")}
               icon={<Clock3 className="size-5" aria-hidden="true" />}
               items={dashboard.data.tasks}
               canOpen={canOpen}
+              emptyDescription={t("dashboard.autoUpdate")}
+              openLabel={t("dashboard.open")}
+              locale={locale}
+              t={t}
             />
             <OperationalList
-              title="Alertas críticas"
-              emptyTitle="No hay alertas críticas"
+              title={t("dashboard.criticalAlerts")}
+              emptyTitle={t("dashboard.noCriticalAlerts")}
               icon={<BellRing className="size-5" aria-hidden="true" />}
               items={dashboard.data.alerts}
               canOpen={canOpen}
+              emptyDescription={t("dashboard.autoUpdate")}
+              openLabel={t("dashboard.open")}
+              locale={locale}
+              t={t}
             />
           </div>
         </>
@@ -236,12 +245,20 @@ function OperationalList({
   icon,
   items,
   canOpen,
+  emptyDescription,
+  openLabel,
+  locale,
+  t,
 }: {
   title: string;
   emptyTitle: string;
   icon: React.ReactNode;
   items: OperationalDashboardItemDto[];
   canOpen: (href: string) => boolean;
+  emptyDescription: string;
+  openLabel: string;
+  locale: string;
+  t: (key: string) => string;
 }) {
   return (
     <Card level={2}>
@@ -261,7 +278,7 @@ function OperationalList({
             />
             <p className="font-medium">{emptyTitle}</p>
             <p className="text-sm text-text-secondary">
-              Se actualizará automáticamente cuando exista una acción real.
+              {emptyDescription}
             </p>
           </div>
         ) : (
@@ -276,13 +293,13 @@ function OperationalList({
                       <p className="mt-1 text-sm text-text-secondary">
                         {item.description}
                       </p>
-                      <ItemMetadata item={item} />
+                      <ItemMetadata item={item} locale={locale} t={t} />
                     </div>
                   </div>
                   {canOpen(item.href) ? (
                     <Button asChild size="sm" variant="secondary" className="shrink-0">
-                      <Link href={item.href} aria-label={`Abrir ${item.title}`}>
-                        Abrir
+                      <Link href={item.href} aria-label={`${openLabel} ${item.title}`}>
+                        {openLabel}
                         <ArrowRight className="size-4" aria-hidden="true" />
                       </Link>
                     </Button>
@@ -297,13 +314,13 @@ function OperationalList({
   );
 }
 
-function ItemMetadata({ item }: { item: OperationalDashboardItemDto }) {
+function ItemMetadata({ item, locale, t }: { item: OperationalDashboardItemDto; locale: string; t: (key: string) => string }) {
   return (
     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
       <span>{item.module}</span>
-      {item.recordLabel ? <span>Registro: {item.recordLabel}</span> : null}
-      {item.dueAt ? <span>Vence: {formatDateTime(item.dueAt)}</span> : null}
-      <span>Actualizado: {formatDateTime(item.occurredAt)}</span>
+      {item.recordLabel ? <span>{t("dashboard.record")}: {item.recordLabel}</span> : null}
+      {item.dueAt ? <span>{t("dashboard.due")}: {formatDateTime(item.dueAt, locale)}</span> : null}
+      <span>{t("dashboard.updated")}: {formatDateTime(item.occurredAt, locale)}</span>
     </div>
   );
 }
@@ -325,15 +342,15 @@ function StatusIcon({ tone }: { tone: OperationalDashboardTone }) {
   return <Clock3 className="size-5 shrink-0 text-status-info" aria-hidden="true" />;
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es", {
+function formatDateTime(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
-function scopeLabel(scope: "GLOBAL" | "TENANT" | "BRANCH", branch?: string) {
-  if (scope === "GLOBAL") return "Todas las empresas";
-  if (scope === "BRANCH") return branch ?? "Sucursal activa";
-  return "Empresa activa";
+function scopeLabel(scope: "GLOBAL" | "TENANT" | "BRANCH", branch: string | undefined, t: (key: string) => string) {
+  if (scope === "GLOBAL") return t("dashboard.allCompanies");
+  if (scope === "BRANCH") return branch ?? t("dashboard.activeBranch");
+  return t("dashboard.activeCompany");
 }

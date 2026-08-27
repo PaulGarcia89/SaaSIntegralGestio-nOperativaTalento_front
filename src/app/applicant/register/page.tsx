@@ -6,5 +6,5 @@ import { PortalContextProvider } from "@/components/portal-context";
 import { PortalThemeProvider } from "@/components/portal-theme";
 
 export default function ApplicantRegisterPage() {
-  return <PortalContextProvider><PortalThemeProvider><Suspense fallback={null}><ApplicantAccessPage title="Registro de postulantes" defaultMode="register" /></Suspense></PortalThemeProvider></PortalContextProvider>;
+  return <PortalContextProvider><PortalThemeProvider><Suspense fallback={null}><ApplicantAccessPage defaultMode="register" /></Suspense></PortalThemeProvider></PortalContextProvider>;
 }

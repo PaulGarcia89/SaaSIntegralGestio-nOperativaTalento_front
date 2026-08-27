@@ -1159,7 +1159,20 @@ async function fetchSafeRead(input: RequestInfo | URL, init: RequestInit, enable
   throw lastError;
 }
 
+let refreshInFlight: Promise<AuthSnapshot | null> | null = null;
+
 async function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = refreshAccessTokenOnce();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+async function refreshAccessTokenOnce() {
   const storedAuth = getStoredAuth();
 
   try {
@@ -1167,6 +1180,7 @@ async function refreshAccessToken() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
+      cache: "no-store",
       body: JSON.stringify({}),
     });
 

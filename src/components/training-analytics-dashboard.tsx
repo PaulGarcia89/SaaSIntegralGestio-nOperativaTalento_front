@@ -11,6 +11,7 @@ import {
   Settings2,
   Target,
   Users,
+  X,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -110,16 +111,16 @@ export function TrainingAnalyticsDashboard() {
       <Card>
         <CardContent className="grid gap-3 py-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
-            <Label>Curso</Label>
+            <Label htmlFor="analytics-course">Curso</Label>
             <Select value={courseId || "ALL"} onValueChange={(value) => setCourseId(value === "ALL" ? "" : value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="analytics-course"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="ALL">Todos</SelectItem>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Sucursal</Label>
+            <Label htmlFor="analytics-branch">Sucursal</Label>
             <Select value={branchId || "ALL"} onValueChange={(value) => setBranchId(value === "ALL" ? "" : value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="analytics-branch"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="ALL">Todas</SelectItem>{branches.data?.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
@@ -127,6 +128,16 @@ export function TrainingAnalyticsDashboard() {
           <div><Label htmlFor="analytics-to">Hasta</Label><Input id="analytics-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></div>
         </CardContent>
       </Card>
+
+      <AnalyticsScopeSummary
+        courseId={courseId}
+        courseTitle={courses.data?.items.find((course) => course.id === courseId)?.title}
+        branchId={branchId}
+        branchName={branches.data?.find((branch) => branch.id === branchId)?.name}
+        from={from}
+        to={to}
+        onClear={() => { setCourseId(""); setBranchId(""); setFrom(""); setTo(""); }}
+      />
 
       {analytics.isLoading ? <AsyncState state="loading" title="Calculando indicadores" /> : null}
       {analytics.isError ? <AsyncState state="error" title="No fue posible calcular la analítica" description={getApiErrorMessage(analytics.error, "Reintenta la consulta.")} onRetry={() => analytics.refetch()} /> : null}
@@ -151,6 +162,27 @@ export function TrainingAnalyticsDashboard() {
       <CompliancePolicyDialog open={policyOpen} onOpenChange={setPolicyOpen} />
     </div>
   );
+}
+
+function AnalyticsScopeSummary({
+  courseId,
+  courseTitle,
+  branchId,
+  branchName,
+  from,
+  to,
+  onClear,
+}: {
+  courseId: string;
+  courseTitle?: string;
+  branchId: string;
+  branchName?: string;
+  from: string;
+  to: string;
+  onClear: () => void;
+}) {
+  const filtered = Boolean(courseId || branchId || from || to);
+  return <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-section px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between" aria-live="polite"><div className="flex flex-wrap items-center gap-2"><span className="font-medium">Alcance: {filtered ? "filtros seleccionados" : "toda la organización"}</span>{courseId ? <Badge variant="secondary">Curso: {courseTitle ?? "Seleccionado"}</Badge> : null}{branchId ? <Badge variant="secondary">Sucursal: {branchName ?? "Seleccionada"}</Badge> : null}{from ? <Badge variant="secondary">Desde: {from}</Badge> : null}{to ? <Badge variant="secondary">Hasta: {to}</Badge> : null}</div>{filtered ? <Button type="button" variant="ghost" size="sm" className="self-start sm:self-auto" onClick={onClear}><X className="size-4" />Restablecer</Button> : <span className="text-text-secondary">Sin filtros aplicados</span>}</div>;
 }
 
 function MetricGrid({ data }: { data: TrainingAnalyticsDto }) {

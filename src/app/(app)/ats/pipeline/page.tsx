@@ -42,7 +42,8 @@ function PipelineContent() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { currentBranch, currentUser, can } = useAppStore();
+  const { currentBranch, currentUser, currentRole, can } = useAppStore();
+  const canApproveOwnTransition = ["admin_empresa", "admin_plataforma", "admin_saas"].includes(currentRole);
   const { t } = useLocale();
   const search = params.get("q") ?? "";
   const requestedVacancyId = params.get("vacancy") ?? ALL;
@@ -66,10 +67,8 @@ function PipelineContent() {
     queryFn: fetchVacancies,
   });
   const vacancies = vacanciesQuery.data?.data ?? [];
-  const effectiveVacancyId =
-    requestedVacancyId !== ALL
-      ? requestedVacancyId
-      : vacancies[0]?.id;
+  // ALL intentionally leaves vacancyId undefined so the API returns every vacancy.
+  const effectiveVacancyId = requestedVacancyId !== ALL ? requestedVacancyId : undefined;
   const setup = useQuery({
     queryKey: ["vacancy-setup", effectiveVacancyId],
     queryFn: () => fetchVacancySetup(effectiveVacancyId!),
@@ -93,7 +92,7 @@ function PipelineContent() {
         page,
         pageSize: 100,
       }),
-    enabled: Boolean(effectiveVacancyId),
+    enabled: vacancies.length > 0,
   });
   const rejectionReasons = useQuery({ queryKey: ["application-rejection-reasons"], queryFn: fetchRejectionReasons });
 
@@ -232,7 +231,7 @@ function PipelineContent() {
               <p className="font-semibold">{application.candidate.fullName}</p>
               <p className="text-sm text-text-secondary">{application.vacancy.title}</p>
             </div>
-            {compact ? <Badge variant="secondary">{currentStage?.name ?? "Sin etapa"}</Badge> : null}
+            {(compact || requestedVacancyId === ALL) ? <Badge variant="secondary">{currentStage?.name ?? application.currentStage?.name ?? "Sin etapa"}</Badge> : null}
           </div>
           <div className="space-y-1 text-xs text-text-secondary">
             <p>Recibida: {formatApplicationDate(application.appliedAt)}</p>
@@ -240,7 +239,7 @@ function PipelineContent() {
             {application.stageDueAt ? <p className={application.isStageOverdue ? "font-medium text-status-danger" : ""}><Clock3 className="mr-1 inline size-3.5" />{application.isStageOverdue ? "SLA vencido" : `SLA: ${formatApplicationDate(application.stageDueAt)}`}</p> : null}
           </div>
           {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">Arrastra hacia una etapa resaltada o desliza para avanzar.</p> : null}
-          {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && pendingTransition.requestedByUserId !== currentUser.id ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>La solicitud debe resolverla otro responsable.</p>}</div> : null}
+          {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && (pendingTransition.requestedByUserId !== currentUser.id || canApproveOwnTransition) ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>La solicitud debe resolverla otro responsable.</p>}</div> : null}
           {can("applications.change_stage") && application.status !== "HIRED" && movableStages.length ? (
             <FilterField label="Mover a">
               <Select
@@ -299,9 +298,10 @@ function PipelineContent() {
           </div>
         </FilterField>
         <FilterField label="Vacante">
-          <Select value={effectiveVacancyId ?? ALL} onValueChange={(value) => setFilter("vacancy", value)}>
+          <Select value={requestedVacancyId} onValueChange={(value) => setFilter("vacancy", value)}>
             <SelectTrigger><SelectValue placeholder="Selecciona una vacante" /></SelectTrigger>
             <SelectContent>
+              <SelectItem value={ALL}>Todas las vacantes</SelectItem>
               {vacancies.map((vacancy) => (
                 <SelectItem key={vacancy.id} value={vacancy.id}>{vacancy.title}</SelectItem>
               ))}
@@ -309,7 +309,7 @@ function PipelineContent() {
           </Select>
         </FilterField>
         <FilterField label="Etapa">
-          <Select value={selectedStageId ?? stageFilter} onValueChange={(value) => setFilter("stage", value)}>
+          <Select disabled={requestedVacancyId === ALL} value={selectedStageId ?? stageFilter} onValueChange={(value) => setFilter("stage", value)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Todas las etapas</SelectItem>
@@ -335,9 +335,18 @@ function PipelineContent() {
       {setup.isError || applications.isError ? <AsyncState state="error" title={t("ats.pipelineUnavailable")} onRetry={() => { void setup.refetch(); void applications.refetch(); }} /> : null}
       {move.isError ? <InlineFeedback tone="danger" title="No fue posible cambiar la etapa">{move.error instanceof Error ? move.error.message : t("ats.stageUnchanged")}</InlineFeedback> : null}
       {decide.isError ? <InlineFeedback tone="danger" title={t("ats.approvalUnavailable")}>{decide.error instanceof Error ? decide.error.message : t("ats.tryAgain")}</InlineFeedback> : null}
-      {setup.isSuccess && !stages.length ? <InlineFeedback tone="warning" title={t("ats.vacancyWithoutStages")}>{t("ats.configureStages")}</InlineFeedback> : null}
+      {requestedVacancyId !== ALL && setup.isSuccess && !stages.length ? <InlineFeedback tone="warning" title={t("ats.vacancyWithoutStages")}>{t("ats.configureStages")}</InlineFeedback> : null}
 
-      {stages.length ? (
+      {requestedVacancyId === ALL ? (
+        <>
+          <p className="text-sm text-text-secondary" aria-live="polite">{applications.data?.meta.total ?? 0} {(applications.data?.meta.total ?? 0) === 1 ? t("ats.applicationFound") : t("ats.applicationsFound")}</p>
+          <section aria-label="Todas las postulaciones" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((item) => card(item))}
+            {!filtered.length ? <p className="col-span-full rounded-xl border border-dashed p-6 text-center text-sm text-text-secondary">{t("ats.noApplications")}</p> : null}
+          </section>
+          {applications.data?.meta && applications.data.meta.totalPages > 1 ? <Pagination page={applications.data.meta.page - 1} totalPages={applications.data.meta.totalPages} totalItems={applications.data.meta.total} pageSize={applications.data.meta.pageSize} onPageChange={(next) => setFilter("page", String(next + 1))} /> : null}
+        </>
+      ) : stages.length ? (
         <>
           <p className="text-sm text-text-secondary" aria-live="polite">{applications.data?.meta.total ?? 0} {(applications.data?.meta.total ?? 0) === 1 ? t("ats.applicationFound") : t("ats.applicationsFound")}</p>
           <div className="space-y-5 lg:hidden">

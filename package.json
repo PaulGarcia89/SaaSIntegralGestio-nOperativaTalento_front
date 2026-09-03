@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "local:up": "docker compose --env-file ../deploy/.env.self-hosted -f ../docker-compose.self-hosted.yml up -d --build --remove-orphans",
+    "local:down": "docker compose --env-file ../deploy/.env.self-hosted -f ../docker-compose.self-hosted.yml down",
+    "local:logs": "docker compose --env-file ../deploy/.env.self-hosted -f ../docker-compose.self-hosted.yml logs -f --tail=100",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

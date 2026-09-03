@@ -1,7 +1,7 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, BookOpen, CalendarDays, History, Plus, Radio, RefreshCw, ShieldCheck, Webhook } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { PageHeader } from "@/components/design-system";
@@ -57,7 +57,7 @@ export function TrainingIntegrationsPanel() {
   if (query.isError) return <AsyncState state="error" title="No fue posible cargar las integraciones" description={getApiErrorMessage(query.error, "Reintenta para continuar.")} onRetry={() => query.refetch()} />;
   const data = query.data!;
   return <div className="space-y-6">
-    <PageHeader eyebrow="Aprendizaje" title="Integraciones formativas" description="Supervisa SCORM, actividad xAPI, sesiones virtuales y webhooks sin exponer secretos." actions={<div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog("webhook")}><Plus />Webhook</Button><Button variant="secondary" onClick={() => setDialog("session")}><Plus />Sesión virtual</Button><Button onClick={() => setDialog("scorm")}><Plus />Registrar SCORM</Button></div>} />
+    <PageHeader eyebrow="Aprendizaje" title="Integraciones formativas" description="Supervisa SCORM, actividad xAPI, sesiones virtuales y webhooks sin exponer secretos." actions={<div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog("webhook")}><Plus />Webhook</Button><Button variant="secondary" onClick={() => setDialog("session")}><Plus />Sesión virtual</Button><Button onClick={() => setDialog("scorm")}><Plus />Registrar SCORM</Button></div>} /><IntegrationGuide />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{[{label:"Paquetes SCORM",value:data.packages.length,icon:BookOpen},{label:"Eventos xAPI",value:data.xapiStatements,icon:Radio},{label:"Webhooks",value:data.webhooks.length,icon:Webhook},{label:"Sesiones próximas",value:data.sessions.length,icon:CalendarDays},{label:"Recursos publicados",value:data.resources,icon:BookOpen}].map((item)=><Card key={item.label}><CardContent className="py-5"><item.icon className="size-5 text-primary"/><p className="mt-3 text-sm text-muted-foreground">{item.label}</p><strong className="text-3xl">{item.value}</strong></CardContent></Card>)}</div>
     <Card><CardHeader><CardTitle>Salud operativa</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><HealthItem label="Almacenamiento" value={data.operations.storage.driver === "s3" ? `S3 · ${data.operations.storage.bucket}` : "Volumen local"} state={data.operations.storage.encryption ? "Cifrado" : "Sin cifrado"} /><HealthItem label="Antivirus" value={data.operations.antivirus.mode === "disabled" ? "No configurado" : data.operations.antivirus.mode} state={data.operations.antivirus.required ? "Obligatorio" : "Opcional"} warning={data.operations.antivirus.mode === "disabled"} /><HealthItem label="Uso SCORM" value={`${formatBytes(data.operations.usage.bytes)} / ${formatBytes(data.operations.limits.tenantQuotaBytes)}`} state={`${data.operations.usage.packages} / ${data.operations.limits.packageLimit} paquetes`} /><HealthItem label="Entregas fallidas" value={String(data.operations.webhooks.failedDeliveries)} state={data.operations.webhooks.failedDeliveries ? "Requiere atención" : "Operativo"} warning={data.operations.webhooks.failedDeliveries > 0} /></CardContent></Card>
     <TrainingOperationsCenter />
@@ -66,6 +66,26 @@ export function TrainingIntegrationsPanel() {
     <div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader><CardTitle>Próximas sesiones</CardTitle></CardHeader><CardContent className="space-y-3">{data.sessions.length?data.sessions.map((item)=><div key={item.id} className="rounded-xl border p-4"><strong>{item.title}</strong><p className="text-sm text-muted-foreground">{new Date(item.startsAt).toLocaleString()} · {item.timeZone}</p>{item.meetingUrl?<a className="text-sm text-primary underline" href={item.meetingUrl} target="_blank" rel="noreferrer">Abrir reunión</a>:null}</div>):<p className="text-sm text-muted-foreground">No hay sesiones virtuales próximas.</p>}</CardContent></Card><Card><CardHeader><CardTitle>Recomendaciones explicables</CardTitle></CardHeader><CardContent className="space-y-3">{data.recommendations.length?data.recommendations.map((item)=><div key={item.id} className="rounded-xl border p-4"><p className="text-sm">{item.reason}</p><p className="my-2 text-xs text-muted-foreground">Es una sugerencia; requiere confirmación humana.</p><div className="flex gap-2"><Button size="sm" onClick={() => decision.mutate({id:item.id,status:"ACCEPTED"})}>Aceptar</Button><Button size="sm" variant="secondary" onClick={() => decision.mutate({id:item.id,status:"DISMISSED"})}>Descartar</Button></div></div>):<p className="text-sm text-muted-foreground">No hay recomendaciones pendientes.</p>}</CardContent></Card></div>
     <IntegrationDialog kind={dialog} courses={courses.data?.items ?? []} pending={mutation.isPending} onClose={() => setDialog(null)} onSubmit={(kind,input)=>mutation.mutate({kind,input})} />
   </div>;
+}
+
+function IntegrationGuide() {
+  return (
+    <section aria-labelledby="integration-guide-title" className="rounded-2xl border border-border-default bg-surface-section p-4">
+      <div className="mb-3">
+        <h2 id="integration-guide-title" className="font-semibold">Qué puedes conectar</h2>
+        <p className="text-sm text-muted-foreground">Elige la integración según el tipo de experiencia o sistema que necesitas supervisar.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <GuideItem icon={<BookOpen className="size-4" />} title="SCORM" description="Paquetes de contenido formativo que se reproducen dentro de la plataforma." />
+        <GuideItem icon={<Radio className="size-4" />} title="xAPI" description="Eventos que registran actividad de aprendizaje y uso de recursos." />
+        <GuideItem icon={<Webhook className="size-4" />} title="Webhooks" description="Notificaciones automáticas para informar a otros sistemas sobre eventos." />
+      </div>
+    </section>
+  );
+}
+
+function GuideItem({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+  return <div className="flex gap-3 rounded-xl border border-border-default bg-card p-3"><span className="mt-0.5 text-primary">{icon}</span><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p></div></div>;
 }
 
 const operationLabels: Record<TrainingOperationKind, string> = {

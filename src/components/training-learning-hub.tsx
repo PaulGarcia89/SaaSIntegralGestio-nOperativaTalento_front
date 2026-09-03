@@ -2,9 +2,11 @@
 
 import {
   BookOpen,
+  Award,
   CalendarDays,
   CheckCircle2,
   Clock3,
+  ClipboardCheck,
   PlayCircle,
   Plus,
   FlaskConical,
@@ -16,6 +18,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
@@ -49,6 +52,7 @@ import {
   fetchLearnerTrainingCourse,
   fetchMyTrainingAssignments,
   fetchMyTrainingPilots,
+  fetchTrainingOverview,
   fetchTrainingAdminAssignments,
   fetchTrainingCourses,
   fetchTrainingLaunches,
@@ -59,6 +63,7 @@ import {
   resolveTrainingAssetUrl,
   submitTrainingPilotFeedback,
   startTrainingVideo,
+  updateTrainingLessonProgress,
   updateTrainingLaunchStatus,
 } from "@/lib/backend";
 import type {
@@ -69,8 +74,11 @@ import type {
   TrainingLaunchDto,
   TrainingLaunchStatus,
   TrainingProgressStatus,
+  TrainingOverviewDto,
 } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
+import { getLocalTrainingVideo } from "@/lib/training-local-storage";
+import { selectTrainingNextAssignment } from "@/lib/training-ux";
 
 const statusLabels: Record<TrainingProgressStatus, string> = {
   NOT_STARTED: "Pendiente",
@@ -98,6 +106,7 @@ export function TrainingLearningHub() {
         eyebrow="Aprendizaje"
         title="Centro de aprendizaje"
         description="Continúa tus cursos y consulta claramente qué formación requiere tu atención."
+        actions={<div className="flex flex-wrap gap-2"><Button asChild variant="secondary"><Link href="/training/evaluations"><ClipboardCheck className="size-4" />Mis evaluaciones</Link></Button><Button asChild variant="secondary"><Link href="/training/certificates"><Award className="size-4" />Mis certificados</Link></Button></div>}
       />
       <Tabs defaultValue="mine">
         <TabsList aria-label="Secciones de aprendizaje">
@@ -187,14 +196,16 @@ function MyPilots({ onOpen }: { onOpen: (courseId: string) => void }) {
 function MyCourses({ onOpen }: { onOpen: (courseId: string) => void }) {
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const query = useQuery({
-    queryKey: ["my-training-assignments", status, search],
-    queryFn: () =>
-      fetchMyTrainingAssignments({
-        pageSize: 50,
-        status: status || undefined,
-        search: search || undefined,
-      }),
+    queryKey: ["my-training-assignments", status, search, page],
+    queryFn: async () => {
+      const [assignments, overview] = await Promise.all([
+        fetchMyTrainingAssignments({ page, pageSize: 20, status: status || undefined, search: search || undefined }),
+        fetchTrainingOverview(),
+      ]);
+      return { ...assignments, overview };
+    },
   });
 
   if (query.isLoading) return <AsyncState state="loading" title="Cargando tus cursos" />;
@@ -216,14 +227,14 @@ function MyCourses({ onOpen }: { onOpen: (courseId: string) => void }) {
           <Input
             id="my-course-search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
             placeholder="Curso, categoría o palabra clave"
           />
         </div>
         <div>
-          <Label>Estado</Label>
-          <Select value={status || "ALL"} onValueChange={(value) => setStatus(value === "ALL" ? "" : value)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Label htmlFor="my-course-status">Estado</Label>
+          <Select value={status || "ALL"} onValueChange={(value) => { setStatus(value === "ALL" ? "" : value); setPage(1); }}>
+            <SelectTrigger id="my-course-status"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Todos</SelectItem>
               {Object.entries(statusLabels).map(([value, label]) => (
@@ -234,12 +245,22 @@ function MyCourses({ onOpen }: { onOpen: (courseId: string) => void }) {
         </div>
       </div>
 
+      <LearnerTrainingSummary
+        assignments={query.data?.items ?? []}
+        summary={query.data?.summary}
+        overview={query.data?.overview}
+        onOpen={onOpen}
+      />
+
       {query.data?.items.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {query.data.items.map((assignment) => (
-            <AssignmentCard key={assignment.id} assignment={assignment} onOpen={onOpen} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {query.data.items.map((assignment) => (
+              <AssignmentCard key={assignment.id} assignment={assignment} onOpen={onOpen} />
+            ))}
+          </div>
+          <Pagination page={page} totalPages={query.data.totalPages ?? 1} totalItems={query.data.total} pageSize={20} onPageChange={setPage} />
+        </>
       ) : (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
@@ -251,6 +272,77 @@ function MyCourses({ onOpen }: { onOpen: (courseId: string) => void }) {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function LearnerTrainingSummary({
+  assignments,
+  summary,
+  overview,
+  onOpen,
+}: {
+  assignments: TrainingAssignmentDto[];
+  summary?: { total: number; notStarted: number; inProgress: number; completed: number; overdue: number };
+  overview?: TrainingOverviewDto;
+  onOpen: (courseId: string) => void;
+}) {
+  const nextAssignment = selectTrainingNextAssignment(overview, assignments);
+
+  if (!summary?.total && !nextAssignment) return null;
+
+  return (
+    <section aria-labelledby="training-summary-title" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+      <Card className="bg-surface-section">
+        <CardHeader className="pb-3">
+          <CardTitle id="training-summary-title" className="text-base">Tu formación</CardTitle>
+          <p className="text-sm text-muted-foreground">Una vista rápida de lo que requiere tu atención.</p>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryMetric label="Pendientes" value={summary?.notStarted ?? 0} />
+          <SummaryMetric label="En progreso" value={summary?.inProgress ?? 0} />
+          <SummaryMetric label="Completados" value={summary?.completed ?? 0} tone="success" />
+          <SummaryMetric label="Vencidos" value={summary?.overdue ?? 0} tone="danger" />
+        </CardContent>
+      </Card>
+
+      <Card className={nextAssignment?.effectiveStatus === "OVERDUE" ? "border-status-danger/40 bg-status-danger/5" : "border-primary/30 bg-primary/5"}>
+        <CardHeader className="pb-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Siguiente paso</p>
+          <CardTitle className="text-base">{nextAssignment ? nextAssignment.title : "No hay acciones pendientes"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {nextAssignment ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {nextAssignment.effectiveStatus === "OVERDUE"
+                  ? "Esta formación necesita atención porque ya superó su fecha límite."
+                  : nextAssignment.effectiveStatus === "IN_PROGRESS"
+                    ? "Retoma donde lo dejaste para mantener tu avance."
+                    : "Empieza esta formación cuando tengas disponibilidad."}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" />{nextAssignment.estimatedMinutes} min</span>
+                {nextAssignment.dueAt ? <span className="inline-flex items-center gap-1"><CalendarDays className="size-3.5" />Vence {formatDate(nextAssignment.dueAt)}</span> : null}
+                {nextAssignment.isRequired ? <Badge variant="secondary">Obligatorio</Badge> : null}
+              </div>
+              <Button className="w-full sm:w-auto" disabled={!nextAssignment.courseId} onClick={() => nextAssignment.courseId && onOpen(nextAssignment.courseId)}>
+                <PlayCircle className="size-4" />
+                {nextAssignment.effectiveStatus === "IN_PROGRESS" ? "Continuar" : "Abrir formación"}
+              </Button>
+            </>
+          ) : <p className="text-sm text-muted-foreground">Has completado todas las formaciones asignadas.</p>}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function SummaryMetric({ label, value, tone = "normal" }: { label: string; value: number; tone?: "normal" | "success" | "danger" }) {
+  return (
+    <div className="rounded-xl border bg-card p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p>
     </div>
   );
 }
@@ -275,7 +367,10 @@ function AssignmentCard({
       ) : null}
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-lg">{assignment.title}</CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="text-lg">{assignment.title}</CardTitle>
+            {assignment.isRequired ? <Badge className="mt-2" variant="secondary">Obligatorio</Badge> : null}
+          </div>
           <Badge variant={effectiveStatus === "OVERDUE" ? "destructive" : effectiveStatus === "COMPLETED" ? "success" : "default"}>
             {statusLabels[effectiveStatus]}
           </Badge>
@@ -473,7 +568,7 @@ function LaunchCard({
               </Button>
             ) : null}
             {["DRAFT", "SCHEDULED", "ACTIVE", "PAUSED"].includes(launch.status) ? (
-              <Button size="sm" variant="ghost" onClick={() => onStatus("CANCELLED")} disabled={pending}>
+              <Button size="sm" variant="ghost" onClick={() => { if (window.confirm("¿Cancelar esta campaña? Las personas aún no asignadas ya no recibirán el curso.")) onStatus("CANCELLED"); }} disabled={pending}>
                 Cancelar
               </Button>
             ) : null}
@@ -599,11 +694,18 @@ function AssignmentManagement() {
         </div>
       ) : null}
 
+      {query.data?.items.some((item) => ["OVERDUE", "IN_PROGRESS"].includes(item.effectiveStatus ?? item.status)) ? (
+        <Card className="border-status-warning/40 bg-status-warning-soft/30">
+          <CardHeader className="pb-3"><CardTitle className="text-base">Requiere atención</CardTitle><p className="text-sm text-muted-foreground">Prioriza las asignaciones vencidas o que necesitan seguimiento.</p></CardHeader>
+          <CardContent className="space-y-2">{query.data.items.filter((item) => ["OVERDUE", "IN_PROGRESS"].includes(item.effectiveStatus ?? item.status)).slice(0, 5).map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="font-medium">{item.course?.title ?? item.title}</p><p className="text-xs text-muted-foreground">{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"} · {item.progressPercent}%</p></div><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "secondary"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge></div>)}</CardContent>
+        </Card>
+      ) : null}
+
       {query.isLoading ? <AsyncState state="loading" /> : query.isError ? (
         <AsyncState state="error" onRetry={() => query.refetch()} />
       ) : query.data?.items.length ? (
         <>
-          <div className="grid gap-3 md:hidden">{query.data.items.map((item) => <Card key={item.id}><CardContent className="space-y-3 p-4"><div><p className="font-semibold">{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"}</p><p className="text-sm text-muted-foreground">{item.user?.email}</p></div><p className="text-sm font-medium">{item.course?.title ?? item.title}</p><div className="flex flex-wrap items-center justify-between gap-2"><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "default"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge><span className="text-sm">{item.progressPercent}%</span></div><dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-muted-foreground">Vencimiento</dt><dd>{item.dueAt ? formatDate(item.dueAt) : "Sin fecha"}</dd></div><div><dt className="text-muted-foreground">Acciones</dt><dd><Button variant="ghost" size="icon" aria-label={`Retirar asignación de ${item.user ? `${item.user.firstName} ${item.user.lastName}` : "usuario"}`} onClick={() => removeMutation.mutate(item.id)}><Trash2 className="size-4" /></Button></dd></div></dl></CardContent></Card>)}</div>
+          <div className="grid gap-3 md:hidden">{query.data.items.map((item) => <Card key={item.id}><CardContent className="space-y-3 p-4"><div><p className="font-semibold">{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"}</p><p className="text-sm text-muted-foreground">{item.user?.email}</p></div><p className="text-sm font-medium">{item.course?.title ?? item.title}</p><div className="flex flex-wrap items-center justify-between gap-2"><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "default"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge><span className="text-sm">{item.progressPercent}%</span></div><dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-muted-foreground">Vencimiento</dt><dd>{item.dueAt ? formatDate(item.dueAt) : "Sin fecha"}</dd></div><div><dt className="text-muted-foreground">Acciones</dt><dd><Button variant="ghost" size="icon" aria-label={`Retirar asignación de ${item.user ? `${item.user.firstName} ${item.user.lastName}` : "usuario"}`} onClick={() => { if (window.confirm("¿Retirar esta asignación? El avance histórico se conservará, pero dejará de estar activa.")) removeMutation.mutate(item.id); }}><Trash2 className="size-4" /></Button></dd></div></dl></CardContent></Card>)}</div>
           <div className="hidden overflow-x-auto rounded-2xl border bg-card md:block">
             <table className="w-full min-w-[860px] text-sm">
               <thead className="bg-muted/60 text-left">
@@ -617,7 +719,7 @@ function AssignmentManagement() {
                     <td className="p-4"><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "default"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge></td>
                     <td className="p-4">{item.progressPercent}%</td>
                     <td className="p-4">{item.dueAt ? formatDate(item.dueAt) : "Sin fecha"}</td>
-                    <td className="p-4 text-right"><Button variant="ghost" size="icon" aria-label="Retirar asignación" onClick={() => removeMutation.mutate(item.id)}><Trash2 className="size-4" /></Button></td>
+                    <td className="p-4 text-right"><Button variant="ghost" size="icon" aria-label="Retirar asignación" onClick={() => { if (window.confirm("¿Retirar esta asignación? El avance histórico se conservará, pero dejará de estar activa.")) removeMutation.mutate(item.id); }}><Trash2 className="size-4" /></Button></td>
                   </tr>
                 ))}
               </tbody>
@@ -703,6 +805,7 @@ function CoursePlayer({ courseId, open, onOpenChange }: { courseId: string | nul
         try {
           if (event.eventType === "PLAY") return await startTrainingVideo(event);
           if (event.eventType === "HEARTBEAT") return await heartbeatTrainingVideo({ ...event, clientTimestamp: new Date().toISOString(), isPlaying: true });
+          if (event.eventType === "COMPLETED") return await updateTrainingLessonProgress(event.lessonId, true);
           if (event.eventType === "PAUSE" || event.eventType === "SEEK" || event.eventType === "ENDED") return await recordTrainingVideoEvent(event.eventType === "ENDED" ? "ended" : "pause", event);
           return null;
         } catch (error) {
@@ -714,6 +817,7 @@ function CoursePlayer({ courseId, open, onOpenChange }: { courseId: string | nul
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["my-training-assignments"] });
+      await queryClient.invalidateQueries({ queryKey: ["learner-course", courseId] });
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible sincronizar tu avance.")),
   });
@@ -737,22 +841,47 @@ export type VideoProgressEvent = {
   durationSeconds: number;
 };
 
-export function CourseContent({ course, onVideoProgress }: { course: LearnerTrainingCourseDto; onVideoProgress: (event: VideoProgressEvent) => void }) {
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl bg-muted p-4"><div className="flex justify-between text-sm"><span>Avance general</span><strong>{course.progress?.progressPercent ?? 0}%</strong></div></div>
-      {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => <div key={lesson.id} className="rounded-xl border p-4"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div><div className="mt-4 space-y-3">{lesson.videoUrl ? <VideoLesson key={`${lesson.id}-video`} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} /> : null}{lesson.blocks.map((block) => block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-primary underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="size-4" />Completada automáticamente</p> : null}</div>)}</CardContent></Card>)}
-    </div>
-  );
+export function CourseContent({ course, onVideoProgress }: { course: LearnerTrainingCourseDto; onVideoProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
+  const lessons = course.modules.flatMap((module) => module.lessons);
+  return <div className="space-y-5">
+    <div className="rounded-xl bg-muted p-4" aria-live="polite"><div className="flex justify-between text-sm"><span>Avance general</span><strong>{course.progress?.progressPercent ?? 0}%</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-primary" style={{ width: `${course.progress?.progressPercent ?? 0}%` }} /></div></div>
+    {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => { const index = lessons.findIndex((item) => item.id === lesson.id); const nextLesson = lessons[index + 1]; return <div id={`lesson-${lesson.id}`} key={lesson.id} className="scroll-mt-6 rounded-xl border p-4"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div><div className="mt-4 space-y-3">{lesson.videoUrl ? <VideoLesson key={`${lesson.id}-video`} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} /> : <LocalVideoLesson courseId={course.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} onProgress={onVideoProgress} />}{lesson.blocks.map((block) => lesson.type === "VIDEO" && block.type === "VIDEO" ? null : block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-primary underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="size-4" />Completada y guardada</p> : null}{nextLesson ? <a href={`#lesson-${nextLesson.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline">Siguiente lección: {nextLesson.title} <span className="ml-1" aria-hidden="true">→</span></a> : lesson.completed ? <p className="mt-4 text-sm font-medium text-emerald-700">Has completado todo el contenido disponible.</p> : null}</div>; })}</CardContent></Card>)}
+  </div>;
 }
 
-export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => void }) {
+function LocalVideoLesson({ courseId, lesson, assignmentId, onProgress }: { courseId: string; lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void getLocalTrainingVideo(courseId, lesson.id).then((record) => {
+      if (!active) return;
+      if (record) setUrl(URL.createObjectURL(record.blob));
+      else setMissing(true);
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      setUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+    };
+  }, [courseId, lesson.id]);
+  if (url) return <VideoLesson lesson={lesson} assignmentId={assignmentId} url={url} onProgress={onProgress} />;
+  return missing ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Este video se guardó localmente en el navegador del editor y todavía no está disponible en este navegador.</p> : <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">Cargando video local...</p>;
+}
+
+export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onProgressRef = useRef(onProgress);
   const sessionRef = useRef<string>(crypto.randomUUID());
   const lastSentRef = useRef(0);
+  const completionSentRef = useRef(false);
   const [syncState, setSyncState] = useState("Listo para reproducir");
+  const [watchPercent, setWatchPercent] = useState(0);
+  const [mediaError, setMediaError] = useState(false);
   const savedPosition = lesson.videoProgress?.lastPositionSeconds ?? 0;
+  const completionThreshold = lesson.requiredCompletionPercentage ?? 90;
   useEffect(() => {
     onProgressRef.current = onProgress;
   }, [onProgress]);
@@ -766,7 +895,11 @@ export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson:
       if (eventType === "HEARTBEAT" && current === lastSentRef.current) return;
       lastSentRef.current = current;
       setSyncState("Sincronizando…");
-      onProgressRef.current({ assignmentId, lessonId: lesson.id, playbackSessionId: sessionRef.current, eventType, currentTimeSeconds: current, durationSeconds: duration });
+      void Promise.resolve(onProgressRef.current({ assignmentId, lessonId: lesson.id, playbackSessionId: sessionRef.current, eventType, currentTimeSeconds: current, durationSeconds: duration })).then(() => setSyncState("Avance guardado")).catch(() => setSyncState("No fue posible guardar el avance"));
+      if (!completionSentRef.current && duration > 0 && current / duration >= completionThreshold / 100) {
+        completionSentRef.current = true;
+        void Promise.resolve(onProgressRef.current({ assignmentId, lessonId: lesson.id, playbackSessionId: sessionRef.current, eventType: "COMPLETED", currentTimeSeconds: current, durationSeconds: duration })).then(() => setSyncState("Completado y guardado")).catch(() => setSyncState("No fue posible guardar la finalización"));
+      }
     };
     const restore = () => { if (savedPosition > 0 && video.currentTime < 1) video.currentTime = savedPosition; };
     const heartbeat = window.setInterval(() => { if (!video.paused && !video.ended) send("HEARTBEAT"); }, 10_000);
@@ -776,11 +909,15 @@ export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson:
     const onSeeked = () => send("SEEK");
     const onVisibilityChange = () => { if (document.hidden && !video.paused) send("PAUSE"); };
     const onOnline = () => { if (!video.paused && !video.ended) send("HEARTBEAT"); };
+    const onTimeUpdate = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) setWatchPercent(Math.min(100, Math.round((video.currentTime / video.duration) * 100)));
+    };
     video.addEventListener("loadedmetadata", restore);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onEnded);
     video.addEventListener("seeked", onSeeked);
+    video.addEventListener("timeupdate", onTimeUpdate);
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("online", onOnline);
     return () => {
@@ -791,12 +928,13 @@ export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson:
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onEnded);
       video.removeEventListener("seeked", onSeeked);
+      video.removeEventListener("timeupdate", onTimeUpdate);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("online", onOnline);
     };
-  }, [lesson.id, savedPosition]);
+  }, [assignmentId, completionThreshold, lesson.id, savedPosition]);
 
-  return <div className="rounded-xl bg-black p-2"><video ref={videoRef} className="aspect-video w-full rounded-lg" controls playsInline preload="metadata" src={url} aria-label={`Video de ${lesson.title}`} /><p className="px-2 pb-1 pt-2 text-xs text-white/70">{syncState} · Se completa automáticamente al reproducir el 90%.</p></div>;
+  return <div className="rounded-xl bg-black p-2"><video ref={videoRef} className="aspect-video w-full rounded-lg" controls playsInline preload="metadata" src={url} onError={() => { setMediaError(true); setSyncState("No fue posible reproducir este MP4"); }} aria-label={`Video de ${lesson.title}`} />{mediaError ? <p className="px-2 pt-2 text-xs text-amber-300">Verifica que el archivo sea un MP4 compatible (H.264/AAC) y vuelve a cargarlo desde el editor.</p> : null}<div className="px-2 pt-3"><div className="relative h-2 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label={`Avance del video ${watchPercent}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={watchPercent}><div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${watchPercent}%` }} /><span className="absolute inset-y-0 w-0.5 bg-white/80" style={{ left: `${completionThreshold}%` }} aria-hidden="true" /></div><div className="mt-1 flex justify-between text-[11px] text-white/70"><span>{watchPercent}% visto</span><span>Completa al {completionThreshold}%</span></div></div><p className="px-2 pb-1 pt-2 text-xs text-white/70" aria-live="polite">{syncState}</p></div>;
 }
 
 function formatDate(value: string) {

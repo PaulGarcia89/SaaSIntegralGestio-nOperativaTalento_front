@@ -4,10 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Award, CheckCircle2, ClipboardCheck, Library, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
-import { PageHeader } from "@/components/design-system";
+import { PageHeader, Pagination } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,7 @@ import {
   deleteTrainingAssessmentQuestion,
   deleteTrainingAssessment,
   fetchLearnerTrainingCourse,
+  fetchTrainingAssessmentAttempt,
   fetchMyTrainingAssignments,
   fetchMyTrainingCertificates,
   fetchTrainingAdminCertificates,
@@ -58,8 +59,11 @@ import type {
   TrainingQuestionDifficulty,
   TrainingQuizAttemptDto,
   TrainingQuizDto,
+  TrainingQuizAttemptRecoveryDto,
 } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
+import { formatTrainingRemainingTime } from "@/lib/training-ux";
+import { acquireTrainingAssessmentSubmit, clearTrainingAssessmentSubmitKey, getTrainingAssessmentSubmitKey, persistTrainingAssessmentSubmitKey } from "@/lib/training-assessment-submit-storage";
 
 export function TrainingEvaluations() {
   const { can } = useAppStore();
@@ -113,6 +117,7 @@ function AssessmentBuilder() {
       {query.isError ? (
         <AsyncState state="error" title="No fue posible cargar las evaluaciones" onRetry={() => query.refetch()} />
       ) : null}
+      {query.data ? <AssessmentBuilderSummary assessments={query.data.items} /> : null}
       {query.data?.items.length ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {query.data.items.map((quiz) => (
@@ -148,7 +153,7 @@ function AssessmentBuilder() {
                   </Button>
                   <Button variant="secondary" onClick={() => setBankQuiz(quiz)}><Library />Banco</Button>
                   <Button variant="secondary" onClick={() => setConfigureQuiz(quiz)}><Settings2 />Reglas</Button>
-                  <Button variant="destructive" size="icon" aria-label={`Eliminar ${quiz.title}`} onClick={() => remove.mutate(quiz.id)}>
+                  <Button variant="destructive" size="icon" aria-label={`Eliminar ${quiz.title}`} onClick={() => { if (window.confirm(`¿Eliminar la evaluación “${quiz.title}”? Solo se puede eliminar si no tiene intentos.`)) remove.mutate(quiz.id); }}>
                     <Trash2 />
                   </Button>
                 </div>
@@ -162,6 +167,55 @@ function AssessmentBuilder() {
       <CreateQuestionDialog quiz={questionQuiz} onClose={() => setQuestionQuiz(null)} />
       <QuestionBankDialog quiz={bankQuiz} onClose={() => setBankQuiz(null)} />
     </div>
+  );
+}
+
+function AssessmentBuilderSummary({ assessments }: { assessments: TrainingQuizDto[] }) {
+  const ready = assessments.filter((assessment) => assessment.readiness?.ready).length;
+  const questions = assessments.reduce((total, assessment) => total + assessment.questions.length, 0);
+  const attempts = assessments.reduce((total, assessment) => total + (assessment._count?.attempts ?? 0), 0);
+  const incomplete = assessments.length - ready;
+
+  return (
+    <section aria-labelledby="assessment-summary-title" className="space-y-3">
+      <div>
+        <h2 id="assessment-summary-title" className="text-lg font-semibold">Estado de tus evaluaciones</h2>
+        <p className="text-sm text-muted-foreground">Revisa la preparación antes de abrir una evaluación individual.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <AssessmentMetric label="Evaluaciones" value={assessments.length} icon={<ClipboardCheck className="size-4" />} />
+        <AssessmentMetric label="Listas para usar" value={ready} icon={<CheckCircle2 className="size-4" />} tone="success" />
+        <AssessmentMetric label="Requieren revisión" value={incomplete} icon={<Settings2 className="size-4" />} tone={incomplete ? "warning" : "normal"} />
+        <AssessmentMetric label="Preguntas" value={questions} detail={`${attempts} intentos registrados`} icon={<Library className="size-4" />} />
+      </div>
+    </section>
+  );
+}
+
+function AssessmentMetric({
+  label,
+  value,
+  detail,
+  icon,
+  tone = "normal",
+}: {
+  label: string;
+  value: number;
+  detail?: string;
+  icon: ReactNode;
+  tone?: "normal" | "success" | "warning";
+}) {
+  return (
+    <Card level={2}>
+      <CardContent className="p-4">
+        <div className={`mb-3 flex size-8 items-center justify-center rounded-lg ${tone === "success" ? "bg-status-success/10 text-status-success" : tone === "warning" ? "bg-status-warning/10 text-status-warning" : "bg-primary/10 text-primary"}`}>
+          {icon}
+        </div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-semibold">{value}</p>
+        {detail ? <p className="mt-1 text-xs text-muted-foreground">{detail}</p> : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -199,10 +253,10 @@ function CreateAssessmentDialog({ open, onOpenChange, initialCourseId }: { open:
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="[&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
         <DialogHeader><DialogTitle>Nueva evaluación</DialogTitle><DialogDescription>Define las reglas generales. Después podrás agregar preguntas.</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
-          <div><Label>Curso</Label><Select name="courseId" defaultValue={initialCourseId} required><SelectTrigger><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label htmlFor="assessment-course">Curso</Label><Select name="courseId" defaultValue={initialCourseId} required><SelectTrigger id="assessment-course"><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
           <div><Label htmlFor="assessment-title">Título</Label><Input id="assessment-title" name="title" required /></div>
           <div><Label htmlFor="assessment-description">Descripción</Label><Input id="assessment-description" name="description" /></div>
           <div className="grid grid-cols-3 gap-3">
@@ -260,7 +314,7 @@ function ConfigureAssessmentDialog({ quiz, onClose }: { quiz: TrainingQuizDto | 
   }
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto [&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
         <DialogHeader><DialogTitle>Reglas de evaluación</DialogTitle><DialogDescription>Controla disponibilidad, selección, intentos y retroalimentación.</DialogDescription></DialogHeader>
         {quiz ? <form className="space-y-4" onSubmit={submit}>
           <div><Label htmlFor="config-title">Título</Label><Input id="config-title" name="title" defaultValue={quiz.title} required /></div>
@@ -334,7 +388,7 @@ function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null;
   }
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="[&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
         <DialogHeader><DialogTitle>Agregar pregunta</DialogTitle><DialogDescription>{quiz?.title}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
           <div><Label htmlFor="question-prompt">Enunciado</Label><Input id="question-prompt" name="prompt" required /></div>
@@ -384,7 +438,7 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
   });
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto [&>button:last-child]:sticky [&>button:last-child]:bottom-0 [&>button:last-child]:z-10 [&>button:last-child]:bg-card [&>button:last-child]:py-3">
         <DialogHeader><DialogTitle>Banco de preguntas</DialogTitle><DialogDescription>Selecciona preguntas validadas para copiarlas a {quiz?.title}.</DialogDescription></DialogHeader>
         {query.isLoading ? <AsyncState state="loading" /> : null}
         {query.data?.items.length ? <div className="space-y-2">
@@ -407,7 +461,8 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
 }
 
 function LearnerAssessments() {
-  const [attempt, setAttempt] = useState<(TrainingQuizAttemptDto & { quiz: TrainingQuizDto }) | null>(null);
+  const queryClient = useQueryClient();
+  const [attempt, setAttempt] = useState<AssessmentPlayerAttempt | null>(null);
   const query = useQuery({
     queryKey: ["learner-assessments"],
     queryFn: async () => {
@@ -416,23 +471,158 @@ function LearnerAssessments() {
       return courses.flatMap((course) => course.quizSummary ?? []);
     },
   });
+  useEffect(() => {
+    query.data?.forEach((quiz) => {
+      if (quiz.latestAttempt && quiz.latestAttempt.status !== "IN_PROGRESS") clearTrainingAssessmentSubmitKey(quiz.latestAttempt.id);
+    });
+  }, [query.data]);
   const start = useMutation({
     mutationFn: startTrainingAssessment,
     onSuccess: (data) => setAttempt(data),
     onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo iniciar la evaluación")),
   });
+  const resume = useMutation({
+    mutationFn: async (quiz: LearnerQuizSummary) => {
+      if (!quiz.latestAttempt) throw new Error("No hay un intento activo para reanudar.");
+      const recovered = await fetchTrainingAssessmentAttempt(quiz.id, quiz.latestAttempt.id);
+      return mapRecoveredAttempt(recovered, quiz);
+    },
+    onSuccess: (data) => setAttempt(data),
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo recuperar el intento")),
+  });
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Aprendizaje" title="Mis evaluaciones" description="Completa tus evaluaciones pendientes y consulta claramente el resultado de cada intento." />
       {query.isLoading ? <AsyncState state="loading" title="Cargando evaluaciones" /> : null}
-      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => <Card key={quiz.id}><CardHeader><CardTitle>{quiz.title}</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge></div><Button className="w-full" onClick={() => start.mutate(quiz.id)}><ClipboardCheck />Comenzar evaluación</Button></CardContent></Card>)}</div> : query.isSuccess ? <EmptyCard title="No tienes evaluaciones pendientes" /> : null}
-      <AssessmentPlayer attempt={attempt} onClose={() => setAttempt(null)} />
+      {query.data?.length ? <LearnerAssessmentSummary quizzes={query.data} /> : null}
+      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; return <Card key={quiz.id}><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">Último resultado: <strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">Retroalimentación: {quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : "Comenzar evaluación"}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyCard title="No tienes evaluaciones pendientes" /> : null}
+      <AssessmentPlayer key={attempt?.id ?? "no-attempt"} attempt={attempt} onClose={() => setAttempt(null)} onSubmitted={() => queryClient.invalidateQueries({ queryKey: ["learner-assessments"] })} />
     </div>
   );
 }
 
-function AssessmentPlayer({ attempt, onClose }: { attempt: (TrainingQuizAttemptDto & { quiz: TrainingQuizDto }) | null; onClose: () => void }) {
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+function LearnerAssessmentSummary({ quizzes }: { quizzes: Array<{ latestAttempt?: TrainingQuizAttemptDto | null }> }) {
+  const completed = quizzes.filter((quiz) => quiz.latestAttempt?.status === "GRADED").length;
+  const pending = quizzes.filter((quiz) => quiz.latestAttempt?.status === "PENDING_REVIEW" || quiz.latestAttempt?.status === "SUBMITTED").length;
+  const passed = quizzes.filter((quiz) => quiz.latestAttempt?.passed).length;
+
+  return (
+    <section aria-labelledby="learner-assessment-summary" className="rounded-2xl border border-border-default bg-surface-section p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 id="learner-assessment-summary" className="font-semibold">Tu avance en evaluaciones</h2>
+          <p className="text-sm text-muted-foreground">Consulta tu último intento antes de volver a empezar.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-sm">
+          <SummaryValue label="Aprobadas" value={passed} />
+          <SummaryValue label="Revisadas" value={completed} />
+          <SummaryValue label="En revisión" value={pending} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SummaryValue({ label, value }: { label: string; value: number }) {
+  return <div className="min-w-20 rounded-xl bg-card px-3 py-2"><p className="text-lg font-semibold">{value}</p><p className="text-[11px] text-muted-foreground">{label}</p></div>;
+}
+
+function LearnerAttemptBadge({ attempt }: { attempt?: TrainingQuizAttemptDto | null }) {
+  if (!attempt) return null;
+  const content = attempt.status === "PENDING_REVIEW" || attempt.status === "SUBMITTED"
+    ? "En revisión"
+    : attempt.status === "IN_PROGRESS"
+      ? "En curso"
+      : attempt.passed
+        ? "Aprobada"
+        : "Último intento";
+  const variant = attempt.status === "PENDING_REVIEW" || attempt.status === "SUBMITTED" ? "secondary" : attempt.passed ? "success" : "default";
+  return <Badge variant={variant}>{content}</Badge>;
+}
+
+type AssessmentPlayerAttempt = (TrainingQuizAttemptDto & { quiz: TrainingQuizDto }) & {
+  recoveredAnswers?: TrainingQuizAttemptRecoveryDto["answers"];
+  timeRemainingSeconds?: number | null;
+};
+
+type LearnerQuizSummary = {
+  id: string;
+  title: string;
+  description?: string | null;
+  passingScore: number;
+  maxAttempts?: number | null;
+  timeLimitMinutes?: number | null;
+  questionsCount: number;
+  latestAttempt?: TrainingQuizAttemptDto | null;
+};
+
+function mapRecoveredAttempt(recovered: TrainingQuizAttemptRecoveryDto, quiz: LearnerQuizSummary): AssessmentPlayerAttempt {
+  return {
+    id: recovered.id,
+    quizId: quiz.id,
+    startedAt: recovered.startedAt,
+    submittedAt: recovered.submittedAt,
+    expiresAt: recovered.expiresAt,
+    status: recovered.status,
+    questionIds: recovered.questions.map((question) => question.id),
+    timeRemainingSeconds: recovered.timeRemainingSeconds,
+    recoveredAnswers: recovered.answers,
+    quiz: {
+      id: quiz.id,
+      courseId: "",
+      title: quiz.title,
+      description: quiz.description,
+      passingScore: quiz.passingScore,
+      maxAttempts: quiz.maxAttempts,
+      timeLimitMinutes: quiz.timeLimitMinutes,
+      shuffleQuestions: false,
+      shuffleOptions: false,
+      requireAllQuestions: true,
+      feedbackMode: "AFTER_SUBMISSION",
+      questions: recovered.questions.map((question, index) => ({
+        ...question,
+        requiresManualGrading: question.questionType === "TEXT",
+        difficulty: "MEDIUM" as const,
+        tags: [],
+        sortOrder: index,
+      })),
+    },
+  };
+}
+
+function AssessmentPlayer({ attempt, onClose, onSubmitted }: { attempt: AssessmentPlayerAttempt | null; onClose: () => void; onSubmitted?: () => void }) {
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>(() => getInitialAnswers(attempt));
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const submitLock = useRef(false);
+  useEffect(() => {
+    if (!attempt) return;
+    const update = () => setRemainingSeconds(attempt.expiresAt ? Math.max(0, Math.floor((new Date(attempt.expiresAt).getTime() - Date.now()) / 1000)) : attempt.timeRemainingSeconds ?? null);
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [attempt]);
+  const saveAnswer = useMutation({
+    mutationFn: ({ questionId, value }: { questionId: string; value: string | string[] }) => {
+      if (!attempt) throw new Error("No hay un intento activo.");
+      const question = attempt.quiz.questions.find((item) => item.id === questionId);
+      if (!question) throw new Error("No se encontró la pregunta.");
+      return saveTrainingAssessmentAnswer(attempt.quizId, attempt.id, {
+        questionId,
+        textAnswer: question.questionType === "TEXT" ? String(value) : undefined,
+        selectedOptionIds: Array.isArray(value) ? value : value ? [value] : [],
+        optionId: typeof value === "string" && question.questionType !== "TEXT" ? value : undefined,
+      });
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo guardar tu respuesta.")),
+  });
+  const updateAnswer = (questionId: string, value: string | string[]) => {
+    setAnswers((current) => ({ ...current, [questionId]: value }));
+    saveAnswer.mutate({ questionId, value });
+  };
+  const isAnswered = (questionId: string) => {
+    const value = answers[questionId];
+    return Array.isArray(value) ? value.length > 0 : Boolean(value?.trim());
+  };
   const submit = useMutation({
     mutationFn: async () => {
       if (!attempt) return;
@@ -445,37 +635,55 @@ function AssessmentPlayer({ attempt, onClose }: { attempt: (TrainingQuizAttemptD
           optionId: typeof answer === "string" && question.questionType !== "TEXT" ? answer : undefined,
         });
       }
-      return submitTrainingAssessment(attempt.quizId, attempt.id);
+      const idempotencyKey = getTrainingAssessmentSubmitKey(attempt.id) ?? persistTrainingAssessmentSubmitKey(attempt.id);
+      return submitTrainingAssessment(attempt.quizId, attempt.id, idempotencyKey ?? undefined);
     },
     onSuccess: (result) => {
+      if (attempt) clearTrainingAssessmentSubmitKey(attempt.id);
+      submitLock.current = false;
       toast.success(result?.status === "PENDING_REVIEW" ? "Enviada para revisión" : `Resultado: ${result?.score}%`);
+      onSubmitted?.();
       onClose();
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo enviar la evaluación")),
+    onError: (error) => { submitLock.current = false; toast.error(getApiErrorMessage(error, "No se pudo enviar la evaluación")); },
   });
+  const handleSubmit = () => {
+    if (!acquireTrainingAssessmentSubmit(submitLock, submit.isPending)) return;
+    submit.mutate();
+  };
   return (
     <Dialog open={Boolean(attempt)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader><DialogTitle>{attempt?.quiz.title}</DialogTitle><DialogDescription>Responde todas las preguntas antes de enviar. El envío es definitivo.</DialogDescription></DialogHeader>
+        {remainingSeconds !== null ? <div className={`sticky top-0 z-10 rounded-xl border p-3 text-sm ${remainingSeconds <= 60 ? "border-status-danger/40 bg-status-danger/10 text-status-danger" : "bg-surface-section"}`} role="timer" aria-live="polite"><strong>Tiempo restante:</strong> {formatTrainingRemainingTime(remainingSeconds)}{remainingSeconds === 0 ? " · El intento expiró" : ""}</div> : null}
         <div className="space-y-5">
           {attempt?.quiz.questions.map((question, index) => (
             <fieldset key={question.id} className="rounded-xl border p-4">
               <legend className="px-2 font-semibold">{index + 1}. {question.prompt}</legend>
               <div className="mt-3 space-y-2">
-                {question.questionType === "TEXT" ? <Input value={String(answers[question.id] || "")} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} /> : question.options.map((option) => <label key={option.id} className="flex min-h-11 items-center gap-3 rounded-lg border px-3"><input type={question.questionType === "MULTIPLE_CHOICE" ? "checkbox" : "radio"} name={question.id} checked={Array.isArray(answers[question.id]) ? (answers[question.id] as string[]).includes(option.id) : answers[question.id] === option.id} onChange={() => setAnswers((current) => { const existing = current[question.id]; if (question.questionType !== "MULTIPLE_CHOICE") return { ...current, [question.id]: option.id }; const values = Array.isArray(existing) ? existing : []; return { ...current, [question.id]: values.includes(option.id) ? values.filter((id) => id !== option.id) : [...values, option.id] }; })} />{option.label}</label>)}
+                {question.questionType === "TEXT" ? <Input aria-label={`Respuesta para ${question.prompt}`} value={String(answers[question.id] || "")} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} onBlur={(event) => updateAnswer(question.id, event.target.value)} /> : question.options.map((option) => <label key={option.id} className="flex min-h-11 items-center gap-3 rounded-lg border px-3"><input type={question.questionType === "MULTIPLE_CHOICE" ? "checkbox" : "radio"} name={question.id} checked={Array.isArray(answers[question.id]) ? (answers[question.id] as string[]).includes(option.id) : answers[question.id] === option.id} onChange={() => { const existing = answers[question.id]; if (question.questionType !== "MULTIPLE_CHOICE") return updateAnswer(question.id, option.id); const values = Array.isArray(existing) ? existing : []; updateAnswer(question.id, values.includes(option.id) ? values.filter((id) => id !== option.id) : [...values, option.id]); }} />{option.label}</label>)}
               </div>
             </fieldset>
           ))}
-          <Button className="w-full" disabled={submit.isPending || attempt?.quiz.questions.some((question) => !answers[question.id])} onClick={() => submit.mutate()}>{submit.isPending ? "Enviando…" : "Enviar evaluación"}</Button>
+          <Button className="w-full" disabled={submit.isPending || saveAnswer.isPending || remainingSeconds === 0 || attempt?.quiz.questions.some((question) => !isAnswered(question.id))} onClick={handleSubmit}>{submit.isPending ? "Enviando…" : remainingSeconds === 0 ? "Intento expirado" : "Enviar evaluación"}</Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
+function getInitialAnswers(attempt: AssessmentPlayerAttempt | null) {
+  return Object.fromEntries(attempt?.recoveredAnswers?.map((answer) => [
+    answer.questionId,
+    answer.textAnswer ?? (answer.selectedOptionIds.length > 1 ? answer.selectedOptionIds : answer.selectedOptionIds[0] ?? answer.optionId ?? ""),
+  ]) ?? []) as Record<string, string | string[]>;
+}
+
+
 export function TrainingResults() {
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ["training-assessment-results"], queryFn: () => fetchTrainingAssessmentResults() });
+  const query = useQuery({ queryKey: ["training-assessment-results", page], queryFn: () => fetchTrainingAssessmentResults(page) });
   const grade = useMutation({
     mutationFn: (attempt: TrainingQuizAttemptDto) => gradeTrainingAssessment(attempt.id, {
       answers: (attempt.answers ?? []).map((answer) => ({ answerId: answer.id, awardedPoints: answer.awardedPoints ?? 0 })),
@@ -484,7 +692,65 @@ export function TrainingResults() {
     onSuccess: () => { toast.success("Calificación publicada"); queryClient.invalidateQueries({ queryKey: ["training-assessment-results"] }); },
     onError: (error) => toast.error(getApiErrorMessage(error, "No se pudo publicar la calificación")),
   });
-  return <div className="space-y-6"><PageHeader eyebrow="Aprendizaje" title="Resultados" description="Supervisa intentos, calificaciones y revisiones pendientes." />{query.isLoading ? <AsyncState state="loading" title="Cargando resultados" /> : null}{query.data?.items.length ? <div className="grid gap-3">{query.data.items.map((attempt) => <Card key={attempt.id}><CardContent className="flex flex-col gap-4 py-5 md:flex-row md:items-center md:justify-between"><div><strong>{attempt.quiz?.title}</strong><p className="text-sm text-muted-foreground">{attempt.user ? `${attempt.user.firstName} ${attempt.user.lastName}` : "Participante"} · {new Date(attempt.startedAt).toLocaleDateString("es")}</p></div><div className="flex items-center gap-3"><Badge variant={attempt.passed ? "success" : attempt.status === "PENDING_REVIEW" ? "secondary" : "destructive"}>{attempt.status === "PENDING_REVIEW" ? "Revisión pendiente" : `${attempt.score ?? 0}%`}</Badge>{attempt.status === "PENDING_REVIEW" ? <Button onClick={() => grade.mutate(attempt)}>Revisar y publicar</Button> : null}</div></CardContent></Card>)}</div> : query.isSuccess ? <EmptyCard title="Aún no hay intentos" /> : null}</div>;
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Aprendizaje" title="Resultados" description="Supervisa intentos, calificaciones y revisiones pendientes." />
+      {query.isLoading ? <AsyncState state="loading" title="Cargando resultados" /> : null}
+      {query.data ? <ResultsSummary items={query.data.items} total={query.data.total} /> : null}
+      {query.data?.items.length ? (
+        <div className="grid gap-3">
+          {query.data.items.map((attempt) => (
+            <Card key={attempt.id}>
+              <CardContent className="flex flex-col gap-4 py-5 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <strong className="block truncate">{attempt.quiz?.title ?? "Evaluación"}</strong>
+                  <p className="text-sm text-muted-foreground">
+                    {attempt.user ? `${attempt.user.firstName} ${attempt.user.lastName}` : "Participante"} · {new Date(attempt.startedAt).toLocaleDateString("es")}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ResultStatusBadge attempt={attempt} />
+                  {attempt.status === "PENDING_REVIEW" ? <Button onClick={() => grade.mutate(attempt)} disabled={grade.isPending}>Revisar y publicar</Button> : null}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : query.isSuccess ? <EmptyCard title="Aún no hay intentos" /> : null}
+      {query.data ? <Pagination page={query.data.page - 1} totalPages={Math.max(1, Math.ceil(query.data.total / query.data.pageSize))} totalItems={query.data.total} pageSize={query.data.pageSize} onPageChange={(nextPage) => setPage(nextPage + 1)} /> : null}
+    </div>
+  );
+}
+
+function ResultsSummary({ items, total }: { items: TrainingQuizAttemptDto[]; total: number }) {
+  const pending = items.filter((attempt) => attempt.status === "PENDING_REVIEW").length;
+  const graded = items.filter((attempt) => attempt.status === "GRADED").length;
+  const passed = items.filter((attempt) => attempt.passed).length;
+  return (
+    <section aria-labelledby="results-summary-title" className="space-y-3">
+      <div>
+        <h2 id="results-summary-title" className="text-lg font-semibold">Resumen de resultados</h2>
+        <p className="text-sm text-muted-foreground">{total} intentos en total · estados calculados para esta página.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ResultMetric label="Intentos totales" value={total} />
+        <ResultMetric label="Revisión pendiente" value={pending} tone="warning" />
+        <ResultMetric label="Calificados" value={graded} />
+        <ResultMetric label="Aprobados" value={passed} tone="success" />
+      </div>
+    </section>
+  );
+}
+
+function ResultMetric({ label, value, tone = "normal" }: { label: string; value: number; tone?: "normal" | "warning" | "success" }) {
+  return <Card level={2}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className={`mt-1 text-2xl font-semibold ${tone === "warning" ? "text-status-warning" : tone === "success" ? "text-status-success" : "text-foreground"}`}>{value}</p></CardContent></Card>;
+}
+
+function ResultStatusBadge({ attempt }: { attempt: TrainingQuizAttemptDto }) {
+  if (attempt.status === "PENDING_REVIEW") return <Badge variant="secondary">Revisión pendiente</Badge>;
+  if (attempt.status === "GRADED") return <Badge variant={attempt.passed ? "success" : "destructive"}>{attempt.passed ? "Aprobado" : "No aprobado"} · {attempt.score ?? 0}%</Badge>;
+  if (attempt.status === "SUBMITTED") return <Badge variant="secondary">Enviado</Badge>;
+  return <Badge>En curso</Badge>;
 }
 
 export function TrainingCertificates() {
@@ -506,6 +772,7 @@ export function TrainingCertificates() {
     <div className="space-y-6">
       <PageHeader eyebrow="Aprendizaje" title="Certificados" description="Consulta credenciales verificables, evidencia, vigencia y cadena de renovación." />
       {query.isLoading ? <AsyncState state="loading" title="Cargando certificados" /> : null}
+      {query.data ? <CertificateSummary certificates={query.data.items} admin={admin} /> : null}
       {query.data?.items.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {query.data.items.map((certificate) => {
@@ -540,6 +807,31 @@ export function TrainingCertificates() {
       ) : query.isSuccess ? <EmptyCard title="Aún no hay certificados" /> : null}
     </div>
   );
+}
+
+function CertificateSummary({ certificates, admin }: { certificates: TrainingCertificateDto[]; admin: boolean }) {
+  const valid = certificates.filter((certificate) => (certificate.status ?? (certificate.revokedAt ? "REVOKED" : "VALID")) === "VALID").length;
+  const expired = certificates.filter((certificate) => certificate.status === "EXPIRED").length;
+  const revoked = certificates.filter((certificate) => certificate.status === "REVOKED" || certificate.revokedAt).length;
+  const renewable = certificates.filter((certificate) => certificate.renewalEligible).length;
+  return (
+    <section aria-labelledby="certificate-summary-title" className="space-y-3">
+      <div>
+        <h2 id="certificate-summary-title" className="text-lg font-semibold">Estado de credenciales</h2>
+        <p className="text-sm text-muted-foreground">{admin ? "Prioriza las credenciales que requieren gestión administrativa." : "Consulta rápidamente qué credenciales siguen vigentes."}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <CertificateMetric label="Vigentes" value={valid} tone="success" />
+        <CertificateMetric label="Vencidos" value={expired} tone={expired ? "warning" : "normal"} />
+        <CertificateMetric label="Revocados" value={revoked} tone={revoked ? "danger" : "normal"} />
+        <CertificateMetric label={admin ? "Renovables" : "Para renovar"} value={renewable} />
+      </div>
+    </section>
+  );
+}
+
+function CertificateMetric({ label, value, tone = "normal" }: { label: string; value: number; tone?: "normal" | "success" | "warning" | "danger" }) {
+  return <Card level={2}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "warning" ? "text-status-warning" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p></CardContent></Card>;
 }
 
 function EmptyCard({ title, description }: { title: string; description?: string }) {

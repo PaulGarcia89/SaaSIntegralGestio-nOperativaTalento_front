@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { cancelRestaurantReceipt, confirmRestaurantReceipt, createRestaurantReceipt, fetchRestaurantIngredients, fetchRestaurantReceipts, fetchRestaurantSuppliers, fetchRestaurantUnits, fetchRestaurantWarehouses, getApiErrorMessage, previewRestaurantReceipt, updateRestaurantReceipt } from "@/lib/backend";
@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RestaurantReceiptWizard } from "@/components/restaurant-receipt-wizard";
+import { useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
 
 type Line = ReceiptDraftLine & { lotNumber: string; expirationDate: string };
 type Editor = { id?: string; status?: "DRAFT" | "CONFIRMED" | "CANCELLED"; supplierId: string; warehouseId: string; receivedAt: string; invoice: string; notes: string; lines: Line[] };
@@ -21,9 +22,14 @@ type Preview = Awaited<ReturnType<typeof previewRestaurantReceipt>>;
 
 export function RestaurantReceiptsScreen() {
   const { can, currentBranch } = useAppStore();
+  const { setHasPendingChanges } = useRestaurantInventoryContext();
   const queryClient = useQueryClient();
   const [editor, setEditor] = useState<Editor | null>(null);
   const [confirming, setConfirming] = useState<{ id: string; preview: Preview } | null>(null);
+  useEffect(() => {
+    setHasPendingChanges(Boolean(editor || confirming));
+    return () => setHasPendingChanges(false);
+  }, [confirming, editor, setHasPendingChanges]);
   const receipts = useQuery({ queryKey: ["restaurant-receipts", currentBranch?.id], queryFn: () => fetchRestaurantReceipts({ branchId: currentBranch?.id }), enabled: Boolean(currentBranch?.id) });
   const ingredients = useQuery({ queryKey: ["restaurant-receipt-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) });
   const units = useQuery({ queryKey: ["restaurant-receipt-units"], queryFn: () => fetchRestaurantUnits({ status: "ACTIVE", pageSize: 200 }) });
@@ -34,7 +40,7 @@ export function RestaurantReceiptsScreen() {
     return input.editor.id ? updateRestaurantReceipt(input.editor.id, payload) : createRestaurantReceipt(payload);
   }, onSuccess: async (created, variables) => { setEditor(null); setConfirming({ id: created.id, preview: variables.preview }); await queryClient.invalidateQueries({ queryKey: ["restaurant-receipts"] }); } });
   const preview = useMutation({ mutationFn: (input: Editor) => previewRestaurantReceipt(receiptPayload(input, currentBranch!.id)) });
-  const action = useMutation({ mutationFn: ({ id, type }: { id: string; type: "confirm" | "cancel" }) => type === "confirm" ? confirmRestaurantReceipt(id) : cancelRestaurantReceipt(id, "Cancelación solicitada por el usuario"), onSuccess: async () => { setConfirming(null); await queryClient.invalidateQueries({ queryKey: ["restaurant-receipts"] }); } });
+  const action = useMutation({ mutationFn: ({ id, type }: { id: string; type: "confirm" | "cancel" }) => type === "confirm" ? confirmRestaurantReceipt(id) : cancelRestaurantReceipt(id, "Cancelación solicitada por el usuario"), onSuccess: async () => { setConfirming(null); await Promise.all([queryClient.invalidateQueries({ queryKey: ["restaurant-receipts"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-lots"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] })]); } });
   const canManage = can("restaurant_inventory.manage");
   const canCreate = canManage; const canUpdate = canManage; const canConfirm = canManage; const canCancel = canManage;
   const catalogLoading = ingredients.isLoading || units.isLoading || suppliers.isLoading || warehouses.isLoading;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Plus, Send, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ type CountLine = { ingredientId: string; quantity: string; reason: string };
 type Ingredient = { id: string; sku?: string; name?: string; stock?: number; inventoryUnit?: string };
 
 export function RestaurantStockCountWorkflow({ branchId }: { branchId: string }) {
-  const { warehouseId, warehouseName } = useRestaurantInventoryContext();
+  const { warehouseId, warehouseName, setHasPendingChanges } = useRestaurantInventoryContext();
   const queryClient = useQueryClient();
   const [blind, setBlind] = useState(true); const [stage, setStage] = useState(1); const [documentId, setDocumentId] = useState(""); const [lines, setLines] = useState<CountLine[]>([{ ingredientId: "", quantity: "", reason: "" }]);
   const ingredients = useQuery({ queryKey: ["restaurant-count-workflow-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) });
@@ -29,6 +29,11 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
   const ingredientOptions = (ingredients.data?.data ?? []) as Ingredient[];
   const stockRows = (stock.data ?? []) as unknown as Ingredient[];
   const invalid = !warehouseId || lines.some((line) => !line.ingredientId || line.quantity === "" || Number(line.quantity) < 0);
+  useEffect(() => {
+    const hasDraft = stage > 1 || Boolean(documentId) || lines.some((line) => line.ingredientId || line.quantity || line.reason);
+    setHasPendingChanges(hasDraft);
+    return () => setHasPendingChanges(false);
+  }, [documentId, lines, setHasPendingChanges, stage]);
   const updateLine = (index: number, key: keyof CountLine, value: string) => setLines(lines.map((line, current) => current === index ? { ...line, [key]: value } : line));
   const impact = lines.map((line) => { const item = stockRows.find((row) => row.id === line.ingredientId); const theoretical = Number(item?.stock ?? 0); const counted = Number(line.quantity || 0); return { ...line, name: item?.name ?? ingredientOptions.find((option) => option.id === line.ingredientId)?.name ?? "Ingrediente", unit: item?.inventoryUnit ?? "", theoretical, counted, difference: counted - theoretical }; });
   if (ingredients.isLoading || stock.isLoading || counts.isLoading) return <AsyncState state="loading" />;

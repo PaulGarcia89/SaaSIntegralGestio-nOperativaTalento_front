@@ -54,7 +54,7 @@ function SalesImportInner() {
   const [preview, setPreview] = useState<import("@/lib/contracts").SalesImportPreviewDto | null>(null);
   const [jobId, setJobId] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const history = useQuery({ queryKey: ["restaurant-sales-import-history"], queryFn: fetchRestaurantSalesImportHistory });
+  const history = useQuery({ queryKey: ["restaurant-sales-import-history", currentBranch?.id], queryFn: () => fetchRestaurantSalesImportHistory({ branchId: currentBranch?.id }) });
   const restored = useQuery({ queryKey: ["restaurant-sales-import-session", sessionId], queryFn: () => fetchRestaurantSalesImportSession(sessionId), enabled: Boolean(sessionId && !validation) });
   const validate = useMutation({ mutationFn: (input: { file: File; branchId: string; warehouseId: string }) => validateRestaurantSalesImport(input), onSuccess: (data) => { setValidation(data); setSessionId(data.sessionId); setStep(1); } });
   const configure = useMutation({ mutationFn: () => configureRestaurantSalesImport(sessionId, config), onSuccess: () => setStep(2) });

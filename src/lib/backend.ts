@@ -126,6 +126,7 @@ import type {
   HireCandidateInput,
   HiringContextDto,
   HiringWorkflowResultDto,
+  DocuSealHiringBundleStatusDto,
   EmployeeOnboardingDocumentDto,
   EmployeeOnboardingFlowDto,
   EmployeeOnboardingFlowListDto,
@@ -430,6 +431,9 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
   if (!(error instanceof ApiError)) return error instanceof Error ? error.message : fallback;
   if (error.status === 400) return `La solicitud no es válida. ${error.message}`;
   if (error.status === 401) return "Tu sesión expiró o las credenciales no son correctas.";
+  if (error.status === 403 && error.code === "ROLE_NOT_ALLOWED") {
+    return "El rol seleccionado no es asignable por este administrador. Selecciona un rol estándar de empleado.";
+  }
   if (error.status === 403) return "No tienes permiso para realizar esta acción.";
   if (error.status === 404) return "No encontramos el recurso solicitado.";
   if (error.status === 409) return `Existe un conflicto con la información actual. ${error.message}`;
@@ -475,6 +479,8 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "onboarding.view": ["applications.read"],
   "onboarding.manage": ["applications.update"],
   "training.view": ["training.read"],
+  "courses.complete": ["training.update"],
+  "assessments.attempt": ["training.update"],
   "training.manage": [
     "training.create",
     "training.update",
@@ -557,7 +563,7 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
   "interviews.evaluate": ["applications.update"],
   "scorecards.view": ["applications.read"],
   "scorecards.complete": ["applications.update"],
-  "courses.view": ["training.read"],
+  "courses.view": ["training.course.read"],
   "courses.create": ["training.create"],
   "courses.update": ["training.update"],
   "courses.assign": ["training.update"],
@@ -777,6 +783,22 @@ function roleKeyToBackendCode(role: RoleKey) {
   return codes[role];
 }
 
+function resolveTenantRole(roles: BackendRole[], roleKey: RoleKey) {
+  const targetCodes = roleKey === "empleado"
+    ? new Set(["BRANCH_USER", "EMPLOYEE", "TENANT_EMPLOYEE", "TENANT_EMPLEADO", "USER", "STANDARD_USER", "TENANT_USER"])
+    : new Set([roleKeyToBackendCode(roleKey)]);
+  const role = roles.find((entry) => targetCodes.has(entry.code.toUpperCase()));
+  if (!role) {
+    throw new ApiError(
+      `El rol ${roleKey} no está configurado para esta empresa.`,
+      422,
+      "ROLE_NOT_CONFIGURED",
+      { roleKey, availableRoles: roles.map((entry) => entry.code) },
+    );
+  }
+  return role;
+}
+
 function deriveEnabledModules(source: string[] | undefined, includeAdmin = false): ModuleKey[] {
   const enabled = new Set<ModuleKey>(["dashboard", "notifications", "profile"]);
 
@@ -834,6 +856,7 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
     mapped.add("scorecards.view");
   }
   if (hasCode("applications.update")) {
+    mapped.add("applications.update");
     mapped.add("applications.change_stage");
     mapped.add("applications.reject");
     mapped.add("applications.hire");
@@ -856,6 +879,20 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
     mapped.add("assessments.grade");
     mapped.add("certificates.issue");
   }
+  if (hasCode("restaurant_inventory.receipts.create")) mapped.add("restaurant_inventory.receipts.create");
+  if (hasCode("restaurant_inventory.receipts.confirm")) mapped.add("restaurant_inventory.receipts.confirm");
+  if (hasCode("restaurant_inventory.recipes.manage")) mapped.add("restaurant_inventory.recipes.manage");
+  if (hasCode("restaurant_inventory.operations.create")) mapped.add("restaurant_inventory.operations.create");
+  if (hasCode("restaurant_inventory.operations.confirm")) mapped.add("restaurant_inventory.operations.confirm");
+  if (hasCode("restaurant_inventory.counts.approve")) mapped.add("restaurant_inventory.counts.approve");
+  if (hasCode("restaurant_inventory.adjustments.create")) mapped.add("restaurant_inventory.adjustments.create");
+  if (hasCode("restaurant_inventory.transfers.manage")) mapped.add("restaurant_inventory.transfers.manage");
+  if (hasCode("restaurant_inventory.settings.manage")) mapped.add("restaurant_inventory.settings.manage");
+  if (hasCode("restaurant_inventory.commercial.view")) mapped.add("restaurant_inventory.commercial.view");
+  if (hasCode("restaurant_inventory.commissary.manage")) mapped.add("restaurant_inventory.commissary.manage");
+  if (hasCode("restaurant_inventory.budgets.manage")) mapped.add("restaurant_inventory.budgets.manage");
+  if (hasCode("restaurant_inventory.invoices.upload")) mapped.add("restaurant_inventory.manage");
+  if (hasCode("restaurant_inventory.counts.schedule")) mapped.add("restaurant_inventory.counts.schedule");
   if (hasCode("training.course.read")) mapped.add("courses.view");
   if (hasCode("training.course.create")) mapped.add("courses.create");
   if (hasCode("training.course.update")) mapped.add("courses.update");
@@ -2146,6 +2183,21 @@ export function createDocuSealSubmission(employeeId: string, templateKey: string
   });
 }
 
+export function createDocuSealHiringBundle(employeeId: string) {
+  return request<{ employeeId: string; requiredTemplates: string[]; created: DocuSealSubmissionDto[]; alreadyCreated: Array<{ id: string; templateKey: string; status: string }> }>("/signatures/docuseal/hiring-bundle", {
+    method: "POST",
+    body: JSON.stringify({ employeeId }),
+  });
+}
+
+export function createDocuSealHiringBundleForApplication(applicationId: string) {
+  return request<{ employeeId: string; requiredTemplates: string[]; created: DocuSealSubmissionDto[]; alreadyCreated: Array<{ id: string; templateKey: string; status: string }>; emailSent?: boolean }>(`/signatures/docuseal/hiring-bundle/application/${encodeURIComponent(applicationId)}`, { method: "POST" });
+}
+
+export function fetchDocuSealHiringBundleStatus(applicationId: string) {
+  return request<DocuSealHiringBundleStatusDto>(`/signatures/docuseal/hiring-bundle/application/${encodeURIComponent(applicationId)}/status`);
+}
+
 function updateEmployeeSection<T extends Record<string, unknown>>(id: string, section: string, input: T) {
   return request(`/employees/${encodeURIComponent(id)}/${section}`, {
     method: "PATCH",
@@ -2230,8 +2282,7 @@ export async function createTenantUser(input: Omit<UserDto, "id">) {
   const branchIds = branches.map((branch) => branch.id);
   const activeBranchId = branchIds[0];
   const { firstName, lastName } = splitFullName(input.fullName);
-  const targetRoleCode = roleKeyToBackendCode(input.role);
-  const role = roles.find((entry) => entry.code === targetRoleCode) ?? roles[0];
+  const role = resolveTenantRole(roles, input.role);
 
   const created = await request<BackendUser>("/users", {
     method: "POST",
@@ -2259,8 +2310,7 @@ export async function updateTenantUser(id: string, input: Omit<UserDto, "id">) {
   const branchIds = branches.map((branch) => branch.id);
   const activeBranchId = branchIds[0];
   const { firstName, lastName } = splitFullName(input.fullName);
-  const targetRoleCode = roleKeyToBackendCode(input.role);
-  const role = roles.find((entry) => entry.code === targetRoleCode) ?? roles[0];
+  const role = resolveTenantRole(roles, input.role);
 
   const updated = await request<BackendUser>(`/users/${id}`, {
     method: "PATCH",
@@ -2659,13 +2709,13 @@ export async function fetchVacancies(): Promise<PublicVacancyListDto> {
 
 export function fetchApplications(filters: import("./contracts").ApplicationFilters = {}): Promise<VacancyApplicationListDto> {
   const query = new URLSearchParams({ page: String(filters.page ?? 1), pageSize: String(filters.pageSize ?? 20) });
-  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  Object.entries(filters).forEach(([key, value]) => { if (!['page', 'pageSize'].includes(key) && value !== undefined && value !== "") query.set(key, String(value)); });
   return request<VacancyApplicationListDto>(`/applications?${query.toString()}`);
 }
 
 export function fetchTalentCandidates(filters: { search?: string; poolId?: string; tagId?: string; branchId?: string; doNotContact?: boolean; page?: number; pageSize?: number } = {}) {
   const query = new URLSearchParams({ page: String(filters.page ?? 1), pageSize: String(filters.pageSize ?? 20) });
-  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); });
+  Object.entries(filters).forEach(([key, value]) => { if (!['page', 'pageSize'].includes(key) && value !== undefined && value !== "") query.set(key, String(value)); });
   return request<import("./contracts").TalentCandidateListDto>(`/talent-crm/candidates?${query.toString()}`);
 }
 
@@ -2776,6 +2826,70 @@ export function fetchHiringContext(applicationId: string) {
   return request<HiringContextDto>(
     `/workflows/hiring/context/${encodeURIComponent(applicationId)}`,
   );
+}
+
+export function fetchHiringContracts(filters: { branchId?: string; status?: import("./contracts").HiringContractStatus; search?: string; page?: number; pageSize?: number } = {}) {
+  // The hiring endpoint applies pagination defaults. Numeric query parameters
+  // are omitted until the backend DTO transforms string values from the URL.
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (!['page', 'pageSize'].includes(key) && value !== undefined && value !== "") query.set(key, String(value)); });
+  return request<import("./contracts").HiringContractListDto>(`/hiring?${query.toString()}`);
+}
+
+export function createHiringContract(applicationId: string, input: { hiringManagerUserId?: string; hrResponsibleUserId?: string; roleTitle?: string } = {}) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/applications/${encodeURIComponent(applicationId)}`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchHiringContract(contractId: string) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}`);
+}
+
+export function updateHiringContract(contractId: string, input: { roleTitle?: string; hiringManagerUserId?: string; hrResponsibleUserId?: string; nextAction?: string; nextActor?: string; priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT"; deadlineAt?: string | null }) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function configureHiringOffer(contractId: string, input: { jobOfferId: string; jobOfferVersionId?: string; roleTitle?: string }) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}/offer`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function sendHiringOffer(contractId: string) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}/offer/send`, { method: "POST" });
+}
+
+export function respondHiringOffer(contractId: string, accepted: boolean, reason?: string) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}/offer/respond`, { method: "POST", body: JSON.stringify({ accepted, reason }) });
+}
+
+export function requestHiringDocument(contractId: string, input: { type: string; title: string; required?: boolean; source?: string }) {
+  return request<import("./contracts").HiringContractDocumentDto>(`/hiring/${encodeURIComponent(contractId)}/documents`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchHiringDocuments(contractId: string) {
+  return request<import("./contracts").HiringContractDocumentDto[]>(`/hiring/${encodeURIComponent(contractId)}/documents`);
+}
+
+export function sendHiringDocuments(contractId: string) {
+  return request<unknown>(`/hiring/${encodeURIComponent(contractId)}/documents/send`, { method: "POST" });
+}
+
+export function reviewHiringDocument(contractId: string, documentId: string, input: { status: string; reason?: string }) {
+  return request<import("./contracts").HiringContractDocumentDto>(`/hiring/${encodeURIComponent(contractId)}/documents/${encodeURIComponent(documentId)}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function fetchHiringProgress(contractId: string) {
+  return request<NonNullable<import("./contracts").HiringContractDto["progress"]>>(`/hiring/${encodeURIComponent(contractId)}/progress`);
+}
+
+export function confirmHiringContract(contractId: string) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}/confirm`, { method: "POST" });
+}
+
+export function cancelHiringContract(contractId: string, reason: string) {
+  return request<import("./contracts").HiringContractDto>(`/hiring/${encodeURIComponent(contractId)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
+}
+
+export function fetchHiringHistory(contractId: string) {
+  return request<NonNullable<import("./contracts").HiringContractDto["stateHistory"]>>(`/hiring/${encodeURIComponent(contractId)}/history`);
 }
 
 export function fetchVacancySetup(vacancyId: string) {
@@ -3003,6 +3117,24 @@ export function counterCandidateJobOffer(offerId: string, input: { salaryAmount?
 export function fetchCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto | null>("/ats/communications/domain"); }
 export function configureCommunicationDomain(input: { domain: string; fromName: string; fromEmail: string; replyToEmail?: string; dkimSelector?: string }) { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain", { method: "PUT", body: JSON.stringify(input) }); }
 export function verifyCommunicationDomain() { return request<import("./contracts").CommunicationDomainDto>("/ats/communications/domain/verify", { method: "POST" }); }
+export type CompanyEmailSettings = {
+  id: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUsername: string;
+  passwordConfigured: boolean;
+  fromName: string;
+  fromEmail: string;
+  enabled: boolean;
+  lastTestedAt: string | null;
+  lastTestStatus: string | null;
+  lastTestError: string | null;
+  updatedAt: string;
+};
+export function fetchCompanyEmailSettings() { return request<CompanyEmailSettings | null>("/company/email-settings"); }
+export function saveCompanyEmailSettings(input: { smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpUsername: string; smtpPassword?: string; fromName: string; fromEmail: string; enabled: boolean }) { return request<CompanyEmailSettings>("/company/email-settings", { method: "PUT", body: JSON.stringify(input) }); }
+export function testCompanyEmailSettings(recipient: string) { return request<{ success: boolean; messageId: string; recipient: string }>("/company/email-settings/test", { method: "POST", body: JSON.stringify({ recipient }) }); }
 export function fetchCommunicationInbox(filters: { page?: number; pageSize?: number; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value != null && value !== "" && query.set(key, String(value))); return request<{ data: AtsMessageDto[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/ats/communications/inbox?${query}`); }
 export function replyCandidateEmail(messageId: string, input: { subject: string; body: string }) { return request<AtsMessageDto[]>(`/ats/communications/messages/${encodeURIComponent(messageId)}/reply`, { method: "POST", body: JSON.stringify(input) }); }
 export function fetchAtsConversations(filters: { page?: number; pageSize?: number; search?: string; status?: import("./contracts").AtsConversationStatus; assignedUserId?: string; assignedToMe?: boolean; unreadOnly?: boolean; archived?: boolean } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value != null && value !== "" && query.set(key, String(value))); return request<import("./contracts").AtsConversationListDto>(`/ats/communications/conversations?${query}`); }
@@ -3255,9 +3387,22 @@ type CandidateProfileUpdateInput = Partial<CandidatePortalProfileDto> & {
 };
 
 export function updateCandidateProfile(input: CandidateProfileUpdateInput) {
+  const editableKeys = [
+    "fullName", "phone", "city", "linkedinUrl", "portfolioUrl", "locale",
+    "timezone", "statusUpdates", "interviewReminders", "offerNotifications",
+    "marketingConsent", "applicationProfile", "socialSecurityNumber",
+  ] as const;
+  const payload = Object.fromEntries(
+    editableKeys
+      .filter((key) => input[key] !== undefined)
+      .map((key) => [key, input[key]]),
+  ) as Record<string, unknown>;
+  for (const key of ["linkedinUrl", "portfolioUrl"] as const) {
+    if (typeof payload[key] === "string" && !payload[key].trim()) delete payload[key];
+  }
   return candidateRequest<CandidatePortalProfileDto>("/candidate-auth/profile", {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -3658,7 +3803,7 @@ export function reorderTrainingCourseModules(courseId: string, entityIds: string
 
 export function createTrainingLesson(
   moduleId: string,
-  input: { title: string; description?: string; estimatedMinutes?: number; sortOrder?: number; isRequired?: boolean },
+  input: { title: string; description?: string; estimatedMinutes?: number; sortOrder?: number; isRequired?: boolean; requiredCompletionPercentage?: number },
 ) {
   return request<TrainingLessonDto>(
     `/training/admin/modules/${encodeURIComponent(moduleId)}/lessons`,
@@ -3668,7 +3813,7 @@ export function createTrainingLesson(
 
 export function updateTrainingLesson(
   lessonId: string,
-  input: { title?: string; description?: string; estimatedMinutes?: number; sortOrder?: number; isRequired?: boolean },
+  input: { title?: string; description?: string; estimatedMinutes?: number; sortOrder?: number; isRequired?: boolean; requiredCompletionPercentage?: number },
 ) {
   return request<TrainingLessonDto>(
     `/training/admin/lessons/${encodeURIComponent(lessonId)}`,
@@ -3678,13 +3823,14 @@ export function updateTrainingLesson(
 
 export function uploadTrainingVideo(
   courseId: string,
-  input: { file: File; lessonId: string; title: string; description?: string; durationSeconds: number; isMandatory?: boolean },
+  input: { file: File; lessonId: string; title: string; description?: string; durationSeconds: number; requiredCompletionPercentage?: number; isMandatory?: boolean },
 ) {
   const body = new FormData();
   body.append("file", input.file);
   body.append("lessonId", input.lessonId);
   body.append("title", input.title);
   body.append("durationSeconds", String(input.durationSeconds));
+  if (input.requiredCompletionPercentage !== undefined) body.append("requiredCompletionPercentage", String(input.requiredCompletionPercentage));
   if (input.description) body.append("description", input.description);
   if (input.isMandatory !== undefined) body.append("isMandatory", String(input.isMandatory));
   return request<TrainingLessonDto>(`/training/admin/courses/${encodeURIComponent(courseId)}/video`, { method: "POST", body });
@@ -3781,6 +3927,10 @@ export function fetchMyTrainingAssignments(filters: {
   return request<TrainingAssignmentsListDto>(
     `/training/assignments?${query.toString()}`,
   );
+}
+
+export function fetchTrainingOverview() {
+  return request<import("./contracts").TrainingOverviewDto>("/training/overview");
 }
 
 export function fetchLearnerTrainingCourse(courseId: string) {
@@ -4062,6 +4212,12 @@ export function startTrainingAssessment(quizId: string) {
   );
 }
 
+export function fetchTrainingAssessmentAttempt(quizId: string, attemptId: string) {
+  return request<import("./contracts").TrainingQuizAttemptRecoveryDto>(
+    `/training/quizzes/${encodeURIComponent(quizId)}/attempts/${encodeURIComponent(attemptId)}`,
+  );
+}
+
 export function saveTrainingAssessmentAnswer(
   quizId: string,
   attemptId: string,
@@ -4073,10 +4229,11 @@ export function saveTrainingAssessmentAnswer(
   );
 }
 
-export function submitTrainingAssessment(quizId: string, attemptId: string) {
+export function submitTrainingAssessment(quizId: string, attemptId: string, idempotencyKey?: string) {
   return request<TrainingQuizAttemptDto>(
     `/training/quizzes/${encodeURIComponent(quizId)}/attempts/${encodeURIComponent(attemptId)}/submit`,
     { method: "POST", body: JSON.stringify({}) },
+    idempotencyKey ? { idempotencyKey } : undefined,
   );
 }
 
@@ -4542,17 +4699,29 @@ function normalizeRestaurantAdvancedDashboard(payload: import("./contracts").Res
     purchaseSuggestions: Array.isArray(data.purchaseSuggestions) ? data.purchaseSuggestions : [],
   };
 }
+type RestaurantInventoryEnvelope<T> = { data: T; meta?: { requestId?: string | null; context?: { companyId?: string | null; branchId?: string | null; warehouseId?: string | null } } };
+function unwrapRestaurantInventory<T>(payload: unknown): T {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return (payload as RestaurantInventoryEnvelope<T>).data;
+  }
+  return payload as T;
+}
 type RestaurantCatalogPage<T> = { data: T[]; page: number; pageSize: number; total: number; totalPages: number };
 type RestaurantCatalogFilters = { search?: string; status?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: "asc" | "desc" };
 type RestaurantCatalogRecord = Record<string, unknown> & { id: string; name: string; status?: string };
 function normalizeRestaurantCatalogPage<T>(payload: RestaurantCatalogPage<T> | T[] | { data?: T[]; items?: T[] } | null | undefined) {
-  if (Array.isArray(payload)) return { data: payload, page: 1, pageSize: payload.length, total: payload.length, totalPages: payload.length ? 1 : 0 };
-  const value = payload as RestaurantCatalogPage<T> & { items?: T[] };
-  const data = Array.isArray(value.data) ? value.data : Array.isArray(value.items) ? value.items : [];
-  return { data, page: Number(value.page ?? 1), pageSize: Number(value.pageSize ?? data.length), total: Number(value.total ?? data.length), totalPages: Number(value.totalPages ?? (data.length ? 1 : 0)) };
+  const value = unwrapRestaurantInventory<RestaurantCatalogPage<T> | T[] | { data?: T[]; items?: T[] }>(payload);
+  if (Array.isArray(value)) return { data: value, page: 1, pageSize: value.length, total: value.length, totalPages: value.length ? 1 : 0 };
+  const data = Array.isArray(value.data) ? value.data : "items" in value && Array.isArray(value.items) ? value.items : [];
+  const page = "page" in value ? value.page : undefined;
+  const pageSize = "pageSize" in value ? value.pageSize : undefined;
+  const total = "total" in value ? value.total : undefined;
+  const totalPages = "totalPages" in value ? value.totalPages : undefined;
+  return { data, page: Number(page ?? 1), pageSize: Number(pageSize ?? data.length), total: Number(total ?? data.length), totalPages: Number(totalPages ?? (data.length ? 1 : 0)) };
 }
 function normalizeRestaurantList<T>(payload: T[] | { data?: T[]; items?: T[] } | null | undefined) {
-  const rows = Array.isArray(payload) ? payload : !payload ? [] : Array.isArray(payload.data) ? payload.data : Array.isArray(payload.items) ? payload.items : [];
+  const value = unwrapRestaurantInventory<T[] | { data?: T[]; items?: T[] }>(payload);
+  const rows = Array.isArray(value) ? value : !value ? [] : Array.isArray(value.data) ? value.data : Array.isArray(value.items) ? value.items : [];
   return rows.map((row) => {
     if (!row || typeof row !== "object") return row;
     const record = row as Record<string, unknown>;
@@ -4569,6 +4738,18 @@ function normalizeRestaurantList<T>(payload: T[] | { data?: T[]; items?: T[] } |
       numericFields.includes(key) && value == null ? 0 : value,
     ])) as T;
   });
+}
+type RestaurantListResult<T> = T[] & { page: number; pageSize: number; total: number; totalPages: number };
+function normalizeRestaurantListPage<T>(payload: T[] | RestaurantCatalogPage<T> | { data?: T[]; items?: T[] } | RestaurantInventoryEnvelope<RestaurantCatalogPage<T> | T[]> | null | undefined): RestaurantListResult<T> {
+  const value = unwrapRestaurantInventory<T[] | RestaurantCatalogPage<T> | { data?: T[]; items?: T[] }>(payload);
+  const page = value && typeof value === "object" ? value as RestaurantCatalogPage<T> & { data?: T[]; items?: T[] } : undefined;
+  const data = Array.isArray(value) ? value : Array.isArray(page?.data) ? page.data : Array.isArray(page?.items) ? page.items : [];
+  const result = [...data] as RestaurantListResult<T>;
+  result.page = Array.isArray(value) ? 1 : Number(page?.page ?? 1);
+  result.pageSize = Array.isArray(value) ? data.length : Number(page?.pageSize ?? data.length);
+  result.total = Array.isArray(value) ? data.length : Number(page?.total ?? data.length);
+  result.totalPages = Array.isArray(value) ? (data.length ? 1 : 0) : Number(page?.totalPages ?? (data.length ? 1 : 0));
+  return result;
 }
 function restaurantCatalogQuery(filters: RestaurantCatalogFilters = {}) {
   const query = new URLSearchParams();
@@ -4602,14 +4783,15 @@ export function updateRestaurantIngredient(id: string, input: Record<string, unk
 export function deactivateRestaurantIngredient(id: string) { return request<{ count: number }>(`/restaurant-inventory/ingredients/${encodeURIComponent(id)}`, { method: "DELETE" }); }
 export async function fetchRestaurantRecipes(search?: string) {
   const payload = await request<import("./contracts").RestaurantRecipeDto[] | { data?: import("./contracts").RestaurantRecipeDto[]; items?: import("./contracts").RestaurantRecipeDto[] }>(`/restaurant-inventory/recipes${search ? `?search=${encodeURIComponent(search)}` : ""}`);
-  if (Array.isArray(payload)) return payload;
-  return Array.isArray(payload.data) ? payload.data : Array.isArray(payload.items) ? payload.items : [];
+  const value = unwrapRestaurantInventory<import("./contracts").RestaurantRecipeDto[] | { data?: import("./contracts").RestaurantRecipeDto[]; items?: import("./contracts").RestaurantRecipeDto[] }>(payload);
+  if (Array.isArray(value)) return value;
+  return Array.isArray(value.data) ? value.data : Array.isArray(value.items) ? value.items : [];
 }
 export function createRestaurantRecipe(input: Record<string, unknown>) { return request<import("./contracts").RestaurantRecipeDto>("/restaurant-inventory/recipes", { method: "POST", body: JSON.stringify(input) }); }
 export function updateRestaurantRecipe(id: string, input: Record<string, unknown>) { return request<import("./contracts").RestaurantRecipeDto>(`/restaurant-inventory/recipes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
 export function activateRestaurantRecipe(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/recipes/${encodeURIComponent(id)}/activate`, { method: "PATCH" }); }
 export function archiveRestaurantRecipe(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/recipes/${encodeURIComponent(id)}/archive`, { method: "PATCH" }); }
-export async function fetchRestaurantReceipts(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<import("./contracts").RestaurantReceiptDto[] | { data?: import("./contracts").RestaurantReceiptDto[]; items?: import("./contracts").RestaurantReceiptDto[] }>(`/restaurant-inventory/receipts${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
+export async function fetchRestaurantReceipts(filters: { branchId?: string; warehouseId?: string; status?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantCatalogPage<import("./contracts").RestaurantReceiptDto> | import("./contracts").RestaurantReceiptDto[]>(`/restaurant-inventory/receipts${query.size ? `?${query}` : ""}`); return normalizeRestaurantListPage(payload); }
 export function previewRestaurantReceipt(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular una entrada"); return request<{ branchId: string; warehouseId: string; items: Array<{ ingredientId: string; purchaseQuantity: number; purchaseUnitId: string; conversionFactor: number; inventoryQuantity: number; unitCost: number; totalCost: number; lotNumber: string | null; expirationDate: string | null }>; totalCost: number; totalInventoryQuantity: number }>("/restaurant-inventory/receipts/preview", { method: "POST", body: JSON.stringify(input) }); }
 export function createRestaurantReceipt(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { requireRestaurantContext(input, "crear una entrada"); void action; return request<import("./contracts").RestaurantReceiptDto>("/restaurant-inventory/receipts", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function updateRestaurantReceipt(id: string, input: Record<string, unknown>) { requireRestaurantContext(input, "editar una entrada"); return request<import("./contracts").RestaurantReceiptDto>(`/restaurant-inventory/receipts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }); }
@@ -4617,12 +4799,12 @@ export function confirmRestaurantReceipt(id: string, idempotencyKey = requestId(
 export function cancelRestaurantReceipt(id: string, reason: string) { return request<import("./contracts").RestaurantReceiptDto>(`/restaurant-inventory/receipts/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
 export function previewRestaurantConsumption(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular el consumo"); return request<import("./contracts").RestaurantConsumptionPreviewDto>("/restaurant-inventory/consumptions/preview", { method: "POST", body: JSON.stringify(input) }); }
 export function createRestaurantConsumption(input: Record<string, unknown>) { requireRestaurantContext(input, "registrar el consumo"); return request("/restaurant-inventory/consumptions", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
-export async function fetchRestaurantConsumptions(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<Record<string, unknown>[] | { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] }>(`/restaurant-inventory/consumptions${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
+export async function fetchRestaurantConsumptions(filters: { branchId?: string; warehouseId?: string; status?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantCatalogPage<Record<string, unknown>> | Record<string, unknown>[]>(`/restaurant-inventory/consumptions${query.size ? `?${query}` : ""}`); return normalizeRestaurantListPage(payload); }
 export function confirmRestaurantConsumption(id: string, justification?: string, idempotencyKey = requestId()) { return request<Record<string, unknown>>(`/restaurant-inventory/consumptions/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }, { idempotencyKey }); }
 export function cancelRestaurantConsumption(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/consumptions/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
 export function createRestaurantWaste(input: Record<string, unknown>) { requireRestaurantContext(input, "registrar el desperdicio"); return request("/restaurant-inventory/wastes", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function previewRestaurantWaste(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular el desperdicio"); return request<Record<string, unknown>>("/restaurant-inventory/wastes/preview", { method: "POST", body: JSON.stringify(input) }); }
-export async function fetchRestaurantWastes(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<Record<string, unknown>[] | { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] }>(`/restaurant-inventory/wastes${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
+export async function fetchRestaurantWastes(filters: { branchId?: string; warehouseId?: string; status?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantCatalogPage<Record<string, unknown>> | Record<string, unknown>[]>(`/restaurant-inventory/wastes${query.size ? `?${query}` : ""}`); return normalizeRestaurantListPage(payload); }
 export function confirmRestaurantWaste(id: string, justification?: string, idempotencyKey = requestId()) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }, { idempotencyKey }); }
 export function cancelRestaurantWaste(id: string) { return request<Record<string, unknown>>(`/restaurant-inventory/wastes/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
 export async function fetchRestaurantStock(filters: { branchId?: string; warehouseId?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<import("./contracts").RestaurantIngredientDto[] | { data?: import("./contracts").RestaurantIngredientDto[]; items?: import("./contracts").RestaurantIngredientDto[] }>(`/restaurant-inventory/balances${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
@@ -4648,20 +4830,20 @@ export async function fetchRestaurantMovements(filters: { branchId?: string; war
     } satisfies import("./contracts").RestaurantMovementDto;
   });
 }
-export function fetchRestaurantPhase2Dashboard(filters: { branchId?: string; warehouseId?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantPhase2DashboardDto>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantPhase2Dashboard(filters: { branchId?: string; warehouseId?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); return request<import("./contracts").RestaurantPhase2DashboardDto | RestaurantInventoryEnvelope<import("./contracts").RestaurantPhase2DashboardDto>>(`/restaurant-inventory/dashboard${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<import("./contracts").RestaurantPhase2DashboardDto>(payload)); }
 export async function fetchRestaurantProductions(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<import("./contracts").RestaurantProductionDto[] | { data?: import("./contracts").RestaurantProductionDto[]; items?: import("./contracts").RestaurantProductionDto[] }>(`/restaurant-inventory/productions${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
 export function previewRestaurantProduction(input: Record<string, unknown>) { requireRestaurantContext(input, "calcular la producción"); return request<import("./contracts").RestaurantProductionDto>("/restaurant-inventory/productions/preview", { method: "POST", body: JSON.stringify(input) }); }
 export function createRestaurantProduction(input: Record<string, unknown>, action: "draft" | "confirm" = "draft") { requireRestaurantContext(input, "crear una producción"); void action; return request<import("./contracts").RestaurantProductionDto>("/restaurant-inventory/productions", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function confirmRestaurantProduction(id: string, idempotencyKey = requestId()) { return request<import("./contracts").RestaurantProductionDto>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/confirm`, { method: "POST" }, { idempotencyKey }); }
 export function cancelRestaurantProduction(id: string, reason: string) { return request<import("./contracts").RestaurantProductionDto>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }); }
 export function confirmRestaurantProductionWithJustification(id: string, justification?: string, idempotencyKey = requestId()) { return request<Record<string, unknown>>(`/restaurant-inventory/productions/${encodeURIComponent(id)}/confirm`, { method: "POST", body: JSON.stringify(justification ? { justification } : {}) }, { idempotencyKey }); }
-export async function fetchRestaurantLots(filters: { branchId?: string; warehouseId?: string; expiry?: string; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<import("./contracts").RestaurantLotDto[] | { data?: import("./contracts").RestaurantLotDto[]; items?: import("./contracts").RestaurantLotDto[] }>(`/restaurant-inventory/lots${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
-export async function fetchRestaurantStockCounts(filters: { branchId?: string; warehouseId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<import("./contracts").RestaurantStockCountDto[] | { data?: import("./contracts").RestaurantStockCountDto[]; items?: import("./contracts").RestaurantStockCountDto[] }>(`/restaurant-inventory/stock-counts${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
+export async function fetchRestaurantLots(filters: { branchId?: string; warehouseId?: string; expiry?: string; search?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantCatalogPage<import("./contracts").RestaurantLotDto> | import("./contracts").RestaurantLotDto[]>(`/restaurant-inventory/lots${query.size ? `?${query}` : ""}`); return normalizeRestaurantListPage(payload); }
+export async function fetchRestaurantStockCounts(filters: { branchId?: string; warehouseId?: string; status?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantCatalogPage<import("./contracts").RestaurantStockCountDto> | import("./contracts").RestaurantStockCountDto[]>(`/restaurant-inventory/stock-counts${query.size ? `?${query}` : ""}`); return normalizeRestaurantListPage(payload); }
 export function createRestaurantStockCount(input: Record<string, unknown>) { requireRestaurantContext(input, "crear un conteo"); return request<import("./contracts").RestaurantStockCountDto>("/restaurant-inventory/stock-counts", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
 export function submitRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/submit`, { method: "POST" }); }
 export function approveRestaurantStockCount(id: string, idempotencyKey = requestId()) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/approve`, { method: "POST" }, { idempotencyKey }); }
 export function cancelRestaurantStockCount(id: string) { return request<import("./contracts").RestaurantStockCountDto>(`/restaurant-inventory/stock-counts/${encodeURIComponent(id)}/cancel`, { method: "POST" }); }
-export async function fetchRestaurantTransfers(filters: { branchId?: string; status?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, value); }); const payload = await request<import("./contracts").RestaurantTransferDto[] | { data?: import("./contracts").RestaurantTransferDto[]; items?: import("./contracts").RestaurantTransferDto[] }>(`/restaurant-inventory/transfers${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
+export async function fetchRestaurantTransfers(filters: { branchId?: string; warehouseId?: string; status?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantCatalogPage<import("./contracts").RestaurantTransferDto> | import("./contracts").RestaurantTransferDto[]>(`/restaurant-inventory/transfers${query.size ? `?${query}` : ""}`); return normalizeRestaurantListPage(payload); }
 export function createRestaurantTransfer(input: Record<string, unknown>) { requireRestaurantContext({ branchId: input.sourceBranchId, warehouseId: input.sourceWarehouseId }, "crear una transferencia"); return request<import("./contracts").RestaurantTransferDto>("/restaurant-inventory/transfers", { method: "POST", body: JSON.stringify(input) }); }
 export function sendRestaurantTransfer(id: string) { return request<import("./contracts").RestaurantTransferDto>(`/restaurant-inventory/transfers/${encodeURIComponent(id)}/send`, { method: "POST" }); }
 export function receiveRestaurantTransfer(id: string) { return request<import("./contracts").RestaurantTransferDto>(`/restaurant-inventory/transfers/${encodeURIComponent(id)}/receive`, { method: "POST" }); }
@@ -4671,12 +4853,12 @@ export async function downloadRestaurantSalesImportTemplate() {
   const blob = await request<Blob>("/restaurant-inventory/sales-imports/template", {}, { responseType: "blob" });
   const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "plantilla-importacion-ventas.xlsx"; anchor.click(); URL.revokeObjectURL(url);
 }
-export function uploadRestaurantSalesImport(input: { file: File; branchId: string; warehouseId: string }) { const body = new FormData(); body.set("file", input.file); return request<import("./contracts").SalesImportValidationDto>(`/restaurant-inventory/sales-imports/upload?branchId=${encodeURIComponent(input.branchId)}&warehouseId=${encodeURIComponent(input.warehouseId)}`, { method: "POST", body }); }
+export function uploadRestaurantSalesImport(input: { file: File; branchId: string; warehouseId: string }) { const body = new FormData(); body.set("file", input.file); return request<import("./contracts").SalesImportValidationDto | RestaurantInventoryEnvelope<import("./contracts").SalesImportValidationDto>>(`/restaurant-inventory/sales-imports/upload?branchId=${encodeURIComponent(input.branchId)}&warehouseId=${encodeURIComponent(input.warehouseId)}`, { method: "POST", body }).then((payload) => unwrapRestaurantInventory<import("./contracts").SalesImportValidationDto>(payload)); }
 export async function validateRestaurantSalesImport(input: { file: File; branchId: string; warehouseId: string }) {
   const uploaded = await uploadRestaurantSalesImport(input);
   const sessionId = (uploaded as { id?: string }).id;
   if (!sessionId) throw new ApiError("El backend no devolvió el identificador de importación.", 500, "SALES_IMPORT_ID_MISSING");
-  const result = await request<Record<string, unknown>>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}/validate`, { method: "POST" });
+  const result = await request<Record<string, unknown> | RestaurantInventoryEnvelope<Record<string, unknown>>>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}/validate`, { method: "POST" }).then((payload) => unwrapRestaurantInventory<Record<string, unknown>>(payload));
   return {
     sessionId,
     totalRows: Number(result.totalRows ?? 0),
@@ -4699,14 +4881,14 @@ export function configureRestaurantSalesImport(sessionId: string, input: Record<
 export function saveRestaurantSalesImportColumnMap(sessionId: string, columnMap: Record<string, string>) { void sessionId; void columnMap; return Promise.reject(new ApiError("El mapeo de columnas automático no está expuesto por el backend.", 404, "SALES_IMPORT_COLUMNS_UNAVAILABLE")); }
 export function saveRestaurantSalesImportMappings(_sessionId: string, mappings: Array<Record<string, unknown>>) { return Promise.all(mappings.map((mapping) => request<import("./contracts").SalesImportMappingDto>("/restaurant-inventory/sales-imports/mappings", { method: "POST", body: JSON.stringify(mapping) }))); }
 export function fetchRestaurantSalesImportMappings(sessionId: string) { void sessionId; return Promise.reject(new ApiError("La consulta de mapeos no está expuesta por el backend.", 404, "SALES_IMPORT_MAPPINGS_UNAVAILABLE")); }
-export function fetchRestaurantSalesImportSession(sessionId: string) { return request<import("./contracts").SalesImportValidationDto>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}`); }
-export function previewRestaurantSalesImport(sessionId: string) { void sessionId; return Promise.reject(new ApiError("La vista previa de importación aún no está expuesta por el backend.", 404, "SALES_IMPORT_PREVIEW_UNAVAILABLE")); }
-export function processRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportJobDto>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}/process`, { method: "POST" }); }
-export function fetchRestaurantSalesImportJob(jobId: string) { return request<import("./contracts").SalesImportJobDto>(`/restaurant-inventory/sales-imports/${encodeURIComponent(jobId)}`); }
-export function fetchRestaurantSalesImportHistory() { return Promise.reject(new ApiError("El historial de importaciones no está expuesto por el backend.", 404, "SALES_IMPORT_HISTORY_UNAVAILABLE")); }
+export function fetchRestaurantSalesImportSession(sessionId: string) { return request<import("./contracts").SalesImportValidationDto | RestaurantInventoryEnvelope<import("./contracts").SalesImportValidationDto>>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}`).then((payload) => unwrapRestaurantInventory<import("./contracts").SalesImportValidationDto>(payload)); }
+export function previewRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportPreviewDto | RestaurantInventoryEnvelope<import("./contracts").SalesImportPreviewDto>>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}/preview`, { method: "POST" }).then((payload) => unwrapRestaurantInventory<import("./contracts").SalesImportPreviewDto>(payload)); }
+export function processRestaurantSalesImport(sessionId: string) { return request<import("./contracts").SalesImportJobDto | RestaurantInventoryEnvelope<import("./contracts").SalesImportJobDto>>(`/restaurant-inventory/sales-imports/${encodeURIComponent(sessionId)}/process`, { method: "POST" }).then((payload) => unwrapRestaurantInventory<import("./contracts").SalesImportJobDto>(payload)); }
+export function fetchRestaurantSalesImportJob(jobId: string) { return request<import("./contracts").SalesImportJobDto | RestaurantInventoryEnvelope<import("./contracts").SalesImportJobDto>>(`/restaurant-inventory/sales-imports/${encodeURIComponent(jobId)}`).then((payload) => unwrapRestaurantInventory<import("./contracts").SalesImportJobDto>(payload)); }
+export function fetchRestaurantSalesImportHistory(filters: { branchId?: string; page?: number; pageSize?: number } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantCatalogPage<import("./contracts").SalesImportHistoryDto> | RestaurantInventoryEnvelope<RestaurantCatalogPage<import("./contracts").SalesImportHistoryDto>>>(`/restaurant-inventory/sales-imports/history${query.size ? `?${query}` : ""}`).then((payload) => normalizeRestaurantListPage<import("./contracts").SalesImportHistoryDto>(payload)); }
 type RestaurantAdvancedDashboardPayload = import("./contracts").RestaurantAdvancedDashboardDto | { data?: Partial<import("./contracts").RestaurantAdvancedDashboardDto> } | null;
 export async function fetchRestaurantAdvancedDashboard(filters: Record<string, string> = {}) { const query = new URLSearchParams(filters); const payload = await request<RestaurantAdvancedDashboardPayload>(`/restaurant-inventory/reports/advanced-dashboard${query.size ? `?${query}` : ""}`); return normalizeRestaurantAdvancedDashboard(payload); }
-export function fetchRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<import("./contracts").RestaurantReportDto>(`/restaurant-inventory/reports/${encodeURIComponent(report)}${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<import("./contracts").RestaurantReportDto | RestaurantInventoryEnvelope<import("./contracts").RestaurantReportDto>>(`/restaurant-inventory/reports/${encodeURIComponent(report)}${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<import("./contracts").RestaurantReportDto>(payload)); }
 export async function downloadRestaurantReport(report: string, filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const blob = await request<Blob>(`/restaurant-inventory/reports/${encodeURIComponent(report)}/export${query.size ? `?${query}` : ""}`, {}, { responseType: "blob" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${report}-inventario.csv`; anchor.click(); URL.revokeObjectURL(url); }
 export function fetchRestaurantRecipeCost(recipeId: string) { return request<import("./contracts").RestaurantRecipeCostDto>(`/restaurant-inventory/reports/recipe-cost/${encodeURIComponent(recipeId)}`); }
 export function fetchRestaurantAudit(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<{ items: import("./contracts").RestaurantAuditEntryDto[]; page: number; pageSize: number; total: number; totalPages: number; generatedAt: string }>(`/restaurant-inventory/reports/audit${query.size ? `?${query}` : ""}`); }
@@ -4724,19 +4906,19 @@ export async function fetchRestaurantPriceHistory(filters: Record<string, string
 export async function fetchRestaurantPurchaseSuggestions(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantPurchaseSuggestionDto[] | { data?: RestaurantPurchaseSuggestionDto[]; items?: RestaurantPurchaseSuggestionDto[] }>(`/restaurant-inventory/purchase-suggestions${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
 export function convertRestaurantPurchaseSuggestions(items: Array<Record<string, unknown>>, idempotencyKey = requestId()) { return request<RestaurantPurchaseOrderDto>("/restaurant-inventory/purchase-suggestions/convert", { method: "POST", body: JSON.stringify({ items }) }, { idempotencyKey }); }
 export async function fetchRestaurantInvoices(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); const payload = await request<RestaurantInvoiceDto[] | { data?: RestaurantInvoiceDto[]; items?: RestaurantInvoiceDto[] }>(`/restaurant-inventory/invoices${query.size ? `?${query}` : ""}`); return normalizeRestaurantList(payload); }
-export function uploadRestaurantInvoice(file: File) { const body = new FormData(); body.set("file", file); return request<RestaurantInvoiceDto>("/restaurant-inventory/invoices/upload", { method: "POST", body }, { idempotencyKey: requestId() }); }
+export function uploadRestaurantInvoice(file: File, context: { branchId: string; warehouseId: string }) { const body = new FormData(); body.set("file", file); const query = new URLSearchParams({ branchId: context.branchId, warehouseId: context.warehouseId }); return request<RestaurantInvoiceDto | RestaurantInventoryEnvelope<RestaurantInvoiceDto>>(`/restaurant-inventory/invoices/upload?${query}`, { method: "POST", body }, { idempotencyKey: requestId() }).then((payload) => unwrapRestaurantInventory<RestaurantInvoiceDto>(payload)); }
 export function processRestaurantInvoice(id: string, idempotencyKey = requestId()) { return request<RestaurantInvoiceDto>(`/restaurant-inventory/invoices/${encodeURIComponent(id)}/process`, { method: "POST" }, { idempotencyKey }); }
 export type RestaurantExpiryAlertDto = { id: string; ingredientId: string; ingredientName?: string; lotNumber?: string; expirationDate: string; quantity: number; unit?: string; daysRemaining: number; severity: "INFO" | "WARNING" | "CRITICAL" | "EXPIRED"; acknowledged?: boolean };
 export type RestaurantVarianceDto = { ingredientId: string; ingredientName?: string; theoreticalQuantity: number; actualQuantity: number; varianceQuantity: number; variancePercent: number; theoreticalCost: number; actualCost: number; varianceCost: number; periodStart?: string; periodEnd?: string };
 export type RestaurantShrinkageAlertDto = { id: string; ingredientId: string; ingredientName?: string; variancePercent: number; varianceCost: number; reason?: string; status: string; detectedAt?: string };
 export type RestaurantAuditLogDto = { id: string; action: string; entityType: string; entityId: string; actorName?: string; before?: unknown; after?: unknown; reason?: string; createdAt: string; immutable: true };
-export function fetchRestaurantExpiryAlerts(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantExpiryAlertDto[]>(`/restaurant-inventory/alerts/expiry${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantExpiryAlerts(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantExpiryAlertDto[] | RestaurantInventoryEnvelope<RestaurantExpiryAlertDto[]>>(`/restaurant-inventory/alerts/expiry${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<RestaurantExpiryAlertDto[]>(payload)); }
 export function acknowledgeRestaurantExpiryAlert(id: string, idempotencyKey = requestId()) { return request(`/restaurant-inventory/alerts/expiry/${encodeURIComponent(id)}/acknowledge`, { method: "POST" }, { idempotencyKey }); }
-export function fetchRestaurantVariance(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantVarianceDto[]>(`/restaurant-inventory/analytics/variance${query.size ? `?${query}` : ""}`); }
-export function fetchRestaurantShrinkageAlerts(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantShrinkageAlertDto[]>(`/restaurant-inventory/alerts/shrinkage${query.size ? `?${query}` : ""}`); }
-export function fetchRestaurantAuditLog(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantAuditLogDto[]>(`/restaurant-inventory/audit-log${query.size ? `?${query}` : ""}`); }
-export function createRestaurantCountSchedule(input: Record<string, unknown>) { requireRestaurantContext(input, "programar un conteo"); return request("/restaurant-inventory/stock-count-schedules", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }); }
-export function fetchRestaurantCountSchedules(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<Array<Record<string, unknown>>>(`/restaurant-inventory/stock-count-schedules${query.size ? `?${query}` : ""}`); }
+export function fetchRestaurantVariance(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantVarianceDto[] | RestaurantInventoryEnvelope<RestaurantVarianceDto[]>>(`/restaurant-inventory/analytics/variance${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<RestaurantVarianceDto[]>(payload)); }
+export function fetchRestaurantShrinkageAlerts(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantShrinkageAlertDto[] | RestaurantInventoryEnvelope<RestaurantShrinkageAlertDto[]>>(`/restaurant-inventory/alerts/shrinkage${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<RestaurantShrinkageAlertDto[]>(payload)); }
+export function fetchRestaurantAuditLog(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<RestaurantAuditLogDto[] | RestaurantInventoryEnvelope<RestaurantAuditLogDto[]>>(`/restaurant-inventory/audit-log${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<RestaurantAuditLogDto[]>(payload)); }
+export function createRestaurantCountSchedule(input: Record<string, unknown>) { requireRestaurantContext(input, "programar un conteo"); return request<Record<string, unknown> | RestaurantInventoryEnvelope<Record<string, unknown>>>("/restaurant-inventory/stock-count-schedules", { method: "POST", body: JSON.stringify(input) }, { idempotencyKey: String(input.clientOperationId ?? requestId()) }).then((payload) => unwrapRestaurantInventory<Record<string, unknown>>(payload)); }
+export function fetchRestaurantCountSchedules(filters: Record<string, string | number | undefined> = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== "") query.set(key, String(value)); }); return request<Array<Record<string, unknown>> | RestaurantInventoryEnvelope<Array<Record<string, unknown>>>>(`/restaurant-inventory/stock-count-schedules${query.size ? `?${query}` : ""}`).then((payload) => unwrapRestaurantInventory<Array<Record<string, unknown>>>(payload)); }
 export type RestaurantDemandForecastDto = { period: string; ingredientId?: string; ingredientName?: string; branchId?: string; predictedQuantity: number; confidence?: number; lowerBound?: number; upperBound?: number; unit?: string };
 export type RestaurantBranchCostDto = { branchId: string; branchName: string; period: string; inventoryCost: number; purchaseCost: number; consumptionCost: number; foodCostPercent?: number; varianceCost?: number };
 export type RestaurantRecipeMarginDto = { recipeId: string; recipeName: string; period: string; portions: number; revenue: number; cost: number; margin: number; marginPercent: number };

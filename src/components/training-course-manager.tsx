@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   Rocket,
   Target,
+  X,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -109,6 +110,7 @@ import {
 } from "@/lib/training-course-wizard";
 import { moveTrainingEntity, trainingBlockSummary } from "@/lib/training-content-editor";
 import { getTrainingAssessmentReadiness } from "@/lib/training-assessment";
+import { saveLocalTrainingVideo, getLocalTrainingVideo } from "@/lib/training-local-storage";
 
 const statusLabels: Record<TrainingCourseStatus, string> = {
   DRAFT: "Borrador",
@@ -305,6 +307,22 @@ export function TrainingCourseManager() {
           />
         </CardContent>
       </Card>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-section px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">{coursesQuery.data?.total ?? 0} cursos</span>
+          {search ? <Badge variant="secondary">Búsqueda: {search}</Badge> : null}
+          {status ? <Badge variant="secondary">Estado: {statusLabels[status as TrainingCourseStatus]}</Badge> : null}
+          {scope ? <Badge variant="secondary">Alcance: {scope === "TENANT" ? "Empresa" : "Global"}</Badge> : null}
+          {categoryId ? <Badge variant="secondary">Categoría: {(categoriesQuery.data ?? []).find((category) => category.id === categoryId)?.name ?? "Seleccionada"}</Badge> : null}
+        </div>
+        {search || status || scope || categoryId ? (
+          <Button type="button" variant="ghost" size="sm" className="self-start sm:self-auto" onClick={() => router.replace(pathname, { scroll: false })}>
+            <X className="size-4" aria-hidden="true" />
+            Limpiar filtros
+          </Button>
+        ) : <span className="text-text-secondary">Mostrando el catálogo completo</span>}
+      </div>
 
       {coursesQuery.isLoading ? <AsyncState state="loading" title="Cargando cursos" /> : null}
       {coursesQuery.isError ? (
@@ -570,19 +588,46 @@ function CourseCard(props: CourseActionsProps) {
   );
 }
 
+function VisualCourseHint({ thresholdPercent = 90 }: { thresholdPercent?: number }) {
+  return (
+    <InlineFeedback tone="info" title="Curso visual">
+      Pensado para apoyarse en video. Cuando una lección es audiovisual, se completa al alcanzar el {thresholdPercent}% de reproducción.
+    </InlineFeedback>
+  );
+}
+
 export function TrainingCourseCreatePage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [categoryId, setCategoryId] = useState("NONE");
+  const [isVisualCourse, setIsVisualCourse] = useState(true);
+  const [introVideoUrl, setIntroVideoUrl] = useState("");
+  const [courseTemplate, setCourseTemplate] = useState<"BLANK" | "VISUAL">("VISUAL");
   const categories = useQuery({ queryKey: ["training-categories"], queryFn: fetchTrainingCategories });
   const create = useMutation({
-    mutationFn: () => createTrainingCourse({
-      title: title.trim(),
-      summary: summary.trim() || undefined,
-      categoryId: categoryId === "NONE" ? undefined : categoryId,
-      scope: "TENANT",
-    }),
+    mutationFn: async () => {
+      const course = await createTrainingCourse({
+        title: title.trim(),
+        summary: summary.trim() || undefined,
+        categoryId: categoryId === "NONE" ? undefined : categoryId,
+        introVideoUrl: isVisualCourse ? introVideoUrl.trim() || undefined : undefined,
+        scope: "TENANT",
+      });
+      if (courseTemplate === "VISUAL") {
+        const modules = [
+          { title: "Introducción visual", description: "Contexto y conceptos principales mediante videos de apoyo." },
+          { title: "Aplicación práctica", description: "Demostraciones y pasos prácticos para llevar lo aprendido al trabajo." },
+        ];
+        for (const [moduleIndex, moduleInput] of modules.entries()) {
+          const createdModule = await createTrainingCourseModule(course.id, { ...moduleInput, sortOrder: moduleIndex, isRequired: true });
+          for (const [lessonIndex, lessonTitle] of ["Video de bienvenida", "Demostración paso a paso"].entries()) {
+            await createTrainingLesson(createdModule.id, { title: moduleIndex === 0 ? lessonTitle : lessonTitle.replace("Video", "Video práctico"), sortOrder: lessonIndex, isRequired: true, requiredCompletionPercentage: 90 });
+          }
+        }
+      }
+      return course;
+    },
     onSuccess: (course) => {
       toast.success("Curso creado como borrador");
       router.replace(`/training/content/${encodeURIComponent(course.id)}`);
@@ -613,6 +658,43 @@ export function TrainingCourseCreatePage() {
           <FormField id="course-category" label="Categoría" description="Opcional. Puedes crear o cambiar categorías más adelante.">
             {(field) => <Select value={categoryId} onValueChange={setCategoryId} disabled={categories.isLoading}><SelectTrigger {...field}><SelectValue placeholder="Sin categoría" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin categoría</SelectItem>{(categories.data ?? []).map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent></Select>}
           </FormField>
+          <div className="space-y-4 rounded-2xl border border-border-default bg-surface-section p-4">
+            <FormField id="course-template" label="Plantilla inicial" description="La plantilla visual crea módulos y lecciones base listas para recibir videos locales.">
+              {(field) => <Select value={courseTemplate} onValueChange={(value) => { const next = value as "BLANK" | "VISUAL"; setCourseTemplate(next); setIsVisualCourse(next === "VISUAL"); }}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="VISUAL">Curso visual</SelectItem><SelectItem value="BLANK">Curso en blanco</SelectItem></SelectContent></Select>}
+            </FormField>
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={isVisualCourse}
+                onChange={(event) => setIsVisualCourse(event.target.checked)}
+              />
+              <span>
+                <span className="block font-medium">Crear como curso visual</span>
+                <span className="block text-sm text-text-secondary">
+                  Prioriza videos de apoyo y deja visible la regla de avance al 90% para completar.
+                </span>
+              </span>
+            </label>
+            {isVisualCourse ? (
+              <FormField
+                id="course-intro-video"
+                label="Video introductorio"
+                description="Opcional, pero recomendado para cursos visuales. Sirve como apoyo de bienvenida."
+              >
+                {(field) => (
+                  <Input
+                    {...field}
+                    type="url"
+                    value={introVideoUrl}
+                    onChange={(event) => setIntroVideoUrl(event.target.value)}
+                    placeholder="https://..."
+                  />
+                )}
+              </FormField>
+            ) : null}
+            <VisualCourseHint />
+          </div>
           <InlineFeedback tone="info" title="El resto se configura después">Dificultad, duración, idioma, etiquetas, portada y visibilidad no son necesarios para crear el borrador.</InlineFeedback>
           <div className="flex flex-col-reverse gap-3 border-t border-border-default pt-5 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={() => router.push("/training/content")}>Cancelar</Button><Button type="submit" disabled={create.isPending || Boolean(errors.length)}>{create.isPending ? "Creando…" : "Crear y diseñar curso"}</Button></div>
         </form>
@@ -707,6 +789,10 @@ function CourseMetadataForm({
       <FormField id="course-description" label="Descripción">
         {(field) => <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />}
       </FormField>
+      <FormField id="course-intro-video" label="Video introductorio" description="Opcional. Sirve como apoyo visual y entrada rápida al contenido.">
+        {(field) => <Input {...field} type="url" value={form.introVideoUrl ?? ""} onChange={(event) => setForm({ ...form, introVideoUrl: event.target.value })} placeholder="https://..." />}
+      </FormField>
+      <VisualCourseHint />
       <FormField id="course-duration" label="Duración estimada (minutos)" description="Puedes ajustar este valor cuando definas las lecciones.">
         {(field) => <Input {...field} type="number" min={0} value={form.estimatedMinutes} onChange={(event) => setForm({ ...form, estimatedMinutes: Number(event.target.value) })} />}
       </FormField>
@@ -770,11 +856,12 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
       <section className="overflow-hidden rounded-3xl border border-border-default bg-card shadow-sm">
         <header className="border-b border-border-default p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><p className="text-sm font-medium text-text-secondary">Borrador y publicación</p><p className="mt-1 text-sm text-text-secondary">Completa cada etapa a tu ritmo; los campos avanzados son opcionales.</p></div>
+            <div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-text-secondary">Borrador y publicación</p>{query.data ? <CourseStatusBadge status={query.data.status} /> : null}</div><p className="mt-1 text-sm text-text-secondary">Completa cada etapa a tu ritmo; los campos avanzados son opcionales.</p></div>
             {wizard ? (
               <div className="min-w-48">
                 <div className="mb-2 flex justify-between text-xs font-medium"><span>Avance editorial</span><span>{wizard.progressPercent}%</span></div>
-                <div className="h-2 overflow-hidden rounded-full bg-surface-section"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${wizard.progressPercent}%` }} /></div>
+                <div className="h-2 overflow-hidden rounded-full bg-surface-section" role="progressbar" aria-label="Avance editorial del curso" aria-valuemin={0} aria-valuemax={100} aria-valuenow={wizard.progressPercent}><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${wizard.progressPercent}%` }} /></div>
+                <p className={`mt-2 text-xs ${wizard.requiredReady ? "text-status-success" : "text-status-warning"}`}>{wizard.requiredReady ? "Etapas obligatorias completas" : "Completa Información, Fundamento y Estructura para publicar"}</p>
               </div>
             ) : null}
           </div>
@@ -880,7 +967,7 @@ function WizardSidebar({
     PUBLISH: <Rocket className="size-4" />,
   };
   return (
-    <aside className="overflow-y-auto border-b border-border-default bg-surface-section p-4 lg:border-b-0 lg:border-r">
+    <aside className="sticky top-0 z-10 max-h-[22rem] overflow-y-auto border-b border-border-default bg-surface-section p-4 lg:static lg:max-h-none lg:border-b-0 lg:border-r">
       <nav aria-label="Etapas del curso" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         {TRAINING_COURSE_WIZARD_STEPS.map((item, index) => (
           <button
@@ -1367,13 +1454,39 @@ function LessonEditor({ courseId, lesson, index, total, editable, moving, onMove
   const [description, setDescription] = useState(lesson.description ?? "");
   const [estimatedMinutes, setEstimatedMinutes] = useState(lesson.estimatedMinutes ?? 0);
   const [isRequired, setIsRequired] = useState(lesson.isRequired);
+  const [completionPercentage, setCompletionPercentage] = useState(lesson.requiredCompletionPercentage ?? 90);
   const [blockOpen, setBlockOpen] = useState(false);
+  const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void getLocalTrainingVideo(courseId, lesson.id).then((record) => {
+      if (active && record) setLocalVideoUrl(URL.createObjectURL(record.blob));
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      setLocalVideoUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+    };
+  }, [courseId, lesson.id]);
   const upload = useMutation({
-    mutationFn: async (file: File) => uploadTrainingVideo(courseId, { file, lessonId: lesson.id, title, description: description || undefined, durationSeconds: await readVideoDuration(file), isMandatory: isRequired }),
-    onSuccess: async () => { toast.success("Video cargado en el almacenamiento de Railway"); await onChanged(); },
+    mutationFn: async (file: File) => {
+      const durationSeconds = await readVideoDuration(file);
+      const record = await saveLocalTrainingVideo({ courseId, lessonId: lesson.id, name: file.name, type: file.type, size: file.size, durationSeconds, blob: file });
+      await uploadTrainingVideo(courseId, { file, lessonId: lesson.id, title, description: description || undefined, durationSeconds, requiredCompletionPercentage: completionPercentage, isMandatory: isRequired });
+      return record;
+    },
+    onSuccess: (record) => {
+      setLocalVideoUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return URL.createObjectURL(record.blob);
+      });
+      toast.success("Video guardado y disponible para los participantes");
+    },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cargar el video.")),
   });
-  const update = useMutation({ mutationFn: () => updateTrainingLesson(lesson.id, { title, description: description || undefined, estimatedMinutes, isRequired }), onSuccess: async () => { setEditing(false); await onChanged(); } });
+  const update = useMutation({ mutationFn: () => updateTrainingLesson(lesson.id, { title, description: description || undefined, estimatedMinutes, isRequired, requiredCompletionPercentage: completionPercentage }), onSuccess: async () => { setEditing(false); await onChanged(); }, onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible guardar la lección.")) });
   const remove = useMutation({ mutationFn: () => deleteTrainingLesson(lesson.id), onSuccess: onChanged });
   const duplicate = useMutation({ mutationFn: () => duplicateTrainingLesson(lesson.id), onSuccess: async () => { toast.success("Lección duplicada"); await onChanged(); } });
   const reorder = useMutation({
@@ -1385,13 +1498,13 @@ function LessonEditor({ courseId, lesson, index, total, editable, moving, onMove
     reorder.mutate(moveTrainingEntity(lesson.blocks.map((item) => item.id), blockId, direction));
   };
   return (
-    <div className="rounded-xl border border-border-default bg-surface-section p-3">
+      <div className="rounded-xl border border-border-default bg-surface-section p-3">
       <div className="flex items-start gap-2">
         <Button type="button" size="icon" variant="ghost" aria-label={expanded ? "Contraer lección" : "Expandir lección"} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronDown /> : <ChevronRight />}</Button>
-        <div className="min-w-0 flex-1">{editing ? <div className="grid gap-2 sm:grid-cols-[1fr_9rem]"><Input aria-label="Título de la lección" value={title} onChange={(event) => setTitle(event.target.value)} /><Input aria-label="Duración estimada en minutos" type="number" min={0} value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} /><textarea aria-label="Descripción de la lección" className="min-h-20 rounded-xl border border-border-default bg-surface-elevated p-3 text-sm sm:col-span-2" placeholder="Objetivo y contexto de la lección" value={description} onChange={(event) => setDescription(event.target.value)} /><label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />Lección obligatoria</label></div> : <><p className="font-medium">{lesson.title}</p>{lesson.description ? <p className="text-sm text-text-secondary">{lesson.description}</p> : null}<p className="text-xs text-text-secondary">{lesson.estimatedMinutes || 0} min · {lesson.isRequired ? "Obligatoria" : "Opcional"} · {lesson.blocks.length} bloques</p></>}</div>
-        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<label className="inline-flex cursor-pointer items-center justify-center rounded-md px-2 text-sm hover:bg-muted" title="Cargar video MP4"><Video className="size-4" /><input className="sr-only" type="file" accept="video/mp4,.mp4" disabled={upload.isPending} onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.currentTarget.value = ""; }} /></label><Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
+        <div className="min-w-0 flex-1">{editing ? <div className="grid gap-2 sm:grid-cols-[1fr_9rem]"><Input aria-label="Título de la lección" value={title} onChange={(event) => setTitle(event.target.value)} /><Input aria-label="Duración estimada en minutos" type="number" min={0} value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} /><textarea aria-label="Descripción de la lección" className="min-h-20 rounded-xl border border-border-default bg-surface-elevated p-3 text-sm sm:col-span-2" placeholder="Objetivo y contexto de la lección" value={description} onChange={(event) => setDescription(event.target.value)} /><label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />Lección obligatoria</label><label className="flex items-center gap-2 text-sm sm:col-span-2">Porcentaje para completar video<input className="w-24" type="number" min={1} max={100} value={completionPercentage} onChange={(event) => setCompletionPercentage(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} />%</label></div> : <><p className="font-medium">{lesson.title}</p>{lesson.description ? <p className="text-sm text-text-secondary">{lesson.description}</p> : null}<p className="text-xs text-text-secondary">{lesson.estimatedMinutes || 0} min · {lesson.isRequired ? "Obligatoria" : "Opcional"} · {lesson.blocks.length} bloques · Video: {lesson.requiredCompletionPercentage ?? 90}%</p></>}</div>
+        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>Guardar</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<label className="inline-flex cursor-pointer items-center justify-center rounded-md px-2 text-sm hover:bg-muted" title="Cargar video MP4 local"><Video className="size-4" /><input className="sr-only" type="file" accept="video/mp4,.mp4" disabled={upload.isPending} onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.currentTarget.value = ""; }} /></label><Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       </div>
-      {expanded ? <div className="mt-3 space-y-2 pl-0 sm:pl-12">{lesson.blocks.map((block, blockIndex) => <BlockEditor key={block.id} block={block} index={blockIndex} total={lesson.blocks.length} editable={editable} moving={reorder.isPending} onMove={moveBlock} onChanged={onChanged} />)}{editable ? <Button type="button" size="sm" variant="secondary" onClick={() => setBlockOpen(true)}><Plus className="size-4" />Agregar contenido</Button> : null}</div> : null}
+      {expanded ? <div className="mt-3 space-y-2 pl-0 sm:pl-12">{localVideoUrl ? <div className="rounded-xl border border-primary/20 bg-card p-3"><p className="mb-2 text-xs font-medium text-primary">Copia local de respaldo</p><p className="mb-3 text-xs text-text-secondary">La copia local sirve para este navegador; la disponibilidad para participantes depende del archivo subido al servidor.</p><video className="aspect-video w-full rounded-lg bg-black" controls playsInline preload="metadata" src={localVideoUrl} aria-label={`Video local de ${lesson.title}`} /></div> : null}{lesson.blocks.map((block, blockIndex) => <BlockEditor key={block.id} block={block} index={blockIndex} total={lesson.blocks.length} editable={editable} moving={reorder.isPending} onMove={moveBlock} onChanged={onChanged} />)}{editable ? <Button type="button" size="sm" variant="secondary" onClick={() => setBlockOpen(true)}><Plus className="size-4" />Agregar contenido</Button> : null}</div> : null}
       <BlockFormDialog lessonId={lesson.id} open={blockOpen} onOpenChange={setBlockOpen} onSaved={onChanged} />
     </div>
   );
@@ -1402,7 +1515,12 @@ function readVideoDuration(file: File) {
     const video = document.createElement("video");
     const url = URL.createObjectURL(file);
     video.preload = "metadata";
-    video.onloadedmetadata = () => { URL.revokeObjectURL(url); const duration = Math.round(video.duration); duration > 0 ? resolve(duration) : reject(new Error("El video no tiene una duración válida.")); };
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      const duration = Math.round(video.duration);
+      if (duration > 0) resolve(duration);
+      else reject(new Error("El video no tiene una duración válida."));
+    };
     video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No fue posible leer el video MP4.")); };
     video.src = url;
   });
@@ -1495,7 +1613,7 @@ function CoursePreviewDialog({ courseId, open, onOpenChange }: { courseId: strin
     >
       {query.isLoading ? <AsyncState state="loading" title="Preparando vista previa" /> : null}
       {query.isError ? <AsyncState state="error" title="No fue posible abrir la vista previa" onRetry={() => void query.refetch()} /> : null}
-      {query.data ? <article className="mx-auto max-w-4xl space-y-6 pb-2">{query.data.coverImageUrl ? <div role="img" aria-label={`Portada de ${query.data.title}`} className="aspect-[16/6] w-full rounded-2xl bg-cover bg-center shadow-sm" style={{ backgroundImage: `url("${query.data.coverImageUrl.replace(/"/g, "%22")}")` }} /> : null}<div><div className="flex flex-wrap gap-2"><CourseStatusBadge status={query.data.status} /><Badge>{query.data.difficulty}</Badge><Badge>{query.data.estimatedMinutes} min</Badge><Badge variant="secondary">Solo lectura</Badge></div><h2 className="mt-4 text-3xl font-semibold">{query.data.title}</h2><p className="mt-2 text-text-secondary">{query.data.summary}</p></div>{query.data.modules.map((module, moduleIndex) => <section key={module.id} className="space-y-3 rounded-2xl border border-border-default bg-surface-section/40 p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{moduleIndex + 1}</span><h3 className="text-xl font-semibold">{module.title}</h3></div>{module.lessons.map((lesson, lessonIndex) => { const externalVideoUrl = lesson.videoUrl ?? lesson.blocks.find((block) => block.type === "VIDEO" && block.resourceUrl)?.resourceUrl; const storedVideo = lesson.type === "VIDEO" && !externalVideoUrl && Boolean(lesson.durationSeconds); return <div key={lesson.id} className="rounded-xl border border-border-default bg-card p-4"><p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Lección {moduleIndex + 1}.{lessonIndex + 1}</p><h4 className="mt-1 font-medium">{lesson.title}</h4>{externalVideoUrl ? <video className="mt-4 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(externalVideoUrl) ?? externalVideoUrl} aria-label={`Video de ${lesson.title}`} /> : storedVideo && courseId ? <AuthenticatedTrainingVideo courseId={courseId} lessonId={lesson.id} title={lesson.title} /> : null}<ul className="mt-3 space-y-2">{lesson.blocks.map((block) => <li key={block.id} className="flex gap-2 text-sm text-text-secondary"><FileText className="size-4 shrink-0" />{block.title || blockLabels[block.type]}</li>)}</ul></div>; })}</section>)}</article> : null}
+      {query.data ? <article className="mx-auto max-w-4xl space-y-6 pb-2">{query.data.coverImageUrl ? <div role="img" aria-label={`Portada de ${query.data.title}`} className="aspect-[16/6] w-full rounded-2xl bg-cover bg-center shadow-sm" style={{ backgroundImage: `url("${query.data.coverImageUrl.replace(/"/g, "%22")}")` }} /> : null}<div><div className="flex flex-wrap gap-2"><CourseStatusBadge status={query.data.status} /><Badge>{query.data.difficulty}</Badge><Badge>{query.data.estimatedMinutes} min</Badge><Badge variant="secondary">Solo lectura</Badge>{query.data.introVideoUrl ? <Badge variant="success">Curso visual</Badge> : null}</div><h2 className="mt-4 text-3xl font-semibold">{query.data.title}</h2><p className="mt-2 text-text-secondary">{query.data.summary}</p>{query.data.introVideoUrl ? <div className="mt-4 rounded-2xl border border-border-default bg-surface-section p-4"><p className="text-sm font-medium">Video introductorio</p><p className="mt-1 text-sm text-text-secondary">Recurso de apoyo visual para arrancar el curso.</p><video className="mt-3 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(query.data.introVideoUrl) ?? query.data.introVideoUrl} aria-label={`Video introductorio de ${query.data.title}`} /></div> : null}</div>{query.data.modules.map((module, moduleIndex) => <section key={module.id} className="space-y-3 rounded-2xl border border-border-default bg-surface-section/40 p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{moduleIndex + 1}</span><h3 className="text-xl font-semibold">{module.title}</h3></div>{module.lessons.map((lesson, lessonIndex) => { const externalVideoUrl = lesson.videoUrl ?? lesson.blocks.find((block) => block.type === "VIDEO" && block.resourceUrl)?.resourceUrl; const storedVideo = lesson.type === "VIDEO" && !externalVideoUrl && Boolean(lesson.durationSeconds); const completionThreshold = lesson.requiredCompletionPercentage ?? 90; return <div key={lesson.id} className="rounded-xl border border-border-default bg-card p-4"><p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Lección {moduleIndex + 1}.{lessonIndex + 1}</p><h4 className="mt-1 font-medium">{lesson.title}</h4>{lesson.type === "VIDEO" ? <p className="mt-1 text-xs font-medium text-primary">Se completa con {completionThreshold}% de visualización</p> : null}{externalVideoUrl ? <video className="mt-4 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(externalVideoUrl) ?? externalVideoUrl} aria-label={`Video de ${lesson.title}`} /> : storedVideo && courseId ? <AuthenticatedTrainingVideo courseId={courseId} lessonId={lesson.id} title={lesson.title} /> : null}<ul className="mt-3 space-y-2">{lesson.blocks.map((block) => <li key={block.id} className="flex gap-2 text-sm text-text-secondary"><FileText className="size-4 shrink-0" />{block.title || blockLabels[block.type]}</li>)}</ul></div>; })}</section>)}</article> : null}
     </ResponsiveDialog>
   );
 }

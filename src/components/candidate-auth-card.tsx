@@ -11,8 +11,19 @@ import { Label } from "@/components/ui/label";
 import { useLocale } from "@/components/locale-provider";
 
 function candidateAuthErrorMessage(error: unknown, mode: "login" | "register", t: (key: string) => string) {
-  if (mode === "register" && error instanceof ApiError && /Applicant account already exists/i.test(error.message)) {
-    return t("candidate.existingAccount");
+  if (error instanceof ApiError) {
+    if (mode === "register" && (error.code === "APPLICANT_ACCOUNT_EXISTS" || /Applicant account already exists|Candidate account already exists/i.test(error.message))) {
+      return t("candidate.existingAccount");
+    }
+    if (error.status === 404 && /Career portal not found/i.test(error.message)) {
+      return t("candidate.portalUnavailable");
+    }
+    if (error.status >= 500) {
+      return t("candidate.serverError");
+    }
+    if (mode === "login" && error.status === 401) {
+      return t("candidate.invalidCredentials");
+    }
   }
   return t("candidate.accessError");
 }

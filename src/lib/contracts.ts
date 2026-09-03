@@ -89,6 +89,7 @@ export type PermissionKey =
   | "candidates.view"
   | "candidates.update"
   | "applications.view"
+  | "applications.update"
   | "applications.change_stage"
   | "applications.reject"
   | "applications.hire"
@@ -841,6 +842,22 @@ export interface TrainingAssignmentsListDto {
   };
 }
 
+export interface TrainingOverviewDto {
+  attentionRequired: TrainingAssignmentDto[];
+  upcomingDue: TrainingAssignmentDto[];
+  continueLearning: TrainingAssignmentDto[];
+  newAssignments: TrainingAssignmentDto[];
+  recentlyCompleted: TrainingAssignmentDto[];
+  optionalAssignments: TrainingAssignmentDto[];
+  pendingAssessments: unknown[];
+  overdueAssignments: TrainingAssignmentDto[];
+  inProgressAssignments: TrainingAssignmentDto[];
+  completedAssignments: TrainingAssignmentDto[];
+  upcomingEvents: unknown[];
+  analyticsSnapshot?: Record<string, unknown>;
+  tabsSummary?: { overviewCount: number; inProgressCount: number; completedCount: number };
+}
+
 export type TrainingLaunchStatus =
   | "DRAFT"
   | "SCHEDULED"
@@ -1060,6 +1077,29 @@ export interface TrainingQuizAttemptDto {
     awardedPoints?: number | null;
     graderFeedback?: string | null;
     question: TrainingQuizQuestionDto;
+  }>;
+}
+
+export interface TrainingQuizAttemptRecoveryDto {
+  id: string;
+  status: TrainingQuizAttemptDto["status"];
+  startedAt: string;
+  submittedAt?: string | null;
+  expiresAt?: string | null;
+  timeRemainingSeconds?: number | null;
+  questionCount: number;
+  answers: Array<{
+    questionId: string;
+    optionId?: string | null;
+    selectedOptionIds: string[];
+    textAnswer?: string | null;
+  }>;
+  questions: Array<{
+    id: string;
+    prompt: string;
+    questionType: TrainingQuestionType;
+    points: number;
+    options: Array<{ id: string; label: string }>;
   }>;
 }
 
@@ -3081,6 +3121,72 @@ export interface HiringWorkflowResultDto {
   }>;
   steps: Array<{ id: string; label: string; status: string }>;
 }
+
+export interface DocuSealHiringBundleStatusDto {
+  employeeId: string | null;
+  documents: Array<{ templateKey: string; status: string; sentAt?: string | null; signedAt?: string | null }>;
+  allSent: boolean;
+  allCompleted: boolean;
+}
+
+export type HiringContractStatus = "DRAFT" | "DATA_REVIEW" | "OFFER_PREPARATION" | "OFFER_SENT" | "AWAITING_OFFER_RESPONSE" | "OFFER_ACCEPTED" | "DOCUMENTS_PENDING" | "SIGNATURES_PENDING" | "COMPLIANCE_REVIEW" | "READY_TO_HIRE" | "HIRED" | "CANCELLED";
+
+export interface HiringContractDocumentDto {
+  id: string;
+  contractId: string;
+  type: string;
+  title: string;
+  status: string;
+  source: string;
+  required: boolean;
+  version: number;
+  originalName?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HiringContractDto {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  candidateId: string;
+  applicationId: string;
+  vacancyId: string;
+  jobOfferId?: string | null;
+  jobOfferVersionId?: string | null;
+  employeeId?: string | null;
+  onboardingFlowId?: string | null;
+  roleTitle?: string | null;
+  status: HiringContractStatus;
+  currentStage: string;
+  progressPercent: number;
+  currentActor?: string | null;
+  nextAction?: string | null;
+  nextActor?: string | null;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | string | null;
+  deadlineAt?: string | null;
+  hiringManagerUser?: { id: string; firstName?: string | null; lastName?: string | null } | null;
+  hrResponsibleUser?: { id: string; firstName?: string | null; lastName?: string | null } | null;
+  isActive: boolean;
+  hiredAt?: string | null;
+  cancelledAt?: string | null;
+  cancelledReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  candidate: { id: string; fullName: string; email: string };
+  branch: { id: string; name: string };
+  vacancy: { id: string; title: string; tenant?: { id: string; name: string } | null };
+  application?: { id: string; status: ApplicationStatusKey };
+  jobOffer?: JobOfferDto | null;
+  employee?: { id: string; name: string; email: string; status: string } | null;
+  documents: HiringContractDocumentDto[];
+  signatures: Array<{ id: string; provider: string; status: string; requestedAt: string; completedAt?: string | null }>;
+  stateHistory?: Array<{ id: string; previousState?: string | null; nextState: string; action: string; actorRole?: string | null; occurredAt: string }>;
+  progress?: { currentStage: string; progressPercent: number; tasksCompleted: string[]; tasksPending: string[]; blockers: string[]; nextAction: string; actorResponsible: string };
+}
+
+export interface HiringContractListDto { data: HiringContractDto[]; meta: { total: number; page: number; pageSize: number } }
 
 export interface HireCandidateInput {
   applicationId: string;

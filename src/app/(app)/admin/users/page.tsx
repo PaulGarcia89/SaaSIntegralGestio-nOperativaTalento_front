@@ -7,7 +7,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import { ROLE_KEYS, type RoleKey, type UserDto } from "@/lib/contracts";
-import { createTenantUser, deleteTenantUser, fetchGlobalUsers, fetchTenantUsers, updateTenantUser } from "@/lib/backend";
+import { createTenantUser, deleteTenantUser, fetchGlobalUsers, fetchTenantUsers, getApiErrorMessage, updateTenantUser } from "@/lib/backend";
 import { roleLabels, userStatusLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import { CrudHeader, CrudPanel } from "@/components/admin-crud";
@@ -77,7 +77,7 @@ export default function UsersPage() {
       form.reset();
       toast.success(editing ? "Usuario actualizado" : "Usuario creado");
     },
-    onError: () => toast.error("Error al guardar el usuario"),
+    onError: (error) => toast.error(getApiErrorMessage(error, "Error al guardar el usuario")),
   });
 
   const deleteMutation = useMutation({

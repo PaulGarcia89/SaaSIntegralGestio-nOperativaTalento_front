@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ModuleHeader, SectionCard, InfoList, SplitPanel } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/components/locale-provider";
+import { CompanyEmailSettings } from "@/components/company-email-settings";
 
 export default function CompanySettingsPage() {
   const { t } = useLocale();
@@ -48,6 +49,7 @@ export default function CompanySettingsPage() {
           </SectionCard>
         }
       />
+      <CompanyEmailSettings />
     </>
   );
 }

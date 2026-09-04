@@ -288,7 +288,7 @@ function SidebarContent({
                   className={cn(
                     "flex w-full items-center justify-between px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition hover:text-sidebar-foreground/80",
                     hasActive
-                      ? "text-sidebar-primary"
+                      ? "text-sidebar-brand"
                       : "text-sidebar-foreground/50",
                   )}
                 >
@@ -482,6 +482,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--accent-foreground", "222 47% 11%");
     root.style.setProperty("--sidebar-primary", tenantTheme.primary);
     root.style.setProperty("--sidebar-ring", tenantTheme.primary);
+    // Variantes de marca para TEXTO, con contraste ya validado a 4,5:1 contra
+    // cada superficie. `globals.css` elige cuál aplica según el tema activo.
+    root.style.setProperty("--brand-text-light", tenantTheme.textOnLight);
+    root.style.setProperty("--brand-text-dark", tenantTheme.textOnDark);
+    root.style.setProperty("--brand-text-sidebar", tenantTheme.textOnSidebar);
   }, [tenantTheme]);
 
   useEffect(() => {
@@ -608,7 +613,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <ShieldCheck className="size-4 text-primary" />
+                  <ShieldCheck className="size-4 text-brand" />
                   {currentRole === "admin_saas" ? t("workspace.superadmin") : t("workspace.company")}
                 </div>
                 <div>

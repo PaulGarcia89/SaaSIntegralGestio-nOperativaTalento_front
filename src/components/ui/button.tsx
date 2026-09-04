@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "@radix-ui/react-slot";
+import { LoaderCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -36,14 +37,44 @@ function Button({
   variant,
   size,
   asChild = false,
+  loading = false,
+  loadingLabel,
+  children,
+  disabled,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    /**
+     * Muestra el indicador de carga, desactiva el botón y expone `aria-busy`.
+     *
+     * Antes cada pantalla resolvía esto por su cuenta: se pasaba un atributo
+     * suelto `data-loading` y se cambiaba el texto a mano ("Guardando…"), sin
+     * `aria-busy` y sin impedir el segundo clic de forma consistente.
+     */
+    loading?: boolean;
+    /** Texto alternativo mientras carga. Si se omite, se conserva el original. */
+    loadingLabel?: React.ReactNode;
   }) {
   const Comp = asChild ? Slot : "button";
 
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  // `asChild` delega el renderizado en el hijo (normalmente un `Link`), donde
+  // ni `disabled` ni un spinner inyectado tienen sentido.
+  if (asChild) {
+    return <Comp className={cn(buttonVariants({ variant, size, className }))} disabled={disabled} {...props}>{children}</Comp>;
+  }
+
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size, className }))}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
+      {loading && loadingLabel ? loadingLabel : children}
+    </Comp>
+  );
 }
 
 export { Button, buttonVariants };

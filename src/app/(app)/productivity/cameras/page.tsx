@@ -146,7 +146,7 @@ export default function CamerasPage() {
         <Card level={2}>
           <CardContent className="space-y-4 p-5">
             <div className="flex items-start gap-3">
-              <Camera className="size-5 text-primary" aria-hidden="true" />
+              <Camera className="size-5 text-brand" aria-hidden="true" />
               <div>
                 <h2 className="font-semibold">Registrar cámara</h2>
                 <p className="mt-1 text-sm text-text-secondary">Conecta una fuente ya autorizada por el equipo de infraestructura.</p>
@@ -199,7 +199,7 @@ export default function CamerasPage() {
         <Card level={2}>
           <CardContent className="space-y-4 p-5">
             <div className="flex items-start gap-3">
-              <MapPinned className="size-5 text-primary" aria-hidden="true" />
+              <MapPinned className="size-5 text-brand" aria-hidden="true" />
               <div>
                 <h2 className="font-semibold">Definir zona</h2>
                 <p className="mt-1 text-sm text-text-secondary">La primera zona usa un contorno base; podrás ajustarlo al conectar el editor visual.</p>
@@ -257,7 +257,7 @@ export default function CamerasPage() {
 
       <section aria-labelledby="registered-cameras" className="space-y-4">
         <div className="flex items-center gap-2">
-          <Radio className="size-4 text-primary" aria-hidden="true" />
+          <Radio className="size-4 text-brand" aria-hidden="true" />
           <h2 id="registered-cameras" className="font-semibold">Fuentes registradas</h2>
         </div>
         {currentCameras.length ? (
@@ -298,7 +298,7 @@ export default function CamerasPage() {
 
       <section aria-labelledby="zones-registered" className="space-y-4">
         <div className="flex items-center gap-2">
-          <MapPinned className="size-4 text-primary" aria-hidden="true" />
+          <MapPinned className="size-4 text-brand" aria-hidden="true" />
           <h2 id="zones-registered" className="font-semibold">Zonas configuradas</h2>
         </div>
         {currentZones.length ? (
@@ -328,7 +328,7 @@ export default function CamerasPage() {
         <Card level={2}>
           <CardContent className="space-y-3 p-5">
             <div className="flex items-center gap-2">
-              <Video className="size-4 text-primary" />
+              <Video className="size-4 text-brand" />
               <h2 id="sources-note" className="font-semibold">Notas del demo</h2>
             </div>
             <p className="text-sm text-text-secondary">

@@ -43,7 +43,7 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
       <CardContent className="space-y-4 p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-primary">Demo en vivo</p>
+            <p className="text-sm font-medium text-brand">Demo en vivo</p>
             <h2 className="text-xl font-semibold">Grabación simulada de cámaras</h2>
           </div>
           <Badge variant={session.running ? "success" : "secondary"}>{session.running ? "Simulación activa" : "Pausada"}</Badge>
@@ -268,7 +268,7 @@ export default function ProductivityPage() {
           <CardContent className="space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-primary">Resumen del demo</p>
+                <p className="text-sm font-medium text-brand">Resumen del demo</p>
                 <h2 className="text-xl font-semibold">{currentBranch.name}</h2>
               </div>
               <Badge variant={running ? "success" : "secondary"}>{running ? "Grabando" : "En pausa"}</Badge>
@@ -309,7 +309,7 @@ export default function ProductivityPage() {
         {metricItems.map(([Icon, label, value]) => (
           <Card key={label} level={2}>
             <CardContent className="flex gap-3 p-4">
-              <Icon className="size-5 text-primary" />
+              <Icon className="size-5 text-brand" />
               <div>
                 <p className="text-sm text-text-secondary">{label}</p>
                 <p className="text-2xl font-semibold">{value}</p>
@@ -390,7 +390,7 @@ export default function ProductivityPage() {
                 <div key={item.zoneId} className="rounded-2xl border border-primary/20 p-4">
                   <p className="font-medium">{item.title}</p>
                   <p className="mt-1 text-sm text-text-secondary">{item.explanation}</p>
-                  <p className="mt-2 text-sm font-medium text-primary">Siguiente paso: {item.suggestedAction}</p>
+                  <p className="mt-2 text-sm font-medium text-brand">Siguiente paso: {item.suggestedAction}</p>
                 </div>
               ))}
             </div>

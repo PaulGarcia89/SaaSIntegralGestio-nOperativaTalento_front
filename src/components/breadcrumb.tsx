@@ -64,12 +64,16 @@ export function AppBreadcrumb({ pathname }: { pathname: string }) {
 
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground">
+      {/* El icono es decorativo: el nombre accesible del enlace lo aporta el
+          texto oculto. Sin el, este enlace no tiene nombre y axe lo marca como
+          `link-name` en todas las pantallas del producto. */}
       <Link href="/dashboard" className="flex items-center gap-1 transition hover:text-foreground">
-        <Home className="size-3" />
+        <Home className="size-3" aria-hidden="true" />
+        <span className="sr-only">{localizedLabel("Inicio", t)}</span>
       </Link>
       {crumbs.map((crumb) => (
         <span key={crumb.href ?? crumb.label} className="flex items-center gap-1">
-          <ChevronRight className="size-3" />
+          <ChevronRight className="size-3" aria-hidden="true" />
           {crumb.href ? (
             <Link href={crumb.href} className={cn("transition hover:text-foreground")}>
               {crumb.label}

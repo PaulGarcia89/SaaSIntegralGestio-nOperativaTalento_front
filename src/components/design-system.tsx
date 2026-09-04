@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: ReactNode; actions?: ReactNode }) {
-  return <header className="flex min-w-0 flex-col gap-4 border-b border-border-default pb-5 sm:gap-5 sm:pb-6 lg:flex-row lg:items-end lg:justify-between"><div className="min-w-0 space-y-2">{eyebrow ? <p className="text-sm font-medium text-primary">{eyebrow}</p> : null}<h1 className="text-2xl font-semibold leading-tight text-text-primary sm:text-3xl md:text-4xl">{title}</h1>{description ? <div className="max-w-3xl leading-6 text-text-secondary sm:leading-7">{description}</div> : null}</div>{actions ? <ActionBar>{actions}</ActionBar> : null}</header>;
+  return <header className="flex min-w-0 flex-col gap-4 border-b border-border-default pb-5 sm:gap-5 sm:pb-6 lg:flex-row lg:items-end lg:justify-between"><div className="min-w-0 space-y-2">{eyebrow ? <p className="text-sm font-medium text-brand">{eyebrow}</p> : null}<h1 className="text-2xl font-semibold leading-tight text-text-primary sm:text-3xl md:text-4xl">{title}</h1>{description ? <div className="max-w-3xl leading-6 text-text-secondary sm:leading-7">{description}</div> : null}</div>{actions ? <ActionBar>{actions}</ActionBar> : null}</header>;
 }
 
 export function MetricWithProvenance({ label, value, period, updatedAt, action }: { label: string; value: string | number; period: string; updatedAt: Date; action?: ReactNode }) {

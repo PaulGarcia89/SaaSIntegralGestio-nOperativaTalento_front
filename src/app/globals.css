@@ -14,6 +14,10 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  /* Marca usable como TEXTO: contraste validado contra el fondo del tema
+     activo. `--color-primary` sigue siendo el RELLENO. Ver tenant-branding.ts. */
+  --color-brand: hsl(var(--brand-text));
+  --color-sidebar-brand: hsl(var(--sidebar-brand-text));
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
@@ -69,10 +73,16 @@
   --secondary: 210 40% 96%;
   --secondary-foreground: 222 47% 11%;
   --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 46%;
+  /* 215 16% 46% daba 4,76:1 contra el fondo puro, pero por debajo de AA sobre
+     superficies teñidas (bg-status-info/5, bg-surface-section). Ahora 5,47:1
+     contra el fondo, con margen para esos tintes. */
+  --muted-foreground: 215 18% 42%;
   --accent: 214 95% 93%;
   --accent-foreground: 222 47% 11%;
-  --destructive: 0 84% 60%;
+  /* Antes 0 84% 60%: el texto blanco encima daba 3,78:1 y fallaba AA tanto en
+     el badge de notificaciones (10 px) como en los botones destructivos.
+     Con 0 72% 45% sube a 5,83:1 conservando la lectura de "rojo de peligro". */
+  --destructive: 0 72% 45%;
   --destructive-foreground: 0 0% 100%;
   --border: 214 32% 91%;
   --input: 214 32% 91%;
@@ -101,6 +111,14 @@
   --status-success: 152 69% 35%;
   --status-warning: 35 92% 45%;
   --status-danger: 0 72% 51%;
+  /* Marca como texto. El valor de relleno (--primary, 190 87% 30%) da 3,76:1
+     sobre el fondo oscuro, por debajo de AA; por eso el texto tiene su propio
+     token con un valor distinto por tema. */
+  /* `--brand-text-*` los inyecta AppShell con el color del tenant, ya validado
+     a 4,5:1 contra cada superficie. El CSS elige cual aplica segun el tema,
+     porque un estilo inline sobre :root ganaria a la regla `.dark`. */
+  --brand-text: var(--brand-text-light, 190 87% 27%);
+  --sidebar-brand-text: var(--brand-text-sidebar, 190 80% 62%);
 }
 
 .dark {
@@ -115,7 +133,8 @@
   --secondary: 217 33% 14%;
   --secondary-foreground: 210 40% 96%;
   --muted: 217 33% 14%;
-  --muted-foreground: 215 20% 55%;
+  /* Mismo criterio que en tema claro: margen para superficies teñidas. */
+  --muted-foreground: 215 20% 60%;
   --accent: 215 45% 18%;
   --accent-foreground: 210 40% 96%;
   --destructive: 0 72% 51%;
@@ -146,6 +165,8 @@
   --status-success: 152 60% 50%;
   --status-warning: 38 92% 58%;
   --status-danger: 0 78% 62%;
+  --brand-text: var(--brand-text-dark, 190 80% 62%);
+  --sidebar-brand-text: var(--brand-text-sidebar, 190 80% 62%);
 }
 
 * {

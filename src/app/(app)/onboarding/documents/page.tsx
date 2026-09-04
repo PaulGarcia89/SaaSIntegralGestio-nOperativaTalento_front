@@ -545,7 +545,7 @@ export default function OnboardingDocumentsPage() {
             </div>
             <div className="grid gap-3 rounded-2xl bg-surface-section p-4">
               <div className="flex items-start gap-3">
-                <Sparkles className="mt-0.5 size-5 text-primary" />
+                <Sparkles className="mt-0.5 size-5 text-brand" />
                 <div>
                   <p className="font-medium">Flujo de handoff</p>
                   <p className="text-sm text-text-secondary">
@@ -560,7 +560,7 @@ export default function OnboardingDocumentsPage() {
               </div>
               <div className="rounded-xl border border-border-default bg-card p-4">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <ShieldCheck className="size-4 text-primary" />
+                  <ShieldCheck className="size-4 text-brand" />
                   Siguiente decisión operativa
                 </div>
                 <p className="mt-2 text-sm text-text-secondary">
@@ -724,7 +724,7 @@ export default function OnboardingDocumentsPage() {
                 selected.signaturePackages.map((item) => (
                   <Card key={item.id} level={3}>
                     <CardContent className="flex flex-wrap items-center gap-4 p-4">
-                      <FileSignature className="size-5 text-primary" />
+                      <FileSignature className="size-5 text-brand" />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">{item.title}</p>
                         <p className="text-xs text-text-secondary">
@@ -1516,7 +1516,7 @@ function FlowSummary({ flow }: { flow: EmployeeOnboardingFlowDto }) {
         <Metric icon={FileCheck2} label="Expediente" value={`${flow.documents.length} documentos`} />
         {flow.nextAction ? (
           <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:col-span-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Siguiente acción</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand">Siguiente acción</p>
             <p className="mt-1 font-semibold">{flow.nextAction.title}</p>
             <p className="text-sm text-text-secondary">{flow.nextAction.description}</p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
@@ -1655,7 +1655,7 @@ function Timeline({ flow }: { flow: EmployeeOnboardingFlowDto }) {
   return (
     <section className="space-y-3" aria-labelledby="onboarding-timeline">
       <div className="flex items-center gap-2">
-        <History className="size-5 text-primary" />
+        <History className="size-5 text-brand" />
         <h2 id="onboarding-timeline" className="text-lg font-semibold">
           Timeline
         </h2>
@@ -1732,7 +1732,7 @@ function Documents({
           return (
             <Card key={document.id} level={security.ready ? 3 : 1}>
               <CardContent className="flex flex-wrap items-center gap-4 p-4">
-                <FileCheck2 className={security.ready ? "size-5 text-primary" : "size-5 text-status-warning"} />
+                <FileCheck2 className={security.ready ? "size-5 text-brand" : "size-5 text-status-warning"} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{document.originalName}</p>
                   <p className="text-xs text-text-secondary">
@@ -1809,7 +1809,7 @@ function Metric({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl bg-secondary/40 p-3">
-      <Icon className="size-5 text-primary" />
+      <Icon className="size-5 text-brand" />
       <div>
         <p className="text-xs text-text-secondary">{label}</p>
         <p className="font-semibold">{value}</p>

@@ -40,6 +40,6 @@ export default function TrainingCourseLearnPage() {
 
   return <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <Button asChild variant="ghost" className="-ml-3"><Link href="/training"><ArrowLeft className="size-4" />Volver a mis capacitaciones</Link></Button>
-    {query.isLoading ? <AsyncState state="loading" title="Cargando capacitación" /> : query.isError ? <AsyncState state="error" onRetry={() => query.refetch()} /> : query.data ? <><header><p className="text-sm font-medium text-primary">Capacitación</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{query.data.title}</h1><p className="mt-2 max-w-3xl text-text-secondary">{query.data.summary}</p></header><CourseContent course={query.data} onVideoProgress={(event) => progress.mutateAsync(event)} /></> : null}
+    {query.isLoading ? <AsyncState state="loading" title="Cargando capacitación" /> : query.isError ? <AsyncState state="error" onRetry={() => query.refetch()} /> : query.data ? <><header><p className="text-sm font-medium text-brand">Capacitación</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{query.data.title}</h1><p className="mt-2 max-w-3xl text-text-secondary">{query.data.summary}</p></header><CourseContent course={query.data} onVideoProgress={(event) => progress.mutateAsync(event)} /></> : null}
   </main>;
 }

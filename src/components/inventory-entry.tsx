@@ -28,5 +28,5 @@ export function InventoryEntry() {
 }
 
 function EntryCard({ icon: Icon, title, description, href }: { icon: LucideIcon; title: string; description: string; href: string }) {
-  return <Card level={2}><CardContent className="space-y-4 p-6"><Icon className="size-8 text-primary" /><div><h2 className="text-xl font-semibold">{title}</h2><p className="mt-2 text-sm text-text-secondary">{description}</p></div><Button asChild><Link href={href}>Abrir módulo <ArrowRight className="size-4" /></Link></Button></CardContent></Card>;
+  return <Card level={2}><CardContent className="space-y-4 p-6"><Icon className="size-8 text-brand" /><div><h2 className="text-xl font-semibold">{title}</h2><p className="mt-2 text-sm text-text-secondary">{description}</p></div><Button asChild><Link href={href}>Abrir módulo <ArrowRight className="size-4" /></Link></Button></CardContent></Card>;
 }

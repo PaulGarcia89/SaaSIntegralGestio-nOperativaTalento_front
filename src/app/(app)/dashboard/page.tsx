@@ -143,7 +143,7 @@ export default function DashboardPage() {
                       <CalendarClock className="size-6" aria-hidden="true" />
                     </span>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-brand">
                         {t("dashboard.nextAction")}
                       </p>
                       <h2 id="next-action-title" className="mt-1 text-xl font-semibold">

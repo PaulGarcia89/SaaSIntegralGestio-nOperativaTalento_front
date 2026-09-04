@@ -234,7 +234,7 @@ export function EmployeesDirectoryPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl space-y-3">
             <div>
-              <p className="text-sm font-medium text-primary">Personas</p>
+              <p className="text-sm font-medium text-brand">Personas</p>
               <h2 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Directorio de empleados</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary sm:text-base">
                 Gestión rápida para equipos pequeños o muy grandes. Busca, filtra, navega por páginas y entra al expediente sin cargar información innecesaria.
@@ -546,7 +546,7 @@ export function EmployeesDirectoryPage() {
                       return (
                         <div key={item.id} className="flex gap-3">
                           <div className="flex flex-col items-center">
-                            <div className={cn("flex size-9 items-center justify-center rounded-full border", isFirst ? "border-primary bg-primary/10 text-primary" : "border-border-default bg-surface-elevated text-text-secondary")}>
+                            <div className={cn("flex size-9 items-center justify-center rounded-full border", isFirst ? "border-primary bg-primary/10 text-brand" : "border-border-default bg-surface-elevated text-text-secondary")}>
                               <CheckCircle2 className="size-4" />
                             </div>
                             {isLast ? null : <div className="mt-2 h-full w-px grow bg-border-default" />}
@@ -746,7 +746,7 @@ export function EmployeeCreatePage() {
               </div>
               <div className="mt-4 rounded-2xl border border-border-default bg-surface-elevated p-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-brand">
                     <Upload className="size-5" />
                   </div>
                   <div className="min-w-0">
@@ -821,7 +821,7 @@ function InitialChecklist() {
 function HiringStep({ current = false, description, number, title }: { current?: boolean; description: string; number: string; title: string }) {
   return (
     <li className={current ? "rounded-xl border border-primary/30 bg-primary/5 p-4" : "rounded-xl border border-border-default bg-surface-elevated p-4"}>
-      <span className={current ? "text-xs font-semibold text-primary" : "text-xs font-semibold text-text-secondary"}>Paso {number}</span>
+      <span className={current ? "text-xs font-semibold text-brand" : "text-xs font-semibold text-text-secondary"}>Paso {number}</span>
       <p className="mt-1 font-medium">{title}</p>
       <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
     </li>
@@ -864,12 +864,12 @@ function GuideStep({ number, title, description, icon, accent }: { number: strin
     <li className="min-w-0 rounded-2xl border border-border-default bg-card p-4">
       <div className="flex items-start gap-3">
         <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
-          accent === "primary" ? "bg-primary/10 text-primary" : accent === "info" ? "bg-info/10 text-info" : "bg-status-success/10 text-status-success"
+          accent === "primary" ? "bg-primary/10 text-brand" : accent === "info" ? "bg-info/10 text-info" : "bg-status-success/10 text-status-success"
         }`}>
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-primary">Paso {number}</p>
+          <p className="text-xs font-semibold text-brand">Paso {number}</p>
           <p className="mt-1 font-medium">{title}</p>
           <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
         </div>
@@ -952,7 +952,7 @@ export function EmployeeImportPage() {
             <p className="mt-3 text-xs text-text-secondary">Si tu archivo viene desde Excel, puedes subirlo directamente en .xlsx o exportarlo como CSV/TSV.</p>
             <div className="mt-4 grid grid-cols-3 gap-2">
               <div className="rounded-2xl bg-surface-elevated p-3">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-brand">
                   <FileSpreadsheet className="size-4" />
                 </div>
               </div>
@@ -1075,8 +1075,8 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
                   {selected ? "Seleccionada" : "Seleccionar"}
                 </button>
               ) : null}
-              <UsersRound className="size-4 text-primary" />
-              <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-primary hover:underline">{employee.name}</Link>
+              <UsersRound className="size-4 text-brand" />
+              <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-brand hover:underline">{employee.name}</Link>
             </div>
             <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
           </div>
@@ -1123,8 +1123,8 @@ function EmployeeRow({ employee, compact = false, selected = false, onToggleSele
       </button>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <UsersRound className="size-4 shrink-0 text-primary" />
-          <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-primary hover:underline">{employee.name}</Link>
+          <UsersRound className="size-4 shrink-0 text-brand" />
+          <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-brand hover:underline">{employee.name}</Link>
         </div>
         <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
       </div>

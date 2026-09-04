@@ -192,7 +192,7 @@ function MetricGrid({ data }: { data: TrainingAnalyticsDto }) {
     { label: "Aprobación", value: `${data.summary.passRate}%`, icon: BarChart3 },
     { label: "Vencidos", value: data.summary.overdue, icon: AlertTriangle },
   ];
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <Card key={metric.label}><CardContent className="py-5"><metric.icon className="size-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">{metric.label}</p><strong className="text-3xl">{metric.value}</strong></CardContent></Card>)}</div>;
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <Card key={metric.label}><CardContent className="py-5"><metric.icon className="size-5 text-brand" /><p className="mt-4 text-sm text-muted-foreground">{metric.label}</p><strong className="text-3xl">{metric.value}</strong></CardContent></Card>)}</div>;
 }
 
 function CoursePerformance({ data }: { data: TrainingAnalyticsDto }) {
@@ -227,7 +227,7 @@ function EffectivenessPanel({
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Mejora continua</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">Mejora continua</p>
           <h2 className="mt-1 text-2xl font-semibold">Efectividad del aprendizaje</h2>
           <p className="text-sm text-muted-foreground">Combina adopción, finalización, evaluación, vencimiento y evidencia del piloto.</p>
         </div>
@@ -277,7 +277,7 @@ function EffectivenessMetric({
   label: string;
   value: string | number;
 }) {
-  return <Card><CardContent className="py-5"><Icon className="size-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">{label}</p><strong className="text-3xl">{value}</strong></CardContent></Card>;
+  return <Card><CardContent className="py-5"><Icon className="size-5 text-brand" /><p className="mt-3 text-sm text-muted-foreground">{label}</p><strong className="text-3xl">{value}</strong></CardContent></Card>;
 }
 
 function CourseEffectivenessCard({

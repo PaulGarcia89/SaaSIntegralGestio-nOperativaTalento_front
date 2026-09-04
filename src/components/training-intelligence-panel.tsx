@@ -51,4 +51,4 @@ function intelligenceFieldLabel(key: string) {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase());
 }
 
-function Metric({ icon: Icon, label, value }: { icon: typeof Target; label: string; value: string | number }) { return <Card><CardContent className="p-5"><Icon className="size-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">{label}</p><p className="text-3xl font-semibold">{value}</p></CardContent></Card>; }
+function Metric({ icon: Icon, label, value }: { icon: typeof Target; label: string; value: string | number }) { return <Card><CardContent className="p-5"><Icon className="size-5 text-brand" /><p className="mt-3 text-sm text-muted-foreground">{label}</p><p className="text-3xl font-semibold">{value}</p></CardContent></Card>; }

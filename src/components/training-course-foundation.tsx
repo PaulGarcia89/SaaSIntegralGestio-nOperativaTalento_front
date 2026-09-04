@@ -192,7 +192,7 @@ function FoundationForm({
           <Field label="¿Cómo sabrás que funcionó?" hint="Ej.: 30% menos errores de registro" value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
           <Field label="¿Para quién es?" hint="Ej.: Supervisores de tienda nuevos" value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
           <details className="md:col-span-2">
-            <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80">Añadir contexto opcional</summary>
+            <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">Añadir contexto opcional</summary>
             <div className="mt-4 grid gap-4 border-t border-border-default pt-4 md:grid-cols-2">
               <Field label="Línea base" hint="Valor actual antes de capacitar" value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
               <Field label="Meta" hint="Valor que deseas alcanzar" value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
@@ -238,7 +238,7 @@ function FoundationForm({
           </div>
           {editable ? (
             <details className="rounded-2xl border border-dashed border-border-strong p-4">
-              <summary className="cursor-pointer text-sm font-medium text-primary hover:text-primary/80">Crear una competencia nueva</summary>
+              <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">Crear una competencia nueva</summary>
               <p className="mt-2 text-sm text-text-secondary">Úsalo solo si no existe una competencia reutilizable. El código debe ser corto y único, por ejemplo <code className="rounded bg-surface-section px-1.5 py-0.5 text-xs">VENTA-CIERRE-01</code>.</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-[160px_1fr_auto]">
                 <Input aria-label="Código de competencia" placeholder="Ej.: VENTA-CIERRE-01" value={newCode} onChange={(event) => setNewCode(event.target.value)} />

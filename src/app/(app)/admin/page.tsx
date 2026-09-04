@@ -29,10 +29,10 @@ export default function AdminPage() {
         {sections.map(({ href, label, description, icon: Icon }) => (
           <Card key={href} level={2} className="group transition-shadow hover:shadow-md">
             <CardContent className="flex min-h-44 flex-col p-5">
-              <Icon className="size-5 text-primary" aria-hidden="true" />
+              <Icon className="size-5 text-brand" aria-hidden="true" />
               <h2 className="mt-4 font-semibold">{label}</h2>
               <p className="mt-1 text-sm leading-6 text-text-secondary">{description}</p>
-              <Button asChild variant="ghost" size="sm" className="mt-auto w-fit px-0 text-primary hover:bg-transparent hover:text-primary">
+              <Button asChild variant="ghost" size="sm" className="mt-auto w-fit px-0 text-brand hover:bg-transparent hover:text-brand">
                 <Link href={href}>Abrir sección</Link>
               </Button>
             </CardContent>

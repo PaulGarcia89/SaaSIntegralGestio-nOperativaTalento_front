@@ -146,7 +146,7 @@ function DuplicateQueue({ query, onMerge }: { query: ReturnType<typeof useQuery<
 
 function Identity({ candidate }: { candidate: DuplicateCandidateMatchDto["source"] }) { return <div className="min-w-0 rounded-xl bg-surface-section p-3"><p className="truncate font-semibold">{candidate.fullName}</p><p className="truncate text-xs text-text-secondary">{candidate.email}</p><p className="mt-2 text-xs">{candidate.applications} procesos · {candidate.city || "Sin ciudad"}</p></div>; }
 
-function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string | number; detail: string }) { return <Card level={2}><CardContent className="flex items-center gap-4 p-5"><span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">{icon}</span><div><p className="text-sm text-text-secondary">{label}</p><p className="text-2xl font-semibold">{value}</p><p className="text-xs text-text-secondary">{detail}</p></div></CardContent></Card>; }
+function Metric({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: string | number; detail: string }) { return <Card level={2}><CardContent className="flex items-center gap-4 p-5"><span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-brand">{icon}</span><div><p className="text-sm text-text-secondary">{label}</p><p className="text-2xl font-semibold">{value}</p><p className="text-xs text-text-secondary">{detail}</p></div></CardContent></Card>; }
 
 function CreatePoolDialog({ open, onOpenChange, branchId, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; branchId?: string; onCreated: () => Promise<void> }) {
   const [name, setName] = useState(""); const [description, setDescription] = useState("");

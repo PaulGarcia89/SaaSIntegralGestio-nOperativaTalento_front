@@ -11,7 +11,7 @@ export function AccessLoading() {
     <main className="flex min-h-screen items-center justify-center p-6" aria-busy="true">
       <Card className="w-full max-w-md border-border/70 bg-card/90">
         <CardContent className="flex items-center gap-4 p-6">
-          <LoaderCircle className="size-5 animate-spin text-primary" aria-hidden="true" />
+          <LoaderCircle className="size-5 animate-spin text-brand" aria-hidden="true" />
           <div>
             <h1 className="font-semibold">Verificando acceso</h1>
             <p className="mt-1 text-sm text-muted-foreground">Estamos validando tu sesión y espacio de trabajo.</p>

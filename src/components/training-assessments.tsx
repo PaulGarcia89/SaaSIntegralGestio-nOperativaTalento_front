@@ -208,7 +208,7 @@ function AssessmentMetric({
   return (
     <Card level={2}>
       <CardContent className="p-4">
-        <div className={`mb-3 flex size-8 items-center justify-center rounded-lg ${tone === "success" ? "bg-status-success/10 text-status-success" : tone === "warning" ? "bg-status-warning/10 text-status-warning" : "bg-primary/10 text-primary"}`}>
+        <div className={`mb-3 flex size-8 items-center justify-center rounded-lg ${tone === "success" ? "bg-status-success/10 text-status-success" : tone === "warning" ? "bg-status-warning/10 text-status-warning" : "bg-primary/10 text-brand"}`}>
           {icon}
         </div>
         <p className="text-xs text-muted-foreground">{label}</p>
@@ -782,7 +782,7 @@ export function TrainingCertificates() {
               <Card key={certificate.id}>
                 <CardHeader>
                   <div className="flex justify-between gap-3">
-                    <Award className="size-8 text-primary" />
+                    <Award className="size-8 text-brand" />
                     <Badge variant={status === "VALID" ? "success" : status === "RENEWED" ? "secondary" : "destructive"}>{statusLabel}</Badge>
                   </div>
                   <CardTitle>{certificate.course?.title ?? certificate.curriculum?.title}</CardTitle>

@@ -207,7 +207,7 @@ export default function QueueManagementPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/80 px-5 py-4">
         <div className="flex items-center gap-3">
-          <Activity className="size-5 text-primary" aria-hidden="true" />
+          <Activity className="size-5 text-brand" aria-hidden="true" />
           <div>
             <p className="font-medium">Estado operativo</p>
             <p className="text-sm text-muted-foreground">
@@ -231,7 +231,7 @@ export default function QueueManagementPage() {
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex max-w-3xl gap-3">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
               <div>
                 <p className="font-medium">Resend, almacenamiento privado, antivirus y calendarios</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -310,7 +310,7 @@ export default function QueueManagementPage() {
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex max-w-3xl gap-3">
-              <Database className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+              <Database className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
               <div>
                 <p className="font-medium">R2 privado, cifrado y con retención automática</p>
                 <p className="mt-1 text-sm text-muted-foreground">

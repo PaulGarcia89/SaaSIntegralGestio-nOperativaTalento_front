@@ -202,7 +202,7 @@ function ApplyWizard() {
       {step === 0 ? <CandidateAuthCard returnPath={`/apply?${params.toString()}`} portalLabel={portal?.company?.name ? `el portal de ${portal.company.name}` : "este portal"} onAuthenticated={() => { setAuthenticated(true); setError(""); setStep(1); }} /> : <>
       <section className="space-y-4 rounded-[2rem] border bg-card p-6 md:p-8">
         <Badge variant="secondary">{t("application.secure")}</Badge><h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{vacancy.title}</h1><p className="text-muted-foreground">{vacancy.tenant?.name}{location ? ` · ${location}` : ""}</p>
-        {draftLoaded ? <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-primary">{t("application.resumeSaved")}</div> : null}
+        {draftLoaded ? <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-brand">{t("application.resumeSaved")}</div> : null}
       </section>
       <ApplicationProgressSummary currentStep={step} steps={localizedSteps} draftLoaded={draftLoaded} />
       <Wizard steps={localizedSteps} current={step} onStepChange={step < 6 ? setStep : undefined}>

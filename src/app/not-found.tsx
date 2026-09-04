@@ -9,7 +9,7 @@ export default function NotFound() {
       <Card className="w-full max-w-lg border-border/70 bg-card/85">
         <CardContent className="flex flex-col items-center gap-6 px-6 py-12 text-center">
           <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-900/30 dark:to-blue-900/30">
-            <FileQuestion className="size-8 text-primary" />
+            <FileQuestion className="size-8 text-brand" />
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight">Página no encontrada</h1>

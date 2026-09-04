@@ -19,5 +19,5 @@ export function ApplicantAccessPage({ title, defaultMode = "login", returnPath =
   const destination = safeReturnPath(params.get("returnUrl"), returnPath);
   const portalLabel = portal?.company?.name ? portal.company.name : t("applicant.portalFallback");
   const resolvedTitle = title ?? (defaultMode === "register" ? t("applicant.registerTitle") : t("applicant.accessTitle"));
-  return <main className="mx-auto flex min-h-[70vh] w-full max-w-5xl flex-col gap-6 px-4 py-6"><CandidateNav /><header className="mx-auto w-full max-w-lg space-y-2"><p className="text-sm font-medium text-primary">{resolvedTitle}</p><h1 className="text-3xl font-semibold tracking-tight">{t("applicant.continueProcess")}</h1></header><CandidateAuthCard returnPath={destination} portalLabel={portalLabel} defaultMode={defaultMode} onAuthenticated={() => router.replace(destination)} /></main>;
+  return <main className="mx-auto flex min-h-[70vh] w-full max-w-5xl flex-col gap-6 px-4 py-6"><CandidateNav /><header className="mx-auto w-full max-w-lg space-y-2"><p className="text-sm font-medium text-brand">{resolvedTitle}</p><h1 className="text-3xl font-semibold tracking-tight">{t("applicant.continueProcess")}</h1></header><CandidateAuthCard returnPath={destination} portalLabel={portalLabel} defaultMode={defaultMode} onAuthenticated={() => router.replace(destination)} /></main>;
 }

@@ -121,7 +121,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
       <Card level={2}>
         <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-semibold text-primary">{initials(employee.name)}</div>
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-semibold text-brand">{initials(employee.name)}</div>
             <div className="min-w-0">
               <p className="truncate text-xl font-semibold">{employee.name}</p>
               <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
@@ -442,7 +442,7 @@ function Documents({
               <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <FileText className="size-4 text-primary" />
+                    <FileText className="size-4 text-brand" />
                     <p className="truncate font-medium">{document.originalName}</p>
                     <Badge variant={document.status === "APPROVED" ? "success" : document.status === "REJECTED" ? "destructive" : "secondary"}>{document.status.replaceAll("_", " ")}</Badge>
                   </div>

@@ -66,7 +66,7 @@ export function FileUpload({
         className="flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-border/70 bg-secondary/30 px-6 py-8 text-center transition hover:border-primary/40 hover:bg-secondary/50"
       >
         <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
-          <Upload className="size-5 text-primary" />
+          <Upload className="size-5 text-brand" />
         </div>
         <div>
           <p className="text-sm font-medium">

@@ -74,9 +74,9 @@ function CandidatePortalContent() {
             </div>
           </div>
           <div className="grid gap-2 rounded-2xl border bg-surface-section p-4 text-sm">
-            <div className="flex items-center gap-2"><UserCircle2 className="size-4 text-primary" />{recentApplication?.vacancy.title ?? "Sin postulación reciente"}</div>
-            <div className="flex items-center gap-2"><FileClock className="size-4 text-primary" />{recentApplication?.currentStage?.name ?? recentApplication?.status ?? "Pendiente de actividad"}</div>
-            <div className="flex items-center gap-2"><ShieldCheck className="size-4 text-primary" />{activePrivacyRequests.length ? `${activePrivacyRequests.length} solicitud(es) de privacidad activas` : "Sin solicitudes de privacidad activas"}</div>
+            <div className="flex items-center gap-2"><UserCircle2 className="size-4 text-brand" />{recentApplication?.vacancy.title ?? "Sin postulación reciente"}</div>
+            <div className="flex items-center gap-2"><FileClock className="size-4 text-brand" />{recentApplication?.currentStage?.name ?? recentApplication?.status ?? "Pendiente de actividad"}</div>
+            <div className="flex items-center gap-2"><ShieldCheck className="size-4 text-brand" />{activePrivacyRequests.length ? `${activePrivacyRequests.length} solicitud(es) de privacidad activas` : "Sin solicitudes de privacidad activas"}</div>
           </div>
         </div>
       </header>
@@ -110,11 +110,11 @@ function CandidatePortalContent() {
 
 export default function CandidatePortalPage() { return <Suspense fallback={<AsyncState state="loading" />}><CandidatePortalContent /></Suspense>; }
 
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) { return <Card><CardContent className="flex items-center gap-4 p-5"><span className="text-primary">{icon}</span><div><p className="text-2xl font-semibold">{value}</p><p className="text-sm text-muted-foreground">{label}</p></div></CardContent></Card>; }
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) { return <Card><CardContent className="flex items-center gap-4 p-5"><span className="text-brand">{icon}</span><div><p className="text-2xl font-semibold">{value}</p><p className="text-sm text-muted-foreground">{label}</p></div></CardContent></Card>; }
 function MiniMetric({ label, value }: { label: string; value: number }) { return <div className="rounded-xl bg-surface-section p-4"><p className="text-2xl font-semibold">{value}</p><p className="text-sm text-muted-foreground">{label}</p></div>; }
 function Empty({ text }: { text: string }) { return <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">{text}</p>; }
 function SectionUnavailable({ onRetry }: { onRetry: () => void }) { return <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm text-muted-foreground"><span>Esta información no está disponible por el momento. Tus postulaciones siguen accesibles.</span><Button size="sm" variant="secondary" onClick={onRetry}>Reintentar</Button></div>; }
-function QuickAction({ title, description, href, icon }: { title: string; description: string; href: string; icon: React.ReactNode }) { return <Card className="group border-border-default/70 bg-card transition hover:-translate-y-0.5 hover:shadow-md"><CardContent className="space-y-3 p-5"><div className="flex items-center gap-3"><span className="rounded-xl bg-primary/10 p-2 text-primary">{icon}</span><div><p className="font-semibold">{title}</p><p className="text-sm text-muted-foreground">{description}</p></div></div><Button asChild variant="secondary" className="w-full"><Link href={href}>Abrir</Link></Button></CardContent></Card>; }
+function QuickAction({ title, description, href, icon }: { title: string; description: string; href: string; icon: React.ReactNode }) { return <Card className="group border-border-default/70 bg-card transition hover:-translate-y-0.5 hover:shadow-md"><CardContent className="space-y-3 p-5"><div className="flex items-center gap-3"><span className="rounded-xl bg-primary/10 p-2 text-brand">{icon}</span><div><p className="font-semibold">{title}</p><p className="text-sm text-muted-foreground">{description}</p></div></div><Button asChild variant="secondary" className="w-full"><Link href={href}>Abrir</Link></Button></CardContent></Card>; }
 function timelineLabel(type: string) {
   const labels: Record<string, string> = {
     VACANCY_PUBLISHED: "Vacante publicada",

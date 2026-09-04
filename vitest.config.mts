@@ -11,9 +11,10 @@ export default defineConfig({
   },
   test: {
     exclude: [
-      "tests/e2e/**",
-      "tests/integration/**",
-      "tests/ats-staging/**",
+      // `tests/` es territorio de Playwright; las pruebas de vitest viven en `src/`.
+      // Se excluye el directorio completo en lugar de enumerar subcarpetas: así,
+      // añadir una suite nueva de Playwright no vuelve a romper `pnpm test`.
+      "tests/**",
       "node_modules/**",
       ".next/**",
     ],

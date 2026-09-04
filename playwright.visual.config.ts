@@ -1,6 +1,36 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
+ * La línea base visual necesita una aplicación con datos reales detrás.
+ *
+ * No se levanta un servidor de desarrollo con backend simulado, como hace
+ * `playwright.config.ts`, porque ese camino no funciona: `MOCK_BACKEND_ENABLED`
+ * está fijado a `false` en `src/lib/backend.ts:204` (deliberadamente, para que
+ * producción nunca renderice entidades simuladas), así que la simulación no se
+ * activa aunque se pase `NEXT_PUBLIC_ENABLE_MOCK_BACKEND=true`. Sin backend,
+ * cada pantalla capturaría su estado de error.
+ *
+ * Se falla de inmediato y con instrucciones, en lugar de gastar dos minutos
+ * arrancando un servidor condenado. Es el mismo criterio que ya aplica
+ * `playwright.critical-certification.config.ts`.
+ */
+if (!process.env.E2E_BASE_URL) {
+  throw new Error(
+    [
+      "E2E_BASE_URL es obligatoria para la linea base visual.",
+      "",
+      "Apunta a un despliegue con backend y datos, por ejemplo:",
+      "  E2E_BASE_URL=https://staging.tu-dominio.com pnpm test:visual:update",
+      "",
+      "Ademas necesitas credenciales de 6 roles en .env.e2e:",
+      "  TENANT_ADMIN, HR_MANAGER, RECRUITER, INSTRUCTOR, INVENTORY_MANAGER, BRANCH_USER",
+      "",
+      "Detalle completo en docs/UX_SAFETY_NET.md.",
+    ].join("\n"),
+  );
+}
+
+/**
  * Configuración dedicada a la línea base visual.
  *
  * Vive aparte de `playwright.config.ts` a propósito: las capturas de
@@ -22,7 +52,7 @@ export default defineConfig({
   snapshotPathTemplate: "tests/visual/__screenshots__/{projectName}/{arg}{ext}",
 
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL: process.env.E2E_BASE_URL,
     trace: "retain-on-failure",
     // Tipografía y escala fijas: cualquier variación mueve todos los píxeles.
     deviceScaleFactor: 1,
@@ -46,12 +76,5 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
 
-  webServer: process.env.E2E_BASE_URL
-    ? undefined
-    : {
-        command: "NEXT_PUBLIC_API_URL=http://127.0.0.1:39999/api NEXT_PUBLIC_ENABLE_MOCK_BACKEND=true pnpm dev",
-        url: "http://localhost:3000",
-        reuseExistingServer: false,
-        timeout: 120_000,
-      },
+  // Sin `webServer`: el objetivo lo aporta siempre `E2E_BASE_URL`, validada arriba.
 });

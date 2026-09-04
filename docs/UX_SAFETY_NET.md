@@ -84,10 +84,52 @@ una prueba de "modo oscuro" podría estar midiendo la paleta clara y pasar.
 
 ## Línea base visual
 
+### Requisito previo: hace falta un entorno con datos
+
+Las suites autenticadas **no pueden ejecutarse en local sin backend**. Conviene
+saber por qué antes de intentarlo:
+
+`playwright.config.ts` arranca un servidor de desarrollo con
+`NEXT_PUBLIC_ENABLE_MOCK_BACKEND=true` apuntando a un puerto muerto (39999), con
+la intención de que el backend simulado tome el relevo. **Ese camino ya no
+funciona:** `src/lib/backend.ts:204` fija
+
+```ts
+const MOCK_BACKEND_ENABLED = false;
+```
+
+de forma deliberada —el comentario adjunto explica que producción nunca debe
+renderizar entidades simuladas—, así que `shouldUseMockBackend()` devuelve
+siempre `false` y la variable de entorno se ignora.
+
+Aunque se reactivara, no bastaría para la línea base:
+
+| Métrica | Valor |
+|---|---|
+| Funciones de API que expone el frontend | 610 |
+| Funciones implementadas en `mock-backend.ts` | 66 |
+| Puntos de `backend.ts` con recurso al simulador | 14 |
+
+El simulador cubre autenticación, empleados, vacantes, usuarios, sucursales y
+roles, pero **no** `fetchOperationalDashboard`, `fetchApplications`,
+`fetchRecruitmentInterviews`, `fetchRestaurantDashboard` ni el flujo de
+contratación. Las pantallas más importantes del catálogo capturarían su estado
+de error, y una línea base de estados de error no protege nada.
+
+Por eso `playwright.visual.config.ts` **exige `E2E_BASE_URL`** y falla de
+inmediato con instrucciones, en lugar de gastar dos minutos arrancando un
+servidor condenado.
+
+### Qué se necesita
+
+1. Un despliegue accesible con backend y datos (staging o local con Postgres).
+2. `.env.e2e` con credenciales de los 6 roles.
+3. Un tenant de pruebas con los módulos habilitados (ver «Omisiones legítimas»).
+
 ### Generar las referencias por primera vez
 
 ```bash
-pnpm test:visual:update
+E2E_BASE_URL=https://staging.tu-dominio.com pnpm test:visual:update
 ```
 
 Revisa las 39 imágenes generadas en `tests/visual/__screenshots__/` **antes de

@@ -71,7 +71,7 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
   onReject: (move: StageMove) => void;
   busy: boolean;
 }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const phase = recruitmentPhase(recruitmentPhaseOf(application.status));
   const name = application.candidate.fullName;
 
@@ -84,7 +84,7 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
         <div className="min-w-0 flex-1">
           <h3 className="text-xl font-semibold text-text-primary">{name}</h3>
           <p className="mt-1 text-text-primary">{application.vacancy.title}</p>
-          <p className="mt-1 text-text-secondary">{application.vacancy.branch?.name ?? "Sin sucursal"}</p>
+          <p className="mt-1 text-text-secondary">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
           <p className="mt-1 text-text-secondary">{waitingLabel(application.appliedAt)}</p>
           <div className="mt-3"><PhaseChip label={phaseTitle(phase.id, locale)} tone={phase.id === "DESCARTADOS" ? "neutral" : "waiting"} /></div>
         </div>
@@ -106,14 +106,14 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
           href={`/ats/candidates/${application.id}`}
           className={cn(TAP_TARGET, "flex w-full items-center justify-center gap-2 rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus sm:w-auto")}
         >
-          Ver a {firstNameOf(name)}
+          {t("people.seePerson", { name: firstNameOf(name, locale) })}
           <ChevronRight className="size-5" aria-hidden="true" />
         </Link>
       </div>
 
       {moves.others.length ? (
         <div className="mt-3">
-          <SimpleSection title="Otras opciones" hint={`${moves.others.length} disponible${moves.others.length === 1 ? "" : "s"}`}>
+          <SimpleSection title={t("people.otherOptions")} hint={moves.others.length === 1 ? t("people.availableOne") : t("people.availableMany", { count: moves.others.length })}>
             <div className="flex flex-col gap-2">
               {moves.others.map((move) => (
                 <button
@@ -135,7 +135,7 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
 }
 
 function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -177,8 +177,8 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
   const undo = useMutation({
     mutationFn: ({ applicationId, expectedUpdatedAt }: { applicationId: string; expectedUpdatedAt: string }) => undoApplicationTransition(applicationId, expectedUpdatedAt),
-    onSuccess: async () => { toast.success("Listo, lo dejamos como estaba."); await client.invalidateQueries({ queryKey: ["applications"] }); },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No pudimos deshacer el cambio."),
+    onSuccess: async () => { toast.success(t("people.undone")); await client.invalidateQueries({ queryKey: ["applications"] }); },
+    onError: (error) => toast.error(error instanceof Error ? error.message : t("people.undoFailed")),
   });
 
   const move = useMutation({
@@ -196,7 +196,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
         action: { label: "Deshacer", onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }) },
       });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No pudimos mover a esta persona. Inténtalo otra vez."),
+    onError: (error) => toast.error(error instanceof Error ? error.message : t("people.moveFailed")),
   });
 
   const renderCard = (application: VacancyApplicationDto) => (
@@ -214,9 +214,9 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
   return (
     <SimpleScreen>
-      <SimpleHeader title="Postulaciones" help="Todas las postulaciones que están en algún punto del proceso. Elige cuál quieres ver." />
+      <SimpleHeader title={t("people.title")} help={t("people.help")} />
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Cómo ver las postulaciones">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t("people.viewsAria")}>
         {(["lista", "fases"] as const).map((option) => (
           <button
             key={option}
@@ -226,38 +226,38 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
             onClick={() => setParam("view", option)}
             className={cn(TAP_TARGET, "rounded-full border px-5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus", view === option ? "border-primary bg-primary text-text-on-accent" : "border-border-default bg-surface-elevated text-text-primary")}
           >
-            {option === "lista" ? "En una lista" : "Por fases"}
+            {option === "lista" ? t("people.viewList") : t("people.viewPhases")}
           </button>
         ))}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <label className="space-y-2 font-medium text-text-primary" htmlFor="people-search">
-          Buscar una persona
+          {t("people.searchLabel")}
           <span className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
             <input
               id="people-search"
               value={search}
               onChange={(event) => setParam("q", event.target.value)}
-              placeholder="Nombre o correo"
+              placeholder={t("people.searchPlaceholder")}
               className={cn(TAP_TARGET, "w-full rounded-xl border border-border-default bg-surface-elevated pl-10 pr-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
             />
           </span>
         </label>
 
         <label className="space-y-2 font-medium text-text-primary" htmlFor="people-vacancy">
-          Puesto
-          <select id="people-vacancy" aria-label="Filtrar por puesto" value={vacancyId} onChange={(event) => setParam("vacancy", event.target.value)} className={selectClass}>
-            <option value={ALL}>Todos los puestos</option>
+          {t("people.vacancy")}
+          <select id="people-vacancy" aria-label={t("people.filterVacancy")} value={vacancyId} onChange={(event) => setParam("vacancy", event.target.value)} className={selectClass}>
+            <option value={ALL}>{t("people.allVacancies")}</option>
             {(vacancies.data?.data ?? []).map((vacancy) => <option key={vacancy.id} value={vacancy.id}>{vacancy.title}</option>)}
           </select>
         </label>
 
         <label className="space-y-2 font-medium text-text-primary" htmlFor="people-phase">
-          Fase
-          <select id="people-phase" aria-label="Filtrar por fase" value={phase ?? ALL} onChange={(event) => setParam("phase", event.target.value)} className={selectClass}>
-            <option value={ALL}>Todas las fases</option>
+          {t("people.phase")}
+          <select id="people-phase" aria-label={t("people.filterPhase")} value={phase ?? ALL} onChange={(event) => setParam("phase", event.target.value)} className={selectClass}>
+            <option value={ALL}>{t("people.allPhases")}</option>
             {RECRUITMENT_PHASES.map((entry) => <option key={entry.id} value={entry.id}>{phaseTitle(entry.id, locale)}</option>)}
           </select>
         </label>
@@ -265,19 +265,19 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
       {vacancyId === ALL ? (
         <p className="text-text-secondary">
-          Elige un puesto arriba si quieres mover a alguien de fase: cada puesto tiene sus propios pasos.
+          {t("people.pickVacancyHint")}
         </p>
       ) : null}
 
-      {applications.isLoading ? <AsyncState state="loading" title="Buscando postulaciones" /> : null}
-      {applications.isError ? <AsyncState state="error" title="No pudimos cargar las postulaciones" onRetry={() => void applications.refetch()} /> : null}
+      {applications.isLoading ? <AsyncState state="loading" title={t("people.loading")} /> : null}
+      {applications.isError ? <AsyncState state="error" title={t("people.errorTitle")} onRetry={() => void applications.refetch()} /> : null}
 
       {applications.isSuccess && !items.length ? (
         <SimpleEmpty
-          title={search || vacancyId !== ALL || phase ? "No encontramos a nadie con esos criterios" : "Todavía no hay nadie en el proceso"}
+          title={search || vacancyId !== ALL || phase ? t("people.noMatches") : t("people.emptyTitle")}
           help={search || vacancyId !== ALL || phase
-            ? "Prueba a quitar el puesto o la fase, o busca con otro nombre."
-            : "Cuando alguien se postule a uno de tus puestos, aparecerá aquí."}
+            ? t("people.noMatchesHelp")
+            : t("people.emptyHelp")}
         />
       ) : null}
 
@@ -298,7 +298,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
                   </h2>
                   <p className="text-text-secondary">{phaseMeaning(entry.id, locale)}</p>
                 </div>
-                {people.length ? people.map(renderCard) : <p className="rounded-2xl border border-dashed border-border-default p-4 text-text-secondary">Nadie en esta fase por ahora.</p>}
+                {people.length ? people.map(renderCard) : <p className="rounded-2xl border border-dashed border-border-default p-4 text-text-secondary">{t("people.noneInPhase")}</p>}
               </section>
             );
           })}
@@ -309,7 +309,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
         <Pagination page={meta.page - 1} totalPages={meta.totalPages} totalItems={meta.total} pageSize={meta.pageSize} onPageChange={(next) => setParam("page", String(next + 1))} />
       ) : null}
 
-      <SimpleSection title="Herramientas avanzadas" hint="Acciones en lote, exportar y automatizaciones">
+      <SimpleSection title={t("people.advancedTools")} hint={t("people.advancedHint")}>
         <p className="mb-3 text-text-secondary">
           Estas pantallas son más densas y están pensadas para quien ya conoce el sistema. Nada de lo que había se perdió: sigue aquí.
         </p>
@@ -332,8 +332,8 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
       <ReasonDialog
         open={Boolean(rejecting)}
         title={rejecting ? `Descartar a ${firstNameOf(rejecting.application.candidate.fullName)}` : "Descartar"}
-        description="La persona dejará de avanzar en el proceso. El motivo queda guardado en su historial."
-        confirmLabel="Sí, descartar"
+        description={t("people.rejectDescription")}
+        confirmLabel={t("people.confirmReject")}
         options={rejectionReasons.data?.map((reason) => ({ id: reason.id, label: reason.label }))}
         onOpenChange={(open) => !open && setRejecting(null)}
         onConfirm={({ reasonId, reason }) => {
@@ -346,8 +346,9 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 }
 
 export function PeopleWorkspace({ defaultView = "lista" }: { defaultView?: "lista" | "fases" }) {
+  const { t } = useLocale();
   return (
-    <Suspense fallback={<AsyncState state="loading" title="Preparando la lista de postulaciones" />}>
+    <Suspense fallback={<AsyncState state="loading" title={t("people.preparing")} />}>
       <PeopleContent defaultView={defaultView} />
     </Suspense>
   );

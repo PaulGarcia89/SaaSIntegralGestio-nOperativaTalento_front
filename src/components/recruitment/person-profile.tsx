@@ -59,7 +59,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function PersonProfile({ application }: { application: VacancyApplicationDto }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const client = useQueryClient();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
@@ -97,38 +97,38 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
     onSuccess: async (updated, variables) => {
       await refresh();
       toast.success(`Listo. ${firstName} pasó a ${variables.stage.name}.`, {
-        action: { label: "Deshacer", onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }) },
+        action: { label: t("profile.undo"), onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }) },
       });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No pudimos mover a esta persona."),
+    onError: (error) => toast.error(error instanceof Error ? error.message : t("profile.moveFailed")),
   });
 
   const saveNotes = useMutation({
     mutationFn: () => updateApplication(application.id, { notes: notes.trim() || undefined, expectedUpdatedAt: application.updatedAt }),
-    onSuccess: async () => { toast.success("Nota guardada."); await refresh(); },
-    onError: () => toast.error("No pudimos guardar la nota. Inténtalo otra vez; no se perdió lo que escribiste."),
+    onSuccess: async () => { toast.success(t("profile.noteSaved")); await refresh(); },
+    onError: () => toast.error(t("profile.noteFailed")),
   });
 
   const resume = useMutation({
     mutationFn: () => fetchResumeAccess(application.id),
     onSuccess: (access) => window.open(access.url, "_blank", "noopener,noreferrer"),
-    onError: () => toast.error("No pudimos abrir el currículum."),
+    onError: () => toast.error(t("profile.resumeFailed")),
   });
 
   const contract = useMutation({
     mutationFn: () => createHiringContract(application.id, { roleTitle: application.vacancy.title }),
     onSuccess: (created) => window.location.assign(`/hiring/${created.id}`),
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No pudimos preparar la contratación."),
+    onError: (error) => toast.error(error instanceof Error ? error.message : t("profile.hiringFailed")),
   });
 
   const readyToHire = application.status === "APPROVED" && can("applications.hire");
 
   return (
     <SimpleScreen>
-      <nav aria-label="Volver">
+      <nav aria-label={t("profile.backAria")}>
         <Link href="/ats/candidates" className={cn(TAP_TARGET, "inline-flex items-center gap-2 rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
           <ArrowLeft className="size-5" aria-hidden="true" />
-          Volver a Postulaciones
+          {t("profile.back")}
         </Link>
       </nav>
 
@@ -141,7 +141,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
             <div className="min-w-0">
               <h1 className="text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{name}</h1>
               <p className="mt-2 text-lg text-text-primary">Se postuló para {application.vacancy.title}</p>
-              <p className="mt-1 text-text-secondary">{application.vacancy.branch?.name ?? "Sin sucursal"}</p>
+              <p className="mt-1 text-text-secondary">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
               <p className="mt-1 text-text-secondary">{waitingLabel(application.appliedAt)}</p>
             </div>
           </div>
@@ -150,24 +150,24 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
 
         <dl className="mt-6 grid gap-4 border-t border-border-default pt-5 sm:grid-cols-3">
           <div>
-            <dt className="text-text-secondary">Correo</dt>
+            <dt className="text-text-secondary">{t("profile.email")}</dt>
             <dd className="mt-1 flex items-center gap-2 text-text-primary">
               <Mail className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
               <a href={`mailto:${application.candidate.email}`} className="underline underline-offset-4">{application.candidate.email}</a>
             </dd>
           </div>
           <div>
-            <dt className="text-text-secondary">Teléfono</dt>
+            <dt className="text-text-secondary">{t("profile.phone")}</dt>
             <dd className="mt-1 flex items-center gap-2 text-text-primary">
               <Phone className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
-              {application.candidate.phone ? <a href={`tel:${application.candidate.phone}`} className="underline underline-offset-4">{application.candidate.phone}</a> : "No lo dejó"}
+              {application.candidate.phone ? <a href={`tel:${application.candidate.phone}`} className="underline underline-offset-4">{application.candidate.phone}</a> : t("profile.notGivenM")}
             </dd>
           </div>
           <div>
-            <dt className="text-text-secondary">Ciudad</dt>
+            <dt className="text-text-secondary">{t("profile.city")}</dt>
             <dd className="mt-1 flex items-center gap-2 text-text-primary">
               <MapPin className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
-              {application.candidate.city ?? "No la dejó"}
+              {application.candidate.city ?? t("profile.notGivenF")}
             </dd>
           </div>
         </dl>
@@ -186,20 +186,20 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
       </header>
 
       <section aria-labelledby="que-hago" className="rounded-2xl border border-primary/30 bg-primary/[0.04] p-5 sm:p-7">
-        <h2 id="que-hago" className="text-2xl font-semibold text-text-primary">¿Qué hago ahora?</h2>
+        <h2 id="que-hago" className="text-2xl font-semibold text-text-primary">{t("profile.whatNow")}</h2>
 
         {!canUpdate ? (
-          <p className="mt-3 text-text-secondary">Tu perfil permite consultar esta ficha, pero no cambiar su estado.</p>
+          <p className="mt-3 text-text-secondary">{t("profile.readOnly")}</p>
         ) : readyToHire ? (
           <>
-            <p className="mt-2 text-text-primary">Ya decidiste contratar a {firstName}. El siguiente paso es prepararle la oferta.</p>
+            <p className="mt-2 text-text-primary">{t("profile.decidedToHire", { name: firstName })}</p>
             <button
               type="button"
               onClick={() => contract.mutate()}
               disabled={contract.isPending}
               className={cn(TAP_TARGET, "mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-semibold text-text-on-accent disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus sm:w-auto")}
             >
-              {contract.isPending ? "Preparando…" : `Preparar la contratación de ${firstName}`}
+              {contract.isPending ? t("profile.preparing") : t("profile.prepareHiring", { name: firstName })}
               <ChevronRight className="size-5" aria-hidden="true" />
             </button>
           </>
@@ -216,12 +216,12 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
             </button>
           </>
         ) : (
-          <p className="mt-3 text-text-secondary">No hay nada pendiente con {firstName} en este momento.</p>
+          <p className="mt-3 text-text-secondary">{t("profile.nothingPending", { name: firstName })}</p>
         )}
 
         {canUpdate && moves.others.length ? (
           <div className="mt-4">
-            <SimpleSection title="Otras opciones" hint={`${moves.others.length} disponible${moves.others.length === 1 ? "" : "s"}`}>
+            <SimpleSection title={t("people.otherOptions")} hint={moves.others.length === 1 ? t("people.availableOne") : t("people.availableMany", { count: moves.others.length })}>
               <div className="flex flex-col gap-2">
                 {moves.others.map((option) => (
                   <button
@@ -241,19 +241,19 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
       </section>
 
       <section aria-labelledby="mas-de" className="space-y-3">
-        <h2 id="mas-de" className="text-xl font-semibold text-text-primary">Más sobre {firstName}</h2>
+        <h2 id="mas-de" className="text-xl font-semibold text-text-primary">{t("profile.moreAbout", { name: firstName })}</h2>
 
-        <SimpleSection title="Su postulación" hint={formatApplicationDate(application.appliedAt)}>
+        <SimpleSection title={t("profile.theirApplication")} hint={formatApplicationDate(application.appliedAt)}>
           <dl>
-            <DataRow label="Puesto" value={application.vacancy.title} />
-            <DataRow label="Etapa actual" value={application.currentStage?.name ?? phaseTitle(phase.id, locale)} />
-            <DataRow label="Se postuló el" value={formatApplicationDate(application.appliedAt)} />
-            <DataRow label="Responsable" value={application.assignedRecruiter ? `${application.assignedRecruiter.firstName} ${application.assignedRecruiter.lastName}` : "Sin asignar"} />
-            {application.coverLetter ? <DataRow label="Lo que escribió" value={application.coverLetter} /> : null}
+            <DataRow label={t("profile.role")} value={application.vacancy.title} />
+            <DataRow label={t("profile.currentStage")} value={application.currentStage?.name ?? phaseTitle(phase.id, locale)} />
+            <DataRow label={t("profile.appliedOn")} value={formatApplicationDate(application.appliedAt)} />
+            <DataRow label={t("profile.owner")} value={application.assignedRecruiter ? `${application.assignedRecruiter.firstName} ${application.assignedRecruiter.lastName}` : t("profile.unassigned")} />
+            {application.coverLetter ? <DataRow label={t("profile.whatTheyWrote")} value={application.coverLetter} /> : null}
           </dl>
         </SimpleSection>
 
-        <SimpleSection title="Notas internas" hint="Solo las ve tu equipo">
+        <SimpleSection title={t("profile.internalNotes")} hint={t("profile.internalNotesHint")}>
           <label className="block space-y-2 font-medium text-text-primary" htmlFor="person-notes">
             Escribe lo que quieras recordar
             <textarea
@@ -262,7 +262,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
               onChange={(event) => setNotes(event.target.value)}
               disabled={!canUpdate}
               className="min-h-32 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-base disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-              placeholder="Por ejemplo: tiene experiencia en caja, disponible desde el lunes."
+              placeholder={t("profile.notesPlaceholder")}
             />
           </label>
           {canUpdate ? (
@@ -272,12 +272,12 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
               disabled={saveNotes.isPending || notes === (application.notes ?? "")}
               className={cn(TAP_TARGET, "mt-3 rounded-full bg-primary px-5 font-semibold text-text-on-accent disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
             >
-              {saveNotes.isPending ? "Guardando…" : "Guardar la nota"}
+              {saveNotes.isPending ? t("vacancies.saving") : t("profile.saveNote")}
             </button>
           ) : null}
         </SimpleSection>
 
-        <SimpleSection title="Mensajes que le enviamos" hint={communications.data?.length ? `${communications.data.length} en total` : "Ninguno todavía"}>
+        <SimpleSection title={t("profile.messages")} hint={communications.data?.length ? t("profile.messagesCount", { count: communications.data.length }) : t("profile.noneYet")}>
           {communications.data?.length ? (
             <ol className="space-y-3">
               {communications.data.slice(0, 10).map((message) => (
@@ -288,11 +288,11 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
               ))}
             </ol>
           ) : (
-            <p className="text-text-secondary">Todavía no le hemos enviado ningún mensaje.</p>
+            <p className="text-text-secondary">{t("profile.noMessages")}</p>
           )}
         </SimpleSection>
 
-        <SimpleSection title="Herramientas avanzadas" hint="Evaluaciones, comité de decisión, ofertas y entrevistas">
+        <SimpleSection title={t("people.advancedTools")} hint={t("profile.advancedHint")}>
           <p className="mb-3 text-text-secondary">
             La ficha completa tiene todo lo anterior más las evaluaciones de entrevista, el comité de decisión, el gestor de ofertas y la agenda. Nada se perdió: sigue ahí.
           </p>
@@ -300,7 +300,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
             href={`/ats/candidates/${application.id}/avanzado`}
             className={cn(TAP_TARGET, "flex items-center justify-center rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
           >
-            Abrir la ficha completa de {firstName}
+            {t("profile.openFullRecord", { name: firstName })}
           </Link>
         </SimpleSection>
       </section>
@@ -308,8 +308,8 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
       <ReasonDialog
         open={Boolean(rejecting)}
         title={`Descartar a ${firstName}`}
-        description="La persona dejará de avanzar en el proceso. El motivo queda guardado en su historial."
-        confirmLabel="Sí, descartar"
+        description={t("people.rejectDescription")}
+        confirmLabel={t("people.confirmReject")}
         options={rejectionReasons.data?.map((reason) => ({ id: reason.id, label: reason.label }))}
         onOpenChange={(open) => !open && setRejecting(null)}
         onConfirm={({ reasonId, reason }) => {
@@ -322,8 +322,9 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
 }
 
 export function PersonProfilePage({ applicationId }: { applicationId: string }) {
+  const { t } = useLocale();
   const application = useQuery({ queryKey: ["application", applicationId], queryFn: () => fetchApplication(applicationId), enabled: Boolean(applicationId) });
-  if (application.isLoading) return <AsyncState state="loading" title="Cargando la ficha" />;
-  if (application.isError || !application.data) return <AsyncState state="error" title="No pudimos cargar la ficha" onRetry={() => void application.refetch()} />;
+  if (application.isLoading) return <AsyncState state="loading" title={t("profile.loading")} />;
+  if (application.isError || !application.data) return <AsyncState state="error" title={t("profile.errorTitle")} onRetry={() => void application.refetch()} />;
   return <PersonProfile application={application.data} />;
 }

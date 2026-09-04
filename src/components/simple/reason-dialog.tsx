@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { TAP_TARGET } from "@/components/simple/simple-ui";
+import { useLocale } from "@/components/locale-provider";
 
 /**
  * Diálogo de motivo para una acción que no se puede deshacer sola.
@@ -22,6 +23,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, options, 
   onOpenChange: (open: boolean) => void;
   onConfirm: (input: { reasonId?: string; reason: string }) => void;
 }) {
+  const { t } = useLocale();
   const [reasonId, setReasonId] = useState("");
   const [reason, setReason] = useState("");
   const needsOption = Boolean(options?.length);
@@ -52,7 +54,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, options, 
               onChange={(event) => setReasonId(event.target.value)}
               className={cn(TAP_TARGET, "w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
             >
-              <option value="">Elige un motivo</option>
+              <option value="">{t("reason.pickOne")}</option>
               {options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
           </label>
@@ -65,13 +67,13 @@ export function ReasonDialog({ open, title, description, confirmLabel, options, 
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             className="min-h-28 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-            placeholder="Esto queda guardado en el historial de la persona."
+            placeholder={t("reason.placeholder")}
           />
         </label>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" className={TAP_TARGET} onClick={() => onOpenChange(false)}>
-            Mejor no
+            {t("reason.cancel")}
           </Button>
           <Button type="button" variant="destructive" className={TAP_TARGET} disabled={!ready} onClick={submit}>
             {confirmLabel}

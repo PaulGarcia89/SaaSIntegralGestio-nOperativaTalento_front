@@ -12,7 +12,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/onboarding/signatures", label: "Documentos y firmas", group: "Personas", module: "onboarding", permission: "onboarding.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "signatures" },
   { href: "/ats", label: "Hoy", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "dashboard", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
   { href: "/ats/vacancies", label: "Vacantes", group: "Reclutamiento", module: "ats", permission: "jobs.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "vacancies", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
-  // Fusionada dentro de "Personas" como su vista "Por fases". La ruta y su
+  // Fusionada dentro de "Postulaciones" como su vista "Por fases". La ruta y su
   // política de acceso se conservan para no romper enlaces guardados ni las
   // pruebas de permisos, pero deja de ocupar un sitio en el menú: dos entradas
   // al mismo destino es la duplicación que este rediseño vino a eliminar.

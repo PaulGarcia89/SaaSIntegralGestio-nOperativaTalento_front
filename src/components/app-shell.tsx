@@ -384,7 +384,7 @@ function SidebarContent({
  * (48px de destino táctil + 2×6px de relleno del contenedor) más la separación
  * que la despega del borde, que ya absorbe el área segura del iPhone.
  *
- * `MobileActionBar` (pantallas «Hoy» y «Personas») se apoya en esta variable
+ * `MobileActionBar` (pantallas «Hoy» y «Postulaciones») se apoya en esta variable
  * para apilarse ENCIMA de la navegación. Antes se dibujaba en `bottom-0` con
  * `z-30` contra el `z-40` de la navegación, de modo que en un iPhone la barra
  * de navegación tapaba el botón principal de esas dos pantallas.

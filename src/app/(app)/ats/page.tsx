@@ -72,7 +72,7 @@ export default function TodayPage() {
         help="Esto es todo lo que necesita tu atención ahora mismo. Cuando termines, la lista se queda vacía."
       />
 
-      <nav aria-label="Personas por fase">
+      <nav aria-label="Postulaciones por fase">
         <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {MAIN_PHASES.map((phase, index) => {
             const total = counts[index]?.data?.meta.total;
@@ -135,7 +135,7 @@ export default function TodayPage() {
           href="/ats/candidates"
           className={cn(TAP_TARGET, "flex w-full items-center justify-center rounded-full bg-primary px-5 font-semibold text-text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
         >
-          Ver todas las personas
+          Ver todas las postulaciones
         </Link>
       </MobileActionBar>
     </SimpleScreen>

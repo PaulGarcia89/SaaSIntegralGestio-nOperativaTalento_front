@@ -124,7 +124,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
       <nav aria-label="Volver">
         <Link href="/ats/candidates" className={cn(TAP_TARGET, "inline-flex items-center gap-2 rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
           <ArrowLeft className="size-5" aria-hidden="true" />
-          Volver a Personas
+          Volver a Postulaciones
         </Link>
       </nav>
 

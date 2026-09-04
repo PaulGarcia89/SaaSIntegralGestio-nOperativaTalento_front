@@ -211,7 +211,7 @@ describe("navigation policy", () => {
     expect(decision.code).toBe("SUBSCRIPTION_BLOCKED");
   });
 
-  it("keeps the pipeline route reachable but out of the menu after merging it into Personas", () => {
+  it("keeps the pipeline route reachable but out of the menu after merging it into Postulaciones", () => {
     const pipeline = appNavigation.find((item) => item.href === "/ats/pipeline");
     // La ruta sigue existiendo y conserva su política de acceso: hay enlaces
     // guardados apuntando ahí y las pruebas de permisos dependen de ella.

@@ -147,7 +147,7 @@ export function SimpleEmpty({ title, help, action }: { title: string; help?: str
  * en móvil ocupa la franja inferior (`fixed ... bottom-[max(0.75rem,safe-area)]`,
  * `z-40`, alto 60px). Antes esta barra estaba en `bottom-0` con `z-30`, así que
  * la navegación se dibujaba encima y tapaba el botón principal justo en las dos
- * pantallas rediseñadas («Hoy» y «Personas»). El desplazamiento se calcula con
+ * pantallas rediseñadas («Hoy» y «Postulaciones»). El desplazamiento se calcula con
  * `--mobile-nav-space`, que define `app-shell`, para que las dos barras no se
  * solapen aunque cambie el alto de la navegación.
  *

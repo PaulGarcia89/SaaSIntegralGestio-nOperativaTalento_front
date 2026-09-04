@@ -23,7 +23,7 @@ const routeLabels: Record<string, string> = {
   modules: "Módulos",
   ats: "ATS",
   vacancies: "Vacantes",
-  candidates: "Personas",
+  candidates: "Postulaciones",
   "talent-crm": "Base de talento",
   avanzado: "Vista avanzada",
   interviews: "Entrevistas",

@@ -28,7 +28,7 @@ import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
 /**
- * "Personas" — la fusión de Candidatos y Pipeline.
+ * "Postulaciones" — la fusión de Candidatos y Pipeline.
  *
  * Eran dos pantallas que mostraban lo mismo de dos maneras: una lista con siete
  * filtros y una tabla, y un tablero por etapas. Aquí hay una sola pantalla con
@@ -209,9 +209,9 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
   return (
     <SimpleScreen>
-      <SimpleHeader title="Personas" help="Todas las personas que están en algún punto del proceso. Elige a quién quieres ver." />
+      <SimpleHeader title="Postulaciones" help="Todas las postulaciones que están en algún punto del proceso. Elige cuál quieres ver." />
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Cómo ver a las personas">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Cómo ver las postulaciones">
         {(["lista", "fases"] as const).map((option) => (
           <button
             key={option}
@@ -264,8 +264,8 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
         </p>
       ) : null}
 
-      {applications.isLoading ? <AsyncState state="loading" title="Buscando personas" /> : null}
-      {applications.isError ? <AsyncState state="error" title="No pudimos cargar las personas" onRetry={() => void applications.refetch()} /> : null}
+      {applications.isLoading ? <AsyncState state="loading" title="Buscando postulaciones" /> : null}
+      {applications.isError ? <AsyncState state="error" title="No pudimos cargar las postulaciones" onRetry={() => void applications.refetch()} /> : null}
 
       {applications.isSuccess && !items.length ? (
         <SimpleEmpty
@@ -342,7 +342,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
 export function PeopleWorkspace({ defaultView = "lista" }: { defaultView?: "lista" | "fases" }) {
   return (
-    <Suspense fallback={<AsyncState state="loading" title="Preparando la lista de personas" />}>
+    <Suspense fallback={<AsyncState state="loading" title="Preparando la lista de postulaciones" />}>
       <PeopleContent defaultView={defaultView} />
     </Suspense>
   );

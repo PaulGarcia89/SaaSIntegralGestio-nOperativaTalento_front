@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ClipboardCheck, ClipboardList, Eye, Plus, Trash2, Utensils } from "lucide-react";
+import { Check, ClipboardList, Eye, Plus } from "lucide-react";
 import {
   cancelRestaurantReceipt, confirmRestaurantReceipt, createRestaurantConsumption,
   createRestaurantWaste, fetchRestaurantDashboard, fetchRestaurantIngredients,
@@ -64,7 +64,7 @@ function RestaurantInventoryInner() {
   const effectiveTask = visibleTasks.some((item) => item.key === selectedTask && (section === "dashboard" ? item.key === "overview" : item.items.some((child) => child.key === section))) ? selectedTask : activeTask;
   const task = visibleTasks.find((item) => item.key === effectiveTask) ?? visibleTasks[0];
   return <div className={compactMode ? "space-y-4 text-sm" : "space-y-6"} data-compact={compactMode ? "true" : "false"}>
-    <PageHeader eyebrow="Operaciones" title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." />
+    <PageHeader eyebrow={task?.label ?? "Operaciones"} title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." />
     <nav aria-label="Tareas de inventario de restaurante">
       <label className="sr-only" htmlFor="inventory-task-mobile">Sección de inventario</label>
       <select id="inventory-task-mobile" className="h-11 w-full rounded-2xl border border-border-default bg-surface-elevated px-3 md:hidden" value={effectiveTask} onChange={(event) => setSelectedTask(event.target.value)}>
@@ -74,16 +74,8 @@ function RestaurantInventoryInner() {
         {visibleTasks.map((item) => <button key={item.key} type="button" onClick={() => setSelectedTask(item.key)} className={`min-h-14 rounded-2xl border px-4 py-3 text-left transition ${effectiveTask === item.key ? "border-primary bg-primary/10 shadow-sm" : "border-border-default bg-surface-elevated hover:border-primary/40"}`}><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-xs text-text-secondary">{item.description}</span></button>)}
       </div>
     </nav>
-    {task ? <div className="flex flex-wrap gap-2 rounded-2xl border border-border-default bg-surface-elevated p-3" aria-label={`Rutas de ${task.label}`}>{task.items.map((item) => <Button key={item.key} asChild size="sm" className="min-h-10" variant={section === item.key ? "default" : "secondary"}><Link href={item.href}>{item.label}</Link></Button>)}</div> : null}
+    {task ? <section className={`space-y-3 rounded-2xl border bg-surface-elevated p-4 ${task.key === "daily" ? "border-primary/40" : task.key === "control" ? "border-warning/40" : task.key === "configuration" ? "border-success/40" : "border-border-default"}`} aria-labelledby="inventory-area-title"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">Área activa</p><h2 id="inventory-area-title" className="mt-1 font-semibold">{task.label}</h2><p className="mt-1 text-sm text-text-secondary">{task.description}. Los accesos de otras áreas permanecen fuera de este flujo.</p></div><nav className="flex flex-wrap gap-2" aria-label={`Accesos de ${task.label}`}>{task.items.map((item) => <Button key={item.key} asChild size="sm" className="min-h-10" variant={section === item.key ? "default" : "secondary"}><Link href={item.href}>{item.label}</Link></Button>)}</nav></section> : null}
     {section === "dashboard" ? <RestaurantInventoryQuickStart canAny={canAny} /> : null}
-    {section !== "dashboard" ? <div className="flex flex-wrap items-center gap-2" aria-label="Acciones principales">
-      {canAny(["restaurant_inventory.manage", "restaurant_inventory.receipts.create"]) ? <Button asChild className="min-h-11"><Link href="/inventory/restaurant/receipts"><Plus className="size-4" />Nueva entrada</Link></Button> : null}
-      {canAny(["restaurant_inventory.manage", "restaurant_inventory.operations.create"]) ? <Button asChild variant="secondary" className="min-h-11"><Link href="/inventory/restaurant/production"><ClipboardList className="size-4" />Registrar producción</Link></Button> : null}
-      {canAny(["restaurant_inventory.manage", "restaurant_inventory.operations.create"]) ? <Button asChild variant="secondary" className="min-h-11"><Link href="/inventory/restaurant/consumption"><Utensils className="size-4" />Registrar consumo</Link></Button> : null}
-      {canAny(["restaurant_inventory.manage", "restaurant_inventory.operations.create"]) ? <Button asChild variant="secondary" className="min-h-11"><Link href="/inventory/restaurant/waste"><Trash2 className="size-4" />Registrar merma</Link></Button> : null}
-      {canAny(["restaurant_inventory.manage", "restaurant_inventory.counts.approve"]) ? <Button asChild variant="secondary" className="min-h-11"><Link href="/inventory/restaurant/stock-counts"><ClipboardCheck className="size-4" />Iniciar conteo</Link></Button> : null}
-      <Button asChild variant="ghost" className="min-h-11"><Link href="/inventory/restaurant/stock">Consultar existencias</Link></Button>
-    </div> : null}
     <RestaurantInventoryContextBar />
     <Card level={1}><CardContent className="flex flex-wrap gap-4 p-4 text-sm text-text-secondary"><span>Empresa: contexto actual</span><span>Sucursal: {currentBranch?.name ?? "Sin sucursal"}</span><span>Almacén: {warehouseName}</span><span>Stock y costos: fuente de verdad del backend</span></CardContent></Card>
     {section === "dashboard" ? <RestaurantDecisionDashboard /> : null}
@@ -119,6 +111,13 @@ function RestaurantInventoryInner() {
 }
 
 function RestaurantInventoryQuickStart({ canAny }: { canAny: (permissions: PermissionKey[]) => boolean }) {
+  const { currentBranch } = useAppStore();
+  const { warehouseId, warehouseName } = useRestaurantInventoryContext();
+  const dashboard = useQuery({
+    queryKey: ["restaurant-operational-home", currentBranch?.id, warehouseId],
+    queryFn: () => fetchRestaurantDashboard({ branchId: currentBranch?.id, warehouseId }),
+    enabled: Boolean(currentBranch?.id && warehouseId),
+  });
   const actions: Array<{ label: string; detail: string; href: string; permissions: PermissionKey[] }> = [
     { label: "Recibir productos", detail: "Registra una entrada de mercancía", href: "/inventory/restaurant/receipts", permissions: ["restaurant_inventory.manage", "restaurant_inventory.receipts.create"] },
     { label: "Registrar salida", detail: "Descuenta consumo o producción", href: "/inventory/restaurant/consumption", permissions: ["restaurant_inventory.manage", "restaurant_inventory.operations.create"] },
@@ -126,7 +125,21 @@ function RestaurantInventoryQuickStart({ canAny }: { canAny: (permissions: Permi
     { label: "Realizar conteo", detail: "Compara existencia física y teórica", href: "/inventory/restaurant/stock-counts", permissions: ["restaurant_inventory.manage", "restaurant_inventory.counts.approve"] },
     { label: "Transferir productos", detail: "Mueve stock entre almacenes", href: "/inventory/restaurant/transfers", permissions: ["restaurant_inventory.manage", "restaurant_inventory.transfers.manage"] },
   ];
-  return <section aria-labelledby="inventory-quick-start" className="space-y-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Inicio operativo</p><h2 id="inventory-quick-start" className="mt-1 text-xl font-semibold">¿Qué necesitas hacer?</h2><p className="mt-1 text-sm text-text-secondary">Elige una tarea para comenzar en la sucursal y almacén activos.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{actions.filter((action) => canAny(action.permissions)).map((action) => <Link key={action.href} href={action.href} className="group rounded-2xl border border-border-default bg-surface-elevated p-4 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="block font-semibold group-hover:text-primary">{action.label}</span><span className="mt-1 block text-sm text-text-secondary">{action.detail}</span><span className="mt-4 block text-sm font-medium text-primary">Comenzar</span></Link>)}</div></section>;
+  const visibleActions = actions.filter((action) => canAny(action.permissions));
+  const belowMinimum = dashboard.data?.belowMinimum ?? 0;
+  const draftReceipts = dashboard.data?.recentReceipts.filter((item) => item.status === "DRAFT").length ?? 0;
+  const recommended = belowMinimum > 0
+    ? { label: "Reponer productos bajo mínimo", detail: `${belowMinimum} ingrediente${belowMinimum === 1 ? "" : "s"} requiere${belowMinimum === 1 ? "" : "n"} atención.`, href: "/inventory/restaurant/stock?filter=LOW" }
+    : draftReceipts > 0
+      ? { label: "Revisar entradas pendientes", detail: `${draftReceipts} entrada${draftReceipts === 1 ? "" : "s"} espera confirmación.`, href: "/inventory/restaurant/receipts?status=DRAFT" }
+      : visibleActions[0] ?? { label: "Consultar existencias", detail: "Revisa el inventario del almacén activo.", href: "/inventory/restaurant/stock" };
+  const secondaryActions = visibleActions.filter((action) => action.href !== recommended.href).slice(0, 4);
+  return <section aria-labelledby="inventory-quick-start" className="space-y-4">
+    <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Inicio operativo</p><h2 id="inventory-quick-start" className="mt-1 text-xl font-semibold">¿Qué necesitas hacer?</h2><p className="mt-1 text-sm text-text-secondary">{currentBranch?.name ?? "Sin sucursal"} · {warehouseName}</p></div>
+    <Card level={2} className="border-l-4 border-l-primary"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Siguiente acción recomendada</p><h3 className="mt-1 text-lg font-semibold">{recommended.label}</h3><p className="mt-1 text-sm text-text-secondary">{dashboard.isLoading ? "Consultando el estado del inventario…" : recommended.detail}</p></div><Button asChild className="min-h-11 shrink-0"><Link href={recommended.href}>Abrir acción</Link></Button></CardContent></Card>
+    <div className="flex flex-wrap items-center gap-2" aria-label="Acciones secundarias"><span className="mr-1 text-sm font-medium text-text-secondary">Acciones frecuentes:</span>{secondaryActions.map((action) => <Button key={action.href} asChild size="sm" variant="secondary"><Link href={action.href}>{action.label}</Link></Button>)}</div>
+    {dashboard.error ? <InlineFeedback tone="warning" title="No se pudo actualizar la recomendación">Puedes continuar usando las acciones frecuentes.</InlineFeedback> : null}
+  </section>;
 }
 
 function RestaurantInventorySettings() {

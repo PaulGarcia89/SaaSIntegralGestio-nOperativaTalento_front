@@ -102,7 +102,7 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
   test("recibir una transferencia refresca existencias y Kardex", async ({ page }) => {
     await login(page);
     await page.goto("/inventory/restaurant/transfers");
-    const receive = page.getByRole("button", { name: "Recibir" }).first();
+    const receive = page.getByRole("button", { name: /Recibir|Confirmar recepción/ }).first();
     test.skip((await receive.count()) === 0, "No hay una transferencia en tránsito para ejecutar este escenario.");
     const stockRefresh = page.waitForResponse((response) => response.url().includes("/restaurant-inventory/balances") && response.request().method() === "GET");
     const movementRefresh = page.waitForResponse((response) => response.url().includes("/restaurant-inventory/movements") && response.request().method() === "GET");

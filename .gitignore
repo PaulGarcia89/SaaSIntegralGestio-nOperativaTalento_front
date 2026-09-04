@@ -14,6 +14,9 @@
 /coverage
 /test-results
 /playwright-report
+/playwright-report-visual
+# Las capturas de referencia SI se versionan: son la linea base del rediseno.
+# (tests/visual/__screenshots__ queda deliberadamente fuera de este bloque.)
 
 # next.js
 /.next/
@@ -38,6 +41,8 @@ yarn-error.log*
 !.env.example
 !.env.development.example
 !.env.production.example
+# Plantilla de variables E2E: sin ella nadie puede ejecutar la red de seguridad.
+!.env.e2e.example
 
 # vercel
 .vercel

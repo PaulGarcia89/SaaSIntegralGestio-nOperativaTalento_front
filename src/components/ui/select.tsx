@@ -56,13 +56,21 @@ export function SelectTrigger({
   children,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
+  /*
+   * `text-base sm:text-sm`: aquí NO es por el zoom de Safari. Ese zoom solo lo
+   * disparan los controles nativos (`input`, `textarea`, `select`), y este
+   * disparador es un `<button role="combobox">` de Radix, así que nunca lo
+   * provocó. El motivo es de legibilidad: el valor elegido es lo único que se
+   * lee de un desplegable cerrado, y 14px es poco para el público al que
+   * apunta el rediseño. A partir de `sm` se conserva el tamaño anterior.
+   */
   const { ref, derived } = useLabelFromWrapper(props["aria-label"], props["aria-labelledby"]);
 
   return (
     <SelectPrimitive.Trigger
       ref={ref}
       className={cn(
-        "flex h-11 w-full items-center justify-between rounded-2xl border border-input bg-background px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40",
+        "flex h-11 w-full items-center justify-between rounded-2xl border border-input bg-background px-4 text-base outline-none focus:ring-2 focus:ring-ring/40 sm:text-sm",
         className,
       )}
       {...props}

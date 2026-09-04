@@ -1,36 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { applicationStageLabel } from "@/lib/applications";
 import type { RejectionReasonDto, VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ResponsiveDialog } from "@/components/design-system";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocale } from "@/components/locale-provider";
 
-export function RecruitmentWorkspaceNav() {
-  const pathname = usePathname();
-  const { t } = useLocale();
-  const items = [
-    { href: "/ats/candidates", label: t("ats.candidates") },
-    { href: "/ats/talent-crm", label: t("ats.talent") },
-    { href: "/ats/pipeline", label: t("ats.pipeline") },
-    { href: "/ats/communications", label: t("ats.communications") },
-    { href: "/ats/scorecards", label: t("ats.scorecards") },
-    { href: "/ats/analytics", label: t("ats.analytics") },
-  ];
-  return <nav aria-label="Vistas de candidatos" className="flex gap-1 overflow-x-auto border-b border-border-default">
-    {items.map((item) => {
-      const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-      return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-11 items-center border-b-2 px-4 text-sm font-medium", active ? "border-primary text-text-primary" : "border-transparent text-text-secondary hover:text-text-primary")}>{item.label}</Link>;
-    })}
-  </nav>;
-}
+/*
+ * `RecruitmentWorkspaceNav` se retiró.
+ *
+ * Era una fila de pestañas horizontales que repetía, con otros nombres, los
+ * mismos destinos que el menú lateral: el lateral decía "Pipeline" y la pestaña
+ * "Flujo de selección"; el lateral "Scorecards" y la pestaña "Evaluaciones de
+ * entrevista". Dos mapas para el mismo territorio obligan a aprender los dos y
+ * no ayudan en ninguno.
+ */
 
 export function StageChangeDialog({ application, targetStage, rejectionReasons = [], open, pending, onOpenChange, onConfirm }: { application: VacancyApplicationDto | null; targetStage: VacancyStageDto | null; rejectionReasons?: RejectionReasonDto[]; open: boolean; pending: boolean; onOpenChange: (open: boolean) => void; onConfirm: (reason?: string, rejectionReasonId?: string) => void }) {
   const { t } = useLocale();

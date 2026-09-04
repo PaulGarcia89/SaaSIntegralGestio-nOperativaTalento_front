@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -379,6 +379,24 @@ function SidebarContent({
   );
 }
 
+/**
+ * Franja inferior que ocupa la navegación flotante de móvil: 3.75rem de alto
+ * (48px de destino táctil + 2×6px de relleno del contenedor) más la separación
+ * que la despega del borde, que ya absorbe el área segura del iPhone.
+ *
+ * `MobileActionBar` (pantallas «Hoy» y «Personas») se apoya en esta variable
+ * para apilarse ENCIMA de la navegación. Antes se dibujaba en `bottom-0` con
+ * `z-30` contra el `z-40` de la navegación, de modo que en un iPhone la barra
+ * de navegación tapaba el botón principal de esas dos pantallas.
+ *
+ * Va aquí y no en `globals.css` porque solo es cierta mientras esa navegación
+ * está en el árbol, y solo lo está dentro de este shell: fuera de él,
+ * `MobileActionBar` usa su valor de reserva.
+ */
+const MOBILE_NAV_SPACE_STYLE = {
+  "--mobile-nav-space": "calc(3.75rem + max(0.75rem, env(safe-area-inset-bottom)))",
+} as CSSProperties;
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -578,7 +596,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="operational-shell min-h-screen bg-background">
+    <div
+      className="operational-shell min-h-screen bg-background"
+      style={MOBILE_NAV_SPACE_STYLE}
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[999999] focus:rounded-xl focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground focus:shadow-lg"
@@ -871,10 +892,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {mobileQuickNavigation.map((item) => {
           const Icon = navigationIcons[item.icon];
           const isNotifications = item.href === "/notifications";
-          return <Link key={item.href} href={item.href} aria-label={isNotifications && unreadNotifications ? `${item.label}, ${unreadNotifications} sin leer` : item.label} className={cn("relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-medium", isActivePath(item.href, pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Icon className="size-4 shrink-0" /><span className="max-w-full truncate">{item.label}</span>{isNotifications && unreadNotifications ? <span className="absolute right-2 top-1.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[9px] font-bold text-destructive-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span> : null}</Link>;
+          return <Link key={item.href} href={item.href} aria-label={isNotifications && unreadNotifications ? `${item.label}, ${unreadNotifications} sin leer` : item.label} className={cn("relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-xs font-medium", isActivePath(item.href, pathname) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary")}><Icon className="size-4 shrink-0" /><span className="max-w-full truncate">{item.label}</span>{isNotifications && unreadNotifications ? <span className="absolute right-2 top-1.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[9px] font-bold text-destructive-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span> : null}</Link>;
         })}
         {Array.from({ length: Math.max(0, 3 - mobileQuickNavigation.length) }).map((_, index) => <span key={`mobile-nav-placeholder-${index}`} aria-hidden="true" />)}
-        <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-muted-foreground hover:bg-secondary" aria-label={t("workspace.openMenu")}><Menu className="size-4" />{t("workspace.menu")}</button>
+        <button type="button" onClick={() => setMobileSidebarOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-xs font-medium text-muted-foreground hover:bg-secondary" aria-label={t("workspace.openMenu")}><Menu className="size-4" />{t("workspace.menu")}</button>
       </nav>
       <MobileDrawer open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen} title={t("workspace.openMenu")}>
         <SidebarContent

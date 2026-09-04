@@ -99,7 +99,7 @@
   "candidate.newAccount": "Create a new account",
   "candidate.socialHint": "Social access is enabled only after the provider's OAuth approval and configuration."
   ,"ats.candidates": "Candidates",
-  "ats.talent": "Talent and campaigns",
+  "ats.talent": "Talent database",
   "ats.pipeline": "Hiring pipeline",
   "ats.communications": "Communications",
   "ats.scorecards": "Interview evaluations",
@@ -513,8 +513,8 @@
   ,"nav.Documentos y firmas": "Documents and signatures"
   ,"nav.Vacantes": "Jobs"
   ,"nav.Pipeline": "Pipeline"
-  ,"nav.Candidatos": "Candidates"
-  ,"nav.Talent CRM": "Talent CRM"
+  ,"nav.Candidatos": "People"
+  ,"nav.Base de talento": "Talent database"
   ,"nav.Comunicaciones": "Communications"
   ,"branches.noAccess": "No access to branches"
   ,"branches.noAccessDescription": "Only administrative roles can manage locations or branches."

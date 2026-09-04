@@ -57,7 +57,7 @@ describe("navigation policy", () => {
 
   it("keeps the operational ATS workspaces visible in navigation", () => {
     const atsItems = appNavigation.filter((item) => item.module === "ats");
-    for (const href of ["/ats/pipeline", "/ats/talent-crm", "/ats/communications", "/ats/scorecards"]) {
+    for (const href of ["/ats/talent-crm", "/ats/communications", "/ats/scorecards"]) {
       expect(atsItems.find((item) => item.href === href)?.showInNavigation).not.toBe(false);
     }
   });
@@ -209,6 +209,18 @@ describe("navigation policy", () => {
       branchAvailable: true,
     });
     expect(decision.code).toBe("SUBSCRIPTION_BLOCKED");
+  });
+
+  it("keeps the pipeline route reachable but out of the menu after merging it into Personas", () => {
+    const pipeline = appNavigation.find((item) => item.href === "/ats/pipeline");
+    // La ruta sigue existiendo y conserva su política de acceso: hay enlaces
+    // guardados apuntando ahí y las pruebas de permisos dependen de ella.
+    expect(pipeline).toBeDefined();
+    expect(pipeline?.permission).toBe("applications.view");
+    // Pero no ocupa un sitio en el menú: su contenido es la vista "Por fases"
+    // de /ats/candidates, y dos entradas al mismo destino confunden.
+    expect(pipeline?.showInNavigation).toBe(false);
+    expect(appNavigation.find((item) => item.href === "/ats/candidates")?.showInNavigation).not.toBe(false);
   });
 
   it("allows an interviewer to assigned-work routes but not the full pipeline", () => {

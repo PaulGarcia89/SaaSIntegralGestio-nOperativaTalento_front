@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2 } from "lucide-react";
-import { RecruitmentWorkspaceNav } from "@/components/recruitment-workspace";
 import { CommunicationOperationsConsole } from "@/components/communication-operations-console";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
@@ -76,7 +75,6 @@ export default function AtsCommunicationsPage() {
 
   return <div className="space-y-7">
     <PageHeader eyebrow="Reclutamiento" title="Bandeja de candidatos" description="Gestiona conversaciones de correo, responsables, pendientes y plantillas desde un historial bidireccional completo." />
-    <RecruitmentWorkspaceNav />
     <InlineFeedback tone="success" title="Correo bidireccional conectado">Envíos y respuestas se agrupan por expediente, con no leídos, asignación, reintentos, tracking y recuperación segura de correos entrantes.</InlineFeedback>
     <CommunicationOperationsConsole />
     <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">

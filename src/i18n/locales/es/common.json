@@ -99,7 +99,7 @@
   "candidate.newAccount": "Crear una cuenta nueva",
   "candidate.socialHint": "El acceso social se habilita únicamente después de la aprobación y configuración OAuth del proveedor."
   ,"ats.candidates": "Candidatos",
-  "ats.talent": "Talento y campañas",
+  "ats.talent": "Base de talento",
   "ats.pipeline": "Flujo de selección",
   "ats.communications": "Comunicaciones",
   "ats.scorecards": "Evaluaciones de entrevista",
@@ -513,8 +513,8 @@
   ,"nav.Documentos y firmas": "Documentos y firmas"
   ,"nav.Vacantes": "Vacantes"
   ,"nav.Pipeline": "Pipeline"
-  ,"nav.Candidatos": "Postulantes"
-  ,"nav.Talent CRM": "Talent CRM"
+  ,"nav.Candidatos": "Personas"
+  ,"nav.Base de talento": "Base de talento"
   ,"nav.Comunicaciones": "Comunicaciones"
   ,"branches.noAccess": "Sin acceso a sucursales"
   ,"branches.noAccessDescription": "Solo roles administrativos pueden gestionar sedes o sucursales."

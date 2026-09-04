@@ -447,7 +447,7 @@ function CreateImprovementDialog({
         <DialogHeader><DialogTitle>Crear iniciativa de mejora</DialogTitle><DialogDescription>{context?.courseTitle}{context?.signal ? ` · basada en ${context.signal.title}` : ""}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
           <div><Label htmlFor="improvement-title">Título</Label><Input id="improvement-title" name="title" maxLength={180} defaultValue={context?.signal ? `Corregir: ${context.signal.title}` : ""} required /></div>
-          <div><Label htmlFor="improvement-description">Descripción y criterio esperado</Label><textarea id="improvement-description" name="description" className="min-h-24 w-full rounded-xl border bg-background p-3 text-sm" defaultValue={context?.signal?.recommendation ?? ""} /></div>
+          <div><Label htmlFor="improvement-description">Descripción y criterio esperado</Label><textarea id="improvement-description" name="description" className="min-h-24 w-full rounded-xl border bg-background p-3 text-base sm:text-sm" defaultValue={context?.signal?.recommendation ?? ""} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Label>Prioridad</Label><Select name="priority" defaultValue={context?.signal?.severity === "CRITICAL" ? "CRITICAL" : context?.signal ? "HIGH" : "MEDIUM"}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="LOW">Baja</SelectItem><SelectItem value="MEDIUM">Media</SelectItem><SelectItem value="HIGH">Alta</SelectItem><SelectItem value="CRITICAL">Crítica</SelectItem></SelectContent></Select></div>
             <div><Label>Responsable</Label><Select name="ownerId"><SelectTrigger><SelectValue placeholder="Asignar después" /></SelectTrigger><SelectContent>{users.data?.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select></div>
@@ -474,7 +474,7 @@ function CompleteImprovementDialog({
   pending: boolean;
 }) {
   const [notes, setNotes] = useState("");
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Cerrar mejora</DialogTitle><DialogDescription>{improvement?.title}. Documenta el resultado para conservar evidencia verificable.</DialogDescription></DialogHeader><div><Label htmlFor="outcome-notes">Resultado observado</Label><textarea id="outcome-notes" className="min-h-28 w-full rounded-xl border bg-background p-3 text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Describe qué cambió y cómo se verificó…" /></div><Button disabled={notes.trim().length < 10 || pending} onClick={() => onComplete(notes)}>{pending ? "Cerrando…" : "Confirmar cierre"}</Button></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Cerrar mejora</DialogTitle><DialogDescription>{improvement?.title}. Documenta el resultado para conservar evidencia verificable.</DialogDescription></DialogHeader><div><Label htmlFor="outcome-notes">Resultado observado</Label><textarea id="outcome-notes" className="min-h-28 w-full rounded-xl border bg-background p-3 text-base sm:text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Describe qué cambió y cómo se verificó…" /></div><Button disabled={notes.trim().length < 10 || pending} onClick={() => onComplete(notes)}>{pending ? "Cerrando…" : "Confirmar cierre"}</Button></DialogContent></Dialog>;
 }
 
 function ComplianceMatrix({ data }: { data: TrainingAnalyticsDto }) {

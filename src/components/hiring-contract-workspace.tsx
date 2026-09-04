@@ -1,182 +1,270 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, FileCheck2, History, LockKeyhole, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
-import { ActionBar, InlineFeedback, PageHeader, ResponsiveDataView } from "@/components/design-system";
+import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { HiringConfirmDialog, HiringReasonDialog } from "@/components/hiring/hiring-action-dialog";
-import { HiringStageRail } from "@/components/hiring/hiring-stage-rail";
-import { HiringContractMetadataEditor } from "@/components/hiring/hiring-contract-metadata-editor";
+import { HiringCaseHeader, initials, longDate } from "@/components/hiring/hiring-case-header";
 import { HiringQueueMetrics } from "@/components/hiring/hiring-queue-metrics";
-import { cancelHiringContract, configureHiringOffer, confirmHiringContract, fetchDocuSealHiringBundleStatus, fetchHiringContract, fetchHiringContracts, fetchHiringHistory, fetchHiringProgress, fetchHiringDocuments, fetchJobOffers, requestHiringDocument, respondHiringOffer, reviewHiringDocument, sendHiringDocuments, sendHiringOffer } from "@/lib/backend";
-import type { HiringContractDto, HiringContractStatus } from "@/lib/contracts";
+import { HiringSecondaryDetails } from "@/components/hiring/hiring-details";
+import {
+  CancelledPanel,
+  DocumentsPanel,
+  OfferPanel,
+  OutcomePanel,
+  PreparationPanel,
+  ReviewPanel,
+  stageForView,
+} from "@/components/hiring/hiring-stage-panels";
+import { fetchHiringContract, fetchHiringContracts, fetchHiringDocuments, fetchHiringHistory, fetchHiringProgress } from "@/lib/backend";
+import type { HiringContractDto } from "@/lib/contracts";
+import {
+  HIRING_GUIDED_QUEUE_ENABLED,
+  HIRING_STAGES,
+  hiringPriorityLabel,
+  hiringStageIndex,
+  hiringStatusLabels,
+  hiringViewMatches,
+  hiringWaitingLabel,
+  resolveHiringCase,
+  type HiringListView,
+  type HiringStageId,
+} from "@/lib/hiring-ux";
 import { useAppStore } from "@/store/app-store";
-import { HIRING_GUIDED_QUEUE_ENABLED, hiringActionLabel, hiringDocumentStatusLabel, hiringOfferStatusLabel, hiringPhaseLabel, hiringPriorityLabel, hiringSignatureStatusLabel, hiringStatusGuidance, hiringStatusLabels, hiringViewMatches, pendingHiringDocuments, type HiringListView } from "@/lib/hiring-ux";
 
-const statusLabels = hiringStatusLabels;
+const VIEWS: Array<[HiringListView, string]> = [
+  ["ALL", "Todas"],
+  ["ATTENTION", "Te toca a ti"],
+  ["WAITING", "Esperando a la persona"],
+  ["READY", "Listas para confirmar"],
+  ["COMPLETED", "Completadas"],
+];
 
-function initials(name: string) { return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?"; }
-function dateLabel(value?: string | null) { return value ? new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(value)) : "Sin fecha"; }
-function errorText(error: unknown) { return error instanceof Error ? error.message : "El servidor rechazó la operación."; }
+/* ================================ Lista ================================= */
+
+function HiringCaseCard({ item }: { item: HiringContractDto }) {
+  const state = resolveHiringCase(item);
+  const stage = HIRING_STAGES[state.stageIndex];
+  const firstName = item.candidate.fullName.split(" ")[0] || "la persona";
+  return (
+    <Card level={2}>
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-start gap-4">
+          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-semibold text-text-primary">
+            {initials(item.candidate.fullName)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold text-text-primary">
+              <Link href={`/hiring/${item.id}`} className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+                {item.candidate.fullName}
+              </Link>
+            </h3>
+            <p className="mt-1 text-base text-text-primary">{item.roleTitle ?? item.vacancy.title}</p>
+            <p className="mt-1 text-base text-text-secondary">{item.vacancy.tenant?.name ?? "Empresa activa"} · {item.branch.name}</p>
+          </div>
+          <Badge variant={state.completed ? "success" : state.cancelled ? "destructive" : state.blockers.length ? "warning" : "secondary"} className="text-sm">
+            {hiringStatusLabels[item.status]}
+          </Badge>
+        </div>
+
+        <dl className="grid gap-3 border-t border-border-default pt-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-base text-text-secondary">Etapa</dt>
+            <dd className="mt-0.5 text-base font-medium text-text-primary">Paso {stage.step} de {HIRING_STAGES.length}: {stage.title}</dd>
+          </div>
+          <div>
+            <dt className="text-base text-text-secondary">Qué sigue</dt>
+            <dd className="mt-0.5 text-base font-medium text-text-primary">{state.primaryAction.label}</dd>
+          </div>
+          <div>
+            <dt className="text-base text-text-secondary">Quién actúa</dt>
+            <dd className="mt-0.5 text-base text-text-primary">{hiringWaitingLabel(state.waitingOn, firstName)}</dd>
+          </div>
+          <div>
+            <dt className="text-base text-text-secondary">Fecha límite</dt>
+            <dd className="mt-0.5 text-base text-text-primary">{longDate(item.deadlineAt) ?? "Sin fecha límite"}</dd>
+          </div>
+        </dl>
+
+        <Button asChild size="lg" className="w-full sm:w-auto">
+          <Link href={`/hiring/${item.id}`}>
+            Abrir contratación de {firstName}
+            <ArrowRight className="size-5" aria-hidden="true" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 function HiringContractListContent() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<HiringListView>(HIRING_GUIDED_QUEUE_ENABLED ? "ATTENTION" : "ALL");
   const [status, setStatus] = useState("");
   const [branch, setBranch] = useState("");
-  const [responsible, setResponsible] = useState("");
   const [priority, setPriority] = useState("");
   const { can } = useAppStore();
   const query = useQuery({ queryKey: ["hiring-contracts", search], queryFn: () => fetchHiringContracts({ search: search || undefined }), enabled: can("applications.view") });
-  const items = (query.data?.data ?? []).filter((item) => hiringViewMatches(item, view) && (!status || item.status === status) && (!branch || item.branchId === branch) && (!priority || item.priority === priority) && (!responsible || item.hiringManagerUser?.id === responsible || item.hrResponsibleUser?.id === responsible)).sort((left, right) => {
-    const priorityWeight = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 } as Record<string, number>;
-    const overdueWeight = (item: HiringContractDto) => item.deadlineAt && new Date(item.deadlineAt).getTime() < Date.now() ? 1 : 0;
-    return overdueWeight(right) - overdueWeight(left) || (priorityWeight[right.priority ?? ""] ?? 0) - (priorityWeight[left.priority ?? ""] ?? 0) || (new Date(left.deadlineAt ?? "9999-12-31").getTime() - new Date(right.deadlineAt ?? "9999-12-31").getTime());
-  });
-  const statuses = [...new Set((query.data?.data ?? []).map((item) => item.status))];
-  const branches = [...new Map((query.data?.data ?? []).map((item) => [item.branchId, item.branch])).values()];
-  const responsibles = [...new Map((query.data?.data ?? []).flatMap((item) => [item.hiringManagerUser, item.hrResponsibleUser]).filter(Boolean).map((person) => [person!.id, person!])).values()];
-  const card = (item: HiringContractDto) => <div className="space-y-4"><div className="flex items-start gap-3"><div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-semibold text-brand" aria-hidden="true">{initials(item.candidate.fullName)}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{item.candidate.fullName}</p><p className="text-sm text-text-secondary">{item.roleTitle ?? item.vacancy.title}</p></div><Badge variant={item.status === "HIRED" ? "success" : item.status === "CANCELLED" ? "destructive" : "secondary"}>{statusLabels[item.status]}</Badge></div><p className="mt-2 text-sm text-text-secondary">{item.vacancy.tenant?.name ?? "Empresa activa"} · {item.branch.name}</p></div></div><div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="font-medium">Próxima acción:</span> {hiringActionLabel(item.nextAction, item.status)}</p><p><span className="font-medium">Prioridad:</span> {hiringPriorityLabel(item.priority)}</p><p><span className="font-medium">Fecha límite:</span> {dateLabel(item.deadlineAt)}</p><p><span className="font-medium">Documentos pendientes:</span> {pendingHiringDocuments(item)}</p></div><Button asChild className="w-full" variant="secondary"><Link href={`/hiring/${item.id}`}>Abrir contratación<ArrowRight className="size-4" /></Link></Button></div>;
-  return <div className="space-y-7"><PageHeader eyebrow="Personas" title="Contrataciones" description="Gestiona cada contratación desde un único flujo guiado y trazable." actions={<Button asChild variant="secondary"><Link href="/ats/candidates">Ver candidatos</Link></Button>} /><Card level={2}><CardContent className="space-y-4 p-4"><label className="flex items-center gap-3"><Search className="size-4 text-text-secondary" /><span className="sr-only">Buscar contrataciones</span><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar candidato, cargo o vacante" /></label><div className="flex flex-wrap gap-2" role="tablist" aria-label="Vistas de contrataciones">{([['ALL', 'Todas'], ['ATTENTION', 'Requieren atención'], ['WAITING', 'Esperando candidato'], ['READY', 'Listas para confirmar'], ['COMPLETED', 'Completadas']] as const).map(([id, label]) => <Button key={id} role="tab" aria-selected={view === id} variant={view === id ? "default" : "secondary"} size="sm" onClick={() => setView(id)}>{label}</Button>)}</div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="space-y-1 text-xs font-medium">Estado<select aria-label="Filtrar por estado" value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-sm"><option value="">Todos</option>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></label><label className="space-y-1 text-xs font-medium">Sucursal<select aria-label="Filtrar por sucursal" value={branch} onChange={(event) => setBranch(event.target.value)} className="h-10 w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-sm"><option value="">Todas</option>{branches.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}</select></label><label className="space-y-1 text-xs font-medium">Prioridad<select aria-label="Filtrar por prioridad" value={priority} onChange={(event) => setPriority(event.target.value)} className="h-10 w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-sm"><option value="">Todas</option>{["URGENT", "HIGH", "MEDIUM", "LOW"].map((value) => <option key={value} value={value}>{hiringPriorityLabel(value)}</option>)}</select></label><label className="space-y-1 text-xs font-medium">Responsable<select aria-label="Filtrar por responsable" value={responsible} onChange={(event) => setResponsible(event.target.value)} className="h-10 w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-sm"><option value="">Todos</option>{responsibles.map((value) => <option key={value.id} value={value.id}>{[value.firstName, value.lastName].filter(Boolean).join(" ") || "Responsable"}</option>)}</select></label></div></CardContent></Card>{query.isLoading ? <AsyncState state="loading" title="Cargando contrataciones" /> : null}{query.isError ? <AsyncState state="error" title="No fue posible cargar contrataciones" onRetry={() => void query.refetch()} /> : null}{query.isSuccess && !items.length ? <InlineFeedback tone="info" title="No hay contrataciones en esta vista">Ajusta los filtros o inicia una contratación desde una postulación aprobada.</InlineFeedback> : null}{query.isSuccess && items.length ? <ResponsiveDataView data={items} getKey={(item) => item.id} mobile={card} desktop={<div className="overflow-x-auto rounded-2xl border border-border-default"><table className="w-full min-w-[1180px] text-left text-sm"><thead className="bg-surface-section text-xs uppercase tracking-wide text-text-secondary"><tr><th className="p-4">Candidato</th><th className="p-4">Empresa y sucursal</th><th className="p-4">Estado</th><th className="p-4">Próxima acción</th><th className="p-4">Prioridad</th><th className="p-4">Fecha límite</th><th className="p-4">Docs.</th><th className="p-4">Última actividad</th><th className="p-4">Acción</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-t border-border-default"><td className="p-4"><p className="font-medium">{item.candidate.fullName}</p><p className="text-xs text-text-secondary">{item.candidate.email}</p></td><td className="p-4">{item.vacancy.tenant?.name ?? "Empresa activa"}<p className="text-xs text-text-secondary">{item.branch.name}</p></td><td className="p-4"><Badge variant={item.status === "HIRED" ? "success" : item.status === "CANCELLED" ? "destructive" : "secondary"}>{statusLabels[item.status]}</Badge></td><td className="p-4">{hiringActionLabel(item.nextAction, item.status)}</td><td className="p-4">{hiringPriorityLabel(item.priority)}</td><td className="p-4">{dateLabel(item.deadlineAt)}</td><td className="p-4">{pendingHiringDocuments(item)}</td><td className="p-4">{dateLabel(item.updatedAt)}</td><td className="p-4"><Button asChild size="sm"><Link href={`/hiring/${item.id}`}>Abrir</Link></Button></td></tr>)}</tbody></table></div>} /> : null}</div>;
+
+  const all = useMemo(() => query.data?.data ?? [], [query.data]);
+  const items = useMemo(() => all
+    .filter((item) => hiringViewMatches(item, view) && (!status || item.status === status) && (!branch || item.branchId === branch) && (!priority || item.priority === priority))
+    .sort((left, right) => {
+      const weight = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 } as Record<string, number>;
+      const overdue = (item: HiringContractDto) => (item.deadlineAt && new Date(item.deadlineAt).getTime() < Date.now() ? 1 : 0);
+      return overdue(right) - overdue(left) || (weight[right.priority ?? ""] ?? 0) - (weight[left.priority ?? ""] ?? 0) || new Date(left.deadlineAt ?? "9999-12-31").getTime() - new Date(right.deadlineAt ?? "9999-12-31").getTime();
+    }), [all, branch, priority, status, view]);
+
+  const statuses = [...new Set(all.map((item) => item.status))];
+  const branches = [...new Map(all.map((item) => [item.branchId, item.branch])).values()];
+  const selectClass = "min-h-11 w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
+
+  return (
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Personas"
+        title="Contrataciones"
+        description="Cada contratación avanza en cinco pasos. Aquí ves cuáles necesitan algo de ti."
+        actions={<Button asChild variant="secondary"><Link href="/ats/candidates">Ver candidatos</Link></Button>}
+      />
+
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Vistas de contrataciones">
+        {VIEWS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`hiring-tab-${id}`}
+            aria-selected={view === id}
+            aria-controls="hiring-tabpanel"
+            tabIndex={view === id ? 0 : -1}
+            onClick={() => setView(id)}
+            className={`min-h-11 rounded-full border px-4 text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${view === id ? "border-primary bg-primary text-text-on-accent" : "border-border-default bg-surface-elevated text-text-primary"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <Card level={2}>
+        <CardContent className="space-y-4 p-4">
+          <label className="block space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-search">
+            Buscar una contratación
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
+              <Input id="hiring-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre de la persona o del puesto" className="pl-10 text-base" />
+            </span>
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-filter-status">
+              Estado
+              <select id="hiring-filter-status" aria-label="Filtrar por estado" value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass}>
+                <option value="">Todos</option>
+                {statuses.map((value) => <option key={value} value={value}>{hiringStatusLabels[value]}</option>)}
+              </select>
+            </label>
+            <label className="space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-filter-branch">
+              Sucursal
+              <select id="hiring-filter-branch" aria-label="Filtrar por sucursal" value={branch} onChange={(event) => setBranch(event.target.value)} className={selectClass}>
+                <option value="">Todas</option>
+                {branches.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+              </select>
+            </label>
+            <label className="space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-filter-priority">
+              Prioridad
+              <select id="hiring-filter-priority" aria-label="Filtrar por prioridad" value={priority} onChange={(event) => setPriority(event.target.value)} className={selectClass}>
+                <option value="">Todas</option>
+                {["URGENT", "HIGH", "MEDIUM", "LOW"].map((value) => <option key={value} value={value}>{hiringPriorityLabel(value)}</option>)}
+              </select>
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div id="hiring-tabpanel" role="tabpanel" aria-labelledby={`hiring-tab-${view}`} tabIndex={-1} className="space-y-4">
+        {query.isLoading ? <AsyncState state="loading" title="Cargando las contrataciones" /> : null}
+        {query.isError ? <AsyncState state="error" title="No pudimos cargar las contrataciones" onRetry={() => void query.refetch()} /> : null}
+        {query.isSuccess && !items.length ? (
+          <InlineFeedback tone="info" title="No hay contrataciones en esta lista">
+            Prueba con otra pestaña o quita los filtros. Las contrataciones aparecen aquí cuando una postulación es aprobada.
+          </InlineFeedback>
+        ) : null}
+        {items.map((item) => <HiringCaseCard key={item.id} item={item} />)}
+      </div>
+    </div>
+  );
 }
 
 export function HiringContractListPage() {
-  return <div className="space-y-5"><HiringQueueMetrics /><HiringContractListContent /></div>;
-}
-
-function DocumentReviewControls({ contract }: { contract: HiringContractDto }) {
-  const client = useQueryClient();
-  const { can } = useAppStore();
-  const [rejectingDocument, setRejectingDocument] = useState<string | null>(null);
-  const review = useMutation({ mutationFn: ({ id, status, reason }: { id: string; status: string; reason?: string }) => reviewHiringDocument(contract.id, id, { status, reason }), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-documents", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-progress", contract.id] }); } });
-  if (!can("applications.update") || !contract.documents.length) return null;
-  const reviewable = contract.documents.filter((document) => ["RECEIVED", "UNDER_REVIEW", "REJECTED"].includes(document.status));
-  return <><Card level={2}><CardHeader><CardTitle>Revisión documental</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-text-secondary">Aprueba cada documento recibido o recházalo indicando qué debe corregirse.</p>{reviewable.length ? reviewable.map((document) => <div key={document.id} className="flex flex-col gap-3 rounded-xl border border-border-default p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{document.title}</p><p className="text-xs text-text-secondary">{document.type} · {hiringDocumentStatusLabel(document.status)}</p></div><div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => review.mutate({ id: document.id, status: "APPROVED" })} disabled={review.isPending}>Aprobar documentación</Button><Button size="sm" variant="secondary" onClick={() => setRejectingDocument(document.id)} disabled={review.isPending}>Rechazar</Button></div></div>) : <InlineFeedback tone="info" title="Sin documentos para revisar">Los documentos aparecerán aquí cuando el candidato los envíe.</InlineFeedback>}{review.isError ? <InlineFeedback tone="danger" title="No fue posible actualizar el documento">{errorText(review.error)}</InlineFeedback> : null}{review.isSuccess ? <InlineFeedback tone="success" title="Documento actualizado">El estado documental se actualizó y el progreso fue recalculado.</InlineFeedback> : null}</CardContent></Card><HiringReasonDialog open={Boolean(rejectingDocument)} title="Rechazar documento" description="El candidato verá este motivo y podrá corregir el archivo." confirmLabel="Rechazar documento" onOpenChange={(open) => !open && setRejectingDocument(null)} onConfirm={(reason) => { if (rejectingDocument) review.mutate({ id: rejectingDocument, status: "REJECTED", reason }); setRejectingDocument(null); }} /></>;
-}
-
-function HiringOfferControlsLegacy({ contract }: { contract: HiringContractDto }) {
-  const client = useQueryClient();
-  const { can } = useAppStore();
-  const [rejectingOffer, setRejectingOffer] = useState(false);
-  const [selectedOfferId, setSelectedOfferId] = useState(contract.jobOfferId ?? "");
-  const offers = useQuery({ queryKey: ["hiring-offers", contract.applicationId], queryFn: () => fetchJobOffers(contract.applicationId), enabled: Boolean(contract.applicationId) });
-  const configure = useMutation({ mutationFn: () => configureHiringOffer(contract.id, { jobOfferId: selectedOfferId }), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }); } });
-  const send = useMutation({ mutationFn: () => sendHiringOffer(contract.id), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-offers", contract.applicationId] }); } });
-  const respond = useMutation({ mutationFn: ({ accepted, reason }: { accepted: boolean; reason?: string }) => respondHiringOffer(contract.id, accepted, reason), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-offers", contract.applicationId] }); await client.invalidateQueries({ queryKey: ["hiring-progress", contract.id] }); } });
-  if (!can("applications.update")) return null;
-  if (["HIRED", "CANCELLED"].includes(contract.status)) return null;
-  const activeOffer = offers.data?.find((offer) => offer.id === (contract.jobOfferId ?? selectedOfferId)) ?? offers.data?.[0];
-  return <><Card level={2}><CardHeader><CardTitle>Oferta laboral</CardTitle></CardHeader><CardContent className="space-y-4">{offers.isLoading ? <p className="text-sm text-text-secondary">Cargando ofertas disponibles…</p> : offers.isError ? <InlineFeedback tone="danger" title="No fue posible cargar las ofertas">Revisa el perfil ATS para recuperar la oferta.</InlineFeedback> : offers.data?.length ? <><label className="space-y-2 text-sm font-medium" htmlFor="hiring-offer-select">Oferta a vincular<select id="hiring-offer-select" value={selectedOfferId || activeOffer?.id || ""} onChange={(event) => setSelectedOfferId(event.target.value)} className="h-10 w-full rounded-xl border border-border-default bg-surface-elevated px-3"><option value="">Selecciona una oferta</option>{offers.data.map((offer) => <option key={offer.id} value={offer.id}>Versión {offer.currentVersion} · {offer.status}</option>)}</select></label>{activeOffer ? <p className="text-sm text-text-secondary">Estado actual: <span className="font-medium text-text-primary">{activeOffer.status}</span></p> : null}<ActionBar>{!contract.jobOfferId && selectedOfferId ? <Button onClick={() => configure.mutate()} disabled={configure.isPending}>{configure.isPending ? "Vinculando…" : "Vincular oferta"}</Button> : null}{contract.jobOfferId && ["OFFER_PREPARATION", "DRAFT", "DATA_REVIEW"].includes(contract.status) ? <Button onClick={() => send.mutate()} disabled={send.isPending}>{send.isPending ? "Enviando…" : "Enviar oferta al candidato"}<ArrowRight className="size-4" /></Button> : null}{contract.jobOfferId && ["OFFER_SENT", "AWAITING_OFFER_RESPONSE"].includes(contract.status) ? <><Button onClick={() => respond.mutate({ accepted: true })} disabled={respond.isPending}>Registrar aceptación</Button><Button variant="secondary" onClick={() => setRejectingOffer(true)} disabled={respond.isPending}>Registrar rechazo</Button></> : null}</ActionBar>{configure.isError || send.isError || respond.isError ? <InlineFeedback tone="danger" title="No fue posible actualizar la oferta">{errorText(configure.error ?? send.error ?? respond.error)}</InlineFeedback> : null}{send.isSuccess ? <InlineFeedback tone="success" title="Oferta enviada">La oferta fue enviada al candidato. Ahora estamos esperando su respuesta.</InlineFeedback> : null}{respond.isSuccess ? <InlineFeedback tone="success" title="Respuesta registrada">La respuesta fue registrada y el siguiente paso del contrato se actualizó.</InlineFeedback> : null}</> : <InlineFeedback tone="info" title="No hay ofertas preparadas">Crea la oferta desde el perfil ATS y luego regresa aquí para vincularla.</InlineFeedback>}</CardContent></Card><HiringReasonDialog open={rejectingOffer} title="Rechazar oferta" description="Registra el motivo para que quede visible en el historial de la contratación." confirmLabel="Registrar rechazo" onOpenChange={setRejectingOffer} onConfirm={(reason) => respond.mutate({ accepted: false, reason })} /></>;
-}
-
-function HiringOfferControls({ contract }: { contract: HiringContractDto }) {
-  if (["HIRED", "CANCELLED"].includes(contract.status)) return <HiringOfferControlsLegacy contract={contract} />;
-  return <div className="space-y-3">
-    <InlineFeedback tone="info" title="Origen de la oferta">La oferta se prepara en el perfil ATS. Desde aquí se vincula la versión correcta, se envía al candidato y se registra su respuesta. Estado actual: {hiringOfferStatusLabel(contract.jobOffer?.status)}{contract.jobOffer ? ` · versión ${contract.jobOffer.currentVersion}` : ""}.</InlineFeedback>
-    <HiringOfferControlsLegacy contract={contract} />
-  </div>;
-}
-
-function HiringDocumentRequestControls({ contract }: { contract: HiringContractDto }) {
-  const client = useQueryClient();
-  const { can } = useAppStore();
-  const request = useMutation({ mutationFn: (input: { type: string; title: string }) => requestHiringDocument(contract.id, { ...input, required: true, source: "INTERNAL" }), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-documents", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-progress", contract.id] }); } });
-  if (!can("documents.request") || !["OFFER_ACCEPTED", "DOCUMENTS_PENDING"].includes(contract.status)) return null;
-  const templates = [{ type: "IDENTIFICATION", title: "Identificación oficial" }, { type: "TAX", title: "Información fiscal" }, { type: "ELIGIBILITY", title: "Elegibilidad laboral" }];
-  const available = templates.filter((template) => !contract.documents.some((document) => document.type === template.type && document.required && !["REJECTED", "WAIVED"].includes(document.status)));
-  return <Card level={2}><CardHeader><CardTitle>Solicitar documentos pendientes</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-text-secondary">Selecciona los requisitos que el candidato debe entregar para continuar con la revisión.</p>{available.length ? <div className="grid gap-2 sm:grid-cols-3">{available.map((template) => <Button key={template.type} variant="secondary" onClick={() => request.mutate(template)} disabled={request.isPending}>{request.isPending ? "Solicitando…" : template.title}</Button>)}</div> : <InlineFeedback tone="success" title="Checklist solicitada">Los requisitos estándar ya fueron solicitados o completados.</InlineFeedback>}{request.isError ? <InlineFeedback tone="danger" title="No fue posible solicitar el documento">{errorText(request.error)}</InlineFeedback> : null}{request.isSuccess ? <InlineFeedback tone="success" title="Solicitud registrada">El documento quedó pendiente para el candidato y el progreso fue actualizado.</InlineFeedback> : null}</CardContent></Card>;
-}
-
-function HiringSignatureControls({ contract }: { contract: HiringContractDto }) {
-  const client = useQueryClient();
-  const { can } = useAppStore();
-  const signature = useQuery({ queryKey: ["hiring-signatures", contract.id], queryFn: () => fetchDocuSealHiringBundleStatus(contract.applicationId), enabled: ["DOCUMENTS_PENDING", "SIGNATURES_PENDING", "COMPLIANCE_REVIEW", "READY_TO_HIRE", "HIRED"].includes(contract.status), refetchInterval: (query) => query.state.data?.allCompleted ? false : 10000 });
-  const send = useMutation({ mutationFn: () => sendHiringDocuments(contract.id), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }); await client.invalidateQueries({ queryKey: ["hiring-progress", contract.id] }); await signature.refetch(); } });
-  useEffect(() => { if (!signature.data?.allCompleted) return; void Promise.all([client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-progress", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-documents", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-history", contract.id] })]); }, [client, contract.id, signature.data?.allCompleted]);
-  if (!["DOCUMENTS_PENDING", "SIGNATURES_PENDING", "COMPLIANCE_REVIEW", "READY_TO_HIRE", "HIRED"].includes(contract.status)) return null;
-  const status = signature.data;
-  const pendingDocuments = contract.documents.filter((document) => document.required && !["APPROVED", "SIGNED", "WAIVED"].includes(document.status));
-  const canSend = can("documents.sign") || can("candidates.update") || can("applications.hire");
-  return <Card level={2}><CardHeader><CardTitle>Firmas electrónicas</CardTitle></CardHeader><CardContent className="space-y-4">{signature.isLoading ? <p className="text-sm text-text-secondary">Consultando estado de DocuSeal…</p> : status?.allCompleted ? <InlineFeedback tone="success" title="Firmas completadas">El paquete DocuSeal está completo y puede continuar la revisión final.</InlineFeedback> : status?.allSent ? <InlineFeedback tone="warning" title="Firmas pendientes">El paquete fue enviado. Estamos esperando la firma del candidato.</InlineFeedback> : <InlineFeedback tone="info" title="Paquete de firma pendiente">Los documentos aprobados pueden enviarse a firma electrónica.</InlineFeedback>}{status?.documents.length ? <div className="grid gap-2 sm:grid-cols-2">{status.documents.map((document) => <div key={document.templateKey} className="rounded-xl border border-border-default p-3 text-sm"><p className="font-medium">{document.templateKey}</p><p className="mt-1 text-xs text-text-secondary">{hiringSignatureStatusLabel(document.status)}</p></div>)}</div> : null}{canSend && contract.status === "DOCUMENTS_PENDING" ? <Button onClick={() => send.mutate()} disabled={send.isPending || pendingDocuments.length > 0}>{send.isPending ? "Enviando…" : "Enviar documentos a firma"}<ArrowRight className="size-4" /></Button> : null}{pendingDocuments.length > 0 && contract.status === "DOCUMENTS_PENDING" ? <p className="text-xs text-status-warning">Completa o aprueba los {pendingDocuments.length} documento(s) pendiente(s) antes de enviarlos a firma.</p> : null}{send.isError || signature.isError ? <InlineFeedback tone="danger" title="No fue posible consultar o enviar a DocuSeal">Revisa la configuración de firma e inténtalo nuevamente.</InlineFeedback> : null}</CardContent></Card>;
-}
-
-function HiringComplianceControls({ contract }: { contract: HiringContractDto }) {
-  const client = useQueryClient();
-  const { can } = useAppStore();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const confirm = useMutation({ mutationFn: () => confirmHiringContract(contract.id), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: ["hiring-contract", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-progress", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-documents", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-history", contract.id] }), client.invalidateQueries({ queryKey: ["hiring-contracts"] })]); } });
-  if (contract.status !== "COMPLIANCE_REVIEW" || !can("applications.update")) return null;
-  return <><Card level={2}><CardHeader><CardTitle>Revisión final</CardTitle></CardHeader><CardContent className="space-y-4"><InlineFeedback tone="success" title="Firmas y requisitos listos">Revisa que la documentación firmada sea correcta antes de cerrar la contratación.</InlineFeedback><p className="text-sm text-text-secondary">Al confirmar, se creará o vinculará el empleado, se trasladarán sus documentos al expediente y se iniciará onboarding si el plan de la empresa lo incluye.</p><Button onClick={() => setConfirmOpen(true)} disabled={confirm.isPending}>{confirm.isPending ? "Confirmando…" : "Confirmar contratación"}<ArrowRight className="size-4" /></Button>{confirm.isError ? <InlineFeedback tone="danger" title="No fue posible confirmar">{errorText(confirm.error)}</InlineFeedback> : null}{confirm.isSuccess ? <InlineFeedback tone="success" title="Contratación confirmada">El empleado y el resultado de onboarding ya están disponibles.</InlineFeedback> : null}</CardContent></Card><HiringConfirmDialog open={confirmOpen} title="Confirmar contratación" description="Se creará o vinculará el perfil del empleado y se cerrará este flujo. Esta acción no se puede deshacer desde aquí." confirmLabel="Confirmar contratación" onOpenChange={setConfirmOpen} onConfirm={() => confirm.mutate()} /></>;
-}
-
-function HiringOutcomeSummary({ contract }: { contract: HiringContractDto }) {
-  if (contract.status !== "HIRED") return null;
-  return <Card level={2}><CardHeader><CardTitle>Resultado de la contratación</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><InlineFeedback tone="success" title="Empleado activo">{contract.employee ? `${contract.employee.name} · ${contract.employee.email}` : "El perfil de empleado fue creado correctamente."}</InlineFeedback>{contract.onboardingFlowId ? <InlineFeedback tone="info" title="Onboarding iniciado">El flujo de incorporación está disponible para continuar.</InlineFeedback> : <InlineFeedback tone="info" title="Onboarding no incluido">La contratación se completó. El plan de esta empresa no tiene onboarding habilitado.</InlineFeedback>}</div><ActionBar>{contract.employeeId ? <Button asChild variant="secondary"><Link href={`/employees/${contract.employeeId}`}>Ver expediente del empleado<ArrowRight className="size-4" /></Link></Button> : null}{contract.onboardingFlowId ? <Button asChild><Link href="/onboarding/documents">Abrir onboarding<ArrowRight className="size-4" /></Link></Button> : null}</ActionBar></CardContent></Card>;
-}
-
-function HiringWorkflowSection({ id, label, children }: { id: string; label: string; children: ReactNode }) {
-  return <section id={id} aria-label={label} className="scroll-mt-6">{children}</section>;
-}
-
-function HiringFinalizationPreview({ contract }: { contract: HiringContractDto }) {
-  if (!["COMPLIANCE_REVIEW", "READY_TO_HIRE"].includes(contract.status)) return null;
-  const pendingDocuments = contract.documents.filter((document) => document.required && !["APPROVED", "SIGNED", "WAIVED"].includes(document.status)).length;
-  const blockers = contract.progress?.blockers ?? [];
-  return <Card level={2} className="border-status-warning/30 bg-status-warning/[0.04]"><CardHeader><CardTitle>Antes de confirmar</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-text-secondary">Esta revisión resume el efecto de la confirmación antes de ejecutar una acción irreversible.</p><div className="grid gap-2 text-sm sm:grid-cols-2"><div className="rounded-xl border border-border-default bg-surface-elevated p-3"><p className="font-medium">Empleado</p><p className="mt-1 text-text-secondary">Se creará o vinculará el expediente de {contract.candidate.fullName}.</p></div><div className="rounded-xl border border-border-default bg-surface-elevated p-3"><p className="font-medium">Documentos</p><p className="mt-1 text-text-secondary">{pendingDocuments ? `Aún hay ${pendingDocuments} documento(s) pendiente(s).` : "Los requisitos obligatorios están completos."}</p></div><div className="rounded-xl border border-border-default bg-surface-elevated p-3"><p className="font-medium">Onboarding</p><p className="mt-1 text-text-secondary">Se activará si está incluido en el plan o plantilla configurada.</p></div><div className="rounded-xl border border-border-default bg-surface-elevated p-3"><p className="font-medium">Bloqueos</p><p className="mt-1 text-text-secondary">{blockers.length ? blockers.join(" ") : "No se detectan bloqueos críticos."}</p></div></div>{contract.status === "READY_TO_HIRE" && !pendingDocuments && !blockers.length ? <InlineFeedback tone="success" title="Expediente listo para confirmar">La confirmación creará o vinculará al empleado y dejará disponible el siguiente flujo.</InlineFeedback> : null}</CardContent></Card>;
-}
-
-function StageRail({ contract }: { contract: HiringContractDto }) {
-  const { can } = useAppStore();
-  const pendingDocuments = contract.documents.filter((document) => document.required && !["APPROVED", "SIGNED", "WAIVED"].includes(document.status)).length;
-  const blockers = contract.progress?.blockers ?? [];
-  const responsible = contract.hrResponsibleUser ? [contract.hrResponsibleUser.firstName, contract.hrResponsibleUser.lastName].filter(Boolean).join(" ") : null;
-  const guidance = hiringStatusGuidance(contract.status);
-  return <>
-    <div className="grid gap-3 rounded-2xl border border-border-default bg-surface-section p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      <div><p className="text-xs text-text-secondary">Fase actual</p><p className="mt-1 font-semibold">{hiringPhaseLabel(contract.status)}</p></div>
-      <div><p className="text-xs text-text-secondary">Siguiente acción</p><p className="mt-1 font-semibold text-brand">{hiringActionLabel(contract.nextAction, contract.status)}</p></div>
-      <div><p className="text-xs text-text-secondary">Responsable</p><p className="mt-1 font-semibold">{contract.nextActor ?? responsible ?? "RR. HH."}</p></div>
-      <div><p className="text-xs text-text-secondary">Qué falta</p><p className="mt-1 font-semibold">{pendingDocuments ? `${pendingDocuments} documento(s)` : blockers.length ? `${blockers.length} bloqueo(s)` : "Sin pendientes críticos"}</p></div>
+  return (
+    <div className="space-y-5">
+      <HiringQueueMetrics />
+      <HiringContractListContent />
     </div>
-    <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4 text-sm"><p className="font-semibold text-brand">Qué significa esta fase</p><p className="mt-1 text-text-secondary">{guidance.description}</p><div className="mt-3 grid gap-2 text-xs text-text-secondary sm:grid-cols-2"><p>Actor esperado: <span className="font-medium text-text-primary">{guidance.expectedActor}</span></p><p>Dato necesario: <span className="font-medium text-text-primary">{guidance.requiredData}</span></p></div></div>
-    {contract.status === "CANCELLED" ? <InlineFeedback tone="info" title="Contratación cancelada">El flujo está cerrado. El motivo y las acciones anteriores permanecen en el historial.</InlineFeedback> : !can("applications.update") ? <InlineFeedback tone="info" title="Modo consulta">Puedes revisar el expediente y su historial, pero las acciones de contratación deben realizarlas usuarios con permisos de actualización.</InlineFeedback> : null}
-    <HiringStageRail status={contract.status} />
-    <HiringWorkflowSection id="hiring-information" label="Información de la contratación"><HiringContractMetadataEditor key={`${contract.id}-${contract.priority ?? "MEDIUM"}-${contract.deadlineAt ?? ""}`} contract={contract} /></HiringWorkflowSection>
-    <HiringWorkflowSection id="hiring-offer" label="Oferta laboral"><HiringOfferControls contract={contract} /></HiringWorkflowSection>
-    <HiringWorkflowSection id="hiring-documents" label="Documentos requeridos"><HiringDocumentRequestControls contract={contract} /></HiringWorkflowSection>
-    <HiringWorkflowSection id="hiring-signatures" label="Firmas"><HiringSignatureControls contract={contract} /></HiringWorkflowSection>
-    <HiringWorkflowSection id="hiring-review" label="Revisión final"><HiringFinalizationPreview contract={contract} /><HiringComplianceControls contract={contract} /><DocumentReviewControls contract={contract} /></HiringWorkflowSection>
-    <HiringWorkflowSection id="hiring-result" label="Resultado de la contratación"><HiringOutcomeSummary contract={contract} /></HiringWorkflowSection>
-  </>;
+  );
 }
+
+/* =============================== Detalle ================================ */
 
 export function HiringContractDetailPage({ contractId }: { contractId: string }) {
   const client = useQueryClient();
-  const { can } = useAppStore();
-  const [documentTitle, setDocumentTitle] = useState("");
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
+  const [requestedStage, setRequestedStage] = useState<HiringStageId | null>(null);
+
   const contract = useQuery({ queryKey: ["hiring-contract", contractId], queryFn: () => fetchHiringContract(contractId), enabled: Boolean(contractId) });
-  const progress = useQuery({ queryKey: ["hiring-progress", contractId], queryFn: () => fetchHiringProgress(contractId), enabled: Boolean(contractId), refetchInterval: 10000 });
+  const progress = useQuery({ queryKey: ["hiring-progress", contractId], queryFn: () => fetchHiringProgress(contractId), enabled: Boolean(contractId), refetchInterval: 15000 });
   const documents = useQuery({ queryKey: ["hiring-documents", contractId], queryFn: () => fetchHiringDocuments(contractId), enabled: Boolean(contractId) });
   const history = useQuery({ queryKey: ["hiring-history", contractId], queryFn: () => fetchHiringHistory(contractId), enabled: Boolean(contractId) });
-  const refresh = async () => { await Promise.all([client.invalidateQueries({ queryKey: ["hiring-contract", contractId] }), client.invalidateQueries({ queryKey: ["hiring-progress", contractId] }), client.invalidateQueries({ queryKey: ["hiring-documents", contractId] }), client.invalidateQueries({ queryKey: ["hiring-history", contractId] }), client.invalidateQueries({ queryKey: ["hiring-contracts"] })]); };
-  const requestDocument = useMutation({ mutationFn: () => requestHiringDocument(contractId, { type: "OTHER", title: documentTitle.trim(), required: true, source: "INTERNAL" }), onSuccess: async () => { setDocumentTitle(""); await refresh(); } });
-  const sendDocuments = useMutation({ mutationFn: () => sendHiringDocuments(contractId), onSuccess: refresh });
-  const confirm = useMutation({ mutationFn: () => confirmHiringContract(contractId), onSuccess: refresh });
-  const cancel = useMutation({ mutationFn: (reason: string) => cancelHiringContract(contractId, reason), onSuccess: refresh });
-  if (contract.isLoading) return <AsyncState state="loading" title="Cargando contratación" />;
-  if (contract.isError || !contract.data) return <AsyncState state="error" title="No fue posible cargar la contratación" onRetry={() => void contract.refetch()} />;
+
+  const refresh = async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: ["hiring-contract", contractId] }),
+      client.invalidateQueries({ queryKey: ["hiring-progress", contractId] }),
+      client.invalidateQueries({ queryKey: ["hiring-documents", contractId] }),
+      client.invalidateQueries({ queryKey: ["hiring-history", contractId] }),
+      client.invalidateQueries({ queryKey: ["hiring-contracts"] }),
+    ]);
+    setRequestedStage(null);
+  };
+
+  if (contract.isLoading) return <AsyncState state="loading" title="Cargando la contratación" />;
+  if (contract.isError || !contract.data) return <AsyncState state="error" title="No pudimos cargar la contratación" onRetry={() => void contract.refetch()} />;
+
   const item = contract.data;
-  const summary = progress.data ?? item.progress;
-  const pendingDocuments = (documents.data ?? item.documents).filter((document) => document.required && !["APPROVED", "SIGNED", "WAIVED"].includes(document.status));
-  const canUpdate = can("applications.update");
-  return <><div className="space-y-7"><PageHeader eyebrow="Personas · Contratación" title={item.candidate.fullName} description={`${item.roleTitle ?? item.vacancy.title} · ${item.vacancy.tenant?.name ?? "Empresa activa"} · ${item.branch.name}`} actions={<Button asChild variant="secondary"><Link href="/hiring"><ArrowLeft className="size-4" />Volver a contrataciones</Link></Button>} /><Card level={1}><CardContent className="space-y-6 p-5 sm:p-7"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div className="flex items-start gap-4"><div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-text-on-accent">{initials(item.candidate.fullName)}</div><div><p className="text-sm font-medium text-brand">Centro de contratación</p><h1 className="mt-1 text-2xl font-semibold">{item.candidate.fullName}</h1><p className="mt-1 text-sm text-text-secondary">{item.roleTitle ?? item.vacancy.title} · {item.branch.name}</p><p className="mt-1 text-xs text-text-secondary">{item.candidate.email}</p></div></div><Badge variant={item.status === "HIRED" ? "success" : item.status === "CANCELLED" ? "destructive" : "secondary"}>{statusLabels[item.status]}</Badge></div><div><div className="mb-2 flex justify-between text-xs text-text-secondary"><span>Avance del proceso</span><span>{summary?.progressPercent ?? item.progressPercent}%</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-section"><div className="h-full rounded-full bg-primary" style={{ width: `${summary?.progressPercent ?? item.progressPercent}%` }} /></div></div><StageRail contract={item} /></CardContent></Card><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"><div className="space-y-5"><Card level={1} className="border-primary/30 bg-primary/[0.03]"><CardContent className="space-y-4 p-5"><p className="text-sm font-medium text-brand">Próxima acción recomendada</p><h2 className="text-xl font-semibold">{hiringActionLabel(item.nextAction ?? summary?.nextAction, item.status)}</h2><div className="grid gap-2 text-sm text-text-secondary sm:grid-cols-3"><p>Responsable: <span className="font-medium text-text-primary">{item.nextActor ?? summary?.actorResponsible ?? "RRHH"}</span></p><p>Prioridad: <span className="font-medium text-text-primary">{hiringPriorityLabel(item.priority)}</span></p><p>Fecha límite: <span className="font-medium text-text-primary">{dateLabel(item.deadlineAt)}</span></p></div><ActionBar>{item.status === "HIRED" ? <Button asChild><Link href="/onboarding">Iniciar onboarding<ArrowRight className="size-4" /></Link></Button> : item.status === "READY_TO_HIRE" && canUpdate ? <Button onClick={() => setConfirmOpen(true)} disabled={confirm.isPending}>Confirmar contratación<ArrowRight className="size-4" /></Button> : item.status === "SIGNATURES_PENDING" && canUpdate ? <Button onClick={() => sendDocuments.mutate()} disabled={sendDocuments.isPending}>Reenviar a firma<ArrowRight className="size-4" /></Button> : null}<Button asChild variant="secondary"><Link href={`/ats/candidates/${item.applicationId}`}>Ver perfil ATS</Link></Button></ActionBar>{confirm.isError ? <InlineFeedback tone="danger" title="No fue posible confirmar">{errorText(confirm.error)}</InlineFeedback> : null}</CardContent></Card><Card level={2}><CardHeader><CardTitle className="flex items-center gap-2"><FileCheck2 className="size-5 text-brand" />Documentos y firmas</CardTitle></CardHeader><CardContent className="space-y-4"><InlineFeedback tone={pendingDocuments.length ? "warning" : "success"} title={pendingDocuments.length ? `${pendingDocuments.length} documento(s) pendiente(s)` : "Requisitos documentales completos"}>{pendingDocuments.length ? "Revisa o solicita los documentos pendientes antes de confirmar." : "Los requisitos obligatorios están listos para la siguiente etapa."}</InlineFeedback>{documents.isError ? <InlineFeedback tone="danger" title="No fue posible cargar documentos">Vuelve a intentarlo desde esta pantalla.</InlineFeedback> : null}{pendingDocuments.map((document) => <div key={document.id} className="flex items-center justify-between gap-3 rounded-xl border border-border-default p-3 text-sm"><span>{document.title}</span><Badge variant="secondary">{hiringDocumentStatusLabel(document.status)}</Badge></div>)}{canUpdate && ["OFFER_ACCEPTED", "DOCUMENTS_PENDING"].includes(item.status) ? <div className="flex flex-col gap-2 border-t border-border-default pt-4 sm:flex-row"><Input value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} placeholder="Título del documento requerido" /><Button onClick={() => requestDocument.mutate()} disabled={!documentTitle.trim() || requestDocument.isPending}>{requestDocument.isPending ? "Solicitando…" : "Solicitar documento"}</Button></div> : null}{requestDocument.isError || sendDocuments.isError ? <InlineFeedback tone="danger" title="No fue posible completar la acción">{errorText(requestDocument.error ?? sendDocuments.error)}</InlineFeedback> : null}</CardContent></Card></div><aside className="space-y-5"><Card level={2}><CardHeader><CardTitle className="flex items-center gap-2"><LockKeyhole className="size-5 text-status-warning" />Bloqueos</CardTitle></CardHeader><CardContent className="space-y-3">{summary?.blockers?.length ? summary.blockers.map((blocker) => <InlineFeedback key={blocker} tone="warning" title="Requiere atención">{blocker}</InlineFeedback>) : <InlineFeedback tone="success" title="Sin bloqueos críticos">El contrato puede continuar según permisos y requisitos.</InlineFeedback>}{item.status !== "HIRED" && canUpdate ? <Button variant="ghost" onClick={() => setCancelOpen(true)}>Cancelar contratación</Button> : null}{cancel.isError ? <InlineFeedback tone="danger" title="No fue posible cancelar">{errorText(cancel.error)}</InlineFeedback> : null}</CardContent></Card><Card level={2}><CardHeader><CardTitle className="flex items-center gap-2"><History className="size-5 text-brand" />Historial</CardTitle></CardHeader><CardContent>{history.isLoading ? <p className="text-sm text-text-secondary">Cargando historial…</p> : <ol className="space-y-3">{(history.data ?? item.stateHistory ?? []).slice(-8).reverse().map((event) => <li key={event.id} className="border-l-2 border-primary/30 pl-3"><p className="text-sm font-medium">{hiringActionLabel(event.action, item.status)}</p><p className="text-xs text-text-secondary">{statusLabels[event.previousState as HiringContractStatus] ?? event.previousState ?? "Inicio"} → {statusLabels[event.nextState as HiringContractStatus] ?? event.nextState} · {dateLabel(event.occurredAt)}</p></li>)}</ol>}</CardContent></Card></aside></div></div><HiringConfirmDialog open={confirmOpen} title="Confirmar contratación" description="Se creará o vinculará el perfil del empleado y se cerrará este flujo." confirmLabel="Confirmar contratación" onOpenChange={setConfirmOpen} onConfirm={() => confirm.mutate()} /><HiringReasonDialog open={cancelOpen} title="Cancelar contratación" description="La contratación se cerrará y el motivo quedará registrado en el historial." confirmLabel="Cancelar contratación" onOpenChange={setCancelOpen} onConfirm={(reason) => cancel.mutate(reason)} /></>;
+  const state = resolveHiringCase(item, progress.data ?? item.progress);
+  const documentList = documents.data ?? item.documents;
+  const stage = stageForView(state, requestedStage);
+  const back = hiringStageIndex(stage) > 0 ? () => setRequestedStage(HIRING_STAGES[hiringStageIndex(stage) - 1].id) : undefined;
+
+  return (
+    <div className="space-y-6">
+      <nav aria-label="Volver">
+        <Button asChild variant="secondary">
+          <Link href="/hiring"><ArrowLeft className="size-4" aria-hidden="true" />Volver a contrataciones</Link>
+        </Button>
+      </nav>
+
+      <HiringCaseHeader contract={item} state={state} />
+
+      {state.cancelled ? <CancelledPanel contract={item} /> : null}
+      {!state.cancelled && stage === "PREPARACION" ? <PreparationPanel contract={item} state={state} onAdvance={() => setRequestedStage("OFERTA")} /> : null}
+      {!state.cancelled && stage === "OFERTA" ? <OfferPanel contract={item} state={state} onBack={back} onRefresh={refresh} /> : null}
+      {!state.cancelled && stage === "DOCUMENTOS" ? <DocumentsPanel contract={item} state={state} documents={documentList} onBack={back} onRefresh={refresh} /> : null}
+      {!state.cancelled && stage === "REVISION" ? <ReviewPanel contract={item} state={state} documents={documentList} onBack={back} onRefresh={refresh} /> : null}
+      {!state.cancelled && stage === "CONFIRMACION" ? <OutcomePanel contract={item} onRefresh={refresh} /> : null}
+
+      <HiringSecondaryDetails
+        contract={item}
+        state={state}
+        documents={documentList}
+        history={history.data ?? item.stateHistory ?? []}
+        onRefresh={refresh}
+      />
+    </div>
+  );
 }

@@ -15,7 +15,6 @@ import type {
   CreateScorecardTemplateInput,
   ScorecardCriterionType,
 } from "@/lib/contracts";
-import { RecruitmentWorkspaceNav } from "@/components/recruitment-workspace";
 import { ScorecardGovernanceConsole } from "@/components/scorecard-governance-console";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Button } from "@/components/ui/button";
@@ -118,7 +117,6 @@ export default function ScorecardsPage() {
 
   return <div className="space-y-7">
     <PageHeader eyebrow="Reclutamiento estructurado" title="Diseñador de fichas de evaluación" description="Crea una rúbrica por vacante y etapa. Cada publicación genera una versión nueva y conserva intactas las evaluaciones firmadas." />
-    <RecruitmentWorkspaceNav />
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,.7fr)]">
       <Card level={1}><CardHeader><CardTitle>Nueva versión</CardTitle></CardHeader><CardContent className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">

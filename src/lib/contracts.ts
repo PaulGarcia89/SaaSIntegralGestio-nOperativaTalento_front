@@ -3146,6 +3146,48 @@ export interface HiringContractDocumentDto {
   updatedAt: string;
 }
 
+/**
+ * Forma real que emite `HiringProgressResolver.resolve()` en el backend.
+ *
+ * Antes este tipo declaraba `blockers: string[]` y `nextAction: string`, pero el
+ * backend siempre envió objetos. La pantalla de detalle renderizaba esos objetos
+ * como hijos de React, lo que rompía la vista en cuanto había un bloqueo — y el
+ * resolver añade uno siempre que la oferta está enviada o esperando respuesta.
+ * Los alias duplicados (`progressPercentage`, `completedTasks`, `pendingTasks`,
+ * `responsibleActor`) existen en la respuesta y se declaran opcionales para no
+ * obligar a consumirlos.
+ */
+export interface HiringContractBlockerDto { code: string; message: string; field?: string }
+
+export interface HiringContractNextActionDto {
+  code: string;
+  label: string;
+  description?: string;
+  role?: string;
+  endpoint?: string;
+  enabled?: boolean;
+  blockers?: HiringContractBlockerDto[];
+}
+
+export interface HiringContractProgressDto {
+  currentStage: string;
+  displayStatus?: string;
+  progressPercent: number;
+  progressPercentage?: number;
+  tasksCompleted: string[];
+  completedTasks?: string[];
+  tasksPending: string[];
+  pendingTasks?: string[];
+  blockers: HiringContractBlockerDto[];
+  nextAction?: HiringContractNextActionDto | string | null;
+  actorResponsible?: string;
+  responsibleActor?: { type: string; code: string; label: string } | null;
+  lastActivity?: { action: string; description?: string; occurredAt: string; actorUserId?: string | null } | null;
+  availableActions?: HiringContractNextActionDto[];
+  requiredDocumentsSummary?: { total: number; completed: number; pending: number; blocked: boolean };
+  signaturesSummary?: { total: number; completed: number; pending: number; operationStatus?: string };
+}
+
 export interface HiringContractDto {
   id: string;
   tenantId: string;
@@ -3183,7 +3225,7 @@ export interface HiringContractDto {
   documents: HiringContractDocumentDto[];
   signatures: Array<{ id: string; provider: string; status: string; requestedAt: string; completedAt?: string | null }>;
   stateHistory?: Array<{ id: string; previousState?: string | null; nextState: string; action: string; actorRole?: string | null; occurredAt: string }>;
-  progress?: { currentStage: string; progressPercent: number; tasksCompleted: string[]; tasksPending: string[]; blockers: string[]; nextAction: string; actorResponsible: string };
+  progress?: HiringContractProgressDto;
 }
 
 export interface HiringContractListDto { data: HiringContractDto[]; meta: { total: number; page: number; pageSize: number } }

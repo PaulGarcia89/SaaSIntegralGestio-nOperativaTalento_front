@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hiringActionLabel, hiringDeadlineState, hiringDocumentStatusLabel, hiringOfferStatusLabel, hiringPhaseLabel, hiringPriorityLabel, hiringSignatureStatusLabel, hiringStatusGuidance, hiringStatusLabels, hiringViewMatches, pendingHiringDocuments } from "@/lib/hiring-ux";
+import { hiringActionLabel, hiringDeadlineState, hiringDocumentStatusLabel, hiringOfferStatusLabel, hiringPhaseLabel, hiringPriorityLabel, hiringSignatureStatusLabel, hiringStatusGuidance, hiringStatusLabel, hiringViewMatches, pendingHiringDocuments } from "@/lib/hiring-ux";
+import { translate } from "@/i18n";
 import type { HiringContractDto } from "@/lib/contracts";
 
 const contract = (status: HiringContractDto["status"]): HiringContractDto => ({
@@ -7,7 +8,7 @@ const contract = (status: HiringContractDto["status"]): HiringContractDto => ({
 });
 
 describe("hiring UX consolidation", () => {
-  const statuses = Object.keys(hiringStatusLabels) as HiringContractDto["status"][];
+  const statuses: HiringContractDto["status"][] = ["DRAFT", "DATA_REVIEW", "OFFER_PREPARATION", "OFFER_SENT", "AWAITING_OFFER_RESPONSE", "OFFER_ACCEPTED", "DOCUMENTS_PENDING", "SIGNATURES_PENDING", "COMPLIANCE_REVIEW", "READY_TO_HIRE", "HIRED", "CANCELLED"];
 
   it("localizes actions, document status and priority", () => {
     expect(hiringActionLabel("CONFIRM_HIRING", "READY_TO_HIRE")).toBe("Confirmar contratación");
@@ -35,7 +36,8 @@ describe("hiring UX consolidation", () => {
   });
 
   it("provides consistent guidance for each operational status", () => {
-    expect(hiringStatusGuidance("DOCUMENTS_PENDING")).toMatchObject({ expectedActor: "Candidato / RR. HH." });
+    expect(hiringStatusGuidance("DOCUMENTS_PENDING", "es")).toMatchObject({ expectedActor: "Candidato / RR. HH." });
+    expect(hiringStatusGuidance("DOCUMENTS_PENDING", "en")).toMatchObject({ expectedActor: "Candidate / HR" });
     expect(hiringStatusGuidance("READY_TO_HIRE").requiredData).toContain("sin bloqueos");
   });
 
@@ -52,13 +54,27 @@ describe("hiring UX consolidation", () => {
     expect(hiringPhaseLabel("CANCELLED")).toBe("Confirmación");
   });
 
-  it("has phase and operational guidance for every official status", () => {
+  it("has phase and operational guidance for every official status, in both languages", () => {
     expect(statuses).toHaveLength(12);
+    (["es", "en"] as const).forEach((locale) => {
+      statuses.forEach((status) => {
+        expect(hiringPhaseLabel(status, locale)).toBeTruthy();
+        expect(hiringStatusLabel(status, locale)).toBeTruthy();
+        expect(hiringStatusGuidance(status, locale).description).toBeTruthy();
+        expect(hiringStatusGuidance(status, locale).expectedActor).toBeTruthy();
+        expect(hiringStatusGuidance(status, locale).requiredData).toBeTruthy();
+      });
+    });
+  });
+
+  // `translate` devuelve la clave misma cuando falta, así que un hueco en el
+  // catálogo inglés se vería en pantalla como "hiring.guidance.DRAFT.description"
+  // sin que nada fallara. Esto lo convierte en un fallo de prueba.
+  it("no deja ningún estado de contratación sin traducir al inglés", () => {
     statuses.forEach((status) => {
-      expect(hiringPhaseLabel(status)).toBeTruthy();
-      expect(hiringStatusGuidance(status).description).toBeTruthy();
-      expect(hiringStatusGuidance(status).expectedActor).toBeTruthy();
-      expect(hiringStatusGuidance(status).requiredData).toBeTruthy();
+      [`hiring.status.${status}`, `hiring.guidance.${status}.description`, `hiring.guidance.${status}.requiredData`].forEach((key) => {
+        expect(translate("en", key)).not.toBe(key);
+      });
     });
   });
 

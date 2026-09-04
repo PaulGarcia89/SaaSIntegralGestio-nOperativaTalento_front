@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchHiringContracts } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { hiringDeadlineState, hiringViewMatches, type HiringListView } from "@/lib/hiring-ux";
+import { useLocale } from "@/components/locale-provider";
 
 /**
  * Resumen de la bandeja.
@@ -12,14 +13,17 @@ import { hiringDeadlineState, hiringViewMatches, type HiringListView } from "@/l
  * sistema: "Fuera de plazo" en vez de "SLA vencido". El número va acompañado
  * siempre de su etiqueta, nunca solo de un color.
  */
-const views: Array<{ id: HiringListView; label: string }> = [
-  { id: "ATTENTION", label: "Te toca a ti" },
-  { id: "WAITING", label: "Esperando a la persona" },
-  { id: "READY", label: "Listas para confirmar" },
-  { id: "COMPLETED", label: "Completadas" },
+// La vista guarda su identificador; la etiqueta se resuelve al pintarla, que
+// es cuando se conoce el idioma. Guardarla aquí la congelaba en español.
+const views: Array<{ id: HiringListView; labelKey: string }> = [
+  { id: "ATTENTION", labelKey: "hiring.metrics.yours" },
+  { id: "WAITING", labelKey: "hiring.metrics.waiting" },
+  { id: "READY", labelKey: "hiring.metrics.ready" },
+  { id: "COMPLETED", labelKey: "hiring.metrics.completed" },
 ];
 
 export function HiringQueueMetrics() {
+  const { t } = useLocale();
   const { can } = useAppStore();
   const query = useQuery({ queryKey: ["hiring-contracts", "metrics"], queryFn: () => fetchHiringContracts(), enabled: can("applications.view") });
   const rows = query.data?.data;
@@ -29,19 +33,19 @@ export function HiringQueueMetrics() {
   const dueSoon = rows.filter((item) => hiringDeadlineState(item.deadlineAt) === "DUE_SOON").length;
 
   return (
-    <section aria-label="Resumen de contrataciones" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <section aria-label={t("hiring.metrics.aria")} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {views.map((view) => (
         <div key={view.id} className="rounded-2xl border border-border-default bg-surface-elevated p-4">
-          <p className="text-base text-text-secondary">{view.label}</p>
+          <p className="text-base text-text-secondary">{t(view.labelKey)}</p>
           <p className="mt-1 text-3xl font-semibold text-text-primary">{rows.filter((item) => hiringViewMatches(item, view.id)).length}</p>
         </div>
       ))}
       <div className="rounded-2xl border border-status-danger/40 bg-status-danger/[0.05] p-4">
-        <p className="text-base text-text-secondary">Fuera de plazo</p>
+        <p className="text-base text-text-secondary">{t("hiring.metrics.overdue")}</p>
         <p className="mt-1 text-3xl font-semibold text-text-primary">{overdue}</p>
       </div>
       <div className="rounded-2xl border border-status-warning/40 bg-status-warning/[0.05] p-4">
-        <p className="text-base text-text-secondary">Vencen en menos de dos días</p>
+        <p className="text-base text-text-secondary">{t("hiring.metrics.dueSoon")}</p>
         <p className="mt-1 text-3xl font-semibold text-text-primary">{dueSoon}</p>
       </div>
     </section>

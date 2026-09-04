@@ -16,10 +16,11 @@ import {
   hiringDocumentStatusLabel,
   hiringDocumentTypeLabel,
   hiringOfferStatusLabel,
-  hiringStatusLabels,
+  hiringStatusLabel,
   type HiringCaseState,
 } from "@/lib/hiring-ux";
 import { useAppStore } from "@/store/app-store";
+import { useLocale } from "@/components/locale-provider";
 
 /**
  * Sección plegable.
@@ -60,6 +61,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
   history: NonNullable<HiringContractDto["stateHistory"]>;
   onRefresh: () => Promise<void>;
 }) {
+  const { locale, t } = useLocale();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -67,8 +69,8 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
 
   return (
     <section aria-labelledby="hiring-more" className="space-y-3">
-      <h2 id="hiring-more" className="text-xl font-semibold text-text-primary">Más información</h2>
-      <p className="text-base text-text-secondary">Aquí está el resto del expediente. Ábrelo solo si lo necesitas.</p>
+      <h2 id="hiring-more" className="text-xl font-semibold text-text-primary">{t("hiring.details.more")}</h2>
+      <p className="text-base text-text-secondary">{t("hiring.details.moreHint")}</p>
 
       <HiringDisclosure title="Oferta laboral" hint={hiringOfferStatusLabel(contract.jobOffer?.status)}>
         {contract.jobOffer?.versions?.length ? (
@@ -82,11 +84,11 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
             ))}
           </dl>
         ) : (
-          <p className="text-base text-text-secondary">Todavía no hay ninguna oferta vinculada a esta contratación.</p>
+          <p className="text-base text-text-secondary">{t("hiring.details.noOffer")}</p>
         )}
       </HiringDisclosure>
 
-      <HiringDisclosure title="Documentos" hint={documents.length ? `${documents.length} en total` : "Ninguno todavía"}>
+      <HiringDisclosure title={t("hiring.details.documents")} hint={documents.length ? `${documents.length} en total` : t("hiring.details.noneYet")}>
         {documents.length ? (
           <dl>
             {documents.map((document) => (
@@ -98,20 +100,20 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
             ))}
           </dl>
         ) : (
-          <p className="text-base text-text-secondary">No se ha pedido ningún documento.</p>
+          <p className="text-base text-text-secondary">{t("hiring.details.noDocs")}</p>
         )}
       </HiringDisclosure>
 
-      <HiringDisclosure title="Datos de la persona">
+      <HiringDisclosure title={t("hiring.details.person")}>
         <dl>
-          <Row label="Nombre completo" value={contract.candidate.fullName} />
-          <Row label="Correo electrónico" value={contract.candidate.email} />
-          <Row label="Puesto" value={contract.roleTitle ?? contract.vacancy.title} />
-          <Row label="Empresa y sucursal" value={`${contract.vacancy.tenant?.name ?? "Empresa activa"} · ${contract.branch.name}`} />
+          <Row label={t("hiring.details.fullName")} value={contract.candidate.fullName} />
+          <Row label={t("hiring.details.email")} value={contract.candidate.email} />
+          <Row label={t("hiring.details.role")} value={contract.roleTitle ?? contract.vacancy.title} />
+          <Row label={t("hiring.details.companyBranch")} value={`${contract.vacancy.tenant?.name ?? t("hiring.activeCompany")} · ${contract.branch.name}`} />
         </dl>
       </HiringDisclosure>
 
-      <HiringDisclosure title="Historial" hint={history.length ? `${history.length} movimientos` : "Sin movimientos"}>
+      <HiringDisclosure title={t("hiring.details.history")} hint={history.length ? `${history.length} movimientos` : t("hiring.details.noMovements")}>
         {history.length ? (
           <ol className="space-y-3">
             {[...history].reverse().map((event) => (
@@ -120,42 +122,42 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
                 <p className="mt-0.5 text-base text-text-secondary">
                   {longDate(event.occurredAt) ?? event.occurredAt}
                   {" · "}
-                  {hiringStatusLabels[event.nextState as HiringContractDto["status"]] ?? event.nextState}
+                  {hiringStatusLabel(event.nextState as HiringContractDto["status"], locale) ?? event.nextState}
                 </p>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-base text-text-secondary">Aún no hay movimientos registrados.</p>
+          <p className="text-base text-text-secondary">{t("hiring.details.noHistory")}</p>
         )}
       </HiringDisclosure>
 
-      <HiringDisclosure title="Auditoría" hint="Datos técnicos para soporte">
+      <HiringDisclosure title={t("hiring.details.audit")} hint={t("hiring.details.auditHint")}>
         <dl>
-          <Row label="Identificador de la contratación" value={<code className="text-base">{contract.id}</code>} />
+          <Row label={t("hiring.details.contractId")} value={<code className="text-base">{contract.id}</code>} />
           <Row label="Estado interno" value={<code className="text-base">{contract.status}</code>} />
-          <Row label="Etapa interna" value={<code className="text-base">{contract.currentStage}</code>} />
-          <Row label="Creada el" value={longDate(contract.createdAt) ?? contract.createdAt} />
-          <Row label="Última actualización" value={longDate(contract.updatedAt) ?? contract.updatedAt} />
+          <Row label={t("hiring.details.internalStage")} value={<code className="text-base">{contract.currentStage}</code>} />
+          <Row label={t("hiring.details.createdOn")} value={longDate(contract.createdAt) ?? contract.createdAt} />
+          <Row label={t("hiring.details.updatedOn")} value={longDate(contract.updatedAt) ?? contract.updatedAt} />
         </dl>
       </HiringDisclosure>
 
       {canUpdate && !state.completed && !state.cancelled ? (
-        <HiringDisclosure title="Opciones avanzadas" hint="Prioridad, fecha límite y cancelación">
+        <HiringDisclosure title="Opciones avanzadas" hint={t("hiring.details.settingsHint")}>
           <div className="space-y-5">
             <HiringContractMetadataEditor
               key={`${contract.id}-${contract.priority ?? "MEDIUM"}-${contract.deadlineAt ?? ""}`}
               contract={contract}
             />
             <div className="rounded-2xl border border-status-danger/40 bg-status-danger/[0.04] p-4">
-              <h3 className="text-lg font-semibold text-text-primary">Cancelar esta contratación</h3>
+              <h3 className="text-lg font-semibold text-text-primary">{t("hiring.details.cancelThis")}</h3>
               <p className="mt-1 text-base text-text-secondary">
                 La contratación se cerrará y no se podrá retomar desde aquí. Tendrás que escribir el motivo.
               </p>
               <Button variant="destructive" className="mt-3" onClick={() => setCancelOpen(true)}>
                 Cancelar contratación
               </Button>
-              {cancel.error ? <InlineFeedback tone="danger" title="No pudimos cancelar la contratación">{hiringErrorMessage(cancel.error)}</InlineFeedback> : null}
+              {cancel.error ? <InlineFeedback tone="danger" title={t("hiring.details.cancelFailed")}>{hiringErrorMessage(cancel.error, locale)}</InlineFeedback> : null}
             </div>
           </div>
         </HiringDisclosure>
@@ -163,9 +165,9 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
 
       <HiringReasonDialog
         open={cancelOpen}
-        title="Cancelar contratación"
-        description="Escribe por qué se cancela. Quedará guardado en el historial y no se podrá deshacer desde aquí."
-        confirmLabel="Sí, cancelar contratación"
+        title={t("hiring.details.cancelTitle")}
+        description={t("hiring.details.cancelBody")}
+        confirmLabel={t("hiring.details.cancelYes")}
         onOpenChange={setCancelOpen}
         onConfirm={(reason) => cancel.mutate(reason)}
       />

@@ -7,11 +7,14 @@ import { cn } from "@/lib/utils";
 import type { HiringContractDto, JobOfferVersionDto } from "@/lib/contracts";
 import {
   explainHiringBlocker,
-  hiringStatusLabels,
+  hiringStatusLabel,
   hiringWaitingLabel,
   type HiringCaseState,
 } from "@/lib/hiring-ux";
 import { HiringProgressBar, HiringStageRail } from "@/components/hiring/hiring-stage-rail";
+import { useLocale } from "@/components/locale-provider";
+import { translate } from "@/i18n";
+import type { SupportedLocale } from "@/i18n/types";
 
 export function initials(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
@@ -30,12 +33,16 @@ export function currentOfferVersion(contract: HiringContractDto): JobOfferVersio
   return offer.versions?.find((version) => version.version === offer.currentVersion) ?? offer.versions?.[0];
 }
 
-export function salaryText(version?: JobOfferVersionDto) {
+export function salaryText(version?: JobOfferVersionDto, locale: SupportedLocale = "es") {
   if (!version) return null;
-  const periodicity = ({ HOURLY: "por hora", WEEKLY: "por semana", BIWEEKLY: "cada quince días", MONTHLY: "al mes", ANNUAL: "al año" } as Record<string, string>)[version.periodicity] ?? "";
+  const keys: Record<string, string> = { HOURLY: "hiring.pay.HOURLY", WEEKLY: "hiring.pay.WEEKLY", BIWEEKLY: "hiring.pay.biweekly", MONTHLY: "hiring.pay.MONTHLY", ANNUAL: "hiring.pay.yearly" };
+  const key = keys[version.periodicity];
+  const periodicity = key ? translate(locale, key) : "";
   const amount = Number(version.salaryAmount);
   if (Number.isNaN(amount)) return null;
-  const formatted = new Intl.NumberFormat("es", { style: "currency", currency: version.currency || "USD", maximumFractionDigits: 0 }).format(amount);
+  // El idioma decide tambien el formato del numero: en ingles el separador de
+  // miles es la coma y el decimal el punto, al reves que en espanol.
+  const formatted = new Intl.NumberFormat(locale, { style: "currency", currency: version.currency || "USD", maximumFractionDigits: 0 }).format(amount);
   return `${formatted} ${periodicity}`.trim();
 }
 
@@ -47,6 +54,7 @@ export function salaryText(version?: JobOfferVersionDto) {
  * en texto de 16 px o mayor, sin abreviaturas y sin depender del color.
  */
 export function HiringCaseHeader({ contract, state }: { contract: HiringContractDto; state: HiringCaseState }) {
+  const { locale, t } = useLocale();
   const version = currentOfferVersion(contract);
   const startDate = longDate(version?.employmentStartDate);
   const deadline = longDate(contract.deadlineAt);
@@ -61,11 +69,11 @@ export function HiringCaseHeader({ contract, state }: { contract: HiringContract
               {initials(contract.candidate.fullName)}
             </span>
             <div className="min-w-0">
-              <p className="text-base font-medium text-text-secondary">Contratación de</p>
+              <p className="text-base font-medium text-text-secondary">{t("hiring.header.forPerson")}</p>
               <h1 className="mt-1 text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{contract.candidate.fullName}</h1>
               <p className="mt-2 text-lg text-text-primary">{contract.roleTitle ?? contract.vacancy.title}</p>
               <p className="mt-1 text-base text-text-secondary">
-                {contract.vacancy.tenant?.name ?? "Empresa activa"} · {contract.branch.name}
+                {contract.vacancy.tenant?.name ?? t("hiring.activeCompany")} · {contract.branch.name}
               </p>
               <p className="mt-1 text-base text-text-secondary">{contract.candidate.email}</p>
             </div>
@@ -75,7 +83,7 @@ export function HiringCaseHeader({ contract, state }: { contract: HiringContract
               variant={state.completed ? "success" : state.cancelled ? "destructive" : state.blockers.length ? "warning" : "secondary"}
               className="text-sm"
             >
-              {hiringStatusLabels[contract.status]}
+              {hiringStatusLabel(contract.status, locale)}
             </Badge>
             <span className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium", state.waitingOn === "CANDIDATO" ? "border-status-warning/40 bg-status-warning/10 text-text-primary" : state.waitingOn === "EMPRESA" ? "border-primary/40 bg-primary/10 text-text-primary" : "border-border-default text-text-secondary")}>
               {state.waitingOn === "CANDIDATO" ? <Clock3 className="size-4" aria-hidden="true" /> : state.waitingOn === "EMPRESA" ? <UserRound className="size-4" aria-hidden="true" /> : <CircleCheck className="size-4" aria-hidden="true" />}
@@ -86,19 +94,19 @@ export function HiringCaseHeader({ contract, state }: { contract: HiringContract
 
         <dl className="grid gap-4 border-t border-border-default pt-5 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <dt className="text-base text-text-secondary">Fecha prevista de inicio</dt>
+            <dt className="text-base text-text-secondary">{t("hiring.header.startDate")}</dt>
             <dd className="mt-1 flex items-center gap-2 text-base font-medium text-text-primary">
               <CalendarDays className="size-5 text-text-secondary" aria-hidden="true" />
-              {startDate ?? "Se definirá con la oferta"}
+              {startDate ?? t("hiring.header.toBeSet")}
             </dd>
           </div>
           <div>
-            <dt className="text-base text-text-secondary">Fecha límite del proceso</dt>
-            <dd className="mt-1 text-base font-medium text-text-primary">{deadline ?? "Sin fecha límite"}</dd>
+            <dt className="text-base text-text-secondary">{t("hiring.header.processDeadline")}</dt>
+            <dd className="mt-1 text-base font-medium text-text-primary">{deadline ?? t("hiring.header.noDeadline")}</dd>
           </div>
           <div>
             <dt className="text-base text-text-secondary">Sueldo ofrecido</dt>
-            <dd className="mt-1 text-base font-medium text-text-primary">{salaryText(version) ?? "Se definirá con la oferta"}</dd>
+            <dd className="mt-1 text-base font-medium text-text-primary">{salaryText(version, locale) ?? t("hiring.header.toBeSet")}</dd>
           </div>
         </dl>
 
@@ -117,11 +125,12 @@ export function HiringCaseHeader({ contract, state }: { contract: HiringContract
  * habilita después.
  */
 export function HiringBlockerList({ state, candidateName }: { state: HiringCaseState; candidateName: string }) {
+  const { locale, t } = useLocale();
   if (!state.blockers.length) return null;
   return (
     <div className="space-y-3">
       {state.blockers.map((blocker) => {
-        const explanation = explainHiringBlocker(blocker, candidateName);
+        const explanation = explainHiringBlocker(blocker, candidateName, locale);
         return (
           <div key={`${explanation.code}-${explanation.what}`} role="status" className="rounded-2xl border border-status-warning/40 bg-status-warning/[0.06] p-4">
             <p className="flex items-start gap-2 text-base font-semibold text-text-primary">
@@ -130,15 +139,15 @@ export function HiringBlockerList({ state, candidateName }: { state: HiringCaseS
             </p>
             <dl className="mt-3 grid gap-2 pl-7 text-base text-text-secondary sm:grid-cols-3">
               <div>
-                <dt className="font-medium text-text-primary">Por qué</dt>
+                <dt className="font-medium text-text-primary">{t("hiring.blocker.whyLabel")}</dt>
                 <dd>{explanation.why}</dd>
               </div>
               <div>
-                <dt className="font-medium text-text-primary">Quién lo resuelve</dt>
+                <dt className="font-medium text-text-primary">{t("hiring.blocker.whoLabel")}</dt>
                 <dd>{explanation.who}</dd>
               </div>
               <div>
-                <dt className="font-medium text-text-primary">Qué pasa después</dt>
+                <dt className="font-medium text-text-primary">{t("hiring.blocker.nextLabel")}</dt>
                 <dd>{explanation.unlocks}</dd>
               </div>
             </dl>

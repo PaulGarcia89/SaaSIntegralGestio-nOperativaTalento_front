@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HIRING_STAGES, type HiringCaseState } from "@/lib/hiring-ux";
+import { useLocale } from "@/components/locale-provider";
+import { HIRING_STAGES, hiringStageTitle, type HiringCaseState } from "@/lib/hiring-ux";
 
 /**
  * Barra de avance de la contratación.
@@ -11,12 +12,13 @@ import { HIRING_STAGES, type HiringCaseState } from "@/lib/hiring-ux";
  * persona quiere oír ("Etapa 2 de 5: Oferta laboral"), no "40 por ciento".
  */
 export function HiringProgressBar({ state }: { state: HiringCaseState }) {
+  const { locale, t } = useLocale();
   const stage = HIRING_STAGES[state.stageIndex];
   const valueText = state.cancelled
-    ? "Contratación cancelada"
+    ? t("hiring.rail.cancelled")
     : state.completed
-      ? "Contratación completada"
-      : `Etapa ${stage.step} de ${HIRING_STAGES.length}: ${stage.title}`;
+      ? t("hiring.rail.completed")
+      : t("hiring.stageOf", { step: stage.step, total: HIRING_STAGES.length, title: hiringStageTitle(stage.id, locale) });
 
   return (
     <div className="space-y-2">
@@ -51,13 +53,14 @@ export function HiringProgressBar({ state }: { state: HiringCaseState }) {
  * alguien que no distingue el verde del gris.
  */
 export function HiringStageRail({ state }: { state: HiringCaseState }) {
+  const { locale, t } = useLocale();
   return (
-    <nav aria-label="Etapas de la contratación">
+    <nav aria-label={t("hiring.rail.aria")}>
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {HIRING_STAGES.map((stage, index) => {
           const done = state.completed || index < state.stageIndex;
           const current = !state.completed && index === state.stageIndex;
-          const stateWord = done ? "Completada" : current ? "Etapa actual" : "Pendiente";
+          const stateWord = done ? t("hiring.rail.done") : current ? t("hiring.rail.current") : t("hiring.rail.pending");
           return (
             <li
               key={stage.id}
@@ -80,7 +83,7 @@ export function HiringStageRail({ state }: { state: HiringCaseState }) {
               </span>
               <span className="min-w-0">
                 <span className={cn("block text-base", current ? "font-semibold text-text-primary" : done ? "font-medium text-text-primary" : "text-text-secondary")}>
-                  {stage.title}
+                  {hiringStageTitle(stage.id, locale)}
                 </span>
                 <span className={cn("mt-0.5 block text-sm", current ? "text-text-primary" : "text-text-secondary")}>{stateWord}</span>
               </span>

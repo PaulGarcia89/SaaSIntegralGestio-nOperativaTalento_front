@@ -1,3 +1,5 @@
+import { translate } from "@/i18n";
+import type { SupportedLocale } from "@/i18n/types";
 import type {
   HiringContractBlockerDto,
   HiringContractDto,
@@ -10,15 +12,18 @@ export type HiringListView = "ALL" | "ATTENTION" | "WAITING" | "READY" | "COMPLE
 // Permite activar gradualmente la bandeja priorizada sin cambiar el workflow.
 export const HIRING_GUIDED_QUEUE_ENABLED = process.env.NEXT_PUBLIC_HIRING_GUIDED_QUEUE !== "false";
 
-export const hiringStatusLabels: Record<HiringContractStatus, string> = { DRAFT: "Borrador", DATA_REVIEW: "Revisión de datos", OFFER_PREPARATION: "Preparando oferta", OFFER_SENT: "Oferta enviada", AWAITING_OFFER_RESPONSE: "Esperando candidato", OFFER_ACCEPTED: "Oferta aceptada", DOCUMENTS_PENDING: "Documentos pendientes", SIGNATURES_PENDING: "Firmas pendientes", COMPLIANCE_REVIEW: "Revisión final", READY_TO_HIRE: "Lista para confirmar", HIRED: "Contratación confirmada", CANCELLED: "Cancelada" };
+/** Nombre visible del estado técnico. Se usa solo en auditoría y filtros. */
+export function hiringStatusLabel(status: HiringContractStatus, locale: SupportedLocale = "es") {
+  return translate(locale, `hiring.status.${status}`);
+}
 
-export function hiringPhaseLabel(status: HiringContractStatus) {
-  if (["DRAFT", "DATA_REVIEW"].includes(status)) return "Información";
-  if (["OFFER_PREPARATION", "OFFER_SENT", "AWAITING_OFFER_RESPONSE", "OFFER_ACCEPTED"].includes(status)) return "Oferta";
-  if (status === "DOCUMENTS_PENDING") return "Documentos";
-  if (status === "SIGNATURES_PENDING") return "Firmas";
-  if (["COMPLIANCE_REVIEW", "READY_TO_HIRE"].includes(status)) return "Revisión";
-  return "Confirmación";
+export function hiringPhaseLabel(status: HiringContractStatus, locale: SupportedLocale = "es") {
+  if (["DRAFT", "DATA_REVIEW"].includes(status)) return translate(locale, "hiring.phase.info");
+  if (["OFFER_PREPARATION", "OFFER_SENT", "AWAITING_OFFER_RESPONSE", "OFFER_ACCEPTED"].includes(status)) return translate(locale, "hiring.phase.offer");
+  if (status === "DOCUMENTS_PENDING") return translate(locale, "hiring.phase.documents");
+  if (status === "SIGNATURES_PENDING") return translate(locale, "hiring.phase.signatures");
+  if (["COMPLIANCE_REVIEW", "READY_TO_HIRE"].includes(status)) return translate(locale, "hiring.phase.review");
+  return translate(locale, "hiring.phase.confirmation");
 }
 
 export type HiringStatusGuidance = {
@@ -27,31 +32,44 @@ export type HiringStatusGuidance = {
   requiredData: string;
 };
 
-const statusGuidance: Record<HiringContractStatus, HiringStatusGuidance> = {
-  DRAFT: { description: "La contratación fue creada y necesita una revisión inicial.", expectedActor: "RR. HH.", requiredData: "Puesto, prioridad y fecha límite" },
-  DATA_REVIEW: { description: "Confirma que los datos heredados del ATS sean correctos.", expectedActor: "RR. HH.", requiredData: "Datos del candidato y del puesto" },
-  OFFER_PREPARATION: { description: "Selecciona o configura la oferta que se enviará al candidato.", expectedActor: "RR. HH.", requiredData: "Oferta laboral vigente" },
-  OFFER_SENT: { description: "La oferta fue enviada y queda pendiente de respuesta.", expectedActor: "Candidato", requiredData: "Respuesta del candidato" },
-  AWAITING_OFFER_RESPONSE: { description: "La contratación está detenida hasta recibir la decisión del candidato.", expectedActor: "Candidato", requiredData: "Aceptación o rechazo de la oferta" },
-  OFFER_ACCEPTED: { description: "La oferta fue aceptada; prepara los requisitos documentales.", expectedActor: "RR. HH.", requiredData: "Checklist documental" },
-  DOCUMENTS_PENDING: { description: "Faltan documentos o hay documentos que requieren corrección.", expectedActor: "Candidato / RR. HH.", requiredData: "Documentos obligatorios revisados" },
-  SIGNATURES_PENDING: { description: "Los documentos fueron enviados a firma y falta completar el proceso.", expectedActor: "Candidato", requiredData: "Firmas completadas" },
-  COMPLIANCE_REVIEW: { description: "Revisa que el expediente cumpla todos los requisitos antes de confirmar.", expectedActor: "RR. HH.", requiredData: "Documentos y firmas aprobados" },
-  READY_TO_HIRE: { description: "El expediente está listo para crear o vincular al empleado.", expectedActor: "RR. HH.", requiredData: "Validación final sin bloqueos" },
-  HIRED: { description: "La contratación fue confirmada y el resultado está disponible.", expectedActor: "RR. HH.", requiredData: "Seguimiento de empleado y onboarding" },
-  CANCELLED: { description: "La contratación fue cancelada y no tiene acciones pendientes.", expectedActor: "Sin responsable", requiredData: "Motivo registrado" },
+/**
+ * Cada estado responde tres cosas: qué pasa, quién tiene la pelota y qué dato
+ * hace falta. El texto vive en el catálogo; aquí solo queda quién es el actor,
+ * que es una decisión de proceso y no una frase.
+ */
+const guidanceActor: Record<HiringContractStatus, string> = {
+  DRAFT: "hiring.actor.hr",
+  DATA_REVIEW: "hiring.actor.hr",
+  OFFER_PREPARATION: "hiring.actor.hr",
+  OFFER_SENT: "hiring.actor.candidate",
+  AWAITING_OFFER_RESPONSE: "hiring.actor.candidate",
+  OFFER_ACCEPTED: "hiring.actor.hr",
+  DOCUMENTS_PENDING: "hiring.actor.both",
+  SIGNATURES_PENDING: "hiring.actor.candidate",
+  COMPLIANCE_REVIEW: "hiring.actor.hr",
+  READY_TO_HIRE: "hiring.actor.hr",
+  HIRED: "hiring.actor.hr",
+  CANCELLED: "hiring.actor.none",
 };
 
-export function hiringStatusGuidance(status: HiringContractStatus) {
-  return statusGuidance[status];
+export function hiringStatusGuidance(status: HiringContractStatus, locale: SupportedLocale = "es"): HiringStatusGuidance {
+  return {
+    description: translate(locale, `hiring.guidance.${status}.description`),
+    expectedActor: translate(locale, guidanceActor[status]),
+    requiredData: translate(locale, `hiring.guidance.${status}.requiredData`),
+  };
 }
 
-export function hiringOfferStatusLabel(status?: string | null) {
-  return ({ DRAFT: "Borrador", PENDING_APPROVAL: "Pendiente de aprobación", APPROVED: "Aprobada", SENT: "Enviada", ACCEPTED: "Aceptada", REJECTED: "Rechazada", EXPIRED: "Vencida" } as Record<string, string>)[status ?? ""] ?? status ?? "Sin oferta vinculada";
+export function hiringOfferStatusLabel(status?: string | null, locale: SupportedLocale = "es") {
+  const known = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"];
+  if (status && known.includes(status)) return translate(locale, `hiring.offerStatus.${status}`);
+  return status ?? translate(locale, "hiring.offerStatus.none");
 }
 
-export function hiringSignatureStatusLabel(status?: string | null) {
-  return ({ PENDING: "Pendiente", SENT: "Enviado", COMPLETED: "Completado", SIGNED: "Firmado", REJECTED: "Requiere corrección", EXPIRED: "Vencido" } as Record<string, string>)[status ?? ""] ?? status ?? "Sin estado";
+export function hiringSignatureStatusLabel(status?: string | null, locale: SupportedLocale = "es") {
+  const known = ["PENDING", "SENT", "COMPLETED", "SIGNED", "REJECTED", "EXPIRED"];
+  if (status && known.includes(status)) return translate(locale, `hiring.signature.${status}`);
+  return status ?? translate(locale, "hiring.signature.none");
 }
 
 export function hiringDeadlineState(deadlineAt?: string | null, now = Date.now()) {
@@ -63,26 +81,28 @@ export function hiringDeadlineState(deadlineAt?: string | null, now = Date.now()
   return "ON_TRACK" as const;
 }
 
-const actionLabels: Record<string, string> = { CONFIGURE_OFFER: "Configurar oferta", SEND_OFFER: "Enviar oferta", WAIT_OFFER_RESPONSE: "Esperar respuesta del candidato", REQUEST_DOCUMENTS: "Solicitar documentos", REVIEW_DOCUMENTS: "Revisar documentos", SEND_SIGNATURES: "Enviar a firma", WAIT_SIGNATURES: "Esperar firmas", REVIEW_COMPLIANCE: "Revisar contratación", CONFIRM_HIRING: "Confirmar contratación" };
+const legacyActionCodes = ["CONFIGURE_OFFER", "SEND_OFFER", "WAIT_OFFER_RESPONSE", "REQUEST_DOCUMENTS", "REVIEW_DOCUMENTS", "SEND_SIGNATURES", "WAIT_SIGNATURES", "REVIEW_COMPLIANCE", "CONFIRM_HIRING"];
 
 const attentionStatuses: HiringContractStatus[] = ["DRAFT", "DATA_REVIEW", "OFFER_PREPARATION", "OFFER_ACCEPTED", "DOCUMENTS_PENDING", "COMPLIANCE_REVIEW", "READY_TO_HIRE"];
 const waitingStatuses: HiringContractStatus[] = ["OFFER_SENT", "AWAITING_OFFER_RESPONSE", "SIGNATURES_PENDING"];
 
-export function hiringActionLabel(action: string | null | undefined, status: HiringContractStatus) {
-  if (action && actionLabels[action]) return actionLabels[action];
+export function hiringActionLabel(action: string | null | undefined, status: HiringContractStatus, locale: SupportedLocale = "es") {
+  if (action && legacyActionCodes.includes(action)) return translate(locale, `hiring.legacy.${action}`);
   const normalized = action?.toUpperCase().replaceAll(" ", "_");
-  if (normalized && actionLabels[normalized]) return actionLabels[normalized];
-  if (status === "HIRED") return "Contratación completada";
-  if (status === "CANCELLED") return "Sin acciones";
-  return action?.replaceAll("_", " ") || "Revisar contratación";
+  if (normalized && legacyActionCodes.includes(normalized)) return translate(locale, `hiring.legacy.${normalized}`);
+  if (status === "HIRED") return translate(locale, "hiring.legacy.completed");
+  if (status === "CANCELLED") return translate(locale, "hiring.legacy.noActions");
+  return action?.replaceAll("_", " ") || translate(locale, "hiring.action.NONE.label");
 }
 
-export function hiringDocumentStatusLabel(status: string) {
-  return ({ REQUIRED: "Pendiente", REQUESTED: "Solicitado", RECEIVED: "Recibido", UNDER_REVIEW: "En revisión", APPROVED: "Aprobado", REJECTED: "Requiere corrección", SIGNED: "Firmado", WAIVED: "Exento" } as Record<string, string>)[status] ?? status;
+export function hiringDocumentStatusLabel(status: string, locale: SupportedLocale = "es") {
+  const known = ["REQUIRED", "REQUESTED", "RECEIVED", "UNDER_REVIEW", "APPROVED", "REJECTED", "SIGNED", "WAIVED"];
+  return known.includes(status) ? translate(locale, `hiring.doc.${status}`) : status;
 }
 
-export function hiringPriorityLabel(priority?: string | null) {
-  return ({ LOW: "Baja", MEDIUM: "Normal", HIGH: "Alta", URGENT: "Urgente" } as Record<string, string>)[priority ?? ""] ?? "Sin prioridad";
+export function hiringPriorityLabel(priority?: string | null, locale: SupportedLocale = "es") {
+  const known = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+  return priority && known.includes(priority) ? translate(locale, `hiring.priority.${priority}`) : translate(locale, "hiring.priority.none");
 }
 
 export function hiringViewMatches(item: HiringContractDto, view: HiringListView) {
@@ -112,18 +132,25 @@ export type HiringStage = {
   id: HiringStageId;
   /** Número visible para el usuario, empezando en 1. */
   step: number;
-  title: string;
-  /** Qué ocurre en esta etapa, en una frase. */
-  summary: string;
 };
 
 export const HIRING_STAGES: HiringStage[] = [
-  { id: "PREPARACION", step: 1, title: "Preparación", summary: "Revisamos a quién vas a contratar y en qué condiciones." },
-  { id: "OFERTA", step: 2, title: "Oferta laboral", summary: "Envías la oferta a la persona y esperas su respuesta." },
-  { id: "DOCUMENTOS", step: 3, title: "Documentos", summary: "Reúnes y apruebas los documentos que la empresa necesita." },
-  { id: "REVISION", step: 4, title: "Revisión final", summary: "Compruebas que no falte nada antes de cerrar la contratación." },
-  { id: "CONFIRMACION", step: 5, title: "Confirmación", summary: "Se crea el perfil del empleado y queda listo para trabajar." },
+  { id: "PREPARACION", step: 1 },
+  { id: "OFERTA", step: 2 },
+  { id: "DOCUMENTOS", step: 3 },
+  { id: "REVISION", step: 4 },
+  { id: "CONFIRMACION", step: 5 },
 ];
+
+/** Nombre visible de la etapa. */
+export function hiringStageTitle(stage: HiringStageId, locale: SupportedLocale = "es") {
+  return translate(locale, `hiring.stage.${stage}.title`);
+}
+
+/** Qué ocurre en la etapa, en una frase. */
+export function hiringStageSummary(stage: HiringStageId, locale: SupportedLocale = "es") {
+  return translate(locale, `hiring.stage.${stage}.summary`);
+}
 
 const stageByStatus: Record<HiringContractStatus, HiringStageId> = {
   DRAFT: "PREPARACION",
@@ -204,18 +231,19 @@ export type HiringBlockerExplanation = {
   unlocks: string;
 };
 
-export function explainHiringBlocker(blocker: HiringContractBlockerDto, candidateName = "la persona candidata"): HiringBlockerExplanation {
+export function explainHiringBlocker(blocker: HiringContractBlockerDto, candidateName?: string, locale: SupportedLocale = "es"): HiringBlockerExplanation {
+  const name = candidateName || translate(locale, "hiring.candidateFallback");
   switch (blocker.code) {
     case "REQUIRED_DOCUMENTS_MISSING":
-      return { code: blocker.code, what: blocker.message, why: "La empresa necesita el expediente completo antes de dar de alta a alguien.", who: `${candidateName} debe enviarlos y tú debes aprobarlos.`, unlocks: "Cuando estén aprobados podrás pasar a la revisión final." };
+      return { code: blocker.code, what: blocker.message, why: translate(locale, "hiring.blocker.docs.why"), who: translate(locale, "hiring.blocker.docs.who", { name }), unlocks: translate(locale, "hiring.blocker.docs.unlocks") };
     case "SIGNATURES_PENDING":
-      return { code: blocker.code, what: blocker.message, why: "Los documentos firmados son el respaldo legal de la contratación.", who: `${candidateName} debe firmarlos desde el correo que recibió.`, unlocks: "Cuando termine de firmar, la contratación queda lista para cerrarse." };
+      return { code: blocker.code, what: blocker.message, why: translate(locale, "hiring.blocker.signatures.why"), who: translate(locale, "hiring.blocker.signatures.who", { name }), unlocks: translate(locale, "hiring.blocker.signatures.unlocks") };
     case "WAITING_CANDIDATE":
-      return { code: blocker.code, what: blocker.message, why: "No se piden documentos hasta saber si la persona acepta el puesto.", who: `${candidateName} debe responder a la oferta.`, unlocks: "Con su respuesta podrás continuar o preparar una oferta nueva." };
+      return { code: blocker.code, what: blocker.message, why: translate(locale, "hiring.blocker.waiting.why"), who: translate(locale, "hiring.blocker.waiting.who", { name }), unlocks: translate(locale, "hiring.blocker.waiting.unlocks") };
     case "OFFER_NOT_CONFIGURED":
-      return { code: blocker.code, what: "Todavía no hay una oferta vinculada a esta contratación.", why: "La oferta define sueldo, jornada y fecha de inicio; sin ella no hay nada que enviar.", who: "Tú, desde el perfil de reclutamiento de la persona.", unlocks: "Con la oferta vinculada podrás enviarla al candidato." };
+      return { code: blocker.code, what: translate(locale, "hiring.blocker.offer.what"), why: translate(locale, "hiring.blocker.offer.why"), who: translate(locale, "hiring.blocker.offer.who"), unlocks: translate(locale, "hiring.blocker.offer.unlocks") };
     default:
-      return { code: blocker.code || "UNKNOWN", what: blocker.message, why: "Es un requisito del proceso de contratación.", who: "Revisa el detalle de la etapa actual.", unlocks: "Al resolverlo podrás continuar con el siguiente paso." };
+      return { code: blocker.code || "UNKNOWN", what: blocker.message, why: translate(locale, "hiring.blocker.default.why"), who: translate(locale, "hiring.blocker.default.who"), unlocks: translate(locale, "hiring.blocker.default.unlocks") };
   }
 }
 
@@ -272,7 +300,7 @@ export type HiringCaseState = {
 
 const CONFIRMABLE_STATUSES: HiringContractStatus[] = ["OFFER_ACCEPTED", "DOCUMENTS_PENDING", "SIGNATURES_PENDING", "COMPLIANCE_REVIEW", "READY_TO_HIRE"];
 
-export function resolveHiringCase(contract: HiringContractDto, progress?: HiringContractProgressDto | null): HiringCaseState {
+export function resolveHiringCase(contract: HiringContractDto, progress?: HiringContractProgressDto | null, locale: SupportedLocale = "es"): HiringCaseState {
   const status = contract.status;
   const blockers = normalizeHiringBlockers(progress?.blockers ?? contract.progress?.blockers);
   const pendingDocuments = pendingHiringDocuments(contract);
@@ -307,30 +335,31 @@ export function resolveHiringCase(contract: HiringContractDto, progress?: Hiring
     pendingDocuments,
     blockers,
     canConfirm,
-    primaryAction: resolvePrimaryAction({ status, stage, canConfirm, pendingDocuments, hasOffer: Boolean(contract.jobOfferId) }),
+    primaryAction: resolvePrimaryAction({ status, stage, canConfirm, pendingDocuments, hasOffer: Boolean(contract.jobOfferId) }, locale),
     waitingOn,
   };
 }
 
-function resolvePrimaryAction({ status, stage, canConfirm, pendingDocuments, hasOffer }: { status: HiringContractStatus; stage: HiringStageId; canConfirm: boolean; pendingDocuments: number; hasOffer: boolean }): HiringPrimaryAction {
-  if (status === "CANCELLED") return { code: "NONE", label: "Sin acciones pendientes", helper: "Esta contratación fue cancelada. Puedes consultar el historial." };
-  if (status === "HIRED") return { code: "VIEW_EMPLOYEE", label: "Ver empleado", helper: "Abre el expediente de la persona que acabas de contratar." };
-  if (canConfirm && stage === "REVISION") return { code: "CONFIRM_HIRING", label: "Confirmar contratación", helper: "Se creará el perfil del empleado y se preparará su acceso." };
+function resolvePrimaryAction({ status, stage, canConfirm, pendingDocuments, hasOffer }: { status: HiringContractStatus; stage: HiringStageId; canConfirm: boolean; pendingDocuments: number; hasOffer: boolean }, locale: SupportedLocale = "es"): HiringPrimaryAction {
+  const t = (key: string) => translate(locale, key);
+  if (status === "CANCELLED") return { code: "NONE", label: t("hiring.action.NONE.cancelled.label"), helper: t("hiring.action.NONE.cancelled.helper") };
+  if (status === "HIRED") return { code: "VIEW_EMPLOYEE", label: t("hiring.action.VIEW_EMPLOYEE.label"), helper: t("hiring.action.VIEW_EMPLOYEE.helper") };
+  if (canConfirm && stage === "REVISION") return { code: "CONFIRM_HIRING", label: t("hiring.action.CONFIRM_HIRING.label"), helper: t("hiring.action.CONFIRM_HIRING.helper") };
 
   switch (stage) {
     case "PREPARACION":
-      return { code: "PREPARE_OFFER", label: "Preparar oferta", helper: "Pasarás a elegir la oferta laboral que recibirá la persona." };
+      return { code: "PREPARE_OFFER", label: t("hiring.action.PREPARE_OFFER.label"), helper: t("hiring.action.PREPARE_OFFER.helperFromPrep") };
     case "OFERTA":
-      if (!hasOffer) return { code: "PREPARE_OFFER", label: "Preparar oferta", helper: "Elegirás la oferta laboral que recibirá la persona." };
-      if (status === "OFFER_SENT" || status === "AWAITING_OFFER_RESPONSE") return { code: "REVIEW_RESPONSE", label: "Revisar respuesta", helper: "Registrarás si la persona aceptó o rechazó la oferta." };
-      return { code: "SEND_OFFER", label: "Enviar oferta", helper: "La persona recibirá la oferta y podrá responderla." };
+      if (!hasOffer) return { code: "PREPARE_OFFER", label: t("hiring.action.PREPARE_OFFER.label"), helper: t("hiring.action.PREPARE_OFFER.helperNoOffer") };
+      if (status === "OFFER_SENT" || status === "AWAITING_OFFER_RESPONSE") return { code: "REVIEW_RESPONSE", label: t("hiring.action.REVIEW_RESPONSE.label"), helper: t("hiring.action.REVIEW_RESPONSE.helper") };
+      return { code: "SEND_OFFER", label: t("hiring.action.SEND_OFFER.label"), helper: t("hiring.action.SEND_OFFER.helper") };
     case "DOCUMENTOS":
-      if (pendingDocuments > 0) return { code: "REVIEW_DOCUMENTS", label: "Revisar documentos", helper: "Aprobarás los documentos recibidos o pedirás correcciones." };
-      return { code: "REQUEST_DOCUMENTS", label: "Solicitar documentos", helper: "La persona verá qué documentos debe enviar." };
+      if (pendingDocuments > 0) return { code: "REVIEW_DOCUMENTS", label: t("hiring.action.REVIEW_DOCUMENTS.label"), helper: t("hiring.action.REVIEW_DOCUMENTS.helper") };
+      return { code: "REQUEST_DOCUMENTS", label: t("hiring.action.REQUEST_DOCUMENTS.label"), helper: t("hiring.action.REQUEST_DOCUMENTS.helper") };
     case "REVISION":
-      return { code: "REVIEW_HIRING", label: "Revisar contratación", helper: "Comprobarás el resumen antes de cerrar la contratación." };
+      return { code: "REVIEW_HIRING", label: t("hiring.action.REVIEW_HIRING.label"), helper: t("hiring.action.REVIEW_HIRING.helper") };
     default:
-      return { code: "NONE", label: "Revisar contratación", helper: "Consulta el detalle de la contratación." };
+      return { code: "NONE", label: t("hiring.action.NONE.label"), helper: t("hiring.action.NONE.helper") };
   }
 }
 
@@ -338,8 +367,9 @@ function resolvePrimaryAction({ status, stage, canConfirm, pendingDocuments, has
  * Etiquetas de dominio en lenguaje cotidiano
  * ------------------------------------------------------------------------- */
 
-export function hiringDocumentTypeLabel(type: string) {
-  return ({ IDENTIFICATION: "Identificación oficial", TAX: "Información fiscal", ELIGIBILITY: "Permiso para trabajar", AGREEMENT: "Contrato o acuerdo", POLICY: "Políticas de la empresa", LICENSE: "Licencia o certificación", OTHER: "Otro documento" } as Record<string, string>)[type] ?? "Documento";
+export function hiringDocumentTypeLabel(type: string, locale: SupportedLocale = "es") {
+  const known = ["IDENTIFICATION", "TAX", "ELIGIBILITY", "AGREEMENT", "POLICY", "LICENSE", "OTHER"];
+  return known.includes(type) ? translate(locale, `hiring.docType.${type}`) : translate(locale, "hiring.docType.fallback");
 }
 
 /**
@@ -347,12 +377,13 @@ export function hiringDocumentTypeLabel(type: string) {
  * para quien contrata. Se traducen aquí y el identificador queda solo en la
  * sección de auditoría.
  */
-export function hiringTemplateLabel(templateKey: string) {
-  return ({ w9: "Formulario W-9 (información fiscal)", i9: "Formulario I-9 (permiso para trabajar)", "food-employee-reporting": "Acuerdo de manipulación de alimentos" } as Record<string, string>)[templateKey] ?? templateKey.replaceAll("-", " ");
+export function hiringTemplateLabel(templateKey: string, locale: SupportedLocale = "es") {
+  const keys: Record<string, string> = { w9: "hiring.template.w9", i9: "hiring.template.i9", "food-employee-reporting": "hiring.template.food" };
+  return keys[templateKey] ? translate(locale, keys[templateKey]) : templateKey.replaceAll("-", " ");
 }
 
-export function hiringWaitingLabel(waitingOn: HiringCaseState["waitingOn"], candidateName: string) {
-  if (waitingOn === "CANDIDATO") return `Esperando a ${candidateName}`;
-  if (waitingOn === "EMPRESA") return "Te toca a ti";
-  return "Sin acciones pendientes";
+export function hiringWaitingLabel(waitingOn: HiringCaseState["waitingOn"], candidateName: string, locale: SupportedLocale = "es") {
+  if (waitingOn === "CANDIDATO") return translate(locale, "hiring.waiting.candidate", { name: candidateName });
+  if (waitingOn === "EMPRESA") return translate(locale, "hiring.waiting.company");
+  return translate(locale, "hiring.waiting.none");
 }

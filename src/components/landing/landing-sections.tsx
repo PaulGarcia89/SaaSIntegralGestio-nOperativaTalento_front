@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { Activity, ArrowRight, BarChart3, BriefcaseBusiness, Building2, CalendarCheck2, Check, ChevronRight, ClipboardCheck, FileCheck2, GraduationCap, Handshake, PackageCheck, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/components/locale-provider";
 
 const modules = [
   { icon: BriefcaseBusiness, title: "Reclutamiento", copy: "Publica vacantes, recibe candidatos y administra cada etapa de selección.", features: ["Vacantes y postulaciones", "Pipeline e entrevistas", "Evaluaciones y ofertas"] },
@@ -12,9 +15,10 @@ const modules = [
 ];
 const lifecycle = [{ label: "Vacante", icon: BriefcaseBusiness }, { label: "Postulación", icon: UserPlus }, { label: "Entrevista", icon: CalendarCheck2 }, { label: "Contratación", icon: Handshake }, { label: "Onboarding", icon: FileCheck2 }, { label: "Capacitación", icon: GraduationCap }, { label: "Empleado", icon: Users }, { label: "Productividad", icon: BarChart3 }];
 
-export function HeroSection() { return <section className="grid gap-10 py-8 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:py-14"><div className="space-y-7"><Badge className="w-fit border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">Una plataforma para todo el ciclo del empleado</Badge><div className="space-y-5"><h1 className="max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">Contrata, capacita y gestiona a tu equipo desde una sola plataforma.</h1><p className="max-w-2xl text-base leading-8 text-slate-200 sm:text-lg">TalentOS conecta reclutamiento, onboarding, capacitación, inventario y productividad para que tu empresa gestione el ciclo del empleado en un solo lugar.</p></div><div className="flex flex-col gap-3 sm:flex-row"><Button asChild size="lg" className="bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-400/20 hover:bg-cyan-300"><Link href="/register-company">Comenzar ahora <ArrowRight className="size-4" /></Link></Button><Button asChild size="lg" variant="secondary" className="border-white/20 bg-white/10 text-white hover:bg-white/15"><a href="#producto">Explorar plataforma</a></Button></div><p className="text-sm text-slate-300">Configura tu empresa, sucursales y módulos según tus necesidades.</p></div><ProductPreview /></section>; }
+export function HeroSection() { const { t } = useLocale(); return <section className="grid gap-10 py-8 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:py-14"><div className="space-y-7"><Badge className="w-fit border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">{t("landing.hero.eyebrow")}</Badge><div className="space-y-5"><h1 className="max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">{t("landing.hero.title")}</h1><p className="max-w-2xl text-base leading-8 text-slate-200 sm:text-lg">{t("landing.hero.description")}</p></div><div className="flex flex-col gap-3 sm:flex-row"><Button asChild size="lg" className="bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-400/20 hover:bg-cyan-300"><Link href="/register-company">{t("landing.hero.start")} <ArrowRight className="size-4" /></Link></Button><Button asChild size="lg" variant="secondary" className="border-white/20 bg-white/10 text-white hover:bg-white/15"><a href="#producto">{t("landing.hero.explore")}</a></Button></div><p className="text-sm text-slate-300">{t("landing.hero.note")}</p></div><ProductPreview /></section>; }
 
 function ProductPreview() {
+  const { t } = useLocale();
   const metrics = [
     ["24", "Vacantes activas", "+12%", "text-cyan-200"],
     ["86", "Nuevos candidatos", "+18%", "text-violet-200"],
@@ -28,11 +32,11 @@ function ProductPreview() {
     <div aria-hidden="true" className="absolute -right-16 -top-16 size-48 rounded-full bg-cyan-400/15 blur-3xl" />
     <div className="relative mb-5 flex items-start justify-between gap-3">
       <div>
-        <div className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,.9)]" /><p className="text-[11px] font-semibold uppercase tracking-[.2em] text-cyan-200">Vista ilustrativa</p></div>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Tu operación conectada</h2>
-        <p className="mt-1 text-xs text-slate-300">Una vista clara de lo que importa hoy.</p>
+        <div className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,.9)]" /><p className="text-[11px] font-semibold uppercase tracking-[.2em] text-cyan-200">{t("landing.preview.illustrative")}</p></div>
+        <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">{t("landing.preview.title")}</h2>
+        <p className="mt-1 text-xs text-slate-300">{t("landing.preview.subtitle")}</p>
       </div>
-      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200/15 bg-emerald-300/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-100"><Activity className="size-3" />En tiempo real</span>
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200/15 bg-emerald-300/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-100"><Activity className="size-3" />{t("landing.preview.realtime")}</span>
     </div>
     <div className="relative grid grid-cols-2 gap-3">
       {metrics.map(([value, label, trend, accent], index) => <div key={label} className="group rounded-2xl border border-white/10 bg-white/[.065] p-3.5 shadow-[inset_0_1px_rgba(255,255,255,.08)] transition duration-300 hover:-translate-y-0.5 hover:bg-white/[.1] sm:p-4">

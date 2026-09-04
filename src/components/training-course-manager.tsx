@@ -557,7 +557,7 @@ function CourseTable(props: Omit<CourseActionsProps, "course"> & { courses: Trai
               </td>
               <td className="px-4 py-4"><CourseStatusBadge status={course.status} /></td>
               <td className="px-4 py-4">{course.tenantId ? "Empresa" : "Global"}</td>
-              <td className="px-4 py-4">{course._count?.modules ?? course.modules?.length ?? 0} módulos · v{course.version}</td>
+              <td className="px-4 py-4">{course._count?.modules ?? course.modules?.length ?? 0} módulos</td>
               <td className="px-4 py-4">{formatDate(course.updatedAt)}</td>
               <td className="px-4 py-4"><CourseActions {...props} course={course} /></td>
             </tr>
@@ -581,7 +581,6 @@ function CourseCard(props: CourseActionsProps) {
       </div>
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div><dt className="text-text-secondary">Alcance</dt><dd>{course.tenantId ? "Empresa" : "Global"}</dd></div>
-        <div><dt className="text-text-secondary">Versión</dt><dd>{course.version}</dd></div>
       </dl>
       <CourseActions {...props} />
     </div>
@@ -736,6 +735,7 @@ function CourseMetadataForm({
         }
       : emptyCourse,
   );
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const save = useMutation({
     mutationFn: () => {
       // Optional URL and text fields must be omitted when empty. Sending an
@@ -786,16 +786,36 @@ function CourseMetadataForm({
       <FormField id="course-summary" label="Resumen">
         {(field) => <textarea {...field} className="min-h-24 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />}
       </FormField>
-      <FormField id="course-description" label="Descripción">
-        {(field) => <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />}
-      </FormField>
-      <FormField id="course-intro-video" label="Video introductorio" description="Opcional. Sirve como apoyo visual y entrada rápida al contenido.">
-        {(field) => <Input {...field} type="url" value={form.introVideoUrl ?? ""} onChange={(event) => setForm({ ...form, introVideoUrl: event.target.value })} placeholder="https://..." />}
-      </FormField>
-      <VisualCourseHint />
-      <FormField id="course-duration" label="Duración estimada (minutos)" description="Puedes ajustar este valor cuando definas las lecciones.">
-        {(field) => <Input {...field} type="number" min={0} value={form.estimatedMinutes} onChange={(event) => setForm({ ...form, estimatedMinutes: Number(event.target.value) })} />}
-      </FormField>
+      <details className="rounded-2xl border border-border-default bg-surface-section" open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
+        <summary className="cursor-pointer list-none p-4 font-semibold">Configuración avanzada <span className="ml-2 text-sm font-normal text-text-secondary">Opcional</span></summary>
+        <div className="space-y-4 border-t border-border-default p-4">
+          <p className="text-sm text-text-secondary">Estos datos mejoran la organización y la presentación, pero no son necesarios para guardar el contenido básico.</p>
+          <FormField id="course-description" label="Descripción">
+            {(field) => <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />}
+          </FormField>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField id="course-difficulty" label="Dificultad">
+              {(field) => <Select value={form.difficulty} onValueChange={(value) => setForm({ ...form, difficulty: value as TrainingCourseInput["difficulty"] })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="BEGINNER">Inicial</SelectItem><SelectItem value="INTERMEDIATE">Intermedia</SelectItem><SelectItem value="ADVANCED">Avanzada</SelectItem></SelectContent></Select>}
+            </FormField>
+            <FormField id="course-language" label="Idioma">
+              {(field) => <Input {...field} value={form.language ?? ""} onChange={(event) => setForm({ ...form, language: event.target.value })} placeholder="es" />}
+            </FormField>
+            <FormField id="course-duration" label="Duración estimada (minutos)" description="Puedes ajustarla cuando definas las lecciones.">
+              {(field) => <Input {...field} type="number" min={0} value={form.estimatedMinutes} onChange={(event) => setForm({ ...form, estimatedMinutes: Number(event.target.value) })} />}
+            </FormField>
+            <FormField id="course-cover" label="Portada" description="URL opcional de la imagen del curso.">
+              {(field) => <Input {...field} type="url" value={form.coverImageUrl ?? ""} onChange={(event) => setForm({ ...form, coverImageUrl: event.target.value })} placeholder="https://..." />}
+            </FormField>
+          </div>
+          <FormField id="course-intro-video" label="Video introductorio" description="Opcional. Sirve como apoyo visual y entrada rápida al contenido.">
+            {(field) => <Input {...field} type="url" value={form.introVideoUrl ?? ""} onChange={(event) => setForm({ ...form, introVideoUrl: event.target.value })} placeholder="https://..." />}
+          </FormField>
+          <FormField id="course-tags" label="Etiquetas" description="Separa las etiquetas con comas para facilitar la búsqueda.">
+            {(field) => <Input {...field} value={(form.tags ?? []).join(", ")} onChange={(event) => setForm({ ...form, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} placeholder="seguridad, operaciones" />}
+          </FormField>
+          <VisualCourseHint />
+        </div>
+      </details>
       <div className="flex justify-end gap-2">
         {showCancel ? <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button> : null}
         <Button type="submit" disabled={save.isPending || Boolean(errors.length)}>{save.isPending ? "Guardando…" : submitLabel ?? "Guardar"}</Button>
@@ -1127,6 +1147,12 @@ function PublishWizardStep({
   const missing = TRAINING_COURSE_WIZARD_STEPS.filter((item) => item.required && item.id !== "PUBLISH" && !wizard.completed[item.id]);
   return (
     <div className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Paso final</p>
+        <h2 className="mt-1 text-2xl font-semibold">Revisión antes de publicar</h2>
+        <p className="mt-1 text-sm text-text-secondary">Confirma el alcance y completa los requisitos antes de cambiar el estado del curso.</p>
+      </div>
+      <PublicationChecklist course={course} wizard={wizard} onGoTo={onGoTo} />
       <EditorSummary course={course} />
       {missing.length ? (
         <InlineFeedback tone="warning" title="El curso todavía no puede enviarse a revisión">
@@ -1148,6 +1174,38 @@ function PublishWizardStep({
         onEdit={() => onGoTo("GENERAL")}
       />
     </div>
+  );
+}
+
+function PublicationChecklist({
+  course,
+  wizard,
+  onGoTo,
+}: {
+  course: TrainingCourseDto;
+  wizard: CourseWizardState;
+  onGoTo: (step: TrainingCourseWizardStep) => void;
+}) {
+  const checks: Array<{ label: string; detail: string; complete: boolean; step: TrainingCourseWizardStep }> = [
+    { label: "Información básica", detail: "Título, resumen y categoría", complete: wizard.completed.GENERAL, step: "GENERAL" },
+    { label: "Fundamento", detail: "Objetivos y audiencia definidos", complete: wizard.completed.FOUNDATION, step: "FOUNDATION" },
+    { label: "Contenido", detail: `${course.modules.length} módulos configurados`, complete: wizard.completed.STRUCTURE, step: "STRUCTURE" },
+    { label: "Evaluación", detail: course.quizzes?.length ? "Evaluación configurada" : "Evaluación recomendada", complete: wizard.completed.ASSESSMENT, step: "ASSESSMENT" },
+    { label: "Vista previa", detail: "Experiencia del participante revisada", complete: wizard.completed.PREVIEW, step: "PREVIEW" },
+  ];
+  return (
+    <Card className="border-primary/20 bg-primary/5">
+      <CardHeader className="pb-3"><CardTitle className="text-base">Checklist de publicación</CardTitle><p className="text-sm text-text-secondary">La publicación conserva la versión y el historial del curso.</p></CardHeader>
+      <CardContent className="space-y-2">
+        {checks.map((check) => (
+          <div key={check.label} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-card p-3">
+            <div className="flex items-start gap-3"><span className={`mt-0.5 flex size-6 items-center justify-center rounded-full ${check.complete ? "bg-status-success-soft text-status-success" : "bg-status-warning-soft text-status-warning"}`}>{check.complete ? <CheckCircle2 className="size-4" /> : <span className="text-xs font-bold">!</span>}</span><div><p className="font-medium">{check.label}</p><p className="text-xs text-text-secondary">{check.detail}</p></div></div>
+            {!check.complete ? <Button type="button" variant="ghost" size="sm" onClick={() => onGoTo(check.step)}>Completar</Button> : <Badge variant="success">Completo</Badge>}
+          </div>
+        ))}
+        <p className="pt-2 text-xs text-text-secondary">Estado actual: <strong className="font-medium text-foreground">{statusLabels[course.status]}</strong> · La validación de calidad se muestra debajo antes de publicar.</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1314,10 +1372,16 @@ function EditorSummary({ course }: { course: TrainingCourseDto }) {
       <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
         <Summary label="Estado"><CourseStatusBadge status={course.status} /></Summary>
         <Summary label="Alcance">{course.tenantId ? "Empresa" : "Global"}</Summary>
-        <Summary label="Versión">{course.version}</Summary>
         <Summary label="Estructura">{course.modules.length} módulos · {lessons} lecciones</Summary>
         <Summary label="Contenido">{blocks} bloques</Summary>
       </CardContent>
+      <details className="border-t border-border-default px-5 py-3 text-sm">
+        <summary className="cursor-pointer font-medium text-text-secondary">Detalles técnicos</summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Summary label="Versión editorial">{course.version}</Summary>
+          <Summary label="Identificador del curso"><span className="break-all font-mono text-xs">{course.id}</span></Summary>
+        </div>
+      </details>
     </Card>
   );
 }

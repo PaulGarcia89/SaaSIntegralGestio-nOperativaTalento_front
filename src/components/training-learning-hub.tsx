@@ -1,12 +1,17 @@
 "use client";
 
 import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
   BookOpen,
   Award,
   CalendarDays,
   CheckCircle2,
   Clock3,
   ClipboardCheck,
+  FilePenLine,
+  ListChecks,
   PlayCircle,
   Plus,
   FlaskConical,
@@ -19,7 +24,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { PageHeader, Pagination } from "@/components/design-system";
@@ -54,6 +59,9 @@ import {
   fetchMyTrainingPilots,
   fetchTrainingOverview,
   fetchTrainingAdminAssignments,
+  fetchTrainingAdminCertificates,
+  fetchTrainingAssessmentResults,
+  fetchTrainingAssessments,
   fetchTrainingCourses,
   fetchTrainingLaunches,
   fetchUsers,
@@ -75,6 +83,7 @@ import type {
   TrainingLaunchStatus,
   TrainingProgressStatus,
   TrainingOverviewDto,
+  PermissionKey,
 } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 import { getLocalTrainingVideo } from "@/lib/training-local-storage";
@@ -98,6 +107,7 @@ const roleTargets = [
 export function TrainingLearningHub() {
   const { can } = useAppStore();
   const router = useRouter();
+  const canManageTraining = can("training.manage");
   const canManageAssignments = can("courses.assign");
 
   return (
@@ -108,8 +118,11 @@ export function TrainingLearningHub() {
         description="Continúa tus cursos y consulta claramente qué formación requiere tu atención."
         actions={<div className="flex flex-wrap gap-2"><Button asChild variant="secondary"><Link href="/training/evaluations"><ClipboardCheck className="size-4" />Mis evaluaciones</Link></Button><Button asChild variant="secondary"><Link href="/training/certificates"><Award className="size-4" />Mis certificados</Link></Button></div>}
       />
-      <Tabs defaultValue="mine">
+      <Tabs defaultValue={canManageTraining ? "priorities" : "mine"}>
         <TabsList aria-label="Secciones de aprendizaje">
+          {canManageTraining ? (
+            <TabsTrigger value="priorities">Prioridades</TabsTrigger>
+          ) : null}
           <TabsTrigger value="mine">Mis cursos</TabsTrigger>
           {canManageAssignments ? (
             <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
@@ -117,7 +130,15 @@ export function TrainingLearningHub() {
           {canManageAssignments ? (
             <TabsTrigger value="launches">Lanzamientos</TabsTrigger>
           ) : null}
+          {canManageAssignments ? (
+            <TabsTrigger value="tracking">Supervisión</TabsTrigger>
+          ) : null}
         </TabsList>
+        {canManageTraining ? (
+          <TabsContent value="priorities" className="mt-6">
+            <AdminLearningPriorities can={can} />
+          </TabsContent>
+        ) : null}
         <TabsContent value="mine" className="mt-6">
           <MyPilots onOpen={(id) => router.push(`/training/learn/${id}`)} />
           <MyCourses onOpen={(id) => router.push(`/training/learn/${id}`)} />
@@ -132,9 +153,197 @@ export function TrainingLearningHub() {
             <LaunchManagement />
           </TabsContent>
         ) : null}
+        {canManageTraining ? (
+          <TabsContent value="tracking" className="mt-6">
+            <AdminLearningTracking />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   );
+}
+
+function AdminLearningPriorities({ can }: { can: (permission: PermissionKey) => boolean }) {
+  const assignments = useQuery({
+    queryKey: ["training-admin-priority-assignments"],
+    queryFn: () => fetchTrainingAdminAssignments({ page: 1, pageSize: 8 }),
+  });
+  const courses = useQuery({
+    queryKey: ["training-admin-priority-courses"],
+    queryFn: () => fetchTrainingCourses({ page: 1, pageSize: 100 }),
+    enabled: can("courses.view"),
+  });
+  const assessments = useQuery({
+    queryKey: ["training-admin-priority-assessments"],
+    queryFn: fetchTrainingAssessments,
+    enabled: can("assessments.manage"),
+  });
+
+  const assignmentSummary = assignments.data?.summary;
+  const draftCourses = courses.data?.items.filter((course) => course.status === "DRAFT").length ?? 0;
+  const reviewCourses = courses.data?.items.filter((course) => course.status === "IN_REVIEW").length ?? 0;
+  const incompleteAssessments = assessments.data?.items.filter((assessment) => !assessment.readiness?.ready).length ?? 0;
+  const attentionCount = (assignmentSummary?.overdue ?? 0) + reviewCourses + incompleteAssessments;
+  const loading = assignments.isLoading || courses.isLoading || assessments.isLoading;
+
+  if (loading) return <AsyncState state="loading" title="Cargando prioridades de aprendizaje" />;
+  if (assignments.isError) {
+    return <AsyncState state="error" title="No fue posible cargar las prioridades" description={getApiErrorMessage(assignments.error, "Reintenta para continuar.")} onRetry={() => void assignments.refetch()} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-3xl border border-primary/20 bg-primary/5 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Administración</p>
+            <h2 className="mt-1 text-2xl font-semibold">Qué requiere atención</h2>
+            <p className="mt-1 max-w-2xl text-sm text-text-secondary">Gestiona el ciclo completo: crea, valida, publica, asigna y supervisa desde una única bandeja.</p>
+          </div>
+          <Badge variant={attentionCount ? "warning" : "success"}>{attentionCount ? `${attentionCount} pendientes` : "Todo al día"}</Badge>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <PriorityMetric label="Asignaciones vencidas" value={assignmentSummary?.overdue ?? 0} tone="danger" />
+          <PriorityMetric label="Cursos en revisión" value={reviewCourses} tone="warning" />
+          <PriorityMetric label="Evaluaciones incompletas" value={incompleteAssessments} tone="warning" />
+        </div>
+      </section>
+
+      <section aria-labelledby="learning-admin-actions" className="space-y-3">
+        <div>
+          <h2 id="learning-admin-actions" className="text-lg font-semibold">Acciones del ciclo</h2>
+          <p className="text-sm text-text-secondary">Cada acción abre el área especializada sin perder el contexto operativo.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <AdminActionCard icon={<FilePenLine className="size-5" />} title="Crear contenido" description={`${draftCourses} cursos en borrador`} href="/training/content" />
+          <AdminActionCard icon={<ListChecks className="size-5" />} title="Validar" description={`${reviewCourses} cursos en revisión`} href="/training/content?status=IN_REVIEW" />
+          <AdminActionCard icon={<Rocket className="size-5" />} title="Publicar y asignar" description="Distribuye cursos publicados" href="/training" />
+          <AdminActionCard icon={<BarChart3 className="size-5" />} title="Supervisar y cerrar" description="Resultados, certificados y mejoras" href="/training/results" />
+        </div>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+        <AdminAttentionQueue
+          assignments={assignments.data?.items ?? []}
+          courses={courses.data?.items ?? []}
+          assessments={assessments.data?.items ?? []}
+        />
+
+        <Card>
+          <CardHeader><CardTitle>Siguiente acción recomendada</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {assignmentSummary?.overdue ? <PriorityNextStep icon={<AlertTriangle className="size-5" />} title="Resolver vencimientos" description="Revisa las asignaciones vencidas y contacta a las personas responsables." href="#admin-assignments" /> : reviewCourses ? <PriorityNextStep icon={<ListChecks className="size-5" />} title="Completar validaciones" description="Hay cursos esperando revisión antes de publicar." href="/training/content?status=IN_REVIEW" /> : incompleteAssessments ? <PriorityNextStep icon={<ClipboardCheck className="size-5" />} title="Completar evaluaciones" description="Algunas evaluaciones todavía no están listas para usarse." href="/training/evaluations" /> : <PriorityNextStep icon={<CheckCircle2 className="size-5" />} title="Mantener el ciclo" description="No hay bloqueos críticos. Consulta resultados o crea nuevo contenido." href="/training/results" />}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function AdminAttentionQueue({
+  assignments,
+  courses,
+  assessments,
+}: {
+  assignments: TrainingAssignmentDto[];
+  courses: Array<{ id: string; title: string; status: string }>;
+  assessments: Array<{ id: string; title: string; course?: { title: string }; readiness?: { ready: boolean } }>;
+}) {
+  const overdueAssignments = assignments.filter((item) => (item.effectiveStatus ?? item.status) === "OVERDUE").slice(0, 4);
+  const reviewCourses = courses.filter((course) => course.status === "IN_REVIEW").slice(0, 4);
+  const incompleteAssessments = assessments.filter((assessment) => !assessment.readiness?.ready).slice(0, 4);
+  const total = overdueAssignments.length + reviewCourses.length + incompleteAssessments.length;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div><CardTitle>Cola de atención</CardTitle><p className="mt-1 text-sm text-text-secondary">Pendientes agrupados por tipo, responsable y resolución.</p></div>
+        <Badge variant={total ? "warning" : "success"}>{total ? `${total} pendientes` : "Sin pendientes"}</Badge>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {overdueAssignments.map((item) => (
+          <AdminAttentionItem key={`assignment-${item.id}`} tone="danger" label="Asignación vencida" title={item.course?.title ?? item.title} detail={`${item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"} · ${item.progressPercent}%`} owner={item.assignedBy ? `${item.assignedBy.firstName} ${item.assignedBy.lastName}` : "Responsable de formación"} action="Revisar asignación" href="#admin-assignments" />
+        ))}
+        {reviewCourses.map((course) => (
+          <AdminAttentionItem key={`course-${course.id}`} tone="warning" label="Curso en revisión" title={course.title} detail="Validar gates antes de publicar" owner="Responsable de contenido" action="Abrir revisión" href={`/training/content/${encodeURIComponent(course.id)}`} />
+        ))}
+        {incompleteAssessments.map((assessment) => (
+          <AdminAttentionItem key={`assessment-${assessment.id}`} tone="warning" label="Evaluación incompleta" title={assessment.title} detail={assessment.course?.title ?? "Curso sin especificar"} owner="Responsable de evaluación" action="Completar evaluación" href="/training/evaluations" />
+        ))}
+        {!total ? <p className="py-6 text-center text-sm text-text-secondary">No hay cursos, asignaciones o evaluaciones que requieran atención.</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AdminAttentionItem({
+  tone,
+  label,
+  title,
+  detail,
+  owner,
+  action,
+  href,
+}: {
+  tone: "danger" | "warning";
+  label: string;
+  title: string;
+  detail: string;
+  owner: string;
+  action: string;
+  href: string;
+}) {
+  return <div className="flex flex-col gap-3 rounded-xl border border-border-default p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant={tone === "danger" ? "destructive" : "secondary"}>{label}</Badge><span className="truncate font-medium">{title}</span></div><p className="mt-1 text-xs text-text-secondary">{detail}</p><p className="mt-1 text-xs text-text-secondary">Responsable: <strong className="font-medium text-foreground">{owner}</strong></p></div><Button asChild size="sm" variant="secondary" className="shrink-0"><Link href={href}>{action}<ArrowRight className="size-4" /></Link></Button></div>;
+}
+
+function AdminLearningTracking() {
+  const [courseId, setCourseId] = useState("ALL");
+  const [status, setStatus] = useState("ALL");
+  const [owner, setOwner] = useState("ALL");
+  const assignments = useQuery({ queryKey: ["training-admin-tracking-assignments"], queryFn: () => fetchTrainingAdminAssignments({ page: 1, pageSize: 100 }) });
+  const courses = useQuery({ queryKey: ["training-admin-tracking-courses"], queryFn: () => fetchTrainingCourses({ page: 1, pageSize: 100 }) });
+  const certificates = useQuery({ queryKey: ["training-admin-tracking-certificates"], queryFn: fetchTrainingAdminCertificates });
+  const results = useQuery({ queryKey: ["training-admin-tracking-results"], queryFn: () => fetchTrainingAssessmentResults(1) });
+
+  if (assignments.isLoading || courses.isLoading || certificates.isLoading || results.isLoading) return <AsyncState state="loading" title="Cargando supervisión" />;
+  if (assignments.isError) return <AsyncState state="error" title="No fue posible cargar la supervisión" description={getApiErrorMessage(assignments.error, "Reintenta para continuar.")} onRetry={() => void assignments.refetch()} />;
+
+  const allAssignments = assignments.data?.items ?? [];
+  const owners = Array.from(new Map(allAssignments.filter((item) => item.assignedBy).map((item) => [item.assignedBy!.id, `${item.assignedBy!.firstName} ${item.assignedBy!.lastName}`])).entries());
+  const filtered = allAssignments.filter((item) => {
+    const itemStatus = item.effectiveStatus ?? item.status;
+    return (courseId === "ALL" || item.courseId === courseId) && (status === "ALL" || itemStatus === status) && (owner === "ALL" || item.assignedBy?.id === owner);
+  });
+  const overdue = filtered.filter((item) => (item.effectiveStatus ?? item.status) === "OVERDUE").length;
+  const completed = filtered.filter((item) => (item.effectiveStatus ?? item.status) === "COMPLETED").length;
+  const inProgress = filtered.filter((item) => (item.effectiveStatus ?? item.status) === "IN_PROGRESS").length;
+  const certificatesForCourse = (certificates.data?.items ?? []).filter((item) => courseId === "ALL" || item.course?.id === courseId);
+  const resultsForCourse = (results.data?.items ?? []).filter((item) => courseId === "ALL" || item.quiz?.courseId === courseId);
+
+  return (
+    <div className="space-y-5">
+      <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Seguimiento</p><h2 className="mt-1 text-2xl font-semibold">Progreso y resultados</h2><p className="mt-1 text-sm text-text-secondary">Consulta avance, vencimientos, evaluaciones y certificados en el mismo contexto.</p></div>
+      <Card><CardContent className="grid gap-3 p-4 md:grid-cols-3"><div><Label htmlFor="tracking-course">Curso</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger id="tracking-course"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Todos los cursos</SelectItem>{(courses.data?.items ?? []).map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="tracking-status">Estado</Label><Select value={status} onValueChange={setStatus}><SelectTrigger id="tracking-status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Todos los estados</SelectItem>{Object.entries(statusLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="tracking-owner">Responsable</Label><Select value={owner} onValueChange={setOwner}><SelectTrigger id="tracking-owner"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Todos los responsables</SelectItem>{owners.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></div></CardContent></Card>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><TrackingMetric label="Asignaciones" value={filtered.length} /><TrackingMetric label="En progreso" value={inProgress} /><TrackingMetric label="Completadas" value={completed} tone="success" /><TrackingMetric label="Vencidas" value={overdue} tone="danger" /><TrackingMetric label="Certificados" value={certificatesForCourse.length} tone="success" /></div>
+      <Card><CardHeader className="flex flex-row items-start justify-between gap-3"><div><CardTitle>Detalle de supervisión</CardTitle><p className="mt-1 text-sm text-text-secondary">{filtered.length} asignaciones · {resultsForCourse.length} intentos de evaluación · {certificatesForCourse.length} certificados</p></div><Button asChild variant="secondary" size="sm"><Link href="/training/results">Ver resultados <ArrowRight className="size-4" /></Link></Button></CardHeader><CardContent className="space-y-2">{filtered.slice(0, 12).map((item) => <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-border-default p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-medium">{item.course?.title ?? item.title}</p><p className="text-xs text-text-secondary">{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"} · Responsable: {item.assignedBy ? `${item.assignedBy.firstName} ${item.assignedBy.lastName}` : "No asignado"}</p></div><div className="flex items-center gap-3"><span className="text-sm">{item.progressPercent}%</span><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : (item.effectiveStatus ?? item.status) === "COMPLETED" ? "success" : "secondary"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge></div></div>)}{!filtered.length ? <p className="py-8 text-center text-sm text-text-secondary">No hay datos para los filtros seleccionados.</p> : null}</CardContent></Card>
+    </div>
+  );
+}
+
+function TrackingMetric({ label, value, tone = "normal" }: { label: string; value: number; tone?: "normal" | "success" | "danger" }) {
+  return <Card><CardContent className="p-4"><p className="text-xs text-text-secondary">{label}</p><p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p></CardContent></Card>;
+}
+
+function PriorityMetric({ label, value, tone }: { label: string; value: number; tone: "danger" | "warning" }) {
+  return <div className="rounded-2xl border border-border-default bg-card p-4"><p className="text-xs text-text-secondary">{label}</p><p className={`mt-1 text-3xl font-semibold ${tone === "danger" ? "text-status-danger" : "text-status-warning"}`}>{value}</p></div>;
+}
+
+function AdminActionCard({ icon, title, description, href }: { icon: ReactNode; title: string; description: string; href: string }) {
+  return <Link href={href} className="group rounded-2xl border border-border-default bg-card p-4 transition-colors hover:border-primary/50 hover:bg-primary/5"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</span><span className="mt-4 block font-semibold">{title}</span><span className="mt-1 block text-sm text-text-secondary">{description}</span><span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">Abrir <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></span></Link>;
+}
+
+function PriorityNextStep({ icon, title, description, href }: { icon: ReactNode; title: string; description: string; href: string }) {
+  return <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-card text-primary">{icon}</span><div><p className="font-semibold">{title}</p><p className="mt-1 text-sm text-text-secondary">{description}</p><Button asChild className="mt-4" size="sm"><Link href={href}>Resolver <ArrowRight className="size-4" /></Link></Button></div></div></div>;
 }
 
 function MyPilots({ onOpen }: { onOpen: (courseId: string) => void }) {
@@ -321,14 +530,23 @@ function LearnerTrainingSummary({
                     ? "Retoma donde lo dejaste para mantener tu avance."
                     : "Empieza esta formación cuando tengas disponibilidad."}
               </p>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={nextAssignment.effectiveStatus === "OVERDUE" ? "destructive" : nextAssignment.effectiveStatus === "COMPLETED" ? "success" : "secondary"}>
+                  {statusLabels[nextAssignment.effectiveStatus ?? nextAssignment.status]}
+                </Badge>
                 <span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" />{nextAssignment.estimatedMinutes} min</span>
-                {nextAssignment.dueAt ? <span className="inline-flex items-center gap-1"><CalendarDays className="size-3.5" />Vence {formatDate(nextAssignment.dueAt)}</span> : null}
+                {nextAssignment.dueAt ? <span className={`inline-flex items-center gap-1 ${nextAssignment.effectiveStatus === "OVERDUE" ? "font-semibold text-status-danger" : "text-muted-foreground"}`}><CalendarDays className="size-3.5" />{nextAssignment.effectiveStatus === "OVERDUE" ? "Venció" : "Vence"} {formatDate(nextAssignment.dueAt)}</span> : <span className="text-xs text-muted-foreground">Sin fecha límite</span>}
                 {nextAssignment.isRequired ? <Badge variant="secondary">Obligatorio</Badge> : null}
               </div>
+              {getTrainingStartBlocker(nextAssignment) ? (
+                <div className="flex items-start gap-2 rounded-xl border border-status-warning/30 bg-status-warning-soft/40 p-3 text-sm text-status-warning" role="status">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <div><strong>Bloqueo:</strong> {getTrainingStartBlocker(nextAssignment)}</div>
+                </div>
+              ) : null}
               <Button className="w-full sm:w-auto" disabled={!nextAssignment.courseId} onClick={() => nextAssignment.courseId && onOpen(nextAssignment.courseId)}>
                 <PlayCircle className="size-4" />
-                {nextAssignment.effectiveStatus === "IN_PROGRESS" ? "Continuar" : "Abrir formación"}
+                {nextAssignment.effectiveStatus === "IN_PROGRESS" ? "Continuar formación" : nextAssignment.effectiveStatus === "OVERDUE" ? "Revisar formación" : "Iniciar formación"}
               </Button>
             </>
           ) : <p className="text-sm text-muted-foreground">Has completado todas las formaciones asignadas.</p>}
@@ -345,6 +563,13 @@ function SummaryMetric({ label, value, tone = "normal" }: { label: string; value
       <p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p>
     </div>
   );
+}
+
+function getTrainingStartBlocker(assignment: TrainingAssignmentDto) {
+  const status = assignment.effectiveStatus ?? assignment.status;
+  if (status === "OVERDUE") return "La fecha límite ya pasó. Revisa con tu responsable si necesitas una nueva fecha.";
+  if (!assignment.courseId) return "Esta asignación no tiene un curso disponible. Contacta con quien la asignó.";
+  return null;
 }
 
 function AssignmentCard({
@@ -671,7 +896,7 @@ function AssignmentManagement() {
   });
 
   return (
-    <div className="space-y-5">
+    <div id="admin-assignments" className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold">Seguimiento de asignaciones</h2>
@@ -843,10 +1068,24 @@ export type VideoProgressEvent = {
 
 export function CourseContent({ course, onVideoProgress }: { course: LearnerTrainingCourseDto; onVideoProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
   const lessons = course.modules.flatMap((module) => module.lessons);
+  const currentLesson = lessons.find((lesson) => lesson.isRequired && !lesson.completed) ?? null;
+  const pendingQuiz = course.quizSummary?.find((quiz) => !quiz.latestAttempt?.passed);
   return <div className="space-y-5">
     <div className="rounded-xl bg-muted p-4" aria-live="polite"><div className="flex justify-between text-sm"><span>Avance general</span><strong>{course.progress?.progressPercent ?? 0}%</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-primary" style={{ width: `${course.progress?.progressPercent ?? 0}%` }} /></div></div>
-    {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => { const index = lessons.findIndex((item) => item.id === lesson.id); const nextLesson = lessons[index + 1]; return <div id={`lesson-${lesson.id}`} key={lesson.id} className="scroll-mt-6 rounded-xl border p-4"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div><div className="mt-4 space-y-3">{lesson.videoUrl ? <VideoLesson key={`${lesson.id}-video`} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} /> : <LocalVideoLesson courseId={course.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} onProgress={onVideoProgress} />}{lesson.blocks.map((block) => lesson.type === "VIDEO" && block.type === "VIDEO" ? null : block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-primary underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="size-4" />Completada y guardada</p> : null}{nextLesson ? <a href={`#lesson-${nextLesson.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline">Siguiente lección: {nextLesson.title} <span className="ml-1" aria-hidden="true">→</span></a> : lesson.completed ? <p className="mt-4 text-sm font-medium text-emerald-700">Has completado todo el contenido disponible.</p> : null}</div>; })}</CardContent></Card>)}
+    <CourseCurrentStep course={course} currentLesson={currentLesson} pendingQuiz={pendingQuiz} />
+    {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => { const index = lessons.findIndex((item) => item.id === lesson.id); const nextLesson = lessons[index + 1]; const isCurrent = currentLesson?.id === lesson.id; return <div id={`lesson-${lesson.id}`} key={lesson.id} aria-current={isCurrent ? "step" : undefined} className={`scroll-mt-6 rounded-xl border p-4 ${isCurrent ? "border-primary bg-primary/5 shadow-sm" : ""}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div>{isCurrent ? <Badge>Ahora</Badge> : lesson.completed ? <Badge variant="success">Completada</Badge> : null}</div><div className="mt-4 space-y-3">{lesson.videoUrl ? <VideoLesson key={`${lesson.id}-video`} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} /> : <LocalVideoLesson courseId={course.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} onProgress={onVideoProgress} />}{lesson.blocks.map((block) => lesson.type === "VIDEO" && block.type === "VIDEO" ? null : block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-primary underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="size-4" />Completada y guardada</p> : null}{nextLesson ? <a href={`#lesson-${nextLesson.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline">Siguiente lección: {nextLesson.title} <span className="ml-1" aria-hidden="true">→</span></a> : lesson.completed ? <p className="mt-4 text-sm font-medium text-emerald-700">Has completado todo el contenido disponible.</p> : null}</div>; })}</CardContent></Card>)}
+    {course.progress?.status === "COMPLETED" ? <Card className="border-status-success/30 bg-status-success-soft/30"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="font-semibold">Formación completada</p><p className="text-sm text-muted-foreground">Consulta si tienes una credencial disponible.</p></div><Button asChild variant="secondary"><Link href="/training/certificates"><Award className="size-4" />Ver certificado</Link></Button></CardContent></Card> : null}
   </div>;
+}
+
+function CourseCurrentStep({ course, currentLesson, pendingQuiz }: { course: LearnerTrainingCourseDto; currentLesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number] | null; pendingQuiz?: NonNullable<LearnerTrainingCourseDto["quizSummary"]>[number] }) {
+  if (currentLesson) {
+    return <Card className="border-primary/30 bg-primary/5"><CardHeader className="pb-3"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Ahora</p><CardTitle className="text-lg">{currentLesson.title}</CardTitle><p className="text-sm text-muted-foreground">{currentLesson.description || "Continúa con la siguiente lección obligatoria."}</p></CardHeader><CardContent className="flex flex-wrap items-center gap-3 pt-0"><Badge variant="secondary">{currentLesson.estimatedMinutes ?? 0} min</Badge><span className="text-sm text-muted-foreground">La lección actual está resaltada en el contenido.</span></CardContent></Card>;
+  }
+  if (pendingQuiz) {
+    return <Card className="border-primary/30 bg-primary/5"><CardHeader className="pb-3"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Siguiente paso</p><CardTitle className="text-lg">Completar {pendingQuiz.title}</CardTitle><p className="text-sm text-muted-foreground">Necesitas demostrar el aprendizaje antes de cerrar esta formación.</p></CardHeader><CardContent className="pt-0"><Button asChild><Link href={`/training/evaluations?courseId=${encodeURIComponent(course.id)}`}><ClipboardCheck className="size-4" />Comenzar evaluación</Link></Button></CardContent></Card>;
+  }
+  return <Card className="border-status-success/30 bg-status-success-soft/30"><CardContent className="flex items-center gap-3 p-4"><CheckCircle2 className="size-5 text-status-success" /><div><p className="font-semibold">Contenido completado</p><p className="text-sm text-muted-foreground">No hay lecciones pendientes en este curso.</p></div></CardContent></Card>;
 }
 
 function LocalVideoLesson({ courseId, lesson, assignmentId, onProgress }: { courseId: string; lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {

@@ -46,5 +46,5 @@ export function HiringConfirmDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="button" variant="destructive" onClick={() => { onConfirm(); onOpenChange(false); }}>{confirmLabel}</Button></div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader><p className="text-xs text-text-secondary">Revisa responsable, documentos y firmas antes de continuar. Esta acción no se puede deshacer desde aquí.</p><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="button" variant="destructive" onClick={() => { onConfirm(); onOpenChange(false); }}>{confirmLabel}</Button></div></DialogContent></Dialog>;
 }

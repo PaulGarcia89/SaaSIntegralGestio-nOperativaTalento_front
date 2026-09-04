@@ -1568,7 +1568,7 @@ function TaskRow({
 }) {
   return (
     <Card level={task.overdue || task.blocked ? 1 : 2}>
-      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start">
+      <CardContent className="flex min-w-0 flex-col gap-4 p-4">
         <div
           className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
             task.status === "COMPLETED"
@@ -1605,7 +1605,7 @@ function TaskRow({
           ) : null}
         </div>
         {canManage ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2 border-t border-border-default pt-3">
             <Button size="sm" variant="secondary" onClick={onAssign}>
               <Pencil className="size-4" />
               Asignar

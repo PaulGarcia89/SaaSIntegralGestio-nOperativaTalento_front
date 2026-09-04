@@ -8,6 +8,15 @@ import { waitForStableScreen } from "../support/e2e-stabilize";
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /**
+ * `public/sw.js` se registra en producción y responde a **todas** las peticiones
+ * GET del mismo origen con `event.respondWith(fetch(...))`. Esa refetch ocurre
+ * en el ámbito del service worker, que Playwright no enruta por omisión, así
+ * que `page.route()` nunca llegaría a interceptar `/auth/preferences` y el tema
+ * forzado no se aplicaría. Bloquearlo también elimina respuestas cacheadas.
+ */
+test.use({ serviceWorkers: "block" });
+
+/**
  * Auditoría de accesibilidad de las superficies internas.
  *
  * Cubre las 22 pantallas del catálogo compartido en tema claro y oscuro. El
@@ -70,8 +79,15 @@ test.describe("accesibilidad autenticada", () => {
           )
           .join("\n");
 
+        // Se compara un resumen compacto en lugar del objeto completo de axe:
+        // el diff de `violations` ocupa cientos de líneas de JSON y esconde la
+        // información util. El detalle accionable va en el mensaje.
+        const summary = results.violations.map(
+          (violation) => `${violation.id} (${violation.impact ?? "sin impacto"}) x${violation.nodes.length}`,
+        );
+
         expect(
-          results.violations,
+          summary,
           `${surface.name} (${surface.path}) en tema ${theme}:\n${detail}`,
         ).toEqual([]);
       });

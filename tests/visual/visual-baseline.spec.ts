@@ -18,6 +18,14 @@ import { FIXED_CLOCK, masksFor, prepareForScreenshot } from "../support/e2e-stab
  * `pnpm test:visual:update`. Una captura que cambia sin que nadie lo esperara
  * es exactamente lo que esta suite existe para detectar.
  */
+/**
+ * Se bloquea `public/sw.js` por el mismo motivo que en la suite de
+ * accesibilidad: intercepta todas las GET del mismo origen, impide que
+ * `page.route()` fuerce el tema y puede servir respuestas cacheadas que harían
+ * inestable la captura.
+ */
+test.use({ serviceWorkers: "block" });
+
 test.describe("linea base visual", () => {
   test.beforeEach(async ({ page }) => {
     // Fija el instante para que las horas relativas y absolutas no muevan píxeles.

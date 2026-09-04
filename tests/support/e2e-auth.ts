@@ -19,6 +19,7 @@ export type E2ERole =
   | "SUPERVISOR"
   | "INVENTORY_MANAGER"
   | "BRANCH_USER"
+  | "TENANT_EMPLEADO"
   | "CANDIDATE";
 
 export type E2ECredentials = { email: string; password: string };
@@ -49,10 +50,16 @@ export async function signIn(page: Page, role: E2ERole) {
   }
 
   await page.goto("/login");
-  await page.getByLabel("Correo corporativo").fill(email);
+  // Se localiza por `id` y no por texto de etiqueta: el rótulo del campo ya
+  // cambió una vez ("Correo corporativo" -> "Correo electrónico") y dejó rotas
+  // las suites que dependían del texto. Los `id` son parte del contrato del
+  // formulario (los usa `htmlFor`), así que son la referencia estable.
+  await page.locator("#login-email").fill(email);
   await page.locator("#login-password").fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await page.waitForURL((url) => !/\/login(?:\?|$)/.test(url.pathname + url.search));
+  await page.getByRole("button", { name: /Iniciar sesión/i }).click();
+  await page.waitForURL((url) => !/\/login(?:\?|$)/.test(url.pathname + url.search), {
+    timeout: 30_000,
+  });
 }
 
 /**
@@ -73,7 +80,25 @@ export const ACCESS_DENIED_PATTERN =
  */
 export async function openSurface(page: Page, path: string) {
   await page.goto(path);
-  await page.locator("main").first().waitFor({ state: "visible" });
-  const denied = await page.getByText(ACCESS_DENIED_PATTERN).first().isVisible().catch(() => false);
-  return !denied;
+
+  // No basta con esperar a `main`: `AccessLoading` y `AccessDenied` también
+  // renderizan uno, así que comprobar el texto justo despues devolvía "hay
+  // acceso" mientras la pantalla todavía estaba verificando la sesión.
+  //
+  // La señal inequívoca es el `id`: solo el shell autenticado renderiza
+  // `<main id="main-content">` (`app-shell.tsx`). Las pantallas de carga y de
+  // acceso denegado renderizan un `<main>` sin ese identificador.
+  const authorized = page.locator("main#main-content");
+  const denied = page.getByRole("heading", { name: /No tienes acceso a esta sección/i });
+
+  const outcome = await Promise.race([
+    authorized.waitFor({ state: "visible", timeout: 30_000 }).then(() => "authorized" as const),
+    denied.waitFor({ state: "visible", timeout: 30_000 }).then(() => "denied" as const),
+  ]).catch(() => "unknown" as const);
+
+  if (outcome === "unknown") {
+    throw new Error(`No se pudo determinar el estado de ${path}: ni shell autenticado ni acceso denegado.`);
+  }
+
+  return outcome === "authorized";
 }

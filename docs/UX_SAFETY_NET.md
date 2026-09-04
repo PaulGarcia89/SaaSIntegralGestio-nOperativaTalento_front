@@ -189,6 +189,33 @@ activos del tenant de pruebas. Si quieres cobertura completa, el tenant de
 pruebas debe tener habilitados `ats`, `onboarding`, `training`,
 `asset_inventory`, `restaurant_inventory`, `productivity` y `admin`.
 
+### Omisión pendiente: inventario de restaurante
+
+`RESTAURANT_INVENTORY` está **deshabilitado en todos los tenants sembrados**
+salvo `datalink-tech-corp`, que es una cuenta personal y no debe usarse para
+pruebas automatizadas. Por eso `/inventory/restaurant` se omite y quedan 36
+capturas en lugar de 39.
+
+Es la omisión más costosa del catálogo: es el módulo con más pantallas (37
+rutas) y el que la auditoría señala como más crítico. Para incorporarlo, activa
+la capacidad en el tenant de pruebas:
+
+```sql
+UPDATE "TenantInventoryCapability" c
+SET enabled = true, "activatedAt" = now(), "deactivatedAt" = NULL, "updatedAt" = now()
+FROM "Tenant" t
+WHERE t.id = c."tenantId"
+  AND t.slug = 'talentos-cloud-usa'
+  AND c.code = 'RESTAURANT_INVENTORY';
+```
+
+```bash
+docker exec talento-postgres psql -U talento -d saas_integral -f -   # con el SQL anterior
+pnpm test:visual:update                                             # regenera 39 capturas
+```
+
+Para revertirlo, el mismo `UPDATE` con `enabled = false`.
+
 ---
 
 ## Puerta de calidad antes de cada merge
@@ -198,18 +225,50 @@ pnpm certify       # typecheck + lint + unit + build + audit de producción
 pnpm test:visual   # línea base visual
 ```
 
-### Línea base medida el 2026-09-03
+### Línea base medida el 2026-09-04
+
+Entorno: stack local `docker-compose.self-hosted.yml` en `http://localhost`,
+datos sembrados, 6 cuentas reales.
 
 | Comprobación | Resultado |
 |---|---|
 | `pnpm typecheck` | ✅ sin errores |
 | `pnpm lint` | ✅ 0 errores · ⚠️ 36 avisos (todos `no-unused-vars`) |
 | `pnpm test` (vitest) | ✅ 27 archivos · 124 pruebas |
+| `pnpm test:visual` | ✅ 39 capturas · estable en pasadas consecutivas |
+| `pnpm test:a11y:internal` | ❌ 44 fallos · 20 pasan · 3 omitidas → **13 fallos · 54 pasan** tras la fase 1 |
 
-Los 36 avisos son componentes definidos y nunca usados —código muerto en los
-workspaces de restaurante, formación e inventario—. Se eliminan en la fase 3
-del plan; se dejan documentados aquí para que la cifra no se confunda con una
-regresión introducida después.
+Los 36 avisos de lint son componentes definidos y nunca usados —código muerto
+en los workspaces de restaurante, formación e inventario—. Se eliminan en la
+fase 3 del plan; se documentan aquí para que la cifra no se confunda después
+con una regresión.
+
+#### Accesibilidad: punto de partida real
+
+**Punto de partida (antes de la fase 1): las 21 pantallas auditables incumplían
+WCAG 2.2 AA en ambos temas. Ninguna pasaba.**
+
+| Regla axe | Impacto | Pantallas afectadas (de 42 ejecuciones) |
+|---|---|---|
+| `color-contrast` | serious | **42** — todas |
+| `link-name` | serious | **42** — todas |
+| `button-name` | **critical** | 8 → `/ats/analytics`, `/ats/interviews`, `/onboarding/documents`, `/admin/users` |
+| `label` | **critical** | 4 → `/ats/analytics`, `/ats/candidates` |
+| `scrollable-region-focusable` | serious | 2 |
+
+Que `color-contrast` y `link-name` fallen en **todas** las pantallas confirma el
+diagnóstico de `UX_UI_AUDIT.md`: no son defectos de pantalla, son defectos de
+las primitivas compartidas. Se corrigen una vez en `components/ds/`, no 21
+veces.
+
+#### Responsive: dos desbordamientos reales
+
+| Pantalla | Desbordamiento |
+|---|---|
+| `/training` | **253 px a 320 px** |
+| `/ats/analytics` | 18 px a 320 px |
+
+Las otras 19 pantallas se adaptan correctamente de 320 a 1280 px.
 
 ---
 
@@ -224,3 +283,47 @@ tests/e2e/authenticated-accessibility.spec.ts   auditoría axe + barrido de anch
 tests/visual/visual-baseline.spec.ts            línea base visual
 playwright.visual.config.ts        configuración aparte de la suite E2E
 ```
+
+---
+
+## Resultado de la fase 1 (tokens y primitivas)
+
+Medido el 2026-09-04 contra el mismo entorno.
+
+| Regla axe | Antes | Después | Cambio |
+|---|---|---|---|
+| `link-name` | 42 | **0** | eliminada |
+| `color-contrast` | 42 | **2** | −95 % |
+| `button-name` (crítico) | 8 | 8 | pendiente |
+| `label` (crítico) | 4 | 4 | pendiente |
+| `scrollable-region-focusable` | 2 | 2 | pendiente |
+| **Total de pruebas** | 44 fallan · 20 pasan | **13 fallan · 54 pasan** | |
+
+### Qué lo consiguió
+
+1. **`breadcrumb.tsx`** — el enlace de inicio contenía solo un icono, sin nombre
+   accesible. Un componente compartido causaba las 42 violaciones de
+   `link-name`.
+2. **`tenant-branding.ts`** — se separó el color de marca de **relleno** del de
+   **texto**. El acento del tenant se inyectaba en `--primary` y se usaba como
+   color de texto sin validar contraste: con `#2563EB` daba 2,82:1 sobre la
+   barra lateral y 3,14:1 sobre el fondo oscuro. Ahora `textOnLight`,
+   `textOnDark` y `textOnSidebar` se ajustan hasta cumplir el umbral, con 45
+   pruebas unitarias sobre 8 marcas incluidos casos degenerados.
+3. **`--destructive`** — de `0 84% 60%` a `0 72% 45%`. El texto blanco encima
+   pasó de 3,78:1 a 5,83:1, lo que corrige a la vez el badge de notificaciones
+   y todos los botones destructivos.
+4. **`--muted-foreground`** — margen suficiente para superficies teñidas.
+
+### Lo que queda (fase 3)
+
+Las 13 pruebas que siguen fallando ya no son sistémicas; son componentes
+concretos:
+
+| Problema | Dónde | Causa |
+|---|---|---|
+| `button-name` ×8 | `/ats/analytics`, `/ats/interviews`, `/onboarding/documents`, `/admin/users` | `SelectTrigger` de Radix sin nombre accesible cuando no hay `<label>` asociado |
+| `label` ×4 | `/ats/analytics`, `/ats/candidates` | `input[type=file]` y `input[type=date]` sin etiqueta |
+| `color-contrast` ×2 | `/notifications`, `/ats/analytics` | pendiente de localizar el nodo exacto |
+| `scrollable-region-focusable` ×2 | — | contenedor con desplazamiento sin `tabindex` |
+| Desbordamiento ×2 | `/training` (253 px), `/ats/analytics` (18 px) | responsive |

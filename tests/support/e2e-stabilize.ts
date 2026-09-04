@@ -47,8 +47,15 @@ export async function freezeMotion(page: Page) {
  * para los spinners, así que ambos sirven como señal de "todavía cargando".
  */
 export async function waitForStableScreen(page: Page) {
-  await page.locator("main").first().waitFor({ state: "visible" });
-  await page.waitForLoadState("networkidle").catch(() => undefined);
+  // Todas las esperas van acotadas y absorben su propio fallo: son señales de
+  // "ya se puede capturar", no aserciones. Sin límite explícito, una pantalla
+  // que nunca alcanza `networkidle` —por sondeo periódico o una conexión
+  // abierta— consumiría el tiempo completo de la prueba y la mataría. Ocurrió
+  // con `/training` en movil.
+  await page.locator("main").first().waitFor({ state: "visible", timeout: 30_000 });
+
+  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+
   await page
     .waitForFunction(
       () =>
@@ -58,7 +65,18 @@ export async function waitForStableScreen(page: Page) {
       { timeout: 15_000 },
     )
     .catch(() => undefined);
-  await page.evaluate(() => document.fonts?.ready);
+
+  // `document.fonts.ready` puede no resolverse nunca si queda una fuente en
+  // vuelo; se le pone su propio limite.
+  await page
+    .evaluate(
+      () =>
+        Promise.race([
+          document.fonts?.ready ?? Promise.resolve(),
+          new Promise((resolve) => setTimeout(resolve, 5_000)),
+        ]),
+    )
+    .catch(() => undefined);
 }
 
 /** Prepara la página para una captura reproducible. */

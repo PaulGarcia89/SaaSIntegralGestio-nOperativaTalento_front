@@ -32,19 +32,31 @@ export type Surface = {
  * El rol de cada superficie sale de las restricciones declaradas en
  * `src/lib/navigation.ts`. Cuando el entorno de datos no habilita un módulo
  * para ese rol, la prueba se omite con motivo explícito en lugar de fallar.
+ *
+ * Asignación de roles y datos sembrados
+ * -------------------------------------
+ * El seed local no incluye cuentas con contraseña conocida para `RECRUITER`,
+ * `INSTRUCTOR`, `INVENTORY_MANAGER` ni `BRANCH_USER`. Esas superficies se
+ * auditan con `TENANT_ADMIN`, que el backend traduce a `admin_empresa`
+ * (`src/lib/backend.ts:758`) y que figura en la lista de roles autorizados de
+ * todas ellas en `navigation.ts`.
+ *
+ * Es cobertura válida, pero no idéntica: un reclutador ve menos acciones que un
+ * administrador de empresa. Cuando existan esas cuentas, basta con devolver
+ * aquí el rol original para recuperar la fidelidad.
  */
 export const SURFACES: readonly Surface[] = [
   // Inicio
   { path: "/dashboard", name: "Inicio operativo", role: "TENANT_ADMIN", module: "dashboard", visual: true },
-  { path: "/profile", name: "Mi perfil", role: "BRANCH_USER", module: "profile" },
+  { path: "/profile", name: "Mi perfil", role: "TENANT_EMPLEADO", module: "profile" },
 
   // Reclutamiento
-  { path: "/ats", name: "ATS requiere atencion", role: "RECRUITER", module: "ats", visual: true },
-  { path: "/ats/vacancies", name: "Vacantes", role: "RECRUITER", module: "ats", visual: true },
-  { path: "/ats/pipeline", name: "Pipeline", role: "RECRUITER", module: "ats", visual: true },
-  { path: "/ats/candidates", name: "Candidatos", role: "RECRUITER", module: "ats", visual: true },
-  { path: "/ats/interviews", name: "Entrevistas", role: "RECRUITER", module: "ats" },
-  { path: "/ats/analytics", name: "Analitica ATS", role: "RECRUITER", module: "ats" },
+  { path: "/ats", name: "ATS requiere atencion", role: "TENANT_ADMIN", module: "ats", visual: true },
+  { path: "/ats/vacancies", name: "Vacantes", role: "TENANT_ADMIN", module: "ats", visual: true },
+  { path: "/ats/pipeline", name: "Pipeline", role: "TENANT_ADMIN", module: "ats", visual: true },
+  { path: "/ats/candidates", name: "Candidatos", role: "TENANT_ADMIN", module: "ats", visual: true },
+  { path: "/ats/interviews", name: "Entrevistas", role: "TENANT_ADMIN", module: "ats" },
+  { path: "/ats/analytics", name: "Analitica ATS", role: "TENANT_ADMIN", module: "ats" },
   { path: "/hiring", name: "Contrataciones", role: "HR_MANAGER", module: "ats", visual: true },
 
   // Personas
@@ -53,12 +65,12 @@ export const SURFACES: readonly Surface[] = [
   { path: "/onboarding/signatures", name: "Documentos y firmas", role: "HR_MANAGER", module: "onboarding" },
 
   // Aprendizaje
-  { path: "/training", name: "Cursos", role: "INSTRUCTOR", module: "training", visual: true },
-  { path: "/training/content", name: "Gestionar cursos", role: "INSTRUCTOR", module: "training" },
+  { path: "/training", name: "Cursos", role: "TENANT_ADMIN", module: "training", visual: true },
+  { path: "/training/content", name: "Gestionar cursos", role: "TENANT_ADMIN", module: "training" },
 
   // Inventario
-  { path: "/inventory", name: "Inventario de activos", role: "INVENTORY_MANAGER", module: "asset_inventory", visual: true },
-  { path: "/inventory/restaurant", name: "Inventario de restaurante", role: "INVENTORY_MANAGER", module: "restaurant_inventory", visual: true },
+  { path: "/inventory", name: "Inventario de activos", role: "TENANT_ADMIN", module: "asset_inventory", visual: true },
+  { path: "/inventory/restaurant", name: "Inventario de restaurante", role: "TENANT_ADMIN", module: "restaurant_inventory", visual: true },
 
   // Analítica y avisos
   { path: "/reports", name: "Reportes", role: "TENANT_ADMIN", module: "reports" },

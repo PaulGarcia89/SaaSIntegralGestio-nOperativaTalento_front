@@ -44,6 +44,9 @@ if (!process.env.E2E_BASE_URL) {
  */
 export default defineConfig({
   testDir: "./tests/visual",
+  // Autentica una vez por rol antes de los workers: evita superar el limite
+  // de 10 accesos por correo cada 900 s que impone el backend.
+  globalSetup: "./tests/support/e2e-global-setup.ts",
   fullyParallel: true,
   // Una captura no debe reintentarse: un reintento que pasa esconde inestabilidad.
   retries: 0,

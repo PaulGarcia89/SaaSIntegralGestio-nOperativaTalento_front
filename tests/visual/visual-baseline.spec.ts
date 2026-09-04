@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { hasCredentials, openSurface, signIn } from "../support/e2e-auth";
+import { hasCredentials, openSurfaceResilient } from "../support/e2e-auth";
 import { surfaceSlug, VISUAL_SURFACES } from "../support/e2e-surfaces";
+import { sessionFile, storageStateFor } from "../support/e2e-session";
 import { assertThemeApplied, forceLocale, forceTheme, THEMES } from "../support/e2e-theme";
 import { FIXED_CLOCK, masksFor, prepareForScreenshot } from "../support/e2e-stabilize";
 
@@ -26,19 +27,25 @@ import { FIXED_CLOCK, masksFor, prepareForScreenshot } from "../support/e2e-stab
  */
 test.use({ serviceWorkers: "block" });
 
-test.describe("linea base visual", () => {
+// Se agrupa por rol para reutilizar la sesión que prepara `globalSetup`: cada
+// prueba iniciando sesión por su cuenta agotaba el límite del backend (10
+// accesos por correo cada 900 s) y provocaba fallos por tiempo de espera.
+for (const role of [...new Set(VISUAL_SURFACES.map((s) => s.role))]) {
+test.describe(`linea base visual · ${role}`, () => {
+  test.use({ storageState: sessionFile(role) });
+
   test.beforeEach(async ({ page }) => {
+    test.skip(
+      !hasCredentials(role) || !storageStateFor(role),
+      `Define E2E_${role}_EMAIL y E2E_${role}_PASSWORD para capturar las pantallas de ${role}.`,
+    );
     // Fija el instante para que las horas relativas y absolutas no muevan píxeles.
     await page.clock.setFixedTime(FIXED_CLOCK);
   });
 
-  for (const surface of VISUAL_SURFACES) {
+  for (const surface of VISUAL_SURFACES.filter((s) => s.role === role)) {
     for (const theme of THEMES) {
       test(`${surface.name} [${theme}]`, async ({ page }, testInfo) => {
-        test.skip(
-          !hasCredentials(surface.role),
-          `Define E2E_${surface.role}_EMAIL y E2E_${surface.role}_PASSWORD para capturar ${surface.path}.`,
-        );
         // Movil solo en tema claro: es el tema por omision del producto y
         // duplicar el catalogo movil no aporta senal proporcional a su coste.
         test.skip(
@@ -48,13 +55,9 @@ test.describe("linea base visual", () => {
 
         await forceTheme(page, theme);
         await forceLocale(page, "es");
-        await signIn(page, surface.role);
 
-        const available = await openSurface(page, surface.path);
-        test.skip(
-          !available,
-          `${surface.path} no esta habilitada para ${surface.role} en este entorno de datos.`,
-        );
+        const available = await openSurfaceResilient(page, surface.path, role);
+        test.skip(!available, `${surface.path} no esta habilitada para ${role} en este entorno de datos.`);
 
         await assertThemeApplied(page, theme);
         await prepareForScreenshot(page);
@@ -68,3 +71,4 @@ test.describe("linea base visual", () => {
     }
   }
 });
+}

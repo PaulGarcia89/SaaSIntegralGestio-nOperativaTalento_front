@@ -108,7 +108,8 @@
   --border-strong: 215 25% 78%;
   --border-focus: var(--ring);
   --status-info: 205 90% 48%;
-  --status-success: 152 69% 35%;
+  /* 152 69% 35% daba 3,72:1 como texto sobre superficies teñidas. */
+  --status-success: 152 69% 28%;
   --status-warning: 35 92% 45%;
   --status-danger: 0 72% 51%;
   /* Marca como texto. El valor de relleno (--primary, 190 87% 30%) da 3,76:1

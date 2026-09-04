@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Autentica una vez por rol antes de los workers: evita superar el limite
+  // de 10 accesos por correo cada 900 s que impone el backend.
+  globalSetup: "./tests/support/e2e-global-setup.ts",
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

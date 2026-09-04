@@ -56,7 +56,10 @@ export async function signIn(page: Page, role: E2ERole) {
   // formulario (los usa `htmlFor`), así que son la referencia estable.
   await page.locator("#login-email").fill(email);
   await page.locator("#login-password").fill(password);
-  await page.getByRole("button", { name: /Iniciar sesión/i }).click();
+  // Se localiza por tipo, no por texto: el rótulo del botón se traduce y para
+  // las cuentas sin idioma preferido guardado el navegador resuelve a inglés,
+  // con lo que "Iniciar sesión" no existía y el clic expiraba.
+  await page.locator('form button[type="submit"]').first().click();
   await page.waitForURL((url) => !/\/login(?:\?|$)/.test(url.pathname + url.search), {
     timeout: 30_000,
   });
@@ -97,8 +100,34 @@ export async function openSurface(page: Page, path: string) {
   ]).catch(() => "unknown" as const);
 
   if (outcome === "unknown") {
-    throw new Error(`No se pudo determinar el estado de ${path}: ni shell autenticado ni acceso denegado.`);
+    // El diagnóstico más frecuente es la pérdida de sesión: el shell redirige a
+    // /login y no aparece ni el contenido ni el aviso de acceso denegado.
+    // Distinguirlo importa, porque no es un problema de la pantalla auditada.
+    throw new Error(`No se pudo determinar el estado de ${path} (url actual: ${page.url()}).`);
   }
 
   return outcome === "authorized";
+}
+
+function isLoginUrl(rawUrl: string) {
+  const url = new URL(rawUrl);
+  return /\/login(?:\?|$)/.test(url.pathname + url.search);
+}
+
+/**
+ * Abre una pantalla reutilizando la sesión guardada y, si ha caducado, vuelve a
+ * autenticarse una sola vez.
+ *
+ * El estado que prepara `globalSetup` lleva un token de acceso de 15 minutos
+ * (`JWT_ACCESS_EXPIRES_IN`). Una ejecución completa puede durar más, y entonces
+ * el shell redirige a /login a mitad de suite. Reautenticar solo cuando ocurre
+ * mantiene los accesos muy por debajo del límite del backend (10 por correo
+ * cada 900 s) sin que la caducidad rompa la ejecución.
+ */
+export async function openSurfaceResilient(page: Page, path: string, role: E2ERole) {
+  await page.goto(path);
+  if (isLoginUrl(page.url())) {
+    await signIn(page, role);
+  }
+  return openSurface(page, path);
 }

@@ -34,7 +34,10 @@ export function FormSelect({
 }: FormSelectProps) {
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger className={className} aria-label={ariaLabel}>
+      {/* Sin rótulo envolvente ni `aria-label` explícito, el marcador de
+          posición ("Cargar dashboard guardado") es el mejor nombre disponible:
+          describe la función del control, no su valor actual. */}
+      <SelectTrigger className={className} aria-label={ariaLabel ?? placeholder}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

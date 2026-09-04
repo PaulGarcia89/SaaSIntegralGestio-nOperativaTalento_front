@@ -81,7 +81,7 @@ export function WorkspaceViewManager({
       <Button variant="secondary" disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}><Save className="size-4" />Guardar configuración</Button>
       <Button variant="ghost" onClick={() => downloadConfig("configuracion-actual", getConfig())}><Download className="size-4" />Exportar actual</Button>
       <Button variant="ghost" onClick={() => fileInput.current?.click()}><FolderUp className="size-4" />Importar</Button>
-      <input ref={fileInput} type="file" accept="application/json,.json" className="sr-only" onChange={(event) => void importConfig(event.target.files?.[0])} />
+      <input ref={fileInput} type="file" accept="application/json,.json" aria-label="Importar configuración de vista desde un archivo JSON" className="sr-only" onChange={(event) => void importConfig(event.target.files?.[0])} />
     </div>
   </section>;
 }

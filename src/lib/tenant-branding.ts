@@ -12,14 +12,14 @@ const SURFACE_SIDEBAR = { h: 220, s: 29, l: 12 };
 const AA_NORMAL_TEXT = 4.5;
 
 /**
- * Umbral para la marca usada como texto.
+ * Opacidad del tinte de marca en distintivos y chips (`bg-primary/10`).
  *
- * Es deliberadamente superior a AA: la marca aparece a menudo sobre superficies
- * levemente teñidas con ella misma (`bg-primary/10` en chips y distintivos), y
- * validarla solo contra el fondo puro la dejaba por debajo de 4,5:1 ahi. El
- * margen extra cubre esos tintes sin necesitar un token por cada variante.
+ * Es la superficie MÁS exigente sobre la que aparece la marca como texto, así
+ * que es contra ella —y no contra el fondo puro— contra la que se valida. Un
+ * umbral fijo más alto también servía, pero no se adapta al tono: este cálculo
+ * sí, porque mezcla el color real de cada tenant.
  */
-const BRAND_TEXT_TARGET = 5.5;
+const BRAND_TINT_ALPHA = 0.1;
 
 type Hsl = { h: number; s: number; l: number };
 
@@ -86,25 +86,39 @@ function contrastRatio(a: Hsl, b: Hsl) {
  * (0 % o 100 %) alcanza el umbral —imposible con tonos reales, pero conviene
  * ser explícito— devuelve el extremo más contrastado que encontró.
  */
-function ensureReadable(brand: Hsl, surface: Hsl, target = AA_NORMAL_TEXT): Hsl {
-  const surfaceIsLight = relativeLuminance(hslToRgb(surface)) > 0.18;
+function ensureReadable(brand: Hsl, surfaces: Hsl | Hsl[], target = AA_NORMAL_TEXT): Hsl {
+  const list = Array.isArray(surfaces) ? surfaces : [surfaces];
+  const worst = list.reduce((acc, s) => (contrastRatio(brand, s) < contrastRatio(brand, acc) ? s : acc), list[0]);
+  const surfaceIsLight = relativeLuminance(hslToRgb(worst)) > 0.18;
   const step = surfaceIsLight ? -1 : 1;
+  const meetsAll = (candidate: Hsl) => list.every((s) => contrastRatio(candidate, s) >= target);
 
   // Se itera sobre luminosidades ENTERAS porque el valor se emite redondeado a
   // CSS. Validando el valor fraccionario, el redondeo posterior podía devolver
   // el color por debajo del umbral: con `#DB2777` daba 4,45:1 tras redondear.
   let candidate: Hsl = { ...brand, l: Math.round(brand.l) };
-  if (contrastRatio(candidate, surface) >= target) return candidate;
+  if (meetsAll(candidate)) return candidate;
 
   for (let lightness = candidate.l + step; lightness >= 0 && lightness <= 100; lightness += step) {
     candidate = { ...brand, l: lightness };
-    if (contrastRatio(candidate, surface) >= target) return candidate;
+    if (meetsAll(candidate)) return candidate;
   }
   return candidate;
 }
 
 const WHITE: Hsl = { h: 0, s: 0, l: 100 };
 const NEAR_BLACK: Hsl = { h: 222, s: 47, l: 11 };
+
+/** Mezcla `top` sobre `bottom` con la opacidad indicada, en sRGB. */
+function blend(top: Hsl, bottom: Hsl, alpha: number): Hsl {
+  const t = hslToRgb(top);
+  const b = hslToRgb(bottom);
+  return rgbToHsl({
+    r: t.r * alpha + b.r * (1 - alpha),
+    g: t.g * alpha + b.g * (1 - alpha),
+    b: t.b * alpha + b.b * (1 - alpha),
+  });
+}
 
 /**
  * Elige la luminosidad del relleno de marca.
@@ -124,6 +138,7 @@ function readableFill({ h, s, l }: Hsl): Hsl {
   return { h, s, l: 0 };
 }
 
+const round = ({ h, s, l }: Hsl): Hsl => ({ h: Math.round(h), s: Math.round(s), l: Math.round(l) });
 const format = ({ h, s, l }: Hsl) => `${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%`;
 
 export type TenantTheme = ReturnType<typeof createTenantTheme>;
@@ -148,12 +163,17 @@ export function createTenantTheme(input?: string) {
 
   // El relleno se mantiene en una franja media para que el texto blanco encima
   // conserve contraste con cualquier marca.
-  const brand: Hsl = { h, s, l };
-  const fill = readableFill({ h, s, l });
+  // Se redondea el tono y la saturación desde el principio, no al formatear:
+  // así lo que se valida es exactamente el color que acaba en el CSS. Con
+  // valores fraccionarios, el redondeo posterior dejaba el contraste por debajo
+  // del umbral (`#0EA5B7` caía a 4,47:1 sobre un distintivo teñido).
+  const brand: Hsl = round({ h, s, l });
+  const fill = round(readableFill(brand));
 
   // El texto del relleno se decide contra el RELLENO, no contra el hex original.
   // Antes se comparaba la luminancia del hex sin recortar, así que una marca
   // muy clara elegía texto oscuro sobre un relleno gris y daba 4,19:1.
+  const accentSurface: Hsl = { h: brand.h, s: Math.max(35, brand.s), l: 93 };
   const onWhite = contrastRatio(fill, WHITE);
   const onNearBlack = contrastRatio(fill, NEAR_BLACK);
 
@@ -163,9 +183,18 @@ export function createTenantTheme(input?: string) {
     foreground: onNearBlack > onWhite ? "222 47% 11%" : "0 0% 100%",
     accent: `${Math.round(h)} ${Math.max(35, Math.round(s))}% 93%`,
     /** Marca legible como texto sobre el fondo claro. */
-    textOnLight: format(ensureReadable(brand, SURFACE_LIGHT, BRAND_TEXT_TARGET)),
-    /** Marca legible como texto sobre el fondo oscuro. */
-    textOnDark: format(ensureReadable(brand, SURFACE_DARK, BRAND_TEXT_TARGET)),
+    textOnLight: format(
+      ensureReadable(brand, [
+        SURFACE_LIGHT,
+        blend(fill, SURFACE_LIGHT, BRAND_TINT_ALPHA),
+        // `--accent`: la marca al 93 % de luminosidad. Es la superficie más
+        // clara y teñida donde aparece texto de marca (distintivos), y la que
+        // hacía fallar `/notifications` con 4,28:1.
+        accentSurface,
+      ]),
+    ),
+    /** Marca legible como texto sobre el fondo oscuro, tinte de chip incluido. */
+    textOnDark: format(ensureReadable(brand, blend(fill, SURFACE_DARK, BRAND_TINT_ALPHA))),
     /** Marca legible como texto sobre la barra lateral, que siempre es oscura. */
     textOnSidebar: format(ensureReadable(brand, SURFACE_SIDEBAR)),
   };

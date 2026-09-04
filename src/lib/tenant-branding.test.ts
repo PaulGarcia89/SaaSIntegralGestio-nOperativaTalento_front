@@ -9,6 +9,34 @@ const SURFACE_DARK = { h: 222, s: 47, l: 7 };
 const SURFACE_SIDEBAR = { h: 220, s: 29, l: 12 };
 const WHITE = { h: 0, s: 0, l: 100 };
 
+/** Réplica de la mezcla sRGB que hace `bg-primary/10` sobre una superficie. */
+function mix(top: { h: number; s: number; l: number }, bottom: { h: number; s: number; l: number }, alpha: number) {
+  const t = toRgb(top);
+  const b = toRgb(bottom);
+  return toHsl({
+    r: t.r * alpha + b.r * (1 - alpha),
+    g: t.g * alpha + b.g * (1 - alpha),
+    b: t.b * alpha + b.b * (1 - alpha),
+  });
+}
+
+function toRgb({ h, s, l }: { h: number; s: number; l: number }) {
+  const sat = s / 100;
+  const light = l / 100;
+  const c = (1 - Math.abs(2 * light - 1)) * sat;
+  const hp = (((h % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  const m = light - c / 2;
+  const [r, g, b] =
+    hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x]
+    : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+  return { r: r + m, g: g + m, b: b + m };
+}
+
+function toHsl(rgb: { r: number; g: number; b: number }) {
+  return __testing.rgbToHsl(rgb);
+}
+
 function parse(value: string) {
   const [h, s, l] = value.split(" ");
   return { h: Number(h), s: Number.parseFloat(s), l: Number.parseFloat(l) };
@@ -44,6 +72,19 @@ describe("createTenantTheme", () => {
 
     it("texto sobre la barra lateral cumple AA", () => {
       expect(contrastRatio(parse(theme.textOnSidebar), SURFACE_SIDEBAR)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it("texto sobre un distintivo tenido (bg-primary/10) cumple AA", () => {
+      // Es la superficie más exigente donde aparece la marca como texto y la
+      // que hacía fallar `/notifications` con 4,42:1.
+      const tinted = mix(parse(theme.primary), SURFACE_LIGHT, 0.1);
+      expect(contrastRatio(parse(theme.textOnLight), tinted)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it("texto sobre el acento de marca (--accent) cumple AA", () => {
+      const src = __testing.rgbToHsl(__testing.hexToRgb(theme.hex));
+      const accent = { h: Math.round(src.h), s: Math.max(35, Math.round(src.s)), l: 93 };
+      expect(contrastRatio(parse(theme.textOnLight), accent)).toBeGreaterThanOrEqual(4.5);
     });
 
     it("el texto blanco sobre el relleno de marca cumple AA", () => {

@@ -23,9 +23,12 @@ import {
   waitingLabel,
   type RecruitmentPhaseId,
   type StageMove,
+  phaseMeaning,
+  phaseTitle,
 } from "@/lib/recruitment-ux";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/locale-provider";
 
 /**
  * "Postulaciones" — la fusión de Candidatos y Pipeline.
@@ -68,6 +71,7 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
   onReject: (move: StageMove) => void;
   busy: boolean;
 }) {
+  const { locale } = useLocale();
   const phase = recruitmentPhase(recruitmentPhaseOf(application.status));
   const name = application.candidate.fullName;
 
@@ -82,7 +86,7 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
           <p className="mt-1 text-text-primary">{application.vacancy.title}</p>
           <p className="mt-1 text-text-secondary">{application.vacancy.branch?.name ?? "Sin sucursal"}</p>
           <p className="mt-1 text-text-secondary">{waitingLabel(application.appliedAt)}</p>
-          <div className="mt-3"><PhaseChip label={phase.title} tone={phase.id === "DESCARTADOS" ? "neutral" : "waiting"} /></div>
+          <div className="mt-3"><PhaseChip label={phaseTitle(phase.id, locale)} tone={phase.id === "DESCARTADOS" ? "neutral" : "waiting"} /></div>
         </div>
       </div>
 
@@ -131,6 +135,7 @@ function PersonCard({ application, moves, onMove, onReject, busy }: {
 }
 
 function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
+  const { locale } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -253,7 +258,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
           Fase
           <select id="people-phase" aria-label="Filtrar por fase" value={phase ?? ALL} onChange={(event) => setParam("phase", event.target.value)} className={selectClass}>
             <option value={ALL}>Todas las fases</option>
-            {RECRUITMENT_PHASES.map((entry) => <option key={entry.id} value={entry.id}>{entry.title}</option>)}
+            {RECRUITMENT_PHASES.map((entry) => <option key={entry.id} value={entry.id}>{phaseTitle(entry.id, locale)}</option>)}
           </select>
         </label>
       </div>
@@ -288,10 +293,10 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
               <section key={entry.id} aria-labelledby={`fase-${entry.id}`} className="space-y-3">
                 <div>
                   <h2 id={`fase-${entry.id}`} className="text-2xl font-semibold text-text-primary">
-                    {entry.step}. {entry.title}
+                    {entry.step}. {phaseTitle(entry.id, locale)}
                     <span className="ml-2 text-text-secondary">({people.length})</span>
                   </h2>
-                  <p className="text-text-secondary">{entry.meaning}</p>
+                  <p className="text-text-secondary">{phaseMeaning(entry.id, locale)}</p>
                 </div>
                 {people.length ? people.map(renderCard) : <p className="rounded-2xl border border-dashed border-border-default p-4 text-text-secondary">Nadie en esta fase por ahora.</p>}
               </section>

@@ -1,5 +1,7 @@
 import type { ApplicationStatusKey, OperationalDashboardItemDto, VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import { currentApplicationStage } from "@/lib/applications";
+import { translate } from "@/i18n";
+import type { SupportedLocale } from "@/i18n/types";
 
 /* ------------------------------------------------------------------------- *
  * Las cuatro fases
@@ -14,24 +16,42 @@ import { currentApplicationStage } from "@/lib/applications";
 
 export type RecruitmentPhaseId = "POSTULARON" | "CONOCIENDO" | "DECIDIDO" | "TRABAJANDO" | "DESCARTADOS";
 
+/**
+ * Una fase guarda su identificador y su número, nunca su texto.
+ *
+ * El texto se resuelve al leerlo con `phaseTitle`, `phaseQuestion` y
+ * `phaseMeaning`, que reciben el idioma. Guardarlo aquí, como estaba, dejaba
+ * cinco títulos en español incrustados en una constante de módulo: no había
+ * forma de traducirlos sin recrear el objeto.
+ */
 export type RecruitmentPhase = {
   id: RecruitmentPhaseId;
   /** Número visible, empezando en 1. `null` para fases fuera del camino. */
   step: number | null;
-  title: string;
-  /** La pregunta que responde esta fase. */
-  question: string;
-  /** Qué significa, en una frase. */
-  meaning: string;
 };
 
 export const RECRUITMENT_PHASES: RecruitmentPhase[] = [
-  { id: "POSTULARON", step: 1, title: "Se postularon", question: "¿A quién miro?", meaning: "Personas que enviaron su solicitud y todavía no has revisado." },
-  { id: "CONOCIENDO", step: 2, title: "Los estoy conociendo", question: "¿Con quién hablo?", meaning: "Personas con entrevista pendiente o ya entrevistadas." },
-  { id: "DECIDIDO", step: 3, title: "Decidí contratar", question: "¿A quién le hago oferta?", meaning: "Personas aprobadas que esperan su oferta de trabajo." },
-  { id: "TRABAJANDO", step: 4, title: "Ya trabaja aquí", question: "¿Quién entró?", meaning: "Personas contratadas o en formación." },
-  { id: "DESCARTADOS", step: null, title: "Descartados", question: "¿A quién dije que no?", meaning: "Personas que no siguieron en el proceso." },
+  { id: "POSTULARON", step: 1 },
+  { id: "CONOCIENDO", step: 2 },
+  { id: "DECIDIDO", step: 3 },
+  { id: "TRABAJANDO", step: 4 },
+  { id: "DESCARTADOS", step: null },
 ];
+
+/** Nombre visible de la fase. */
+export function phaseTitle(id: RecruitmentPhaseId, locale: SupportedLocale = "es"): string {
+  return translate(locale, `recruit.phase.${id}.title`);
+}
+
+/** La pregunta que responde esta fase, en la voz de quien contrata. */
+export function phaseQuestion(id: RecruitmentPhaseId, locale: SupportedLocale = "es"): string {
+  return translate(locale, `recruit.phase.${id}.question`);
+}
+
+/** Qué significa la fase, en una frase. */
+export function phaseMeaning(id: RecruitmentPhaseId, locale: SupportedLocale = "es"): string {
+  return translate(locale, `recruit.phase.${id}.meaning`);
+}
 
 const phaseByStatus: Record<ApplicationStatusKey, RecruitmentPhaseId> = {
   SUBMITTED: "POSTULARON",
@@ -69,16 +89,16 @@ export type RecruitmentAction = {
   helper: string;
 };
 
-const actionByPhase: Record<RecruitmentPhaseId, RecruitmentAction> = {
-  POSTULARON: { label: (name) => `Revisar a ${name}`, helper: "Verás su solicitud y decidirás si la invitas a una entrevista." },
-  CONOCIENDO: { label: (name) => `Ver la entrevista de ${name}`, helper: "Verás cuándo es la entrevista y podrás anotar cómo fue." },
-  DECIDIDO: { label: (name) => `Preparar la oferta de ${name}`, helper: "Pasarás a la contratación para enviarle su oferta de trabajo." },
-  TRABAJANDO: { label: (name) => `Ver a ${name}`, helper: "Verás su expediente como parte del equipo." },
-  DESCARTADOS: { label: (name) => `Ver a ${name}`, helper: "Consultarás su historial y el motivo registrado." },
-};
-
-export function recruitmentAction(phase: RecruitmentPhaseId): RecruitmentAction {
-  return actionByPhase[phase];
+/**
+ * El nombre se interpola con `{{name}}` en vez de concatenarse: en inglés la
+ * frase no coloca el nombre donde lo coloca el español ("Revisar a Ana" frente
+ * a "Review Ana"), y una plantilla deja esa decisión en el catálogo.
+ */
+export function recruitmentAction(phase: RecruitmentPhaseId, locale: SupportedLocale = "es"): RecruitmentAction {
+  return {
+    label: (name: string) => translate(locale, `recruit.action.${phase}.label`, { name }),
+    helper: translate(locale, `recruit.action.${phase}.helper`),
+  };
 }
 
 /* ------------------------------------------------------------------------- *
@@ -88,22 +108,26 @@ export function recruitmentAction(phase: RecruitmentPhaseId): RecruitmentAction 
  * sí, y además dice implícitamente que alguien está esperando por ti.
  * ------------------------------------------------------------------------- */
 
-export function waitingLabel(since?: string | null, now = Date.now()): string {
-  if (!since) return "Sin fecha";
+export function waitingLabel(since?: string | null, now = Date.now(), locale: SupportedLocale = "es"): string {
+  const t = (key: string, count?: number) => translate(locale, key, count === undefined ? {} : { count });
+  if (!since) return t("recruit.waiting.noDate");
   const start = new Date(since).getTime();
-  if (Number.isNaN(start)) return "Sin fecha";
+  if (Number.isNaN(start)) return t("recruit.waiting.noDate");
   const minutes = Math.floor(Math.max(0, now - start) / 60_000);
-  if (minutes < 60) return "Llegó hace un momento";
+  if (minutes < 60) return t("recruit.waiting.justNow");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Lleva ${hours} hora${hours === 1 ? "" : "s"} esperando`;
+  // Singular y plural son claves distintas y no una `s` pegada al final: en
+  // otros idiomas el plural no se forma asi, y "1 horas" es un error visible.
+  if (hours < 24) return hours === 1 ? t("recruit.waiting.hour") : t("recruit.waiting.hours", hours);
   const days = Math.floor(hours / 24);
-  if (days === 1) return "Lleva 1 día esperando";
-  if (days < 30) return `Lleva ${days} días esperando`;
+  if (days === 1) return t("recruit.waiting.day");
+  if (days < 30) return t("recruit.waiting.days", days);
   const months = Math.floor(days / 30);
-  return `Lleva ${months} mes${months === 1 ? "" : "es"} esperando`;
+  return months === 1 ? t("recruit.waiting.month") : t("recruit.waiting.months", months);
 }
 
-export function dueLabel(dueAt?: string | null, now = Date.now()): string | null {
+export function dueLabel(dueAt?: string | null, now = Date.now(), locale: SupportedLocale = "es"): string | null {
+  const t = (key: string, count?: number) => translate(locale, key, count === undefined ? {} : { count });
   if (!dueAt) return null;
   const due = new Date(dueAt).getTime();
   if (Number.isNaN(due)) return null;
@@ -116,24 +140,24 @@ export function dueLabel(dueAt?: string | null, now = Date.now()): string | null
 
   if (minutes <= -1440) {
     const days = Math.floor(-minutes / 1440);
-    return `Se pasó hace ${days} día${days === 1 ? "" : "s"}`;
+    return days === 1 ? t("recruit.due.overdueDay") : t("recruit.due.overdueDays", days);
   }
   if (minutes <= -60) {
     const hours = Math.floor(-minutes / 60);
-    return `Se pasó hace ${hours} hora${hours === 1 ? "" : "s"}`;
+    return hours === 1 ? t("recruit.due.overdueHour") : t("recruit.due.overdueHours", hours);
   }
-  if (minutes < 0) return "Ya pasó la hora";
-  if (minutes < 60) return "Es dentro de menos de una hora";
+  if (minutes < 0) return t("recruit.due.passed");
+  if (minutes < 60) return t("recruit.due.soon");
   if (minutes < 1440) {
     const hours = Math.floor(minutes / 60);
-    return `Es hoy, en ${hours} hora${hours === 1 ? "" : "s"}`;
+    return hours === 1 ? t("recruit.due.todayHour") : t("recruit.due.todayHours", hours);
   }
   const days = Math.round(minutes / 1440);
-  return days === 1 ? "Es mañana" : `Es en ${days} días`;
+  return days === 1 ? t("recruit.due.tomorrow") : t("recruit.due.inDays", days);
 }
 
-export function firstNameOf(fullName: string): string {
-  return fullName.trim().split(/\s+/)[0] || "esta persona";
+export function firstNameOf(fullName: string, locale: SupportedLocale = "es"): string {
+  return fullName.trim().split(/\s+/)[0] || translate(locale, "recruit.thisPerson");
 }
 
 /* ------------------------------------------------------------------------- *
@@ -171,34 +195,52 @@ export type TodayItem = {
  * la única fuente de verdad, y duplicar su criterio en el cliente es
  * exactamente lo que produjo las cuatro bandejas divergentes.
  */
-export function toTodayItems(items: OperationalDashboardItemDto[] | undefined, now = Date.now()): TodayItem[] {
+export function toTodayItems(items: OperationalDashboardItemDto[] | undefined, now = Date.now(), locale: SupportedLocale = "es"): TodayItem[] {
   if (!items?.length) return [];
   return items
     .filter((item) => RECRUITMENT_MODULES.includes(item.module))
     .map((item) => {
       const [who, ...rest] = (item.description ?? "").split("·").map((part) => part.trim());
-      const due = dueLabel(item.dueAt, now);
+      const due = dueLabel(item.dueAt, now, locale);
       return {
         id: item.id,
         title: item.title,
         who: item.recordLabel ?? who ?? "",
         detail: rest.join(" · "),
-        when: due ?? waitingLabel(item.occurredAt, now),
+        when: due ?? waitingLabel(item.occurredAt, now, locale),
         urgent: item.tone === "danger" || item.tone === "warning" || (item.dueAt ? new Date(item.dueAt).getTime() < now : false),
         href: item.href,
-        actionLabel: todayActionLabel(item.title),
+        actionLabel: todayActionLabel(item.module, locale),
       };
     })
     .sort((left, right) => Number(right.urgent) - Number(left.urgent));
 }
 
-function todayActionLabel(title: string): string {
-  if (/postulaci/i.test(title)) return "Revisar solicitud";
-  if (/entrevista/i.test(title)) return "Ver entrevista";
-  if (/oferta/i.test(title)) return "Ver oferta";
-  if (/document/i.test(title)) return "Revisar documentos";
-  if (/contrata/i.test(title)) return "Abrir contratación";
-  return "Abrir";
+/**
+ * Etiqueta del botón de la tarjeta, a partir del módulo que envía el backend.
+ *
+ * Antes se deducía buscando palabras españolas ("postulaci", "entrevista") en
+ * el TÍTULO que manda el servidor. Eso ataba la interfaz al idioma del backend:
+ * en cuanto ese título dejara de estar en español, ninguna expresión coincidía
+ * y todas las tarjetas caían en "Abrir".
+ *
+ * `module` sí es un identificador estable —`RECRUITMENT_MODULES` ya filtra por
+ * él—, así que la deducción sobrevive al cambio de idioma. A cambio se pierde
+ * la distinción entre oferta y documentos dentro de Contratación, que solo el
+ * título permitía: ambas dicen ahora "Abrir contratación", que es cierto en los
+ * dos casos. Distinguirlas de verdad exige que el backend mande su propio
+ * identificador, no una frase.
+ *
+ * IMPORTANTE: `module` no debe traducirse en el backend. Es la clave de este
+ * mapa y del filtro; traducirlo rompería ambos.
+ */
+function todayActionLabel(moduleName: string | undefined, locale: SupportedLocale = "es"): string {
+  const keys: Record<string, string> = {
+    Reclutamiento: "recruit.today.reviewApplication",
+    Entrevistas: "recruit.today.viewInterview",
+    "Contratación": "recruit.today.openHiring",
+  };
+  return translate(locale, (moduleName && keys[moduleName]) || "recruit.today.open");
 }
 
 /* ------------------------------------------------------------------------- *
@@ -229,20 +271,22 @@ export type StageMove = {
  * "Avanzar" no dice a dónde. "Invitar a entrevista" sí, y además permite
  * predecir qué recibirá el candidato.
  */
-export function stageMoveLabel(stage: VacancyStageDto): string {
+export function stageMoveLabel(stage: VacancyStageDto, locale: SupportedLocale = "es"): string {
   switch (stage.applicationStatus) {
     case "INTERVIEW":
-      return "Invitar a entrevista";
+      return translate(locale, "recruit.move.interview");
     case "APPROVED":
-      return "Aprobar para contratación";
+      return translate(locale, "recruit.move.approve");
     case "REJECTED":
-      return "Descartar";
+      return translate(locale, "recruit.move.reject");
     case "HIRED":
-      return "Marcar como contratado";
+      return translate(locale, "recruit.move.hired");
     case "REVIEWING":
-      return "Empezar a revisar";
+      return translate(locale, "recruit.move.reviewing");
     default:
-      return `Mover a ${stage.name}`;
+      // `stage.name` es una etapa que configuró la empresa: se muestra tal cual
+      // porque es su dato, no texto de la interfaz.
+      return translate(locale, "recruit.move.other", { stage: stage.name });
   }
 }
 
@@ -257,6 +301,7 @@ export function stageMoveLabel(stage: VacancyStageDto): string {
 export function stageMovesFor(
   application: VacancyApplicationDto,
   stages: VacancyStageDto[],
+  locale: SupportedLocale = "es",
 ): { primary: StageMove | null; others: StageMove[] } {
   if (!stages.length) return { primary: null, others: [] };
 
@@ -271,7 +316,7 @@ export function stageMovesFor(
     // que no hacía nada.
     .filter((stage) => stage.code !== current?.code && allowedCodes.includes(stage.code))
     .sort((left, right) => left.position - right.position)
-    .map((stage) => ({ stage, label: stageMoveLabel(stage), needsReason: stage.applicationStatus === "REJECTED" }));
+    .map((stage) => ({ stage, label: stageMoveLabel(stage, locale), needsReason: stage.applicationStatus === "REJECTED" }));
 
   const forward = moves.find((move) => !move.needsReason && move.stage.position > currentPosition);
   const primary = forward ?? moves.find((move) => !move.needsReason) ?? null;

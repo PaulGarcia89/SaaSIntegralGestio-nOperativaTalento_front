@@ -7,7 +7,8 @@ import { AsyncState } from "@/components/async-state";
 import { MobileActionBar, PhaseChip, SimpleEmpty, SimpleHeader, SimpleScreen, TaskCard, TAP_TARGET } from "@/components/simple/simple-ui";
 import { fetchApplications, fetchOperationalDashboard } from "@/lib/backend";
 import type { ApplicationStatusKey } from "@/lib/contracts";
-import { MAIN_PHASES, toTodayItems, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
+import { MAIN_PHASES, phaseTitle, toTodayItems, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
+import { useLocale } from "@/components/locale-provider";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ const PHASE_STATUSES: Record<RecruitmentPhaseId, ApplicationStatusKey[]> = {
 
 export default function TodayPage() {
   const { can, currentBranch } = useAppStore();
+  const { locale, t } = useLocale();
   const allowed = can("applications.view");
 
   const dashboard = useQuery({
@@ -54,13 +56,13 @@ export default function TodayPage() {
     })),
   });
 
-  const items = useMemo(() => toTodayItems([...(dashboard.data?.tasks ?? []), ...(dashboard.data?.alerts ?? [])]), [dashboard.data]);
+  const items = useMemo(() => toTodayItems([...(dashboard.data?.tasks ?? []), ...(dashboard.data?.alerts ?? [])], undefined, locale), [dashboard.data, locale]);
 
   if (!allowed) {
     return (
       <SimpleScreen>
-        <SimpleHeader title="Hoy" />
-        <SimpleEmpty title="No tienes acceso a esta sección" help="Pídele a la persona que administra el sistema que te dé permiso para ver las postulaciones." />
+        <SimpleHeader title={t("ats.today.title")} />
+        <SimpleEmpty title={t("ats.today.noAccessTitle")} help={t("ats.today.noAccessHelp")} />
       </SimpleScreen>
     );
   }
@@ -68,11 +70,11 @@ export default function TodayPage() {
   return (
     <SimpleScreen>
       <SimpleHeader
-        title="Hoy"
-        help="Esto es todo lo que necesita tu atención ahora mismo. Cuando termines, la lista se queda vacía."
+        title={t("ats.today.title")}
+        help={t("ats.today.help")}
       />
 
-      <nav aria-label="Postulaciones por fase">
+      <nav aria-label={t("ats.today.phasesNav")}>
         <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {MAIN_PHASES.map((phase, index) => {
             const total = counts[index]?.data?.meta.total;
@@ -82,7 +84,7 @@ export default function TodayPage() {
                   href={`/ats/candidates?phase=${phase.id}`}
                   className={cn(TAP_TARGET, "flex h-full flex-col justify-between rounded-2xl border border-border-default bg-surface-elevated p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
                 >
-                  <span className="text-text-secondary">{phase.title}</span>
+                  <span className="text-text-secondary">{phaseTitle(phase.id, locale)}</span>
                   <span className="mt-2 text-3xl font-semibold text-text-primary">
                     {counts[index]?.isLoading ? "—" : (total ?? 0)}
                   </span>
@@ -95,22 +97,22 @@ export default function TodayPage() {
 
       <section aria-labelledby="hoy-tareas" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="hoy-tareas" className="text-2xl font-semibold text-text-primary">Lo que te toca</h2>
-          {items.length ? <PhaseChip label={`${items.length} pendiente${items.length === 1 ? "" : "s"}`} tone="attention" /> : null}
+          <h2 id="hoy-tareas" className="text-2xl font-semibold text-text-primary">{t("ats.today.yourTasks")}</h2>
+          {items.length ? <PhaseChip label={items.length === 1 ? t("ats.today.pendingOne") : t("ats.today.pendingMany", { count: items.length })} tone="attention" /> : null}
         </div>
 
-        {dashboard.isLoading ? <AsyncState state="loading" title="Buscando lo que necesita tu atención" /> : null}
+        {dashboard.isLoading ? <AsyncState state="loading" title={t("ats.today.loading")} /> : null}
         {dashboard.isError ? (
-          <AsyncState state="error" title="No pudimos cargar tus pendientes" onRetry={() => void dashboard.refetch()} />
+          <AsyncState state="error" title={t("ats.today.errorTitle")} onRetry={() => void dashboard.refetch()} />
         ) : null}
 
         {dashboard.isSuccess && !items.length ? (
           <SimpleEmpty
-            title="No tienes nada pendiente"
-            help="Cuando alguien se postule o tengas una entrevista cerca, aparecerá aquí."
+            title={t("ats.today.emptyTitle")}
+            help={t("ats.today.emptyHelp")}
             action={
               <Link href="/ats/vacancies" className={cn(TAP_TARGET, "inline-flex items-center rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-                Ver mis puestos abiertos
+                {t("ats.today.openVacancies")}
               </Link>
             }
           />
@@ -135,7 +137,7 @@ export default function TodayPage() {
           href="/ats/candidates"
           className={cn(TAP_TARGET, "flex w-full items-center justify-center rounded-full bg-primary px-5 font-semibold text-text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
         >
-          Ver todas las postulaciones
+          {t("ats.today.allApplications")}
         </Link>
       </MobileActionBar>
     </SimpleScreen>

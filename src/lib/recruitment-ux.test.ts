@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { translate } from "@/i18n";
 import {
   MAIN_PHASES,
+  phaseMeaning,
+  phaseQuestion,
+  phaseTitle,
   RECRUITMENT_PHASES,
   dueLabel,
   firstNameOf,
   recruitmentAction,
-  recruitmentPhase,
   recruitmentPhaseOf,
   groupByPhase,
   stageMovesFor,
@@ -41,19 +44,37 @@ describe("las cuatro fases", () => {
     expect(MAIN_PHASES.map((phase) => phase.id)).not.toContain("DESCARTADOS");
   });
 
-  it("cada fase se presenta con una pregunta que el usuario reconoce", () => {
-    RECRUITMENT_PHASES.forEach((phase) => {
-      expect(phase.title).toBeTruthy();
-      expect(phase.question).toContain("?");
-      expect(phase.meaning).toBeTruthy();
+  it("cada fase se presenta con una pregunta que el usuario reconoce, en los dos idiomas", () => {
+    (["es", "en"] as const).forEach((locale) => {
+      RECRUITMENT_PHASES.forEach((phase) => {
+        expect(phaseTitle(phase.id, locale)).toBeTruthy();
+        expect(phaseQuestion(phase.id, locale)).toContain("?");
+        expect(phaseMeaning(phase.id, locale)).toBeTruthy();
+      });
     });
-    expect(recruitmentPhase("DECIDIDO").title).toBe("Decidí contratar");
+    expect(phaseTitle("DECIDIDO", "es")).toBe("Decidí contratar");
+    expect(phaseTitle("DECIDIDO", "en")).toBe("Decided to hire");
+  });
+
+  // Ninguna clave puede faltar: `translate` devuelve la clave misma cuando no
+  // la encuentra, así que un hueco en el catálogo se vería en pantalla como
+  // "recruit.phase.DECIDIDO.title". Esta prueba lo convierte en un fallo.
+  it("no deja ninguna fase sin traducir en inglés", () => {
+    RECRUITMENT_PHASES.forEach((phase) => {
+      ["title", "question", "meaning"].forEach((part) => {
+        const resolved = translate("en", `recruit.phase.${phase.id}.${part}`);
+        expect(resolved).not.toBe(`recruit.phase.${phase.id}.${part}`);
+      });
+    });
   });
 
   it("la acción principal nombra a la persona y anticipa qué pasará", () => {
-    expect(recruitmentAction("POSTULARON").label("Ana")).toBe("Revisar a Ana");
-    expect(recruitmentAction("DECIDIDO").label("Ana")).toContain("oferta");
-    expect(recruitmentAction("CONOCIENDO").helper).toBeTruthy();
+    expect(recruitmentAction("POSTULARON", "es").label("Ana")).toBe("Revisar a Ana");
+    expect(recruitmentAction("POSTULARON", "en").label("Ana")).toBe("Review Ana");
+    expect(recruitmentAction("DECIDIDO", "es").label("Ana")).toContain("oferta");
+    expect(recruitmentAction("DECIDIDO", "en").label("Ana")).toContain("offer");
+    expect(recruitmentAction("CONOCIENDO", "es").helper).toBeTruthy();
+    expect(recruitmentAction("CONOCIENDO", "en").helper).toBeTruthy();
   });
 });
 

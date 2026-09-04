@@ -26,9 +26,12 @@ import {
   stageMovesFor,
   waitingLabel,
   type StageMove,
+  phaseMeaning,
+  phaseTitle,
 } from "@/lib/recruitment-ux";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/locale-provider";
 
 /**
  * Ficha de una persona.
@@ -56,6 +59,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function PersonProfile({ application }: { application: VacancyApplicationDto }) {
+  const { locale } = useLocale();
   const client = useQueryClient();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
@@ -141,7 +145,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
               <p className="mt-1 text-text-secondary">{waitingLabel(application.appliedAt)}</p>
             </div>
           </div>
-          <PhaseChip label={phase.title} tone={phase.id === "DESCARTADOS" ? "neutral" : "waiting"} />
+          <PhaseChip label={phaseTitle(phase.id, locale)} tone={phase.id === "DESCARTADOS" ? "neutral" : "waiting"} />
         </div>
 
         <dl className="mt-6 grid gap-4 border-t border-border-default pt-5 sm:grid-cols-3">
@@ -201,7 +205,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
           </>
         ) : moves.primary ? (
           <>
-            <p className="mt-2 text-text-primary">{recruitmentPhase(phase.id).meaning}</p>
+            <p className="mt-2 text-text-primary">{phaseMeaning(phase.id, locale)}</p>
             <button
               type="button"
               onClick={() => move.mutate({ stage: moves.primary!.stage })}
@@ -242,7 +246,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
         <SimpleSection title="Su postulación" hint={formatApplicationDate(application.appliedAt)}>
           <dl>
             <DataRow label="Puesto" value={application.vacancy.title} />
-            <DataRow label="Etapa actual" value={application.currentStage?.name ?? phase.title} />
+            <DataRow label="Etapa actual" value={application.currentStage?.name ?? phaseTitle(phase.id, locale)} />
             <DataRow label="Se postuló el" value={formatApplicationDate(application.appliedAt)} />
             <DataRow label="Responsable" value={application.assignedRecruiter ? `${application.assignedRecruiter.firstName} ${application.assignedRecruiter.lastName}` : "Sin asignar"} />
             {application.coverLetter ? <DataRow label="Lo que escribió" value={application.coverLetter} /> : null}

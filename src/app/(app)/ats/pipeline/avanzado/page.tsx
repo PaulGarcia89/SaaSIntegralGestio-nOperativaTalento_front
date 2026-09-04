@@ -37,13 +37,13 @@ import { useLocale } from "@/components/locale-provider";
 const ALL = "ALL";
 
 function PipelineContent() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const { currentBranch, currentUser, currentRole, can } = useAppStore();
   const canApproveOwnTransition = ["admin_empresa", "admin_plataforma", "admin_saas"].includes(currentRole);
-  const { t } = useLocale();
   const search = params.get("q") ?? "";
   const requestedVacancyId = params.get("vacancy") ?? ALL;
   const stageFilter = params.get("stage") ?? ALL;
@@ -126,10 +126,10 @@ function PipelineContent() {
   const undo = useMutation({
     mutationFn: ({ applicationId, expectedUpdatedAt }: { applicationId: string; expectedUpdatedAt: string }) => undoApplicationTransition(applicationId, expectedUpdatedAt),
     onSuccess: async () => {
-      toast.success("Cambio deshecho y registrado en el historial");
+      toast.success(t("adv.changeUndone"));
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No fue posible deshacer el cambio"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : t("adv.undoFailed")),
   });
 
   const decide = useMutation({
@@ -141,9 +141,9 @@ function PipelineContent() {
   });
   const createStageAutomation = useMutation({
     mutationFn: () => {
-      if (!automationStage) throw new Error("Selecciona una etapa para automatizar.");
+      if (!automationStage) throw new Error(t("adv.pickStageToAutomate"));
       return createAutomationRule({
-        name: `ATS · ${effectiveVacancyId ? vacancies.find((vacancy) => vacancy.id === effectiveVacancyId)?.title ?? "Vacante" : "Vacante"} · ${automationStage.name}`,
+        name: `ATS · ${effectiveVacancyId ? vacancies.find((vacancy) => vacancy.id === effectiveVacancyId)?.title ?? t("adv.vacancy") : t("adv.vacancy")} · ${automationStage.name}`,
         triggerEvent: "APPLICATION_STAGE_CHANGED",
         scope: currentBranch?.id ? "BRANCH" : "TENANT",
         branchId: currentBranch?.id,
@@ -153,7 +153,7 @@ function PipelineContent() {
       });
     },
     onSuccess: () => {
-      toast.success("Automatización de etapa activada");
+      toast.success(t("adv.automationEnabled"));
       setAutomationStage(null);
       setAutomationTitle("");
       setAutomationMessage("");
@@ -230,17 +230,17 @@ function PipelineContent() {
               <p className="font-semibold">{application.candidate.fullName}</p>
               <p className="text-sm text-text-secondary">{application.vacancy.title}</p>
             </div>
-            {(compact || requestedVacancyId === ALL) ? <Badge variant="secondary">{currentStage?.name ?? application.currentStage?.name ?? "Sin etapa"}</Badge> : null}
+            {(compact || requestedVacancyId === ALL) ? <Badge variant="secondary">{currentStage?.name ?? application.currentStage?.name ?? t("adv.noStage")}</Badge> : null}
           </div>
           <div className="space-y-1 text-xs text-text-secondary">
             <p>Recibida: {formatApplicationDate(application.appliedAt)}</p>
-            <p><span className="font-medium text-text-primary">Siguiente:</span> {applicationNextAction(application.status)}</p>
-            {application.stageDueAt ? <p className={application.isStageOverdue ? "font-medium text-status-danger" : ""}><Clock3 className="mr-1 inline size-3.5" />{application.isStageOverdue ? "SLA vencido" : `SLA: ${formatApplicationDate(application.stageDueAt)}`}</p> : null}
+            <p><span className="font-medium text-text-primary">{t("adv.next")}</span> {applicationNextAction(application.status)}</p>
+            {application.stageDueAt ? <p className={application.isStageOverdue ? "font-medium text-status-danger" : ""}><Clock3 className="mr-1 inline size-3.5" />{application.isStageOverdue ? t("adv.slaBreached") : `SLA: ${formatApplicationDate(application.stageDueAt)}`}</p> : null}
           </div>
-          {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">Arrastra hacia una etapa resaltada o desliza para avanzar.</p> : null}
-          {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && (pendingTransition.requestedByUserId !== currentUser.id || canApproveOwnTransition) ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>La solicitud debe resolverla otro responsable.</p>}</div> : null}
+          {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">{t("adv.dragHint")}</p> : null}
+          {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && (pendingTransition.requestedByUserId !== currentUser.id || canApproveOwnTransition) ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>{t("adv.otherOwnerMustResolve")}</p>}</div> : null}
           {can("applications.change_stage") && application.status !== "HIRED" && movableStages.length ? (
-            <FilterField label="Mover a">
+            <FilterField label={t("adv.moveTo")}>
               <Select
                 value={currentStageId ?? undefined}
                 disabled={move.isPending}
@@ -252,7 +252,7 @@ function PipelineContent() {
                 }}
               >
                 <SelectTrigger aria-label={`Cambiar etapa de ${application.candidate.fullName}`}>
-                  <SelectValue placeholder="Selecciona una etapa" />
+                  <SelectValue placeholder={t("adv.pickStage")} />
                 </SelectTrigger>
                 <SelectContent>
                   {currentStage ? <SelectItem value={currentStage.id!}>{currentStage.name} (actual)</SelectItem> : null}
@@ -263,7 +263,7 @@ function PipelineContent() {
               </Select>
             </FilterField>
           ) : null}
-          {can("applications.change_stage") && application.status !== "HIRED" && !movableStages.length && !pendingTransition ? <p className="text-xs text-text-secondary">No hay transiciones habilitadas desde esta etapa.</p> : null}
+          {can("applications.change_stage") && application.status !== "HIRED" && !movableStages.length && !pendingTransition ? <p className="text-xs text-text-secondary">{t("adv.noTransitions")}</p> : null}
           <Button
             variant="secondary"
             className="w-full"
@@ -288,29 +288,29 @@ function PipelineContent() {
         title={t("ats.selectionFlowByVacancy")}
         description={t("ats.selectionFlowDescription")}
       />
-      <section aria-label="Filtros del pipeline" className="grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 md:grid-cols-2 xl:grid-cols-4">
-        <FilterField label="Buscar">
+      <section aria-label={t("adv.pipelineFiltersAria")} className="grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 md:grid-cols-2 xl:grid-cols-4">
+        <FilterField label={t("adv.search")}>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" />
-            <Input value={search} onChange={(event) => setFilter("q", event.target.value)} placeholder="Nombre o correo" className="pl-9" />
+            <Input value={search} onChange={(event) => setFilter("q", event.target.value)} placeholder={t("adv.namePlaceholder")} className="pl-9" />
           </div>
         </FilterField>
-        <FilterField label="Vacante">
+        <FilterField label={t("adv.vacancy")}>
           <Select value={requestedVacancyId} onValueChange={(value) => setFilter("vacancy", value)}>
-            <SelectTrigger><SelectValue placeholder="Selecciona una vacante" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t("adv.pickVacancySelect")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>Todas las vacantes</SelectItem>
+              <SelectItem value={ALL}>{t("adv.allVacancies")}</SelectItem>
               {vacancies.map((vacancy) => (
                 <SelectItem key={vacancy.id} value={vacancy.id}>{vacancy.title}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </FilterField>
-        <FilterField label="Etapa">
+        <FilterField label={t("adv.stage")}>
           <Select disabled={requestedVacancyId === ALL} value={selectedStageId ?? stageFilter} onValueChange={(value) => setFilter("stage", value)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>Todas las etapas</SelectItem>
+              <SelectItem value={ALL}>{t("adv.allStages")}</SelectItem>
               {stages.map((stage) => <SelectItem key={stage.id} value={stage.id!}>{stage.name}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -331,14 +331,14 @@ function PipelineContent() {
       {!vacancies.length ? <InlineFeedback tone="info" title={t("ats.noVacancies")}>{t("ats.createVacancyForFlow")}</InlineFeedback> : null}
       {setup.isLoading || applications.isLoading ? <AsyncState state="loading" title={t("ats.loadingPipeline")} /> : null}
       {setup.isError || applications.isError ? <AsyncState state="error" title={t("ats.pipelineUnavailable")} onRetry={() => { void setup.refetch(); void applications.refetch(); }} /> : null}
-      {move.isError ? <InlineFeedback tone="danger" title="No fue posible cambiar la etapa">{move.error instanceof Error ? move.error.message : t("ats.stageUnchanged")}</InlineFeedback> : null}
+      {move.isError ? <InlineFeedback tone="danger" title={t("adv.stageChangeFailed")}>{move.error instanceof Error ? move.error.message : t("ats.stageUnchanged")}</InlineFeedback> : null}
       {decide.isError ? <InlineFeedback tone="danger" title={t("ats.approvalUnavailable")}>{decide.error instanceof Error ? decide.error.message : t("ats.tryAgain")}</InlineFeedback> : null}
       {requestedVacancyId !== ALL && setup.isSuccess && !stages.length ? <InlineFeedback tone="warning" title={t("ats.vacancyWithoutStages")}>{t("ats.configureStages")}</InlineFeedback> : null}
 
       {requestedVacancyId === ALL ? (
         <>
           <p className="text-sm text-text-secondary" aria-live="polite">{applications.data?.meta.total ?? 0} {(applications.data?.meta.total ?? 0) === 1 ? t("ats.applicationFound") : t("ats.applicationsFound")}</p>
-          <section aria-label="Todas las postulaciones" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section aria-label={t("adv.allApplications")} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((item) => card(item))}
             {!filtered.length ? <p className="col-span-full rounded-xl border border-dashed p-6 text-center text-sm text-text-secondary">{t("ats.noApplications")}</p> : null}
           </section>
@@ -371,7 +371,7 @@ function PipelineContent() {
                 gridTemplateColumns: `repeat(${stages.length}, minmax(240px, 1fr))`,
                 minWidth: `${Math.max(stages.length * 255, 900)}px`,
               }}
-              aria-label="Etapas personalizadas del pipeline"
+              aria-label={t("adv.customStages")}
             >
               {stages.map((stage) => {
                 const items = filtered.filter((item) => currentApplicationStage(item, stages)?.id === stage.id);

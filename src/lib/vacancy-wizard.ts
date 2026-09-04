@@ -11,22 +11,31 @@
  * hace falta para empezar vive en secciones plegadas.
  */
 
+import { translate } from "@/i18n";
+import type { SupportedLocale } from "@/i18n/types";
+
 export type VacancyStepId = "PUESTO" | "CONDICIONES" | "REVISION";
 
 export type VacancyStep = {
   id: VacancyStepId;
   index: number;
-  /** Título del paso, como pregunta que el usuario reconoce. */
-  title: string;
-  /** Qué se resuelve aquí, en una frase. */
-  help: string;
 };
 
 export const VACANCY_STEPS: VacancyStep[] = [
-  { id: "PUESTO", index: 0, title: "El puesto", help: "Qué puesto es, dónde trabaja y cuántas personas necesitas." },
-  { id: "CONDICIONES", index: 1, title: "Condiciones", help: "Qué va a hacer la persona y cuánto va a ganar." },
-  { id: "REVISION", index: 2, title: "Revisar y publicar", help: "Comprueba cómo lo verá quien se postule." },
+  { id: "PUESTO", index: 0 },
+  { id: "CONDICIONES", index: 1 },
+  { id: "REVISION", index: 2 },
 ];
+
+/** Título del paso, como frase que el usuario reconoce. */
+export function vacancyStepTitle(id: VacancyStepId, locale: SupportedLocale = "es"): string {
+  return translate(locale, `vacancies.step.${id}.title`);
+}
+
+/** Qué se resuelve en ese paso, en una frase. */
+export function vacancyStepHelp(id: VacancyStepId, locale: SupportedLocale = "es"): string {
+  return translate(locale, `vacancies.step.${id}.help`);
+}
 
 /**
  * A qué paso pertenece cada error de validación.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { VACANCY_STEPS, stepForVacancyError, vacancyStep, vacancyStepAt } from "@/lib/vacancy-wizard";
+import { translate } from "@/i18n";
+import { VACANCY_STEPS, stepForVacancyError, vacancyStep, vacancyStepAt, vacancyStepHelp, vacancyStepTitle } from "@/lib/vacancy-wizard";
 
 describe("asistente de puestos", () => {
   it("tiene tres pasos, no siete", () => {
@@ -7,10 +8,27 @@ describe("asistente de puestos", () => {
     expect(VACANCY_STEPS.map((step) => step.id)).toEqual(["PUESTO", "CONDICIONES", "REVISION"]);
   });
 
-  it("cada paso explica qué se resuelve en él", () => {
+  it("cada paso explica qué se resuelve en él, en los dos idiomas", () => {
+    (["es", "en"] as const).forEach((locale) => {
+      VACANCY_STEPS.forEach((step) => {
+        expect(vacancyStepTitle(step.id, locale)).toBeTruthy();
+        expect(vacancyStepHelp(step.id, locale)).toBeTruthy();
+      });
+    });
+    expect(vacancyStepTitle("PUESTO", "es")).toBe("El puesto");
+    expect(vacancyStepTitle("PUESTO", "en")).toBe("The role");
+  });
+
+  // `translate` devuelve la clave misma cuando no la encuentra, así que un
+  // hueco en el catálogo inglés se vería en pantalla como
+  // "vacancies.step.PUESTO.help" sin que nada fallara. Esto lo convierte en un
+  // fallo de prueba.
+  it("no deja ningún paso sin traducir al inglés", () => {
     VACANCY_STEPS.forEach((step) => {
-      expect(step.title).toBeTruthy();
-      expect(step.help).toBeTruthy();
+      ["title", "help"].forEach((part) => {
+        const key = `vacancies.step.${step.id}.${part}`;
+        expect(translate("en", key)).not.toBe(key);
+      });
     });
   });
 

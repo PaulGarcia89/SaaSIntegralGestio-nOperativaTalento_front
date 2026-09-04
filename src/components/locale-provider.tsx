@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { fetchMyPreferences, fetchPreferredLocale, updateMyPreference, updatePreferredLocale } from "@/lib/backend";
-import { getBrowserLocale, normalizeLocale, resolveLocale } from "@/i18n/localeResolver";
+import { getBrowserLocale, normalizeLocale, resolveLocale, resolveLocaleBeforeSignIn } from "@/i18n/localeResolver";
 import { translate } from "@/i18n";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale, type TranslationParams } from "@/i18n/types";
 
@@ -40,7 +40,13 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
             setLocaleState(resolveLocale({ user: userLocale, stored, browser: getBrowserLocale(), enabled: enabledLocales }));
           })
           .catch(() => {
-            if (!cancelled) setLocaleState(resolveLocale({ stored, browser: getBrowserLocale(), enabled: enabledLocales }));
+            // Las dos consultas de preferencia fallaron: no hay sesión, así que
+            // estamos en una pantalla previa al acceso. Aquí el navegador NO
+            // decide —ver `resolveLocaleBeforeSignIn`—. Como el resultado
+            // coincide con `DEFAULT_LOCALE` mientras la persona no haya elegido
+            // idioma, desaparece además el parpadeo es→en que se veía al
+            // hidratar la pantalla de acceso.
+            if (!cancelled) setLocaleState(resolveLocaleBeforeSignIn({ stored, enabled: enabledLocales }));
           });
       });
     return () => { cancelled = true; };

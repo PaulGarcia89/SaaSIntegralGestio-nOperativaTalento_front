@@ -771,9 +771,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Search className="size-4" aria-hidden="true" />
               </Button>
 
-              <LanguageSelector compact />
-              <DensityToggle className="hidden sm:inline-flex" />
-              <ThemeToggle />
+              {/* Idioma y tema se cambian una vez cada mucho: en un teléfono
+                  ocupaban ancho fijo que le hacía falta al contexto, y viven
+                  en el menú de usuario. */}
+              <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                <LanguageSelector compact />
+                <DensityToggle />
+                <ThemeToggle />
+              </div>
 
               <Button variant="ghost" size="icon" className="relative shrink-0" asChild>
                 <Link
@@ -896,8 +901,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     Configuración
                   </Link>
                 ) : null}
-                <div className="px-3 py-2 sm:hidden">
+                {/* En móvil estos tres salen de la cabecera para dejarle ancho
+                    al contexto de empresa, así que tienen que estar aquí: no
+                    se pierde ninguna función, cambia dónde se toca. */}
+                <div className="flex flex-wrap items-center gap-2 px-3 py-2 sm:hidden">
+                  <LanguageSelector compact />
                   <DensityToggle />
+                  <ThemeToggle />
                 </div>
               </div>
 

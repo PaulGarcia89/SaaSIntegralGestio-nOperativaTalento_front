@@ -252,7 +252,19 @@ export function Metric({
   return (
     <div className={cn("min-w-0 space-y-1", className)}>
       <p className="truncate text-xs font-medium text-ink-2">{label}</p>
-      <p className={cn("font-mono text-2xl font-semibold tabular-figures", valueTone)}>{value}</p>
+      {/* La monoespaciada con `tabular-figures` alinea columnas de cifras; en
+          una palabra solo la afea y, con el cero barrado, la hace parecer un
+          dato técnico. «Activa» y «Empresarial» no son cifras. */}
+      <p
+        className={cn(
+          "text-2xl font-semibold",
+          /^[\d\s.,%+\-/$€£¥]+$/.test(value) ? "font-mono tabular-figures" : "hyphens-auto",
+          valueTone,
+        )}
+        lang="es"
+      >
+        {value}
+      </p>
       {trend ? (
         <p
           className={cn(

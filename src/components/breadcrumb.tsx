@@ -65,7 +65,13 @@ export function AppBreadcrumb({ pathname }: { pathname: string }) {
   });
 
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground">
+    // En un teléfono la miga sobra —el título de la página dice lo mismo unos
+    // centímetros más abajo— y, al ser un flex sin `min-w-0`, ensanchaba la
+    // cabecera hasta dejar al nombre de la empresa sin sitio.
+    <nav
+      aria-label="Breadcrumb"
+      className="hidden min-w-0 items-center gap-1 overflow-hidden text-xs text-muted-foreground sm:flex"
+    >
       {/* El icono es decorativo: el nombre accesible del enlace lo aporta el
           texto oculto. Sin el, este enlace no tiene nombre y axe lo marca como
           `link-name` en todas las pantallas del producto. */}
@@ -74,14 +80,14 @@ export function AppBreadcrumb({ pathname }: { pathname: string }) {
         <span className="sr-only">{localizedLabel("Inicio", t)}</span>
       </Link>
       {crumbs.map((crumb) => (
-        <span key={crumb.href ?? crumb.label} className="flex items-center gap-1">
+        <span key={crumb.href ?? crumb.label} className="flex min-w-0 items-center gap-1">
           <ChevronRight className="size-3" aria-hidden="true" />
           {crumb.href ? (
-            <Link href={crumb.href} className={cn("transition hover:text-foreground")}>
+            <Link href={crumb.href} className={cn("truncate transition hover:text-foreground")}>
               {crumb.label}
             </Link>
           ) : (
-            <span className="font-medium text-foreground">{crumb.label}</span>
+            <span className="truncate font-medium text-foreground">{crumb.label}</span>
           )}
         </span>
       ))}

@@ -540,7 +540,11 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display-family), sans-serif;
   font-weight: 600;
   letter-spacing: -0.021em;
-  overflow-wrap: anywhere;
+  /* `anywhere` no solo parte la palabra donde sea: pone a cero el ancho
+     mínimo de contenido, así que un contenedor flex o grid puede aplastar el
+     elemento hasta dejarlo en nada y el texto acaba apilado una letra por
+     línea. `break-word` parte lo que de verdad no cabe y respeta el mínimo. */
+  overflow-wrap: break-word;
   text-wrap: balance;
   color: hsl(var(--ink-1));
 }
@@ -550,7 +554,9 @@ h1, h2, h3, h4, h5, h6 {
 h1 { letter-spacing: -0.03em; }
 
 p, li, dd, dt, label, figcaption {
-  overflow-wrap: anywhere;
+  /* Ver la nota de los titulares: `anywhere` era la causa de que el nombre de
+     la empresa saliera apilado letra a letra en la cabecera del teléfono. */
+  overflow-wrap: break-word;
   text-align: start;
   text-wrap: pretty;
 }

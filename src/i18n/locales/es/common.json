@@ -28,6 +28,8 @@
   "landing.nav.trackApplication": "Seguir postulación",
   "landing.nav.open": "Abrir menú",
   "landing.nav.close": "Cerrar menú",
+  "landing.candidates.title": "¿Buscas empleo?",
+  "landing.candidates.detail": "TalentOS es la plataforma que usan las empresas para contratar. Sus vacantes se publican aquí y puedes consultar el estado de tus postulaciones.",
   "landing.cta.register": "Registrar empresa",
   "landing.hero.eyebrow": "Una plataforma para todo el ciclo del empleado",
   "landing.hero.title": "Contrata, capacita y gestiona a tu equipo desde una sola plataforma.",

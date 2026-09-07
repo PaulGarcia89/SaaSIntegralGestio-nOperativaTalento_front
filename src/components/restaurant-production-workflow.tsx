@@ -1,48 +1,545 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { confirmRestaurantProduction, createRestaurantProduction, fetchRestaurantProductions, getApiErrorMessage, previewRestaurantProduction } from "@/lib/backend";
-import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
+import {
+  confirmRestaurantProduction,
+  createRestaurantProduction,
+  fetchRestaurantProductions,
+  getApiErrorMessage,
+  previewRestaurantProduction,
+} from "@/lib/backend";
+import type { RestaurantProductionDto } from "@/lib/contracts";
+import {
+  ConfirmPanel,
+  EmptyState,
+  ImpactReview,
+  InlineNote,
+  OperationResultView,
+  OperationStepper,
+  PageHeader,
+  PageSection,
+} from "@/components/system";
+import { RestaurantQueryState, RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppStore } from "@/store/app-store";
+import { cn } from "@/lib/utils";
+import { formatMoney, formatQuantity } from "@/lib/restaurant-operation";
+import {
+  initialOperationState,
+  type OperationBlocker,
+  type OperationImpact,
+  type OperationImpactLine,
+  type OperationOutcome,
+  type OperationState,
+  type OperationStepId,
+} from "@/lib/operation-flow";
+
+/**
+ * Producción de recetas, con el patrón universal de operaciones.
+ *
+ * Qué cambió
+ * ----------
+ * · Había SEIS etapas para cinco rótulos, y una de ellas —«3. Ingredientes
+ *   requeridos»— no mostraba ningún ingrediente: sólo la frase «el backend
+ *   calculará cantidades, conversiones y costo». Era un clic que no informaba
+ *   nada, así que desaparece. Quedan los cinco pasos del patrón.
+ * · La comparación de existencias vivía en una tabla de 620px de ancho mínimo
+ *   dentro de un `overflow-x-auto`: en un teléfono había que arrastrarla a
+ *   ciegas. Ahora es el impacto línea a línea, que se lee en cualquier ancho.
+ * · El faltante era un aviso que decía «puedes continuar sólo con una
+ *   justificación de al menos 10 caracteres si el permiso de override está
+ *   habilitado»: describía la regla, no la salida. Ahora es un BLOQUEO con su
+ *   causa, su responsable y su solución, y se levanta solo al escribir la
+ *   justificación que el backend exige.
+ * · No se advertía que la operación es IRREVERSIBLE, siendo que confirma y
+ *   aplica los movimientos de TODAS las recetas seleccionadas.
+ * · La bandeja de pendientes pintaba el estado con su código en inglés
+ *   (`DRAFT`, `IN_PROGRESS`).
+ * · Si la tercera receta fallaba, las dos primeras ya se habían aplicado y la
+ *   pantalla no lo decía. Ahora el resultado distingue el éxito del éxito
+ *   PARCIAL y nombra qué recetas quedaron sin aplicar.
+ *
+ * El contrato del backend no cambia: previsualizar → crear borrador →
+ * confirmar, una vez por receta, con la justificación cuando hay faltante.
+ */
 
 type RecipeOption = { id: string; label: string };
 type ProductionLine = { recipeId: string; plannedQuantity: string; actualYield: string };
 type ProductionPreview = Awaited<ReturnType<typeof previewRestaurantProduction>>;
-type ProductionIngredient = ProductionPreview["ingredients"][number];
-const stages = ["Seleccionar", "Registrar", "Revisar impacto", "Confirmar", "Resultado"];
 
-export function RestaurantProductionWorkflow({ branchId, warehouseId, recipeOptions, canManage }: { branchId: string; warehouseId?: string; recipeOptions: RecipeOption[]; canManage: boolean }) {
+/** Mínimo que exige el backend para autorizar una producción con faltante. */
+const JUSTIFICATION_MIN = 10;
+
+const SELECT_CLASS = cn(
+  "w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3",
+  "min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)]",
+  "text-base text-ink-1 sm:text-sm",
+);
+
+const emptyLine = (): ProductionLine => ({ recipeId: "", plannedQuantity: "1", actualYield: "1" });
+
+export function RestaurantProductionWorkflow({
+  branchId,
+  warehouseId,
+  warehouseName,
+  recipeOptions,
+  canManage,
+}: {
+  branchId: string;
+  warehouseId?: string;
+  warehouseName?: string;
+  recipeOptions: RecipeOption[];
+  canManage: boolean;
+}) {
   const queryClient = useQueryClient();
-  const [stage, setStage] = useState(1);
-  const [lines, setLines] = useState<ProductionLine[]>([{ recipeId: "", plannedQuantity: "1", actualYield: "1" }]);
+  const { currentUser } = useAppStore();
+
+  const [step, setStep] = useState<OperationStepId>("select");
+  const [lines, setLines] = useState<ProductionLine[]>([emptyLine()]);
   const [previews, setPreviews] = useState<ProductionPreview[]>([]);
   const [justification, setJustification] = useState("");
-  const [completed, setCompleted] = useState(false);
-  const preview = useMutation({ mutationFn: async () => Promise.all(lines.map((line) => previewRestaurantProduction({ branchId, warehouseId, recipeId: line.recipeId, plannedQuantity: Number(line.plannedQuantity), actualYield: Number(line.actualYield), productionDate: new Date().toISOString() }))), onSuccess: (data) => { setPreviews(data); setStage(4); } });
-  const confirm = useMutation({ mutationFn: async () => { const created: Array<{ id: string }> = []; for (const line of lines) { const draft = await createRestaurantProduction({ branchId, warehouseId, recipeId: line.recipeId, plannedQuantity: Number(line.plannedQuantity), actualYield: Number(line.actualYield), productionDate: new Date().toISOString(), justification: justification || undefined }); const confirmed = await confirmRestaurantProduction(draft.id); created.push(confirmed); } return created; }, onSuccess: async () => { setCompleted(true); setStage(6); toast.success("Producción confirmada", { description: "Existencias y costos actualizados." }); await Promise.all([queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-productions"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-recipes"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-recipe-cost"] })]); } });
-  const pending = useQuery({ queryKey: ["restaurant-productions", branchId, "pending"], queryFn: async () => (await fetchRestaurantProductions({ branchId })).filter((item) => ["DRAFT", "PENDING", "IN_PROGRESS"].includes(item.status)) });
-  const shortages = previews.flatMap((item) => item.ingredients.filter((ingredient) => !ingredient.sufficient));
-  const valid = Boolean(warehouseId) && lines.length > 0 && lines.every((line) => line.recipeId && Number(line.plannedQuantity) > 0 && Number(line.actualYield) > 0);
-  const next = () => { if (stage === 3) { if (valid) preview.mutate(); return; } if (stage < 5) setStage((value) => value + 1); };
-  const previous = () => setStage((value) => Math.max(1, value - 1));
-  return <div className="space-y-5"><PageHeader eyebrow="Operación diaria" title="Producción pendiente y nueva operación" description="Selecciona, registra, revisa el impacto, confirma y consulta el resultado." />{!warehouseId ? <InlineFeedback tone="warning" title="Almacén requerido">Selecciona un almacén global antes de planificar producción.</InlineFeedback> : null}{preview.error || confirm.error ? <InlineFeedback tone="danger" title="No se pudo completar la producción">{getApiErrorMessage(preview.error ?? confirm.error, "Revisa las recetas y existencias.")}</InlineFeedback> : null}<Card level={1}><CardContent className="space-y-4 p-5"><div className="grid gap-2 sm:grid-cols-5" aria-label="Flujo de producción">{stages.map((label, index) => { const number = index + 1; const active = number === 1 ? stage === 1 : number === 2 ? stage === 2 || stage === 3 : number === 3 ? stage === 4 : number === 4 ? stage === 5 : completed; return <button key={label} type="button" onClick={() => number < 5 && number <= stage && setStage(number === 3 ? 4 : number === 4 ? 5 : number)} className={`rounded-xl border p-3 text-left text-xs font-semibold ${active ? "border-primary bg-primary/10" : number < stage || (number === 5 && completed) ? "border-success/40 bg-success/5" : "border-border-default"}`}><span className="grid size-6 place-items-center rounded-full bg-surface-interactive">{number < stage || (number === 5 && completed) ? <Check className="size-3" /> : number}</span><span className="mt-2 block">{label}</span></button>; })}</div>{stage === 1 ? <RecipeStage lines={lines} recipeOptions={recipeOptions} setLines={setLines} /> : null}{stage === 2 ? <QuantityStage lines={lines} setLines={setLines} recipeOptions={recipeOptions} /> : null}{stage === 3 ? <RequiredStage lines={lines} recipeOptions={recipeOptions} /> : null}{stage === 4 ? <AvailabilityStage previews={previews} recipeOptions={recipeOptions} shortages={shortages} /> : null}{stage === 5 ? <ConfirmStage previews={previews} shortages={shortages} justification={justification} setJustification={setJustification} /> : null}{stage === 6 ? <div className="rounded-2xl border border-success/40 bg-success/5 p-4"><h2 className="font-semibold">5. Resultado</h2><p className="mt-1 text-sm text-text-secondary">La producción fue confirmada. Existencias, costos y movimientos ya fueron actualizados.</p><Button className="mt-4" onClick={() => { setLines([{ recipeId: "", plannedQuantity: "1", actualYield: "1" }]); setPreviews([]); setJustification(""); setCompleted(false); setStage(1); }}>Registrar otra producción</Button></div> : null}<div className="flex justify-between gap-2 border-t border-border-default pt-4">{stage < 6 ? <Button variant="secondary" disabled={stage === 1 || preview.isPending || confirm.isPending} onClick={previous}><ChevronLeft className="size-4" />Anterior</Button> : <span />}{stage < 3 ? <Button disabled={!valid} onClick={next}>Siguiente<ChevronRight className="size-4" /></Button> : stage === 3 ? <Button disabled={!valid || preview.isPending} onClick={next}>{preview.isPending ? "Calculando…" : "Revisar impacto"}<ChevronRight className="size-4" /></Button> : stage === 4 ? <Button disabled={!previews.length} onClick={() => setStage(5)}>Revisar confirmación<ChevronRight className="size-4" /></Button> : stage === 5 ? <Button disabled={!canManage || !previews.length || confirm.isPending || (shortages.length > 0 && justification.trim().length < 10)} onClick={() => confirm.mutate()}>{confirm.isPending ? "Confirmando…" : "Confirmar producción"}</Button> : null}</div></CardContent></Card><PendingProductionInbox query={pending} /></div>;
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [outcome, setOutcome] = useState<OperationOutcome | null>(null);
+
+  const payload = (line: ProductionLine) => ({
+    branchId,
+    warehouseId,
+    recipeId: line.recipeId,
+    plannedQuantity: Number(line.plannedQuantity),
+    actualYield: Number(line.actualYield),
+    productionDate: new Date().toISOString(),
+  });
+
+  const recipeLabel = (line: ProductionLine, index: number) =>
+    previews[index]?.preparationName ||
+    recipeOptions.find((option) => option.id === line.recipeId)?.label ||
+    `Receta ${index + 1}`;
+
+  const calculate = useMutation({
+    mutationFn: () => Promise.all(lines.map((line) => previewRestaurantProduction(payload(line)))),
+    onSuccess: (data) => {
+      setPreviews(data);
+      setStep("review");
+    },
+  });
+
+  const prepare = () => {
+    setAcknowledged(false);
+    setStep("confirm");
+  };
+
+  /**
+   * Cada receta es su propio documento en el backend: se crea el borrador y se
+   * confirma, una por una. Si una falla a mitad de camino, las anteriores YA
+   * están aplicadas; por eso se lleva la cuenta y se devuelve, en vez de
+   * propagar un error que haría creer que no se aplicó nada.
+   */
+  const confirm = useMutation({
+    mutationFn: async () => {
+      const applied: string[] = [];
+      const failures: string[] = [];
+      for (const [index, line] of lines.entries()) {
+        const label = recipeLabel(line, index);
+        try {
+          const draft = await createRestaurantProduction({
+            ...payload(line),
+            justification: justification || undefined,
+          });
+          await confirmRestaurantProduction(draft.id);
+          applied.push(label);
+        } catch (error) {
+          failures.push(`${label}: ${getApiErrorMessage(error, "el servidor rechazó la producción")}`);
+        }
+      }
+      return { applied, failures };
+    },
+    onSuccess: async ({ applied, failures }) => {
+      if (failures.length === 0) {
+        setOutcome({
+          status: "success",
+          headline: applied.length === 1 ? "Producción registrada" : `${applied.length} producciones registradas`,
+          detail: "Existencias, costos y movimientos ya reflejan la operación.",
+          nextAction: { label: "Ver los movimientos", href: "/inventory/restaurant/movements" },
+        });
+        toast.success("Producción confirmada");
+      } else if (applied.length === 0) {
+        setOutcome({
+          status: "error",
+          headline: "No se registró ninguna producción",
+          detail: failures.join(" · "),
+          retryable: true,
+        });
+      } else {
+        setOutcome({
+          status: "partial",
+          headline: `Se aplicaron ${applied.length} de ${lines.length} producciones`,
+          detail:
+            "Las que sí se aplicaron ya movieron existencias y no se deshacen desde aquí. Vuelve a registrar solo las que fallaron.",
+          failures,
+        });
+      }
+      setStep("result");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-productions"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-recipes"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-recipe-cost"] }),
+      ]);
+    },
+  });
+
+  const pending = useQuery({
+    queryKey: ["restaurant-productions", branchId, "pending"],
+    queryFn: async () =>
+      (await fetchRestaurantProductions({ branchId })).filter((item) =>
+        ["DRAFT", "PENDING", "IN_PROGRESS"].includes(item.status),
+      ),
+  });
+
+  const recipesChosen = lines.every((line) => line.recipeId) && lines.length > 0;
+  const quantitiesValid = lines.every(
+    (line) => Number(line.plannedQuantity) > 0 && Number(line.actualYield) > 0,
+  );
+  const ready = Boolean(warehouseId) && recipesChosen && quantitiesValid;
+
+  const justificationReady = justification.trim().length >= JUSTIFICATION_MIN;
+
+  /**
+   * El impacto se arma con lo que el backend YA devuelve por ingrediente:
+   * cuánto hay y cuánto se consume. La resta no es una estimación nuestra, es
+   * la aritmética de esos dos campos.
+   */
+  const impact: OperationImpact | undefined = previews.length
+    ? (() => {
+        const many = previews.length > 1;
+        const impactLines: OperationImpactLine[] = [];
+        const shortages: string[] = [];
+
+        previews.forEach((preview, index) => {
+          const dish = preview.preparationName || recipeLabel(lines[index] ?? emptyLine(), index);
+          preview.ingredients.forEach((ingredient) => {
+            const after = ingredient.availableQuantity - ingredient.requiredQuantity;
+            impactLines.push({
+              label: many ? `${ingredient.ingredientName} · ${dish}` : ingredient.ingredientName,
+              before: `${formatQuantity(ingredient.availableQuantity)} ${ingredient.unit}`,
+              after: `${formatQuantity(after)} ${ingredient.unit}`,
+              adverse: true,
+            });
+            if (!ingredient.sufficient) shortages.push(`${ingredient.ingredientName} (${dish})`);
+          });
+        });
+
+        const blockers: OperationBlocker[] =
+          shortages.length > 0 && !justificationReady
+            ? [
+                {
+                  code: "INGREDIENT_SHORTAGE",
+                  cause:
+                    shortages.length === 1
+                      ? `No hay existencia suficiente de ${shortages[0]}.`
+                      : `No hay existencia suficiente de ${shortages.length} ingredientes: ${shortages.slice(0, 3).join(", ")}${shortages.length > 3 ? "…" : ""}.`,
+                  owner: "Encargado de inventario de la sucursal",
+                  resolution: `Registra primero la entrada que falta, o escribe abajo una justificación de al menos ${JUSTIFICATION_MIN} caracteres para autorizar la producción con faltante.`,
+                  fieldId: "production-justification",
+                },
+              ]
+            : [];
+
+        const cost = previews.reduce((total, preview) => total + preview.consumedCost, 0);
+
+        return {
+          headline: `Producir ${previews.length === 1 ? previews[0].preparationName || "una receta" : `${previews.length} recetas`}${warehouseName ? ` en ${warehouseName}` : ""}`,
+          affectedCount: impactLines.length,
+          affectedLabel: impactLines.length === 1 ? "ingrediente" : "ingredientes",
+          lines: impactLines,
+          cost: { label: "Costo de los ingredientes consumidos", amount: formatMoney(cost), adverse: true },
+          warnings:
+            shortages.length > 0 && justificationReady
+              ? [
+                  {
+                    code: "SHORTAGE_OVERRIDE",
+                    message: `Se produce con faltante en ${shortages.length} ${shortages.length === 1 ? "ingrediente" : "ingredientes"}. Tu justificación queda en la auditoría.`,
+                  },
+                ]
+              : [],
+          blockers,
+          responsible: currentUser.fullName,
+          // Confirmar crea y aplica los movimientos de todas las recetas: no
+          // hay «deshacer», hay que registrar la operación inversa.
+          irreversible: true,
+        } satisfies OperationImpact;
+      })()
+    : undefined;
+
+  const completed: OperationStepId[] = [];
+  if (recipesChosen) completed.push("select");
+  if (previews.length || step === "review" || step === "confirm" || step === "result") completed.push("record");
+  if (step === "confirm" || step === "result") completed.push("review");
+  if (step === "result") completed.push("confirm");
+
+  const operationState: OperationState = {
+    ...initialOperationState(),
+    step,
+    completed,
+    impact,
+    submitting: confirm.isPending,
+    outcome: outcome ?? undefined,
+  };
+
+  const updateLine = (index: number, key: keyof ProductionLine, value: string) =>
+    setLines(lines.map((line, current) => (current === index ? { ...line, [key]: value } : line)));
+
+  const reset = () => {
+    setLines([emptyLine()]);
+    setPreviews([]);
+    setJustification("");
+    setAcknowledged(false);
+    setOutcome(null);
+    setStep("select");
+  };
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Operación diaria"
+        title="Producción"
+        description="Elige las recetas, define cantidades, revisa cómo queda el almacén y confirma."
+        meta={warehouseName ? <span>Almacén: {warehouseName}</span> : null}
+      />
+
+      <OperationStepper state={operationState} onStepChange={setStep} />
+
+      {!warehouseId ? (
+        <InlineNote tone="warning" title="Falta elegir el almacén">
+          Sin almacén no se sabe de dónde salen los ingredientes. Selecciónalo arriba para continuar.
+        </InlineNote>
+      ) : null}
+
+      {calculate.error ? (
+        <InlineNote tone="danger" title="No se pudo calcular el impacto">
+          {getApiErrorMessage(calculate.error, "Revisa las recetas y las cantidades.")}
+        </InlineNote>
+      ) : null}
+
+      {step === "select" ? (
+        <PageSection
+          title="Recetas a producir"
+          description="Puedes agrupar varias recetas en una misma operación."
+          boxed
+        >
+          <div className="space-y-3">
+            {lines.map((line, index) => (
+              <div key={index} className="flex flex-wrap items-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <Label htmlFor={`production-recipe-${index}`}>Receta {index + 1}</Label>
+                  <select
+                    id={`production-recipe-${index}`}
+                    className={SELECT_CLASS}
+                    value={line.recipeId}
+                    onChange={(event) => updateLine(index, "recipeId", event.target.value)}
+                  >
+                    <option value="">Seleccionar</option>
+                    {recipeOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {lines.length > 1 ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setLines(lines.filter((_, current) => current !== index))}
+                    aria-label={`Quitar la receta ${index + 1}`}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button size="sm" variant="secondary" onClick={() => setLines([...lines, emptyLine()])}>
+              <Plus className="size-4" aria-hidden="true" />
+              Agregar otra receta
+            </Button>
+            <Button size="lg" disabled={!recipesChosen} onClick={() => setStep("record")}>
+              Continuar
+            </Button>
+          </div>
+        </PageSection>
+      ) : null}
+
+      {step === "record" ? (
+        <PageSection
+          title="Cantidades"
+          description="Cuánto se planificó producir y cuánto rindió realmente."
+          boxed
+        >
+          <div className="space-y-4">
+            {lines.map((line, index) => (
+              <div key={index} className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
+                <p className="min-w-0 truncate font-medium text-ink-1">{recipeLabel(line, index)}</p>
+                <div>
+                  <Label htmlFor={`production-planned-${index}`}>Cantidad planificada</Label>
+                  <Input
+                    id={`production-planned-${index}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={line.plannedQuantity}
+                    onChange={(event) => updateLine(index, "plannedQuantity", event.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`production-yield-${index}`}>Rendimiento real</Label>
+                  <Input
+                    id={`production-yield-${index}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={line.actualYield}
+                    onChange={(event) => updateLine(index, "actualYield", event.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setStep("select")}>
+              Cambiar las recetas
+            </Button>
+            <Button
+              size="lg"
+              disabled={!ready}
+              loading={calculate.isPending}
+              loadingLabel="Calculando…"
+              onClick={() => calculate.mutate()}
+            >
+              Revisar impacto
+            </Button>
+          </div>
+        </PageSection>
+      ) : null}
+
+      {step === "review" && impact ? (
+        <div className="space-y-4">
+          <ImpactReview impact={impact} />
+
+          {impact.blockers.length > 0 || justificationReady ? (
+            <PageSection title="Autorizar el faltante" boxed>
+              <p className="text-sm text-ink-2">
+                El servidor permite producir aunque no haya existencia suficiente, pero exige dejar por escrito
+                por qué. Queda en la auditoría a nombre de {currentUser.fullName}.
+              </p>
+              <div className="mt-3">
+                <Label htmlFor="production-justification">Justificación</Label>
+                <Input
+                  id="production-justification"
+                  value={justification}
+                  onChange={(event) => setJustification(event.target.value)}
+                  placeholder="Explica por qué se autoriza el faltante"
+                  aria-describedby="production-justification-help"
+                />
+                <p id="production-justification-help" className="mt-1 font-mono text-2xs text-ink-3 tabular-figures">
+                  {justification.trim().length} / {JUSTIFICATION_MIN} caracteres mínimos
+                </p>
+              </div>
+            </PageSection>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setStep("record")}>
+              Corregir las cantidades
+            </Button>
+            <Button size="lg" disabled={!canManage || impact.blockers.length > 0} onClick={prepare}>
+              Continuar
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {step === "confirm" && impact ? (
+        <ConfirmPanel
+          state={operationState}
+          operationName="Registrar producción"
+          onConfirm={() => confirm.mutate()}
+          onBack={() => setStep("review")}
+          acknowledged={acknowledged}
+          onAcknowledgedChange={setAcknowledged}
+        />
+      ) : null}
+
+      {step === "result" && outcome ? (
+        <OperationResultView
+          outcome={outcome}
+          onRetry={() => confirm.mutate()}
+          onStartAnother={reset}
+          startAnotherLabel="Registrar otra producción"
+        />
+      ) : null}
+
+      <PendingProductionInbox query={pending} />
+    </div>
+  );
 }
 
-function RecipeStage({ lines, recipeOptions, setLines }: { lines: ProductionLine[]; recipeOptions: RecipeOption[]; setLines: (lines: ProductionLine[]) => void }) { return <section className="space-y-4"><div><h2 className="font-semibold">1. Seleccionar recetas</h2><p className="text-sm text-text-secondary">Puedes agrupar varias recetas en una misma operación.</p></div>{lines.map((line, index) => <div key={index} className="flex flex-wrap items-end gap-3 rounded-2xl border border-border-default p-3"><div className="min-w-[260px] flex-1"><Select id={`production-recipe-${index}`} label={`Receta ${index + 1}`} value={line.recipeId} options={recipeOptions} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, recipeId: value } : current))} /></div>{lines.length > 1 ? <Button variant="ghost" onClick={() => setLines(lines.filter((_, i) => i !== index))} aria-label="Eliminar receta"><Trash2 className="size-4" /></Button> : null}</div>)}<Button size="sm" variant="secondary" onClick={() => setLines([...lines, { recipeId: "", plannedQuantity: "1", actualYield: "1" }])}><Plus className="size-4" />Agregar otra receta</Button></section>; }
-function QuantityStage({ lines, recipeOptions, setLines }: { lines: ProductionLine[]; recipeOptions: RecipeOption[]; setLines: (lines: ProductionLine[]) => void }) { return <section className="space-y-4"><div><h2 className="font-semibold">2. Definir cantidad</h2><p className="text-sm text-text-secondary">Indica la cantidad planificada y el rendimiento real esperado.</p></div>{lines.map((line, index) => <div key={index} className="grid gap-3 rounded-2xl border border-border-default p-3 sm:grid-cols-[2fr_1fr_1fr]"><p className="flex items-center font-medium">{recipeOptions.find((item) => item.id === line.recipeId)?.label ?? "Receta pendiente"}</p><Field id={`production-planned-${index}`} label="Cantidad planificada" value={line.plannedQuantity} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, plannedQuantity: value } : current))} /><Field id={`production-yield-${index}`} label="Rendimiento real" value={line.actualYield} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, actualYield: value } : current))} /></div>)}</section>; }
-function RequiredStage({ lines, recipeOptions }: { lines: ProductionLine[]; recipeOptions: RecipeOption[] }) { return <section className="space-y-4"><h2 className="font-semibold">3. Ingredientes requeridos</h2>{lines.map((line, index) => <div key={index} className="rounded-2xl border border-border-default p-4"><p className="font-medium">{recipeOptions.find((item) => item.id === line.recipeId)?.label ?? "Receta"}</p><p className="mt-2 text-sm text-text-secondary">El backend calculará cantidades, conversiones y costo al comparar existencias.</p></div>)}</section>; }
-function AvailabilityStage({ previews, recipeOptions, shortages }: { previews: ProductionPreview[]; recipeOptions: RecipeOption[]; shortages: ProductionIngredient[] }) { return <section className="space-y-4"><div><h2 className="font-semibold">4. Comparar existencia disponible</h2><p className="text-sm text-text-secondary">Revisa cada ingrediente antes de confirmar.</p></div>{shortages.length ? <InlineFeedback tone="warning" title={`${shortages.length} faltantes detectados`}>Puedes continuar sólo con una justificación de al menos 10 caracteres si el permiso de override está habilitado.</InlineFeedback> : <InlineFeedback tone="success" title="Existencias suficientes">No se detectaron faltantes en la vista previa.</InlineFeedback>}<div className="space-y-4">{previews.map((preview, index) => <Card key={`${preview.id}-${index}`} level={2}><CardContent className="p-4"><h3 className="font-medium">{preview.preparationName || recipeOptions[index]?.label}</h3><IngredientTable ingredients={preview.ingredients} /></CardContent></Card>)}</div></section>; }
-function ConfirmStage({ previews, shortages, justification, setJustification }: { previews: ProductionPreview[]; shortages: ProductionIngredient[]; justification: string; setJustification: (value: string) => void }) { return <section className="space-y-4"><h2 className="font-semibold">5. Confirmar producción</h2><div className="grid gap-3 sm:grid-cols-3"><Metric label="Recetas" value={previews.length} /><Metric label="Costo consumido" value={`$${previews.reduce((total, item) => total + item.consumedCost, 0).toFixed(2)}`} /><Metric label="Faltantes" value={shortages.length} /></div>{shortages.length ? <div><Label htmlFor="production-justification">Justificación de faltantes</Label><Input id="production-justification" value={justification} onChange={(event) => setJustification(event.target.value)} placeholder="Mínimo 10 caracteres" /></div> : null}<InlineFeedback tone="warning" title="Acción irreversible">Confirmar creará y aplicará los movimientos de todas las recetas seleccionadas.</InlineFeedback></section>; }
-function IngredientTable({ ingredients }: { ingredients: ProductionIngredient[] }) { return <div className="mt-3 overflow-x-auto rounded-xl border border-border-default"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-surface-interactive"><tr>{["Ingrediente", "Requerido", "Disponible", "Unidad", "Estado"].map((header) => <th key={header} className="px-3 py-2">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{ingredients.map((ingredient) => <tr key={`${ingredient.ingredientName}-${ingredient.unit}`}><td className="px-3 py-2">{ingredient.ingredientName}</td><td className="px-3 py-2">{ingredient.requiredQuantity}</td><td className="px-3 py-2">{ingredient.availableQuantity}</td><td className="px-3 py-2">{ingredient.unit}</td><td className="px-3 py-2"><Badge variant={ingredient.sufficient ? "default" : "destructive"}>{ingredient.sufficient ? "Disponible" : "Faltante"}</Badge></td></tr>)}</tbody></table></div>; }
-function PendingProductionInbox({ query }: { query: ReturnType<typeof useQuery<import("@/lib/contracts").RestaurantProductionDto[]>> }) { if (query.isLoading) return <AsyncState state="loading" />; if (query.error) return <AsyncState state="error" onRetry={() => void query.refetch()} description={getApiErrorMessage(query.error, "No fue posible cargar la producción pendiente.")} />; return <Card level={1}><CardContent className="space-y-3 p-5"><div className="flex items-center justify-between"><div><h2 className="font-semibold">Producción pendiente</h2><p className="text-sm text-text-secondary">Documentos en borrador que todavía no actualizan existencias.</p></div><Badge variant="secondary">{query.data?.length ?? 0}</Badge></div>{query.data?.length ? <div className="space-y-2">{query.data.map((item) => <div key={item.id} className="flex flex-wrap justify-between gap-3 rounded-xl border border-border-default p-3"><span><strong>{item.preparationName}</strong> · {item.plannedQuantity} planificadas · ${item.consumedCost.toFixed(2)}</span><Badge>{item.status}</Badge></div>)}</div> : <p className="text-sm text-text-secondary">No hay producciones pendientes.</p>}</CardContent></Card>; }
-function Select({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: RecipeOption[]; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><select id={id} className="h-11 w-full rounded-2xl border border-border-default bg-surface-elevated px-3" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Seleccionar</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
-function Field({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><Input id={id} type="number" min="0.01" step="0.01" value={value} onChange={(event) => onChange(event.target.value)} /></div>; }
-function Metric({ label, value }: { label: string; value: string | number }) { return <div className="rounded-xl border border-border-default bg-surface-interactive p-3"><p className="text-xs text-text-secondary">{label}</p><p className="mt-1 font-semibold">{value}</p></div>; }
+/**
+ * Borradores que todavía no movieron existencias.
+ *
+ * Antes el estado se mostraba con su código (`DRAFT`, `IN_PROGRESS`) y el
+ * importe con un `$` fijo aunque el resto del módulo formatea la moneda.
+ */
+function PendingProductionInbox({
+  query,
+}: {
+  query: ReturnType<typeof useQuery<RestaurantProductionDto[]>>;
+}) {
+  return (
+    <PageSection
+      title="Producción pendiente"
+      description="Documentos en borrador que todavía no actualizan existencias."
+      boxed
+    >
+      <RestaurantQueryState
+        loading={query.isLoading}
+        error={query.error}
+        retry={() => void query.refetch()}
+        label="Cargando la producción pendiente"
+      >
+        {query.data?.length ? (
+          <ul className="divide-y divide-line">
+            {query.data.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-ink-1">{item.preparationName}</p>
+                  <p className="font-mono text-2xs text-ink-3 tabular-figures">
+                    {formatQuantity(item.plannedQuantity)} planificadas · {formatMoney(item.consumedCost)}
+                  </p>
+                </div>
+                <RestaurantStatusBadge status={item.status} size="sm" />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            reason="no-records"
+            title="No hay producción pendiente"
+            description="Todo lo registrado ya se aplicó al inventario."
+          />
+        )}
+      </RestaurantQueryState>
+    </PageSection>
+  );
+}

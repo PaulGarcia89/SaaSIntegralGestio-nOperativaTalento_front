@@ -1,47 +1,531 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Plus, Send, X } from "lucide-react";
+import { Plus, Send, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { approveRestaurantStockCount, cancelRestaurantStockCount, createRestaurantStockCount, fetchRestaurantIngredients, fetchRestaurantStock, fetchRestaurantStockCounts, getApiErrorMessage, submitRestaurantStockCount } from "@/lib/backend";
+import {
+  approveRestaurantStockCount,
+  cancelRestaurantStockCount,
+  createRestaurantStockCount,
+  fetchRestaurantIngredients,
+  fetchRestaurantStock,
+  fetchRestaurantStockCounts,
+  getApiErrorMessage,
+  submitRestaurantStockCount,
+} from "@/lib/backend";
+import type { RestaurantStockCountDto } from "@/lib/contracts";
 import { useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
-import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
+import {
+  ConfirmPanel,
+  EmptyState,
+  ErrorState,
+  ImpactReview,
+  InlineNote,
+  OperationResultView,
+  OperationStepper,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+} from "@/components/system";
+import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppStore } from "@/store/app-store";
+import { cn } from "@/lib/utils";
+import { formatQuantity } from "@/lib/restaurant-operation";
+import {
+  initialOperationState,
+  type OperationImpact,
+  type OperationOutcome,
+  type OperationState,
+  type OperationStepId,
+} from "@/lib/operation-flow";
+
+/**
+ * Conteo físico, con el patrón universal de operaciones.
+ *
+ * Qué cambió
+ * ----------
+ * · Toda la pantalla se reemplazaba por un aro girando mientras cargaban las
+ *   tres consultas, y al llegar el contenido la maqueta saltaba. Ahora hay
+ *   siluetas del alto que va a ocupar el contenido.
+ * · La comparación era una tabla de 620px de ancho mínimo dentro de un
+ *   `overflow-x-auto`, justo en la pantalla que más se usa en tablet y
+ *   teléfono, contando de pie frente a la estantería.
+ * · La aprobación ofrecía tres botones del mismo peso —«Enviar a revisión»,
+ *   «Aprobar y aplicar», «Cancelar»— sin decir cuál es el siguiente paso
+ *   recomendado, y «Aprobar y aplicar» ajustaba existencias sin ninguna
+ *   confirmación, siendo irreversible.
+ * · Los conteos pendientes mostraban su estado con el código del backend
+ *   (`DRAFT`, `IN_REVIEW`).
+ *
+ * El contrato del backend no cambia: crear → enviar a revisión → aprobar o
+ * cancelar, con el modo ciego tal como estaba.
+ */
 
 type CountLine = { ingredientId: string; quantity: string; reason: string };
 type Ingredient = { id: string; sku?: string; name?: string; stock?: number; inventoryUnit?: string };
+type CountRow = { name: string; unit: string; theoretical: number; counted: number; difference: number };
+
+const SELECT_CLASS = cn(
+  "w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3",
+  "min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)]",
+  "text-base text-ink-1 sm:text-sm",
+);
+
+const emptyLine = (): CountLine => ({ ingredientId: "", quantity: "", reason: "" });
 
 export function RestaurantStockCountWorkflow({ branchId }: { branchId: string }) {
   const { warehouseId, warehouseName, setHasPendingChanges } = useRestaurantInventoryContext();
   const queryClient = useQueryClient();
-  const [blind, setBlind] = useState(true); const [stage, setStage] = useState(1); const [documentId, setDocumentId] = useState(""); const [lines, setLines] = useState<CountLine[]>([{ ingredientId: "", quantity: "", reason: "" }]);
-  const ingredients = useQuery({ queryKey: ["restaurant-count-workflow-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) });
-  const stock = useQuery({ queryKey: ["restaurant-count-workflow-stock", branchId, warehouseId], queryFn: () => fetchRestaurantStock({ branchId, warehouseId }), enabled: Boolean(warehouseId) });
-  const counts = useQuery({ queryKey: ["restaurant-counts", branchId], queryFn: () => fetchRestaurantStockCounts({ branchId }) });
-  const create = useMutation({ mutationFn: () => createRestaurantStockCount({ branchId, warehouseId, countedAt: new Date().toISOString(), blind, items: lines.map((line) => ({ ingredientId: line.ingredientId, countedQuantity: Number(line.quantity), reason: line.reason || undefined })) }), onSuccess: (data) => { setDocumentId(data.id); setStage(3); void queryClient.invalidateQueries({ queryKey: ["restaurant-counts"] }); } });
-  const action = useMutation({ mutationFn: (type: "submit" | "approve" | "cancel") => type === "submit" ? submitRestaurantStockCount(documentId) : type === "approve" ? approveRestaurantStockCount(documentId) : cancelRestaurantStockCount(documentId), onSuccess: async (_, type) => { setStage(1); setDocumentId(""); setLines([{ ingredientId: "", quantity: "", reason: "" }]); toast.success(type === "approve" ? "Conteo aprobado" : type === "submit" ? "Conteo enviado" : "Conteo cancelado", { description: type === "approve" ? "Las diferencias ya actualizaron las existencias." : "El estado del conteo fue actualizado." }); await Promise.all([queryClient.invalidateQueries({ queryKey: ["restaurant-counts"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] })]); } });
+  const { currentUser } = useAppStore();
+
+  const [blind, setBlind] = useState(true);
+  const [step, setStep] = useState<OperationStepId>("record");
+  const [documentId, setDocumentId] = useState("");
+  const [lines, setLines] = useState<CountLine[]>([emptyLine()]);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [outcome, setOutcome] = useState<OperationOutcome | null>(null);
+
+  const ingredients = useQuery({
+    queryKey: ["restaurant-count-workflow-ingredients"],
+    queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }),
+  });
+  const stock = useQuery({
+    queryKey: ["restaurant-count-workflow-stock", branchId, warehouseId],
+    queryFn: () => fetchRestaurantStock({ branchId, warehouseId }),
+    enabled: Boolean(warehouseId),
+  });
+  const counts = useQuery({
+    queryKey: ["restaurant-counts", branchId],
+    queryFn: () => fetchRestaurantStockCounts({ branchId }),
+  });
+
+  const create = useMutation({
+    mutationFn: () =>
+      createRestaurantStockCount({
+        branchId,
+        warehouseId,
+        countedAt: new Date().toISOString(),
+        blind,
+        items: lines.map((line) => ({
+          ingredientId: line.ingredientId,
+          countedQuantity: Number(line.quantity),
+          reason: line.reason || undefined,
+        })),
+      }),
+    onSuccess: (data) => {
+      setDocumentId(data.id);
+      setAcknowledged(false);
+      setStep("confirm");
+      void queryClient.invalidateQueries({ queryKey: ["restaurant-counts"] });
+    },
+  });
+
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["restaurant-counts"] }),
+      queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }),
+      queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }),
+      queryClient.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] }),
+    ]);
+
+  const action = useMutation({
+    mutationFn: (type: "submit" | "approve" | "cancel") =>
+      type === "submit"
+        ? submitRestaurantStockCount(documentId)
+        : type === "approve"
+          ? approveRestaurantStockCount(documentId)
+          : cancelRestaurantStockCount(documentId),
+    onSuccess: async (_, type) => {
+      setOutcome(
+        type === "approve"
+          ? {
+              status: "success",
+              headline: "Conteo aprobado",
+              detail: "Las diferencias ya ajustaron las existencias y quedaron como movimientos auditables.",
+              nextAction: { label: "Ver los movimientos", href: "/inventory/restaurant/movements" },
+            }
+          : type === "submit"
+            ? {
+                status: "success",
+                headline: "Conteo enviado a revisión",
+                detail: "Todavía no se ajustaron existencias: esperan la aprobación de quien supervisa el almacén.",
+              }
+            : {
+                status: "success",
+                headline: "Conteo cancelado",
+                detail: "No se aplicó ningún ajuste al inventario.",
+              },
+      );
+      setStep("result");
+      toast.success(
+        type === "approve" ? "Conteo aprobado" : type === "submit" ? "Conteo enviado" : "Conteo cancelado",
+      );
+      await refresh();
+    },
+    onError: (error, type) => {
+      setOutcome({
+        status: "error",
+        headline:
+          type === "approve"
+            ? "No se pudo aprobar el conteo"
+            : type === "submit"
+              ? "No se pudo enviar el conteo"
+              : "No se pudo cancelar el conteo",
+        detail: getApiErrorMessage(error, "El servidor rechazó la operación."),
+        retryable: true,
+      });
+      setStep("result");
+    },
+  });
+
   const ingredientOptions = (ingredients.data?.data ?? []) as Ingredient[];
   const stockRows = (stock.data ?? []) as unknown as Ingredient[];
-  const invalid = !warehouseId || lines.some((line) => !line.ingredientId || line.quantity === "" || Number(line.quantity) < 0);
+
+  const invalid =
+    !warehouseId || lines.some((line) => !line.ingredientId || line.quantity === "" || Number(line.quantity) < 0);
+
   useEffect(() => {
-    const hasDraft = stage > 1 || Boolean(documentId) || lines.some((line) => line.ingredientId || line.quantity || line.reason);
+    const hasDraft =
+      step !== "record" ||
+      Boolean(documentId) ||
+      lines.some((line) => line.ingredientId || line.quantity || line.reason);
     setHasPendingChanges(hasDraft);
     return () => setHasPendingChanges(false);
-  }, [documentId, lines, setHasPendingChanges, stage]);
-  const updateLine = (index: number, key: keyof CountLine, value: string) => setLines(lines.map((line, current) => current === index ? { ...line, [key]: value } : line));
-  const impact = lines.map((line) => { const item = stockRows.find((row) => row.id === line.ingredientId); const theoretical = Number(item?.stock ?? 0); const counted = Number(line.quantity || 0); return { ...line, name: item?.name ?? ingredientOptions.find((option) => option.id === line.ingredientId)?.name ?? "Ingrediente", unit: item?.inventoryUnit ?? "", theoretical, counted, difference: counted - theoretical }; });
-  if (ingredients.isLoading || stock.isLoading || counts.isLoading) return <AsyncState state="loading" />;
-  if (ingredients.error || stock.error || counts.error) return <AsyncState state="error" onRetry={() => { void ingredients.refetch(); void stock.refetch(); void counts.refetch(); }} description={getApiErrorMessage(ingredients.error ?? stock.error ?? counts.error, "No fue posible cargar el conteo físico.")} />;
-  return <div className="space-y-5"><PageHeader eyebrow="Control físico" title="Conteo físico" description="Captura en tablet, compara contra el teórico y solicita aprobación antes de aplicar diferencias." />{!warehouseId ? <InlineFeedback tone="warning" title="Almacén requerido">Selecciona un almacén global para iniciar el conteo.</InlineFeedback> : null}{create.error || action.error ? <InlineFeedback tone="danger" title="No se pudo completar el conteo">{getApiErrorMessage(create.error ?? action.error, "Revisa las cantidades e inténtalo de nuevo.")}</InlineFeedback> : null}<Card level={2}><CardContent className="space-y-5 p-4 md:p-6"><div className="grid gap-2 sm:grid-cols-3" aria-label="Flujo de conteo"><StepButton number={1} label="Captura" active={stage === 1} done={stage > 1} onClick={() => stage === 1 && setStage(1)} /><StepButton number={2} label="Comparación" active={stage === 2} done={stage > 2} onClick={() => stage <= 2 && setStage(2)} /><StepButton number={3} label="Aprobación" active={stage === 3} done={false} onClick={() => undefined} /></div>{stage === 1 ? <section className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Captura de conteo</h2><p className="text-sm text-text-secondary">Almacén: {warehouseName}</p></div><label className="flex items-center gap-2 rounded-xl border border-border-default px-3 py-2 text-sm"><input type="checkbox" checked={blind} onChange={(event) => setBlind(event.target.checked)} />Modo conteo ciego</label></div>{lines.map((line, index) => <div key={index} className="grid gap-3 rounded-2xl border border-border-default p-3 md:grid-cols-[2fr_1fr_1.4fr_auto]"><Select id={`count-ingredient-${index}`} label="Ingrediente" value={line.ingredientId} options={ingredientOptions.map((item) => ({ id: item.id, label: `${item.sku ?? ""} · ${item.name ?? ""}` }))} onChange={(value) => updateLine(index, "ingredientId", value)} /><div><Label htmlFor={`count-quantity-${index}`}>Cantidad contada</Label><Input id={`count-quantity-${index}`} className="h-12 text-base" type="number" min="0" step="0.01" value={line.quantity} onChange={(event) => updateLine(index, "quantity", event.target.value)} /></div><div><Label htmlFor={`count-reason-${index}`}>Observación</Label><Input id={`count-reason-${index}`} className="h-12 text-base" value={line.reason} onChange={(event) => updateLine(index, "reason", event.target.value)} placeholder="Opcional" /></div><Button variant="ghost" className="self-end" disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, current) => current !== index))} aria-label="Eliminar línea"><X className="size-4" /></Button></div>)}<div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setLines([...lines, { ingredientId: "", quantity: "", reason: "" }])}><Plus className="size-4" />Agregar ingrediente</Button><Button disabled={invalid} onClick={() => setStage(2)}>Comparar conteo<ChevronRight className="size-4" /></Button></div></section> : null}{stage === 2 ? <section className="space-y-4"><div><h2 className="text-lg font-semibold">Comparación e impacto esperado</h2><p className="text-sm text-text-secondary">Revisa las diferencias antes de enviar a aprobación.</p></div><CountImpact rows={impact} hidden={blind} /><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setStage(1)}><ChevronLeft className="size-4" />Corregir captura</Button><Button disabled={invalid || create.isPending} onClick={() => create.mutate()}>{create.isPending ? "Guardando…" : "Crear conteo para aprobación"}</Button></div></section> : null}{stage === 3 ? <section className="space-y-4"><h2 className="text-lg font-semibold">Aprobación del conteo</h2><InlineFeedback tone="warning" title="Resumen de impacto">Al aprobar, las diferencias ajustarán existencias y generarán movimientos auditables.</InlineFeedback><CountImpact rows={impact} hidden={false} /><div className="flex flex-wrap gap-2"><Button onClick={() => action.mutate("submit")} disabled={action.isPending}><Send className="size-4" />Enviar a revisión</Button><Button onClick={() => action.mutate("approve")} disabled={action.isPending}><Check className="size-4" />Aprobar y aplicar</Button><Button variant="secondary" onClick={() => action.mutate("cancel")} disabled={action.isPending}>Cancelar</Button></div></section> : null}<div className="flex justify-between border-t border-border-default pt-4"><Button variant="ghost" disabled={stage === 1} onClick={() => setStage((value) => Math.max(1, value - 1))}><ChevronLeft className="size-4" />Anterior</Button><Badge variant="secondary">{blind ? "Conteo ciego" : "Conteo abierto"}</Badge></div></CardContent></Card><PendingCounts counts={counts.data ?? []} /></div>;
+  }, [documentId, lines, setHasPendingChanges, step]);
+
+  const updateLine = (index: number, key: keyof CountLine, value: string) =>
+    setLines(lines.map((line, current) => (current === index ? { ...line, [key]: value } : line)));
+
+  const rows: CountRow[] = lines.map((line) => {
+    const item = stockRows.find((row) => row.id === line.ingredientId);
+    const theoretical = Number(item?.stock ?? 0);
+    const counted = Number(line.quantity || 0);
+    return {
+      name:
+        item?.name ??
+        ingredientOptions.find((option) => option.id === line.ingredientId)?.name ??
+        "Ingrediente",
+      unit: item?.inventoryUnit ?? "",
+      theoretical,
+      counted,
+      difference: counted - theoretical,
+    };
+  });
+
+  const differing = rows.filter((row) => row.difference !== 0);
+
+  const impact: OperationImpact = {
+    headline: `Ajustar el inventario de ${warehouseName ?? "el almacén"} al conteo físico`,
+    affectedCount: differing.length,
+    affectedLabel: differing.length === 1 ? "ingrediente con diferencia" : "ingredientes con diferencia",
+    lines: rows.map((row) => ({
+      label: row.name,
+      before: `${formatQuantity(row.theoretical)} ${row.unit}`.trim(),
+      after: `${formatQuantity(row.counted)} ${row.unit}`.trim(),
+      // Una diferencia negativa es faltante: hay menos de lo que el sistema
+      // creía. Una positiva también merece revisión, pero no es una pérdida.
+      adverse: row.difference < 0,
+    })),
+    warnings: differing.length
+      ? [
+          {
+            code: "COUNT_DIFFERENCES",
+            message: `${differing.length} ${differing.length === 1 ? "ingrediente cambia" : "ingredientes cambian"} de existencia al aprobar. Los demás quedan igual.`,
+          },
+        ]
+      : [],
+    blockers: [],
+    responsible: currentUser.fullName,
+    // Aprobar aplica los ajustes y genera movimientos auditables: revertirlo
+    // exige otro conteo, no un «deshacer».
+    irreversible: true,
+  };
+
+  const completed: OperationStepId[] = [];
+  if (lines.some((line) => line.ingredientId)) completed.push("select");
+  if (step !== "record") completed.push("record");
+  if (step === "confirm" || step === "result") completed.push("review");
+  if (step === "result") completed.push("confirm");
+
+  const operationState: OperationState = {
+    ...initialOperationState(),
+    step,
+    completed,
+    impact,
+    submitting: action.isPending,
+    outcome: outcome ?? undefined,
+  };
+
+  const reset = () => {
+    setLines([emptyLine()]);
+    setDocumentId("");
+    setAcknowledged(false);
+    setOutcome(null);
+    setStep("record");
+  };
+
+  const loading = ingredients.isLoading || stock.isLoading || counts.isLoading;
+  const loadError = ingredients.error ?? stock.error ?? counts.error;
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Control físico"
+        title="Conteo físico"
+        description="Cuenta en la estantería, compara contra lo que el sistema cree que hay y aprueba el ajuste."
+        meta={
+          <>
+            {warehouseName ? <span>Almacén: {warehouseName}</span> : null}
+            <span>{blind ? "Conteo ciego" : "Conteo abierto"}</span>
+          </>
+        }
+      />
+
+      {loading ? (
+        <SkeletonRows rows={6} label="Cargando ingredientes y existencias" />
+      ) : loadError ? (
+        <ErrorState
+          title="No fue posible cargar el conteo físico"
+          detail={getApiErrorMessage(loadError, "Reintenta la consulta para continuar.")}
+          onRetry={() => {
+            void ingredients.refetch();
+            void stock.refetch();
+            void counts.refetch();
+          }}
+        />
+      ) : (
+        <>
+          <OperationStepper state={operationState} onStepChange={setStep} />
+
+          {!warehouseId ? (
+            <InlineNote tone="warning" title="Falta elegir el almacén">
+              Sin almacén no hay existencia teórica contra la que comparar. Selecciónalo arriba para empezar.
+            </InlineNote>
+          ) : null}
+
+          {create.error ? (
+            <InlineNote tone="danger" title="No se pudo crear el conteo">
+              {getApiErrorMessage(create.error, "Revisa las cantidades e inténtalo de nuevo.")}
+            </InlineNote>
+          ) : null}
+
+          {step === "select" || step === "record" ? (
+            <PageSection
+              title="Captura del conteo"
+              description="Una línea por ingrediente contado. La observación es opcional."
+              boxed
+              actions={
+                <label className="flex items-center gap-2 text-sm text-ink-2">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-[hsl(var(--accent-fill))]"
+                    checked={blind}
+                    onChange={(event) => setBlind(event.target.checked)}
+                  />
+                  Conteo ciego
+                </label>
+              }
+            >
+              {blind ? (
+                <InlineNote tone="info" title="Conteo ciego activo">
+                  No se muestra la existencia que el sistema tiene registrada hasta el momento de aprobar, para que
+                  el conteo no se sesgue.
+                </InlineNote>
+              ) : null}
+
+              <div className="mt-4 space-y-4">
+                {lines.map((line, index) => (
+                  <div
+                    key={index}
+                    className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end"
+                  >
+                    <div className="min-w-0">
+                      <Label htmlFor={`count-ingredient-${index}`}>Ingrediente</Label>
+                      <select
+                        id={`count-ingredient-${index}`}
+                        className={SELECT_CLASS}
+                        value={line.ingredientId}
+                        onChange={(event) => updateLine(index, "ingredientId", event.target.value)}
+                      >
+                        <option value="">Seleccionar</option>
+                        {ingredientOptions.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {[item.sku, item.name].filter(Boolean).join(" · ")}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`count-quantity-${index}`}>Cantidad contada</Label>
+                      <Input
+                        id={`count-quantity-${index}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={line.quantity}
+                        onChange={(event) => updateLine(index, "quantity", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`count-reason-${index}`}>Observación</Label>
+                      <Input
+                        id={`count-reason-${index}`}
+                        value={line.reason}
+                        placeholder="Opcional"
+                        onChange={(event) => updateLine(index, "reason", event.target.value)}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      disabled={lines.length === 1}
+                      onClick={() => setLines(lines.filter((_, current) => current !== index))}
+                      aria-label={`Quitar la línea ${index + 1}`}
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Button size="sm" variant="secondary" onClick={() => setLines([...lines, emptyLine()])}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  Agregar ingrediente
+                </Button>
+                <Button size="lg" disabled={invalid} onClick={() => setStep("review")}>
+                  Comparar con el sistema
+                </Button>
+              </div>
+            </PageSection>
+          ) : null}
+
+          {step === "review" ? (
+            <div className="space-y-4">
+              {blind ? (
+                <>
+                  <InlineNote tone="info" title="La comparación queda oculta hasta la aprobación">
+                    Elegiste conteo ciego: quien cuenta no ve la existencia registrada. El detalle completo aparece
+                    en el paso de aprobación.
+                  </InlineNote>
+                  <PageSection title="Lo que registraste" boxed>
+                    <ul className="divide-y divide-line">
+                      {rows.map((row, index) => (
+                        <li key={`${row.name}-${index}`} className="flex items-center justify-between gap-4 py-3">
+                          <span className="min-w-0 truncate text-ink-1">{row.name}</span>
+                          <span className="font-mono text-sm text-ink-1 tabular-figures">
+                            {formatQuantity(row.counted)} {row.unit}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </PageSection>
+                </>
+              ) : (
+                <ImpactReview impact={impact} />
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="secondary" onClick={() => setStep("record")}>
+                  Corregir la captura
+                </Button>
+                <Button
+                  size="lg"
+                  disabled={invalid}
+                  loading={create.isPending}
+                  loadingLabel="Guardando…"
+                  onClick={() => create.mutate()}
+                >
+                  Crear el conteo
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {step === "confirm" ? (
+            <div className="space-y-3">
+              {/* En el paso de aprobación el modo ciego ya no aplica: quien
+                  aprueba necesita ver contra qué se está ajustando. */}
+              <ConfirmPanel
+                state={operationState}
+                operationName="Aprobar y aplicar el conteo"
+                onConfirm={() => action.mutate("approve")}
+                onBack={() => setStep("review")}
+                acknowledged={acknowledged}
+                onAcknowledgedChange={setAcknowledged}
+              />
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="ghost"
+                  disabled={action.isPending}
+                  onClick={() => action.mutate("cancel")}
+                >
+                  Descartar el conteo
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={action.isPending}
+                  onClick={() => action.mutate("submit")}
+                >
+                  <Send className="size-4" aria-hidden="true" />
+                  Enviar a revisión de otra persona
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {step === "result" && outcome ? (
+            <OperationResultView
+              outcome={outcome}
+              onRetry={() => action.mutate("approve")}
+              onStartAnother={reset}
+              startAnotherLabel="Registrar otro conteo"
+            />
+          ) : null}
+
+          <PendingCounts counts={counts.data ?? []} />
+        </>
+      )}
+    </div>
+  );
 }
 
-function CountImpact({ rows, hidden }: { rows: Array<{ name: string; unit: string; theoretical: number; counted: number; difference: number }>; hidden: boolean }) { return <div className="overflow-x-auto rounded-2xl border border-border-default"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-surface-interactive"><tr>{["Ingrediente", "Teórico", "Contado", "Diferencia", "Impacto"].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{rows.map((row) => <tr key={row.name}><td className="px-3 py-3">{row.name}</td><td className="px-3 py-3">{hidden ? "•••" : `${row.theoretical} ${row.unit}`}</td><td className="px-3 py-3">{row.counted} {row.unit}</td><td className="px-3 py-3">{hidden ? "•••" : row.difference}</td><td className="px-3 py-3">{hidden ? <Badge variant="secondary">Oculto</Badge> : <Badge variant={row.difference === 0 ? "default" : "destructive"}>{row.difference === 0 ? "Sin diferencia" : "Ajustará stock"}</Badge>}</td></tr>)}</tbody></table></div>; }
-function PendingCounts({ counts }: { counts: Array<import("@/lib/contracts").RestaurantStockCountDto> }) { const pending = counts.filter((item) => !["APPROVED", "CANCELLED"].includes(item.status)); return <Card level={1}><CardContent className="space-y-2 p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">Conteos pendientes</h2><Badge variant="secondary">{pending.length}</Badge></div>{pending.length ? pending.map((item) => <div key={item.id} className="flex flex-wrap justify-between gap-2 border-b border-border-default py-2 text-sm"><span>{item.warehouseName} · {new Date(item.createdAt).toLocaleString()}</span><Badge>{item.status}</Badge></div>) : <p className="text-sm text-text-secondary">No hay conteos pendientes.</p>}</CardContent></Card>; }
-function StepButton({ number, label, active, done, onClick }: { number: number; label: string; active: boolean; done: boolean; onClick: () => void }) { return <button type="button" onClick={onClick} className={`rounded-xl border p-3 text-left text-sm font-semibold ${active ? "border-primary bg-primary/10" : done ? "border-success/40 bg-success/5" : "border-border-default"}`}><span className="grid size-6 place-items-center rounded-full bg-surface-interactive">{done ? <Check className="size-3" /> : number}</span><span className="mt-2 block">{label}</span></button>; }
-function Select({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Array<{ id: string; label: string }>; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><select id={id} className="h-12 w-full rounded-2xl border border-border-default bg-surface-elevated px-3 text-base" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Seleccionar</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
+/** Conteos que todavía no ajustaron existencias. */
+function PendingCounts({ counts }: { counts: RestaurantStockCountDto[] }) {
+  const pending = counts.filter((item) => !["APPROVED", "CANCELLED"].includes(item.status));
+  return (
+    <PageSection
+      title="Conteos pendientes"
+      description="Documentos abiertos que todavía no ajustaron el inventario."
+      boxed
+    >
+      {pending.length ? (
+        <ul className="divide-y divide-line">
+          {pending.map((item) => (
+            <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-ink-1">{item.warehouseName}</p>
+                <p className="font-mono text-2xs text-ink-3 tabular-figures">
+                  {new Date(item.createdAt).toLocaleString()} ·{" "}
+                  {item.differences === 1 ? "1 diferencia" : `${item.differences} diferencias`}
+                </p>
+              </div>
+              <RestaurantStatusBadge status={item.status} size="sm" />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          reason="no-records"
+          title="No hay conteos pendientes"
+          description="Todos los conteos registrados ya se aprobaron o se descartaron."
+        />
+      )}
+    </PageSection>
+  );
+}

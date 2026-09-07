@@ -274,7 +274,7 @@ function HiringModuleDashboard() {
               className="flex items-center gap-4 rounded-lg border border-line bg-surface-1 px-4 py-3"
             >
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-1">{etapa.title}</span>
-              <span aria-hidden="true" className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 xs:block lg:w-40">
+              <span aria-hidden="true" className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 sm:block lg:w-40">
                 <span
                   className="block h-full rounded-full bg-accent-fill"
                   style={{ width: `${Math.round((etapa.total / maximo) * 100)}%` }}

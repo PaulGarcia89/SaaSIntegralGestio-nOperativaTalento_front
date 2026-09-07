@@ -219,7 +219,7 @@ export function EntityCard({
           {visibles.map((fact) => (
             <div key={fact.label} className="min-w-0">
               <dt className="truncate text-ink-3">{fact.label}</dt>
-              <dd className="truncate font-medium text-ink-1">{fact.value}</dd>
+              <dd className="line-clamp-2 break-words font-medium text-ink-1">{fact.value}</dd>
             </div>
           ))}
         </dl>

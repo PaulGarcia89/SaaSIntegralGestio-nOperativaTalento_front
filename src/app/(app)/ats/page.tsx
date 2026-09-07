@@ -159,7 +159,7 @@ function PhaseRail({
                   compite con el nombre de la fase y gana el nombre. */}
               <span
                 aria-hidden="true"
-                className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 xs:block lg:w-40"
+                className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 sm:block lg:w-40"
               >
                 <span
                   className="block h-full rounded-full bg-accent-fill"

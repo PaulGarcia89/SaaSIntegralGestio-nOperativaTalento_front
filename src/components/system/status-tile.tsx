@@ -69,7 +69,7 @@ export function StatusTile({
   return (
     <article
       className={cn(
-        "relative flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface-1 p-4",
+        "relative flex h-full min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface-1 p-4",
         href && "transition hover:border-line-strong",
         "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus",
         className,

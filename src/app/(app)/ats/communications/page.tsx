@@ -16,6 +16,7 @@ import {
   fetchAtsCommunicationTemplates,
   fetchVacancies,
   fetchVacancySetup,
+  getApiErrorMessage,
 } from "@/lib/backend";
 import type {
   AtsCommunicationAudience,
@@ -113,7 +114,7 @@ export default function AtsCommunicationsPage() {
           <label className="block space-y-2 text-sm font-medium">Asunto<Input value={form.subject} maxLength={240} onChange={(event) => update("subject", event.target.value)} placeholder={t("comms.subjectPlaceholder")} /></label>
           <label className="block space-y-2 text-sm font-medium">{t("comms.message")}<textarea value={form.body} maxLength={12000} rows={9} onChange={(event) => update("body", event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" placeholder={t("comms.bodyPlaceholder")} /></label>
           <p className="text-xs text-text-secondary">Variables: {"{{candidateName}}"}, {"{{vacancyTitle}}"}, {"{{companyName}}"}, {"{{stageName}}"}, {"{{reason}}"}, {"{{interviewDate}}"}, {"{{interviewLocation}}"}.</p>
-          {create.isError ? <InlineFeedback tone="danger" title={t("comms.saveFailed")}>{create.error instanceof Error ? create.error.message : t("comms.checkFields")}</InlineFeedback> : null}
+          {create.isError ? <InlineFeedback tone="danger" title={t("comms.saveFailed")}>{getApiErrorMessage(create.error, t("comms.checkFields"))}</InlineFeedback> : null}
           {create.isSuccess ? <InlineFeedback tone="success" title={t("comms.newVersionActive")}>{t("comms.previousKept")}</InlineFeedback> : null}
           <Button className="w-full" onClick={() => create.mutate(form)} disabled={create.isPending || form.name.trim().length < 2 || form.subject.trim().length < 2 || form.body.trim().length < 2}><FilePlus2 className="size-4" />{create.isPending ? "Guardando…" : t("comms.createVersion")}</Button>
         </CardContent>

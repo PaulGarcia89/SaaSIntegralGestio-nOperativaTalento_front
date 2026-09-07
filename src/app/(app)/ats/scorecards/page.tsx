@@ -10,6 +10,7 @@ import {
   fetchVacancies,
   fetchVacancySetup,
   updateScorecardTemplateAdmin,
+  getApiErrorMessage,
 } from "@/lib/backend";
 import type {
   CreateScorecardTemplateInput,
@@ -139,7 +140,7 @@ export default function ScorecardsPage() {
           <div className="mt-4 flex flex-wrap gap-5 text-sm"><Checkbox label="Obligatorio" checked={criterion.isRequired ?? false} onChange={(isRequired) => updateCriterion(criterion.localId, { isRequired })} /><Checkbox label="Exigir evidencia" checked={criterion.requiresEvidence ?? false} onChange={(requiresEvidence) => updateCriterion(criterion.localId, { requiresEvidence })} /></div>
         </div>)}</div>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-primary/5 p-4"><div className="flex items-center gap-2"><Scale className="size-5 text-brand" /><span className="font-semibold">Peso total: {totalWeight}%</span></div><span className={`text-sm ${totalWeight === 100 ? "text-status-success" : "text-status-danger"}`}>{totalWeight === 100 ? t("scorecards.validDistribution") : "Debe sumar 100%"}</span></div>
-        {save.isError ? <InlineFeedback tone="danger" title={t("scorecards.publishFailed")}>{save.error instanceof Error ? save.error.message : t("scorecards.checkCriteria")}</InlineFeedback> : null}
+        {save.isError ? <InlineFeedback tone="danger" title={t("scorecards.publishFailed")}>{getApiErrorMessage(save.error, t("scorecards.checkCriteria"))}</InlineFeedback> : null}
         {save.isSuccess ? <InlineFeedback tone="success" title={t("scorecards.versionPublished")}>La versión {save.data.version} quedó activa; las versiones anteriores permanecen como historial.</InlineFeedback> : null}
         <Button className="w-full" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Publicando…" : t("scorecards.publishNewVersion")}</Button>
       </CardContent></Card>

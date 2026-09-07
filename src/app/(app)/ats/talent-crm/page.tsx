@@ -30,6 +30,7 @@ import {
   createTalentCampaign,
   prepareTalentCampaignAudience,
   reviewTalentCampaignAudience,
+  getApiErrorMessage,
 } from "@/lib/backend";
 import type { DuplicateCandidateMatchDto, TalentCampaignDto, TalentCandidateDto, TalentActivityType } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
@@ -193,4 +194,4 @@ function MergeDialog({ match, onOpenChange, onMerged }: { match: DuplicateCandid
 
 // No es un componente, asi que no puede usar el hook: recibe el texto de
 // reserva ya traducido por quien la llama.
-function showError(error: unknown, fallback: string) { toast.error(error instanceof Error ? error.message : fallback); }
+function showError(error: unknown, fallback: string) { toast.error(getApiErrorMessage(error, fallback)); }

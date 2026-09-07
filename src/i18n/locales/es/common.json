@@ -2030,4 +2030,5 @@
   "branches.deleteConsequenceHistory": "Lo ya registrado en esta sucursal (contrataciones, movimientos, documentos) se conserva con su firma.",
   "branches.deleteConsequenceLast": "Es la única sucursal de {{company}}: la empresa se queda sin ninguna sede operativa.",
   "branches.deleteConsequenceRemaining": "Quedan {{count}} sucursales en la empresa."
+  ,"interviews.missingCredentials": "Falta configurar las credenciales de este proveedor en el servidor."
 }

@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSelect } from "@/components/ui/form-select";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { type AtsAnalyticsQuery, downloadTextFile, fetchAtsAnalytics, fetchAtsAnalyticsDashboards, fetchAtsAnalyticsExport, fetchAtsHiringQuality, fetchAtsSourceCosts, fetchCandidateConversionMetrics, fetchVacancies, saveAtsAnalyticsDashboard, saveAtsHiringQuality, saveAtsSourceCost } from "@/lib/backend";
+import { type AtsAnalyticsQuery, downloadTextFile, fetchAtsAnalytics, fetchAtsAnalyticsDashboards, fetchAtsAnalyticsExport, fetchAtsHiringQuality, fetchAtsSourceCosts, fetchCandidateConversionMetrics, fetchVacancies, saveAtsAnalyticsDashboard, saveAtsHiringQuality, saveAtsSourceCost, getApiErrorMessage } from "@/lib/backend";
 import type { AtsAnalyticsDto } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 import { useLocale } from "@/components/locale-provider";
@@ -73,7 +73,7 @@ export default function AtsAnalyticsPage() {
     </Card>
 
     {analytics.isPending ? <AsyncState state="loading" title={t("analytics.calculating")} description={t("analytics.calculatingBody")} /> : null}
-    {analytics.isError ? <AsyncState state="error" title={t("analytics.calcError")} description={analytics.error instanceof Error ? analytics.error.message : t("analytics.checkScope")} onRetry={() => analytics.refetch()} /> : null}
+    {analytics.isError ? <AsyncState state="error" title={t("analytics.calcError")} description={getApiErrorMessage(analytics.error, t("analytics.checkScope"))} onRetry={() => analytics.refetch()} /> : null}
     {analytics.data ? <AnalyticsContent data={analytics.data} candidateJourney={candidateJourney.data} /> : null}
     <SourceCostDialog open={costOpen} onOpenChange={setCostOpen} />
     <HiringQualityDialog open={qualityOpen} onOpenChange={setQualityOpen} />

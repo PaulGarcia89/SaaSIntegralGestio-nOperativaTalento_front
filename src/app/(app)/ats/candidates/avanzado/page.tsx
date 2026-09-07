@@ -16,7 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { applicationNextAction, applicationStageLabel, formatApplicationDate } from "@/lib/applications";
-import { bulkUpdateApplications, exportApplications, fetchApplications, fetchRejectionReasons, fetchUsers, fetchVacancies, fetchVacancySetup } from "@/lib/backend";
+import { bulkUpdateApplications, exportApplications, fetchApplications, fetchRejectionReasons, fetchUsers, fetchVacancies, fetchVacancySetup, getApiErrorMessage } from "@/lib/backend";
 import type { ApplicationFilters, ApplicationStatusKey, VacancyApplicationDto } from "@/lib/contracts";
 import { trackProductEvent } from "@/lib/product-analytics";
 import { useAppStore } from "@/store/app-store";
@@ -100,7 +100,7 @@ function CandidatesContent() {
   const bulk = useMutation({
     mutationFn: () => bulkUpdateApplications({ ids: selected, status: bulkStatus === ALL ? undefined : bulkStatus, currentStageId: bulkStage === ALL ? undefined : bulkStage, assignedRecruiterId: bulkRecruiter === ALL ? undefined : bulkRecruiter, rejectionReasonId: bulkRejectionReasonId === ALL ? undefined : bulkRejectionReasonId, reason: bulkReason.trim() || undefined, notes: bulkNotes.trim() || undefined, onlyUnassigned, onlyOverdue }),
     onSuccess: async (result) => { toast.success(`${result.updated} postulaciones actualizadas${result.skipped ? `; ${result.skipped} no cumplieron la condición` : ""}`); setSelected([]); setBulkStage(ALL); setBulkStatus(ALL); setBulkRecruiter(ALL); setBulkRejectionReasonId(ALL); setBulkReason(""); setBulkNotes(""); setOnlyUnassigned(false); setOnlyOverdue(false); await queryClient.invalidateQueries({ queryKey: ["applications"] }); },
-    onError: (error) => toast.error(error instanceof Error ? error.message : t("adv.bulkFailed")),
+    onError: (error) => toast.error(getApiErrorMessage(error, t("adv.bulkFailed"))),
   });
   const exporting = useMutation({ mutationFn: () => exportApplications(filters), onSuccess: (result) => { downloadCsv(result.data, t); toast.success(t("adv.recordsExported", { count: result.count })); }, onError: () => toast.error(t("adv.exportFailed")) });
 

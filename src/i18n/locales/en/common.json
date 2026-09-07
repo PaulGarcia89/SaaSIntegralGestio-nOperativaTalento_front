@@ -2030,4 +2030,5 @@
   "branches.deleteConsequenceHistory": "What was already recorded at this branch (hires, movements, documents) is kept with its signature.",
   "branches.deleteConsequenceLast": "It is the only branch of {{company}}: the company is left with no operating site.",
   "branches.deleteConsequenceRemaining": "{{count}} branches remain in the company."
+  ,"interviews.missingCredentials": "This provider's credentials are not configured on the server yet."
 }

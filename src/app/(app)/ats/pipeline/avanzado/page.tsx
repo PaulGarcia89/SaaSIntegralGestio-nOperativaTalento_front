@@ -19,7 +19,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { applicationNextAction, currentApplicationStage, formatApplicationDate } from "@/lib/applications";
+import { confirmAction } from "@/components/confirm-action";
 import {
+  getApiErrorMessage,
   fetchApplications,
   fetchVacancies,
   fetchVacancySetup,
@@ -98,6 +100,9 @@ function PipelineContent() {
   const filtered = applications.data?.data ?? [];
 
   const move = useMutation({
+    // El aviso de error vivía al principio de la página: en un tablero con
+    // cien tarjetas, quien arrastra una en el pie de la lista no lo ve nunca.
+    onError: (error) => toast.error(getApiErrorMessage(error, t("ats.stageUnchanged"))),
     mutationFn: ({ application, stage, reason, rejectionReasonId }: { application: VacancyApplicationDto; stage: VacancyStageDto; reason?: string; rejectionReasonId?: string }) =>
       updateApplication(application.id, {
         currentStageId: stage.id,
@@ -129,15 +134,17 @@ function PipelineContent() {
       toast.success(t("adv.changeUndone"));
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : t("adv.undoFailed")),
+    onError: (error) => toast.error(getApiErrorMessage(error, t("adv.undoFailed"))),
   });
 
   const decide = useMutation({
     mutationFn: ({ applicationId, requestId, approved }: { applicationId: string; requestId: string; approved: boolean }) =>
       decideApplicationTransition(applicationId, requestId, approved),
-    onSuccess: async () => {
+    onSuccess: async (_result, variables) => {
+      toast.success(variables.approved ? "Aprobación registrada" : "Cambio rechazado");
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
+    onError: (error) => toast.error(getApiErrorMessage(error, t("ats.tryAgain"))),
   });
   const createStageAutomation = useMutation({
     mutationFn: () => {
@@ -158,7 +165,7 @@ function PipelineContent() {
       setAutomationTitle("");
       setAutomationMessage("");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : t("ats.automationCreationError")),
+    onError: (error) => toast.error(getApiErrorMessage(error, t("ats.automationCreationError"))),
   });
 
   function openStageAutomation(stage: VacancyStageDto) {
@@ -186,7 +193,7 @@ function PipelineContent() {
     return (
       <Card level={2} key={application.id}>
         <CardContent
-          className={`space-y-3 p-4 transition-opacity ${draggingId === application.id ? "opacity-50" : ""}`}
+          className={`space-y-3 p-4 transition-opacity ${draggingId === application.id ? "opacity-50" : ""} ${compact && can("applications.change_stage") ? "touch-pan-y" : ""}`}
           draggable={can("applications.change_stage")}
           onDragStart={(event) => {
             if (!can("applications.change_stage")) return;
@@ -205,7 +212,9 @@ function PipelineContent() {
             const targetId = touch
               ? (document.elementFromPoint(touch.clientX, touch.clientY)?.closest("[data-mobile-stage-id]") as HTMLElement | null)?.dataset.mobileStageId ?? null
               : null;
-            setMobileDropStageId(targetId);
+            // Sin esta comparación se escribía el mismo valor en cada
+            // `touchmove` y se volvía a renderizar el tablero entero.
+            setMobileDropStageId((current) => (current === targetId ? current : targetId));
           }}
           onTouchEnd={(event) => {
             const startX = touchStartX.current;
@@ -331,8 +340,8 @@ function PipelineContent() {
       {!vacancies.length ? <InlineFeedback tone="info" title={t("ats.noVacancies")}>{t("ats.createVacancyForFlow")}</InlineFeedback> : null}
       {setup.isLoading || applications.isLoading ? <AsyncState state="loading" title={t("ats.loadingPipeline")} /> : null}
       {setup.isError || applications.isError ? <AsyncState state="error" title={t("ats.pipelineUnavailable")} onRetry={() => { void setup.refetch(); void applications.refetch(); }} /> : null}
-      {move.isError ? <InlineFeedback tone="danger" title={t("adv.stageChangeFailed")}>{move.error instanceof Error ? move.error.message : t("ats.stageUnchanged")}</InlineFeedback> : null}
-      {decide.isError ? <InlineFeedback tone="danger" title={t("ats.approvalUnavailable")}>{decide.error instanceof Error ? decide.error.message : t("ats.tryAgain")}</InlineFeedback> : null}
+      {move.isError ? <InlineFeedback tone="danger" title={t("adv.stageChangeFailed")}>{getApiErrorMessage(move.error, t("ats.stageUnchanged"))}</InlineFeedback> : null}
+      {decide.isError ? <InlineFeedback tone="danger" title={t("ats.approvalUnavailable")}>{getApiErrorMessage(decide.error, t("ats.tryAgain"))}</InlineFeedback> : null}
       {requestedVacancyId !== ALL && setup.isSuccess && !stages.length ? <InlineFeedback tone="warning" title={t("ats.vacancyWithoutStages")}>{t("ats.configureStages")}</InlineFeedback> : null}
 
       {requestedVacancyId === ALL ? (
@@ -428,7 +437,7 @@ function PipelineContent() {
       <Dialog open={Boolean(automationStage)} onOpenChange={(open) => { if (!open && !createStageAutomation.isPending) setAutomationStage(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{t("ats.automateStage", { stage: automationStage?.name ?? "" })}</DialogTitle><DialogDescription>{t("ats.automationDescription")}</DialogDescription></DialogHeader>
-          <div className="space-y-4"><label className="block space-y-2 text-sm font-medium">{t("ats.title")}<Input value={automationTitle} maxLength={160} onChange={(event) => setAutomationTitle(event.target.value)} /></label><label className="block space-y-2 text-sm font-medium">{t("ats.instruction")}<textarea value={automationMessage} maxLength={1000} rows={4} onChange={(event) => setAutomationMessage(event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label><p className="text-xs text-text-secondary">{t("ats.manageAutomation")}</p><Button className="w-full" onClick={() => createStageAutomation.mutate()} disabled={createStageAutomation.isPending || automationTitle.trim().length < 3 || automationMessage.trim().length < 3}>{createStageAutomation.isPending ? t("ats.updating") : t("ats.activateAutomation")}</Button></div>
+          <div className="space-y-4"><label className="block space-y-2 text-sm font-medium">{t("ats.title")}<Input value={automationTitle} maxLength={160} onChange={(event) => setAutomationTitle(event.target.value)} /></label><label className="block space-y-2 text-sm font-medium">{t("ats.instruction")}<textarea value={automationMessage} maxLength={1000} rows={4} onChange={(event) => setAutomationMessage(event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" /></label><p className="text-xs text-text-secondary">{t("ats.manageAutomation")}</p><Button className="w-full" onClick={() => void confirmAction({ title: `¿Activar la automatización de «${automationStage?.name ?? ""}»?`, description: "Quedará encendida y se ejecutará sola cada vez que una candidatura llegue a esa etapa.", consequence: "Actuará sobre candidaturas de personas reales sin volver a preguntar. Puedes apagarla después en Administración › Automatizaciones.", confirmLabel: "Activar la automatización" }).then((ok) => ok && createStageAutomation.mutate())} disabled={createStageAutomation.isPending || automationTitle.trim().length < 3 || automationMessage.trim().length < 3}>{createStageAutomation.isPending ? t("ats.updating") : t("ats.activateAutomation")}</Button></div>
         </DialogContent>
       </Dialog>
     </div>

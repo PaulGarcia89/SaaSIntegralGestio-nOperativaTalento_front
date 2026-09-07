@@ -273,7 +273,7 @@ function StatusRows({ rows }: { rows: Array<{ status: string; count: number }> }
 
 function DataRows({ headers, rows }: { headers: string[]; rows: Array<Array<string | number>> }) {
   return rows.length ? (
-    <><div className="grid gap-3 md:hidden">{rows.map((row, index) => <article key={`${row[0]}-${index}`} className="rounded-xl border p-3"><p className="font-semibold">{row[0]}</p><dl className="mt-3 grid grid-cols-2 gap-3">{row.slice(1).map((cell, cellIndex) => <div key={headers[cellIndex + 1]}><dt className="text-xs text-text-secondary">{headers[cellIndex + 1]}</dt><dd className="mt-1 text-sm font-medium">{cell}</dd></div>)}</dl></article>)}</div><div className="hidden overflow-x-auto rounded-xl border md:block">
+    <><div className="min-w-0 grid gap-3 md:hidden">{rows.map((row, index) => <article key={`${row[0]}-${index}`} className="rounded-xl border p-3"><p className="font-semibold">{row[0]}</p><dl className="mt-3 grid grid-cols-2 gap-3">{row.slice(1).map((cell, cellIndex) => <div key={headers[cellIndex + 1]}><dt className="text-xs text-text-secondary">{headers[cellIndex + 1]}</dt><dd className="mt-1 text-sm font-medium">{cell}</dd></div>)}</dl></article>)}</div><div className="hidden overflow-x-auto rounded-xl border md:block">
       <table className="w-full text-left text-sm">
         <thead className="bg-surface-interactive"><tr>{headers.map((header) => <th key={header} scope="col" className="px-3 py-2 font-medium">{header}</th>)}</tr></thead>
         <tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t">{row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2">{cell}</td>)}</tr>)}</tbody>

@@ -98,7 +98,7 @@ function RestaurantInventoryInner() {
 
     {task && task.items.length > 1 ? (
       <nav aria-label={`Pantallas de ${task.label}`}>
-        <ul className="flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="min-w-0 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {task.items.map((item) => {
             const active = section === item.key;
             return (

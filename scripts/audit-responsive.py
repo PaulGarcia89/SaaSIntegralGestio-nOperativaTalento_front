@@ -30,10 +30,25 @@ SKIP_DIRS = {"node_modules", ".next"}
 fixed_w = re.compile(r"(?<![\w-])(?:min-)?w-\[(\d+)px\]")
 grid_cols = re.compile(r"grid-cols-\[([^\]]+)\]")
 px_in_track = re.compile(r"(\d+)px")
-overflowable = re.compile(r"overflow-x-auto|<table|whitespace-nowrap")
+# `overflow-y-auto` no desborda a lo ancho: es el de casi todos los diálogos
+# largos, y colarlo aquí marcaba cinco secciones que no se desplazan.
+overflowable = re.compile(r"overflow-x-auto|overflow-x-scroll|(?<![-\w])overflow-auto|<table|whitespace-nowrap")
 has_min_w0 = re.compile(r"min-w-0")
 # Prefijos responsive: `md:w-[400px]` solo aplica a partir de ese punto.
 responsive_prefix = re.compile(r"(sm|md|lg|xl|2xl):$")
+
+
+# Un comentario que describe un defecto ya corregido no es ese defecto. El
+# auditor señalaba la línea de documentación que explica qué rejilla se
+# sustituyó, en vez de una rejilla real.
+block_comment = re.compile(r"/\*.*?\*/", re.S)
+line_comment = re.compile(r"(?m)^\s*(?://|\*|/\*|\*/).*$")
+
+
+def strip_comments(text):
+    """Sustituye los comentarios por líneas en blanco, conservando la numeración."""
+    without_blocks = block_comment.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    return line_comment.sub("", without_blocks)
 
 
 def collect():
@@ -48,7 +63,7 @@ findings = []
 
 for path in collect():
     with open(path, encoding="utf-8") as handle:
-        lines = handle.readlines()
+        lines = strip_comments(handle.read()).splitlines(keepends=True)
 
     for number, line in enumerate(lines, start=1):
         # 1 y 2 — anchos fijos.

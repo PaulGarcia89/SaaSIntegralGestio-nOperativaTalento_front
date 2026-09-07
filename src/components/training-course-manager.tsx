@@ -993,7 +993,7 @@ function WizardSidebar({
             aria-current={step === item.id ? "step" : undefined}
             className={`flex min-h-14 items-start gap-3 rounded-xl border p-3 text-left transition-colors ${step === item.id ? "border-primary bg-surface-elevated shadow-sm" : "border-transparent hover:border-border-default hover:bg-surface-elevated"}`}
           >
-            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${wizard.completed[item.id] ? "bg-status-success-soft text-status-success" : "bg-surface-elevated text-text-secondary"}`}>
+            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${wizard.completed[item.id] ? "bg-status-success/15 text-status-success" : "bg-surface-elevated text-text-secondary"}`}>
               {wizard.completed[item.id] ? <CheckCircle2 className="size-4" /> : icons[item.id]}
             </span>
             <span className="min-w-0">
@@ -1195,7 +1195,7 @@ function PublicationChecklist({
       <CardContent className="space-y-2">
         {checks.map((check) => (
           <div key={check.label} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-card p-3">
-            <div className="flex items-start gap-3"><span className={`mt-0.5 flex size-6 items-center justify-center rounded-full ${check.complete ? "bg-status-success-soft text-status-success" : "bg-status-warning-soft text-status-warning"}`}>{check.complete ? <CheckCircle2 className="size-4" /> : <span className="text-xs font-bold">!</span>}</span><div><p className="font-medium">{check.label}</p><p className="text-xs text-text-secondary">{check.detail}</p></div></div>
+            <div className="flex items-start gap-3"><span className={`mt-0.5 flex size-6 items-center justify-center rounded-full ${check.complete ? "bg-status-success/15 text-status-success" : "bg-status-warning/15 text-status-warning"}`}>{check.complete ? <CheckCircle2 className="size-4" /> : <span className="text-xs font-bold">!</span>}</span><div><p className="font-medium">{check.label}</p><p className="text-xs text-text-secondary">{check.detail}</p></div></div>
             {!check.complete ? <Button type="button" variant="ghost" size="sm" onClick={() => onGoTo(check.step)}>Completar</Button> : <Badge variant="success">Completo</Badge>}
           </div>
         ))}

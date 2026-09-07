@@ -272,13 +272,13 @@ export function EmployeesDirectoryPage() {
       />
       <Card level={2}>
         <CardContent className="space-y-4 p-4">
-          <div className="flex justify-end sm:hidden">
+          <div className="min-w-0 flex justify-end sm:hidden">
             <Button type="button" variant="secondary" onClick={() => setMobileFiltersOpen(true)}>
               <Filter className="size-4" />
               Filtros
             </Button>
           </div>
-          <div className="sticky top-4 z-20 hidden flex-nowrap items-center gap-2 overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80 sm:flex sm:flex-wrap sm:p-3">
+          <div className="min-w-0 sticky top-4 z-20 hidden flex-nowrap items-center gap-2 overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80 sm:flex sm:flex-wrap sm:p-3">
             <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-secondary sm:text-xs sm:tracking-wide">Estado</span>
             {statusChips.map((chip) => (
               <button

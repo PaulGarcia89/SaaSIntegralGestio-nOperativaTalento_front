@@ -131,7 +131,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:min-w-64">
+          <div className="min-w-0 grid grid-cols-2 gap-3 sm:min-w-64">
             <Metric label="Documentos" value={String(dossier360.data?.documents.summary.total ?? documents.length)} />
             <Metric label="Asignaciones" value={String(assignments.length)} />
           </div>

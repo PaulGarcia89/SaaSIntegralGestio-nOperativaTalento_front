@@ -115,7 +115,7 @@ function ScorecardForm({ interviewId, context, onClose }: { interviewId: string;
 }
 
 function ScoreSummary({ context }: { context: ScorecardContextDto }) {
-  return <div className="grid gap-3 rounded-xl bg-surface-section p-4 sm:grid-cols-3"><Summary label="Puntuación" value={`${Number(context.scorecard?.weightedScore ?? (context.scorecard?.overallRating ?? 0) * 20).toFixed(1)}/100`} /><Summary label="Recomendación" value={technicalLabel(context.scorecard?.recommendation)} /><Summary label="Evaluador" value={context.scorecard?.reviewer ? `${context.scorecard.reviewer.firstName} ${context.scorecard.reviewer.lastName}` : "Usuario actual"} /></div>;
+  return <div className="min-w-0 grid gap-3 rounded-xl bg-surface-section p-4 sm:grid-cols-3"><Summary label="Puntuación" value={`${Number(context.scorecard?.weightedScore ?? (context.scorecard?.overallRating ?? 0) * 20).toFixed(1)}/100`} /><Summary label="Recomendación" value={technicalLabel(context.scorecard?.recommendation)} /><Summary label="Evaluador" value={context.scorecard?.reviewer ? `${context.scorecard.reviewer.firstName} ${context.scorecard.reviewer.lastName}` : "Usuario actual"} /></div>;
 }
 
 function Comparison({ context }: { context: ScorecardContextDto }) {

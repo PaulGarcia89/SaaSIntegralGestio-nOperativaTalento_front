@@ -450,7 +450,7 @@ function LotsView({
       {/* Los atajos de vencimiento caben en una fila que se desliza sola en el
           teléfono, sin apilarse en cuatro líneas. */}
       <nav aria-label="Filtrar por vencimiento">
-        <ul className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="min-w-0 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {EXPIRY_FILTERS.map(([id, label]) => (
             <li key={id || "all"} className="shrink-0">
               <Button

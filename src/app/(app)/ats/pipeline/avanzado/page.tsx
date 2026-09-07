@@ -363,9 +363,9 @@ function PipelineContent() {
                 <section key={stage.id} data-mobile-stage-id={stage.id} aria-labelledby={`mobile-stage-${stage.id}`} className={`rounded-2xl transition-colors ${mobileDropStageId === stage.id ? "bg-primary/10 ring-2 ring-primary/40" : ""}`}>
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 id={`mobile-stage-${stage.id}`} className="font-semibold">{stage.name}</h2>
-                    <div className="flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="icon" variant="ghost" aria-label={t("ats.automateStage", { stage: stage.name })} onClick={() => openStageAutomation(stage)}><Zap className="size-4" /></Button> : null}</div>
+                    <div className="min-w-0 flex items-center gap-1"><Badge variant="secondary">{items.length}</Badge>{can("applications.change_stage") ? <Button size="icon" variant="ghost" aria-label={t("ats.automateStage", { stage: stage.name })} onClick={() => openStageAutomation(stage)}><Zap className="size-4" /></Button> : null}</div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="min-w-0 grid gap-3 sm:grid-cols-2">
                     {items.map((item) => card(item, true))}
                     {!items.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-text-secondary">{t("ats.noApplications")}</p> : null}
                   </div>

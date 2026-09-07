@@ -69,3 +69,8 @@ export {
   Timeline,
   type TimelineEntry,
 } from "@/components/system/operation";
+
+/* Tarjeta de entidad: la ficha visual de una persona, un documento, una tarea,
+   una vacante, un curso o un recurso. Ver `entity-card.tsx`. */
+export { Avatar, EntityCard, EntityCardList, ProgressMeter, initialsOf } from "./entity-card";
+export type { EntityCardProps, EntityFact } from "./entity-card";

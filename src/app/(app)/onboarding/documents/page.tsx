@@ -78,6 +78,8 @@ import {
   ActionBar,
   BlockerList,
   EmptyState,
+  EntityCard,
+  EntityCardList,
   ErrorState,
   FilterBar,
   InlineNote,
@@ -86,6 +88,7 @@ import {
   PageHeader,
   SkeletonRows,
   StatusBadge,
+  type Tone,
 } from "@/components/system";
 import {
   blockerOwner,
@@ -101,6 +104,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+/**
+ * Estado de una incorporación, derivado de sus tareas.
+ *
+ * No hay un campo «estado legible» en el contrato, y en vez de inventar una
+ * escala se cuenta lo que sí existe: `task.overdue` marca el retraso y
+ * `status === "COMPLETED"` el avance. Cuatro estados y ninguno depende del
+ * color: `StatusBadge` pone icono y palabra.
+ */
+function estadoDeIncorporacion(flow: EmployeeOnboardingFlowDto): { label: string; tone: Tone } {
+  const { total, completed, pending, overdue } = onboardingProgress(flow);
+  if (overdue > 0) return { label: overdue === 1 ? "1 tarea vencida" : `${overdue} tareas vencidas`, tone: "danger" };
+  if (total > 0 && pending === 0) return { label: "Completa", tone: "success" };
+  if (completed > 0) return { label: "En curso", tone: "info" };
+  if (total === 0) return { label: "Sin plantilla", tone: "neutral" };
+  return { label: "Sin empezar", tone: "neutral" };
+}
 
 const starterTasks: OnboardingTemplateTaskConfigDto[] = [
   { taskKey: "documents", taskType: "DOCUMENT_COLLECTION", title: "Documentos de ingreso", description: "Recopilar y validar documentos obligatorios.", ownerType: "SYSTEM", dueOffsetDays: 2, dependsOnKeys: [], required: true, sortOrder: 0 },
@@ -639,35 +659,50 @@ export default function OnboardingDocumentsPage() {
 
       {selected ? (
         <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="space-y-3" aria-label="Empleados en incorporación">
-            {flows.data?.items.map((flow) => (
-              <button
-                key={flow.id}
-                type="button"
-                onClick={() => selectFlow(flow.id)}
-                className={`w-full rounded-2xl border p-4 text-left transition ${
-                  flow.id === selected.id
-                    ? "border-primary bg-primary/5"
-                    : "bg-surface-section hover:bg-surface-interactive"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{flow.employee.name}</p>
-                    <p className="text-sm text-text-secondary">
-                      {flow.employee.jobTitle || "Puesto por confirmar"} · {flow.branch.name}
-                    </p>
-                  </div>
-                  <Badge>{flow.progressPercent}%</Badge>
-                </div>
-                <Progress value={flow.progressPercent} />
-                <p className="mt-3 text-xs text-text-secondary">
-                  {flow.nextAction ? `Siguiente: ${flow.nextAction.title}` : "Sin tareas disponibles"}
-                </p>
-              </button>
-            ))}
+          <aside className="min-w-0" aria-label="Empleados en incorporación">
+            <EntityCardList label="Empleados en incorporación" columns={1} className="sm:grid-cols-2 xl:grid-cols-1">
+              {flows.data?.items.map((flow) => {
+                const avance = onboardingProgress(flow);
+                return (
+                  <li key={flow.id} className="min-w-0">
+                    <EntityCard
+                      avatarName={flow.employee.name}
+                      title={flow.employee.name}
+                      subtitle={`${flow.employee.jobTitle || "Puesto por confirmar"} · ${flow.branch.name}`}
+                      status={estadoDeIncorporacion(flow)}
+                      facts={
+                        avance.total === 0
+                          ? [{ label: "Tareas", value: "Sin tareas" }]
+                          : [
+                              { label: "Pendientes", value: avance.pending },
+                              ...(avance.overdue > 0
+                                ? [{ label: "Vencidas", value: avance.overdue }]
+                                : []),
+                            ]
+                      }
+                      progress={
+                        avance.total === 0
+                          ? undefined
+                          : {
+                              label: "Avance",
+                              value: flow.progressPercent,
+                              detail: `${avance.completed} de ${avance.total} tareas`,
+                            }
+                      }
+                      nextStep={
+                        flow.nextAction
+                          ? `Siguiente: ${flow.nextAction.title}`
+                          : "Sin tareas disponibles"
+                      }
+                      onSelect={() => selectFlow(flow.id)}
+                      selected={flow.id === selected.id}
+                    />
+                  </li>
+                );
+              })}
+            </EntityCardList>
             {flows.data && flows.data.totalPages > 1 ? (
-              <div className="flex items-center justify-between gap-2 pt-2">
+              <div className="flex items-center justify-between gap-2 pt-3">
                 <Button size="sm" variant="secondary" disabled={flowPage <= 1} onClick={() => setFlowPage((page) => page - 1)}>Anterior</Button>
                 <span className="text-xs text-text-secondary">{flowPage} de {flows.data.totalPages}</span>
                 <Button size="sm" variant="secondary" disabled={flowPage >= flows.data.totalPages} onClick={() => setFlowPage((page) => page + 1)}>Siguiente</Button>
@@ -1841,14 +1876,6 @@ function Documents({
         })
       )}
     </section>
-  );
-}
-
-function Progress({ value }: { value: number }) {
-  return (
-    <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary" aria-label={`Progreso ${value}%`}>
-      <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${value}%` }} />
-    </div>
   );
 }
 

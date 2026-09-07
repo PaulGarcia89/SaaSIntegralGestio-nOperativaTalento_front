@@ -129,7 +129,6 @@ const sectionIcons: Record<NavSection, LucideIcon> = {
   productivity: Users,
   asset_inventory: Boxes,
   restaurant_inventory: UtensilsCrossed,
-  notifications: Bell,
   reportes: ChartNoAxesCombined,
   administracion: Settings,
   plataforma: ShieldCheck,
@@ -213,7 +212,6 @@ function getMobileQuickNavigation(items: readonly NavItem[], pathname: string) {
  * Raíces de inventario. Sus subpantallas cuelgan de ellas en vez de ocupar
  * ~28 sitios en el primer nivel del menú.
  */
-const inventoryModuleRoots = new Set(["/inventory/assets", "/inventory/restaurant"]);
 
 /* --------------------------------------------------------------------------
    BARRA LATERAL
@@ -261,10 +259,6 @@ function SidebarContent({
     setPinnedSection(null);
   }
   const openSection = pinnedSection ?? activeSection;
-
-  const isInventorySubmenuItem = (item: SidebarNavigationItem) =>
-    !inventoryModuleRoots.has(item.href) &&
-    (item.module === "asset_inventory" || item.module === "restaurant_inventory");
 
   return (
     <div className="flex min-h-full flex-col overflow-hidden rounded-xl border border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -360,18 +354,11 @@ function SidebarContent({
 
                   {open ? (
                     <div id={panelId} className="mt-1 space-y-3 pb-2 pl-2">
-                      {/* Los elementos se calculan ANTES de rotular. El rótulo
-                          salía de `group.items` y la lista de
-                          `group.items.filter(...)`, así que un área cuyos
-                          elementos se filtran enteros dejaba el encabezado
-                          solo: es el «Inventario de restaurante» vacío que
-                          aparecía bajo Administración. */}
+                      {/* Un área sin elementos no se rotula: el encabezado
+                          salía de `group.items` y la lista de una versión
+                          filtrada, así que un área cuyos elementos se filtraban
+                          enteros dejaba el rótulo solo. */}
                       {groups
-                        .map((group) => ({
-                          group: group.group,
-                          items: group.items.filter((item) => !isInventorySubmenuItem(item)),
-                          all: group.items,
-                        }))
                         .filter((group) => group.items.length > 0)
                         .map((group, _index, visibleGroups) => (
                         <div key={group.group}>
@@ -383,49 +370,22 @@ function SidebarContent({
                             </p>
                           ) : null}
                           <ul className="space-y-0.5">
-                            {group.items
-                              .map((item) => {
-                                const active = item.href === activeHref;
-                                const NavIcon = navigationIcons[item.icon];
-                                const submenu = inventoryModuleRoots.has(item.href)
-                                  ? group.items.filter(
-                                      (candidate) =>
-                                        candidate.module === item.module && isInventorySubmenuItem(candidate),
-                                    )
-                                  : [];
-                                const submenuActive = submenu.some((candidate) => candidate.href === activeHref);
-
-                                return (
-                                  <li key={item.href}>
-                                    <SidebarLink
-                                      href={item.href}
-                                      label={localizedNavLabel(item.label, t)}
-                                      icon={NavIcon}
-                                      active={active}
-                                      onNavigate={onNavigate}
-                                    />
-                                    {/* El submenú de inventario solo se abre si
-                                        estás dentro. Antes se desplegaba
-                                        siempre: 28 enlaces permanentes. */}
-                                    {submenu.length > 0 && (active || submenuActive) ? (
-                                      <ul className="mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
-                                        {submenu.map((child) => (
-                                          <li key={child.href}>
-                                            <SidebarLink
-                                              href={child.href}
-                                              label={localizedNavLabel(child.label, t)}
-                                              icon={navigationIcons[child.icon]}
-                                              active={child.href === activeHref}
-                                              onNavigate={onNavigate}
-                                              dense
-                                            />
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                  </li>
-                                );
-                              })}
+                            {/* Sin submenú: cada módulo ya es una sección
+                                plegable, y plegar dentro de lo plegado
+                                escondía el módulo de quien lo contrató. Las 34
+                                pantallas de restaurante se leen porque el área
+                                las separa en operación, análisis y ajustes. */}
+                            {group.items.map((item) => (
+                              <li key={item.href}>
+                                <SidebarLink
+                                  href={item.href}
+                                  label={localizedNavLabel(item.label, t)}
+                                  icon={navigationIcons[item.icon]}
+                                  active={item.href === activeHref}
+                                  onNavigate={onNavigate}
+                                />
+                              </li>
+                            ))}
                           </ul>
                         </div>
                       ))}

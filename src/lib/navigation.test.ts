@@ -351,7 +351,9 @@ describe("secciones de navegación", () => {
     expect(section("/inventory/restaurant/recipe-margins")).toBe("restaurant_inventory");
     expect(section("/inventory/restaurant/settings")).toBe("restaurant_inventory");
     expect(section("/inventory/assets")).toBe("asset_inventory");
-    expect(section("/notifications")).toBe("notifications");
+    // Las alertas viven en Administración: una sección con un único elemento
+    // llamado igual que ella no es una sección.
+    expect(section("/notifications")).toBe("administracion");
   });
 
   it("administración y gobierno de plataforma no se mezclan", () => {

@@ -32,7 +32,6 @@ export type NavSection =
   | "productivity"
   | "asset_inventory"
   | "restaurant_inventory"
-  | "notifications"
   | "reportes"
   | "administracion"
   | "plataforma";
@@ -56,7 +55,6 @@ export const navSections: ReadonlyArray<{ id: NavSection; label: string; hint: s
   { id: "productivity", label: "Personas y productividad", hint: "Equipo, turnos e indicadores" },
   { id: "asset_inventory", label: "Inventario de activos", hint: "Equipos, entregas y devoluciones" },
   { id: "restaurant_inventory", label: "Inventario de restaurante", hint: "Ingredientes, recetas y consumo" },
-  { id: "notifications", label: "Alertas", hint: "Lo que reclama tu atención" },
   { id: "reportes", label: "Reportes", hint: "Lo que se consulta y se exporta" },
   { id: "administracion", label: "Administración", hint: "Cómo se configura la empresa" },
   { id: "plataforma", label: "Gobierno de plataforma", hint: "Alcance multiempresa" },
@@ -95,6 +93,10 @@ export function sectionForNavItem(item: { href: string; group: NavGroup; module:
   if (item.group === "Gobierno de plataforma") return "plataforma";
   if (item.module === "admin") return "administracion";
   if (item.module === "dashboard" || item.module === "profile") return "inicio";
+  // Las alertas no son un módulo que se opere, son una capacidad transversal:
+  // una sección con un único elemento llamado igual que ella —«Alertas ›
+  // Alertas»— no es una sección, es una fila con un envoltorio.
+  if (item.module === "notifications") return "administracion";
   if (item.module === "reports") return "reportes";
   return item.module as NavSection;
 }
@@ -179,7 +181,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/inventory/restaurant/movements", label: "Movimientos", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "reports", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/restaurant/settings", label: "Configuración", group: "Administración", module: "restaurant_inventory", permission: "restaurant_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "admin", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/reports", label: "Reportes", group: "Analítica", module: "reports", permission: "reports.view", audience: "shared", subscriptionStates: live, icon: "reports" },
-  { href: "/notifications", label: "Alertas", group: "Analítica", module: "notifications", permission: "notifications.view", audience: "shared", icon: "notifications" },
+  { href: "/notifications", label: "Alertas", group: "Administración", module: "notifications", permission: "notifications.view", audience: "shared", icon: "notifications" },
   { href: "/admin/company", label: "Configuración de empresa", group: "Administración", module: "admin", permission: "admin.company", audience: "tenant", icon: "company" },
   { href: "/admin/branches", label: "Sucursales", group: "Administración", module: "admin", permission: "branches.view", audience: "tenant", requiresCommercialModule: false, icon: "branches" },
   { href: "/admin/users", label: "Usuarios", group: "Administración", module: "admin", permission: "admin.users", audience: "tenant", icon: "users" },

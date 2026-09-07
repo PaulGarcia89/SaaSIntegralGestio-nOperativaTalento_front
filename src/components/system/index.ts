@@ -74,3 +74,8 @@ export {
    una vacante, un curso o un recurso. Ver `entity-card.tsx`. */
 export { Avatar, EntityCard, EntityCardList, ProgressMeter, initialsOf } from "./entity-card";
 export type { EntityCardProps, EntityFact } from "./entity-card";
+
+/* Tarjeta de estado: la pieza con la que abre el panel de cada módulo.
+   Ver `status-tile.tsx`. */
+export { StatusTile, StatusTileRow } from "./status-tile";
+export type { StatusTileProps } from "./status-tile";

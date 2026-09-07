@@ -2,17 +2,27 @@
 
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Building2, Plus } from "lucide-react";
 import { MobileActionBar, TaskCard } from "@/components/simple/simple-ui";
 import {
   ErrorState,
   EmptyState,
+  InlineNote,
   PageHeader,
   PageSection,
   SkeletonRows,
   StatusBadge,
+  StatusTile,
+  StatusTileRow,
 } from "@/components/system";
-import { fetchApplications, fetchOperationalDashboard } from "@/lib/backend";
+import { ChartCard, ChartSkeleton, FunnelChart, type FunnelStage } from "@/components/chart";
+import {
+  fetchApplications,
+  fetchAtsAnalytics,
+  fetchInterviewCoordinationQueue,
+  fetchOperationalDashboard,
+  fetchVacancies,
+} from "@/lib/backend";
 import type { ApplicationStatusKey } from "@/lib/contracts";
 import { MAIN_PHASES, phaseTitle, phaseMeaning, toTodayItems, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
 import { useLocale } from "@/components/locale-provider";
@@ -52,6 +62,44 @@ const PHASE_STATUSES: Record<RecruitmentPhaseId, ApplicationStatusKey[]> = {
   TRABAJANDO: ["HIRED", "TRAINING"],
   DESCARTADOS: ["REJECTED", "WITHDRAWN"],
 };
+
+/**
+ * Ventana del embudo.
+ *
+ * El embudo NO se deriva de los conteos por fase de esta misma pantalla. Esos
+ * conteos son ocupación de hoy —cuánta gente hay ahora mismo en cada sitio— y
+ * dibujarlos como embudo afirmaría una conversión que esos números no
+ * demuestran: quien fue rechazado tras la entrevista ya no aparece en
+ * «Conociendo», así que la caída entre fases mediría bajas, no conversión.
+ *
+ * El embudo viene de `/reports/ats-analytics`, donde el backend sí sigue a cada
+ * postulación por las etapas que atravesó y publica, por etapa, cuántas
+ * llegaron (`reached`) y con qué tamaño de muestra (`sampleSize`).
+ */
+const DIAS_EMBUDO = 90;
+
+/**
+ * Muestra mínima para publicar un tiempo medio por etapa.
+ *
+ * Por debajo de esto una sola contratación lenta mueve la media varios días y
+ * el número engaña más de lo que informa. El backend entrega `sampleSize`
+ * justo para poder tomar esta decisión en vez de adivinarla.
+ */
+const MUESTRA_MINIMA = 5;
+
+function ventanaEmbudo(hoy: string, branchId?: string) {
+  const hasta = new Date(`${hoy}T00:00:00.000Z`);
+  const desde = new Date(hasta.getTime() - (DIAS_EMBUDO - 1) * 86_400_000);
+  return {
+    from: desde.toISOString().slice(0, 10),
+    to: hoy,
+    branchId,
+    // Sin sucursal activa se consulta toda la empresa, igual que el resto del
+    // panel: el alcance escrito bajo cada tarjeta dice cuál de los dos es.
+    scope: branchId ? ("context" as const) : ("tenant" as const),
+    granularity: "week" as const,
+  };
+}
 
 /**
  * Raíl de fases.
@@ -169,6 +217,37 @@ export default function TodayPage() {
     })),
   });
 
+  // Entrevistas por coordinar: el endpoint ya entrega el conteo, así que la
+  // tarjeta no estima nada.
+  const coordinacion = useQuery({
+    queryKey: ["interview-coordination", currentTenant.id, currentBranch?.id],
+    queryFn: () => fetchInterviewCoordinationQueue(1, 1),
+    enabled: allowed,
+    staleTime: 60_000,
+  });
+
+  // La fecha entra en la clave para que el embudo se rehaga al cambiar de día
+  // sin dejar la ventana congelada en la que se calculó al abrir la pestaña.
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  // Vacantes abiertas. El endpoint entrega una página de 100; si hubiera más de
+  // una página este recuento sería parcial, y la tarjeta prefiere decir que no
+  // tiene el dato antes que enseñar un número corto como si fuera el total.
+  const vacantes = useQuery({
+    queryKey: ["vacancies", "ats-panel", currentTenant.id],
+    queryFn: fetchVacancies,
+    enabled: allowed,
+    staleTime: 60_000,
+  });
+
+  // Embudo real por etapa, calculado por el backend sobre el histórico.
+  const analitica = useQuery({
+    queryKey: ["ats-analytics", "ats-panel", currentTenant.id, currentBranch?.id ?? null, hoy],
+    queryFn: () => fetchAtsAnalytics(ventanaEmbudo(hoy, currentBranch?.id)),
+    enabled: allowed,
+    staleTime: 300_000,
+  });
+
   const items = toTodayItems(
     [...(dashboard.data?.tasks ?? []), ...(dashboard.data?.alerts ?? [])],
     undefined,
@@ -195,9 +274,137 @@ export default function TodayPage() {
     loading: Boolean(counts[index]?.isLoading),
   }));
 
+  // Alcance escrito al pie de cada tarjeta. Las mismas cifras significan cosas
+  // distintas en una sucursal y en toda la empresa; sin decirlo no hay forma de
+  // saber cuál se está mirando.
+  const alcance = currentBranch?.name ?? t("common.allBranches");
+
+  /** `undefined` = todavía cargando · `null` = el servidor no lo entrega. */
+  const conteoDeFase = (fase: RecruitmentPhaseId) => {
+    const indice = MAIN_PHASES.findIndex((phase) => phase.id === fase);
+    const consulta = counts[indice];
+    if (!consulta) return null;
+    if (consulta.isError) return null;
+    return consulta.data?.meta.total;
+  };
+
+  const nuevas = conteoDeFase("POSTULARON");
+  const decisiones = conteoDeFase("DECIDIDO");
+
+  const vacantesActivas = (() => {
+    if (vacantes.isError) return null;
+    const pagina = vacantes.data;
+    if (!pagina) return undefined;
+    if (pagina.meta.totalPages > 1) return null;
+    return pagina.data.filter((vacante) =>
+      ["OPEN", "PUBLISHED"].includes(String(vacante.status ?? "").toUpperCase()),
+    ).length;
+  })();
+
+  const porCoordinar = coordinacion.isError
+    ? null
+    : coordinacion.data
+      ? coordinacion.data.meta.interviewCount + coordinacion.data.meta.requestCount
+      : undefined;
+
+  /*
+   * Cuatro tarjetas, no doce. Son las cuatro preguntas con las que se abre el
+   * módulo: qué hay publicado, qué llegó, qué hay que agendar y qué espera una
+   * decisión mía. Cada una lleva a la lista ya filtrada, así que la tarjeta no
+   * solo informa: resuelve.
+   *
+   * Ninguna lleva variación. El backend entrega el estado de ahora, no una
+   * serie temporal, y un «+12 % esta semana» inventado sería peor que su
+   * ausencia.
+   */
+  const tarjetas = [
+    {
+      title: t("ats.panel.activeVacancies"),
+      value: vacantesActivas,
+      context: t("ats.panel.activeVacanciesContext"),
+      href: "/ats/vacancies",
+      actionLabel: t("ats.panel.seeVacancies"),
+    },
+    {
+      title: t("ats.panel.newApplications"),
+      value: nuevas,
+      context: t("ats.panel.newApplicationsContext"),
+      status:
+        typeof nuevas === "number" && nuevas > 0
+          ? { label: t("ats.panel.needsReview"), tone: "warning" as const }
+          : undefined,
+      href: "/ats/candidates?phase=POSTULARON",
+      actionLabel: t("ats.panel.review"),
+    },
+    {
+      title: t("ats.panel.interviews"),
+      value: porCoordinar,
+      context: t("ats.panel.interviewsContext"),
+      href: "/ats/interviews",
+      actionLabel: t("ats.panel.seeInterviews"),
+    },
+    {
+      title: t("ats.panel.pendingDecisions"),
+      value: decisiones,
+      context: t("ats.panel.pendingDecisionsContext"),
+      status:
+        typeof decisiones === "number" && decisiones > 0
+          ? { label: t("ats.panel.awaitingDecision"), tone: "progress" as const }
+          : undefined,
+      href: "/ats/candidates?phase=DECIDIDO",
+      actionLabel: t("ats.panel.decide"),
+    },
+  ];
+
+  const embudo: FunnelStage[] = (analitica.data?.funnel ?? []).map((etapa) => ({
+    id: etapa.stageCode,
+    name: etapa.stageName,
+    value: etapa.reached,
+  }));
+
+  // Solo las etapas con muestra suficiente. El resto existe en el backend, pero
+  // publicar su media aquí sería presentar ruido como medida.
+  const tiempos = (analitica.data?.funnel ?? []).filter(
+    (etapa) => etapa.sampleSize >= MUESTRA_MINIMA && etapa.averageHours > 0,
+  );
+
+  const textoDuracion = (horas: number) =>
+    horas < 24
+      ? t("ats.panel.hoursShort", { n: Math.round(horas) })
+      : t("ats.panel.daysShort", {
+          n: (horas / 24).toLocaleString(locale === "es" ? "es-ES" : "en-US", {
+            maximumFractionDigits: 1,
+          }),
+        });
+
   return (
     <div className="space-y-6 pb-4">
-      <PageHeader eyebrow="Reclutamiento" title={t("ats.today.title")} description={t("ats.today.help")} />
+      <PageHeader
+        eyebrow="Reclutamiento"
+        title={t("ats.today.title")}
+        description={t("ats.today.help")}
+        actions={
+          can("jobs.create") ? (
+            <Button asChild>
+              <Link href="/ats/vacancies/new">
+                <Plus className="size-4" aria-hidden="true" />
+                {t("vacancies.new")}
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {/* ---- 0. Contexto activo -----------------------------------------
+          Las cifras de abajo cambian con la empresa y la sucursal elegidas.
+          Sin decirlo, la misma pantalla enseña números distintos y no hay
+          forma de saber por qué. */}
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
+        <Building2 className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+        <span className="font-medium text-ink-1">{currentTenant.name}</span>
+        <span aria-hidden="true" className="text-ink-3">·</span>
+        <span>{currentBranch?.name ?? "Todas las sucursales"}</span>
+      </p>
 
       {/* ---- 1. Lo siguiente ------------------------------------------- */}
       {dashboard.isLoading ? (
@@ -244,14 +451,15 @@ export default function TodayPage() {
         />
       )}
 
-      {/* ---- 2. Reparto por fase ---------------------------------------- */}
-      <PageSection
-        title={t("ats.today.phasesNav")}
-        description="Cuántas personas hay ahora mismo en cada fase del proceso."
-        id="fases"
-      >
-        <PhaseRail phases={phases} locale={locale} />
-      </PageSection>
+      {/* ---- 2. Cómo está el módulo -------------------------------------
+          Cuatro cifras, no doce. Cada una abre la lista ya filtrada. */}
+      <StatusTileRow label={t("ats.panel.tilesLabel")}>
+        {tarjetas.map((tarjeta) => (
+          <li key={tarjeta.title} className="min-w-0">
+            <StatusTile {...tarjeta} scope={alcance} />
+          </li>
+        ))}
+      </StatusTileRow>
 
       {/* ---- 3. El resto de pendientes ---------------------------------- */}
       {rest.length > 0 ? (
@@ -285,6 +493,67 @@ export default function TodayPage() {
           </div>
         </PageSection>
       ) : null}
+
+      {/* ---- 4. Reparto por fase ----------------------------------------
+          Dónde está ahora mismo la gente. Es un gráfico y a la vez una
+          navegación: cada fila abre su fase. */}
+      <PageSection title={t("ats.today.phasesNav")} description={t("ats.panel.phasesHelp")} id="fases">
+        <PhaseRail phases={phases} locale={locale} />
+      </PageSection>
+
+      {/* ---- 5. Embudo por etapa ----------------------------------------
+          Pregunta que responde: ¿en qué etapa se está perdiendo la gente?
+          Dato del backend, no derivado de las cifras de arriba. */}
+      <ChartCard
+        title={t("ats.panel.funnelTitle")}
+        subtitle={t("ats.panel.funnelSubtitle")}
+        period={t("ats.panel.funnelPeriod", { days: DIAS_EMBUDO })}
+        source={analitica.data?.source}
+      >
+        {analitica.isLoading ? (
+          <ChartSkeleton label={t("ats.panel.funnelLoading")} />
+        ) : analitica.isError ? (
+          <InlineNote tone="warning" title={t("ats.panel.funnelErrorTitle")}>
+            {t("ats.panel.funnelErrorHelp")}
+          </InlineNote>
+        ) : (
+          <>
+            <FunnelChart
+              stages={embudo}
+              stageLabel={t("ats.panel.stage")}
+              caption={t("ats.panel.funnelCaption")}
+              emptyReason="sin-registros"
+            />
+
+            {tiempos.length > 0 ? (
+              <div className="mt-5 border-t border-line pt-4">
+                <h4 className="text-sm font-semibold text-ink-1">{t("ats.panel.stageTimeTitle")}</h4>
+                <p className="mt-1 text-xs text-ink-3">
+                  {t("ats.panel.stageTimeHelp", { min: MUESTRA_MINIMA })}
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {tiempos.map((etapa) => (
+                    <li
+                      key={etapa.stageCode}
+                      className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm"
+                    >
+                      <span className="min-w-0 text-ink-2">{etapa.stageName}</span>
+                      <span className="shrink-0 text-ink-1">
+                        <span className="font-mono font-semibold tabular-figures">
+                          {textoDuracion(etapa.averageHours)}
+                        </span>
+                        <span className="ml-2 text-xs text-ink-3">
+                          {t("ats.panel.sample", { n: etapa.sampleSize })}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        )}
+      </ChartCard>
 
       <MobileActionBar>
         <Button asChild size="lg" className="w-full">

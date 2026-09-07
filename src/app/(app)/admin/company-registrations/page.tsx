@@ -3,40 +3,302 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Check, Clock3, Mail, MapPin, X } from "lucide-react";
-import { approveCompanyRegistrationRequest, fetchCompanyRegistrationRequests, rejectCompanyRegistrationRequest, type CompanyRegistrationRequestDto } from "@/lib/backend";
-import { AsyncState } from "@/components/async-state";
+import {
+  approveCompanyRegistrationRequest,
+  fetchCompanyRegistrationRequests,
+  getApiErrorMessage,
+  rejectCompanyRegistrationRequest,
+  type CompanyRegistrationRequestDto,
+} from "@/lib/backend";
+import {
+  BlockedState,
+  EmptyState,
+  ErrorState,
+  InlineNote,
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+  StatusBadge,
+  type Tone,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { StateCard } from "@/components/domain";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { roleLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 
-const statusLabels: Record<CompanyRegistrationRequestDto["status"], string> = { PENDING: "Pendiente", APPROVED: "Aprobada", REJECTED: "Rechazada" };
+/**
+ * Solicitudes de alta de empresa.
+ *
+ * Era el archivo con peor relación defecto/tamaño de todo el producto: 42
+ * líneas, de las cuales una tenía 4 800 caracteres.
+ *
+ * Qué cambió
+ * ----------
+ * · 28 colores crudos de Tailwind y dos hexadecimales fijos —`bg-white`,
+ *   `text-slate-600`, `bg-slate-950/35`, un degradado `#ecfeff → #f8fafc`—
+ *   hacían que la pantalla estuviera pintada solo para tema claro: en modo
+ *   oscuro el modal quedaba blanco con texto gris claro encima. Ahora todo
+ *   pasa por tokens.
+ * · El diálogo de revisión era un `<div className="fixed inset-0">` montado a
+ *   mano: sin trampa de foco, sin cierre con Escape y sin devolver el foco al
+ *   cerrar. Quien navega con teclado quedaba atrapado detrás del velo.
+ * · El texto que lee quien aprueba decía que se crearía «el acceso
+ *   TENANT_ADMIN de forma transaccional»: un código de rol del backend y una
+ *   palabra de base de datos, en la frase que sostiene la decisión.
+ * · El plan se mostraba con su código (`BASIC`, `PRO`, `ENTERPRISE`).
+ * · El error de guardado decía siempre «no fue posible, inténtalo
+ *   nuevamente», ocultando lo que respondió el servidor.
+ * · No había ningún encabezado del sistema: `<h1>` propio, badge de marca y
+ *   una cifra suelta en una caja blanca.
+ *
+ * Lo que ya estaba bien y se conserva: es la única acción de alto impacto del
+ * módulo que explicaba de antemano qué se iba a crear, y que exige un motivo
+ * obligatorio al rechazar. Ese patrón se mantiene y se refuerza.
+ */
+
+const STATUS: Record<CompanyRegistrationRequestDto["status"], { label: string; tone: Tone }> = {
+  PENDING: { label: "Pendiente de revisar", tone: "warning" },
+  APPROVED: { label: "Aprobada", tone: "success" },
+  REJECTED: { label: "Rechazada", tone: "neutral" },
+};
+
+const PLAN_LABELS: Record<CompanyRegistrationRequestDto["plan"], string> = {
+  BASIC: "Básico",
+  PRO: "Profesional",
+  ENTERPRISE: "Empresarial",
+};
 
 export default function CompanyRegistrationsPage() {
   const { can } = useAppStore();
   const client = useQueryClient();
+
   const [active, setActive] = useState<CompanyRegistrationRequestDto | null>(null);
   const [decision, setDecision] = useState<"approve" | "reject" | null>(null);
   const [notes, setNotes] = useState("");
-  const registrations = useQuery({ queryKey: ["company-registration-requests"], queryFn: () => fetchCompanyRegistrationRequests() });
+
+  const registrations = useQuery({
+    queryKey: ["company-registration-requests"],
+    queryFn: () => fetchCompanyRegistrationRequests(),
+  });
+
   const review = useMutation({
     mutationFn: async () => {
       if (!active || !decision) throw new Error("Selecciona una solicitud.");
-      return decision === "approve" ? approveCompanyRegistrationRequest(active.id, notes) : rejectCompanyRegistrationRequest(active.id, notes);
+      return decision === "approve"
+        ? approveCompanyRegistrationRequest(active.id, notes)
+        : rejectCompanyRegistrationRequest(active.id, notes);
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["company-registration-requests"] });
       void client.invalidateQueries({ queryKey: ["admin-tenants"] });
-      setActive(null);
-      setDecision(null);
-      setNotes("");
+      close();
     },
   });
 
-  if (!can("tenants.view")) return <StateCard tone="restricted" title="Sin acceso a solicitudes" description="Sólo la administración de plataforma puede revisar registros de empresas." />;
-  if (registrations.isLoading) return <AsyncState state="loading" title="Cargando solicitudes de empresa" />;
-  if (registrations.isError) return <AsyncState state="error" title="No fue posible cargar las solicitudes" onRetry={() => void registrations.refetch()} />;
+  function open(item: CompanyRegistrationRequestDto, next: "approve" | "reject") {
+    setActive(item);
+    setDecision(next);
+    setNotes("");
+    review.reset();
+  }
 
-  const pending = (registrations.data ?? []).filter((item) => item.status === "PENDING");
-  return <div className="space-y-6"><header className="flex flex-col gap-4 rounded-3xl border border-cyan-100 bg-[linear-gradient(135deg,#ecfeff,#f8fafc)] p-6 sm:flex-row sm:items-end sm:justify-between"><div><Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">Gobierno SaaS</Badge><h1 className="mt-3 text-3xl font-semibold tracking-tight">Solicitudes de empresa</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Revisa los registros antes de crear un tenant, la suscripción, la sede principal y su administrador.</p></div><div className="rounded-2xl bg-white px-4 py-3 text-sm shadow-sm"><span className="text-2xl font-semibold text-cyan-800">{pending.length}</span><span className="ml-2 text-muted-foreground">pendientes</span></div></header><div className="grid gap-4 xl:grid-cols-2">{(registrations.data ?? []).map((item) => <article key={item.id} className="rounded-3xl border border-border bg-card p-5 shadow-sm"><div className="flex items-start justify-between gap-4"><div className="flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-800"><Building2 className="size-5" /></span><div><h2 className="font-semibold">{item.companyName}</h2><p className="text-sm text-muted-foreground">Plan {item.plan}</p></div></div><Badge variant="secondary" className={item.status === "PENDING" ? "bg-amber-100 text-amber-800" : item.status === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}>{statusLabels[item.status]}</Badge></div><dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2"><div className="rounded-xl bg-slate-50 p-3"><dt className="flex items-center gap-2 text-xs text-slate-500"><MapPin className="size-3.5" />Sede principal</dt><dd className="mt-1 font-medium">{item.branchName}</dd><dd className="text-slate-600">{item.branchLocation}</dd></div><div className="rounded-xl bg-slate-50 p-3"><dt className="flex items-center gap-2 text-xs text-slate-500"><Mail className="size-3.5" />Administrador</dt><dd className="mt-1 font-medium">{item.adminName}</dd><dd className="truncate text-slate-600">{item.adminEmail}</dd></div></dl><div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" />{new Date(item.requestedAt).toLocaleString("es")}</span>{item.reviewNotes ? <span className="max-w-56 truncate">{item.reviewNotes}</span> : null}</div>{item.status === "PENDING" ? <div className="mt-5 flex gap-3"><Button className="flex-1" onClick={() => { setActive(item); setDecision("approve"); setNotes(""); }}><Check className="size-4" />Aprobar</Button><Button className="flex-1" variant="secondary" onClick={() => { setActive(item); setDecision("reject"); setNotes(""); }}><X className="size-4" />Rechazar</Button></div> : null}</article>)}</div>{registrations.data?.length === 0 ? <StateCard tone="empty" title="No hay solicitudes" description="Las solicitudes enviadas desde el registro público aparecerán aquí." /> : null}{active && decision ? <div className="fixed inset-0 z-50 flex items-end bg-slate-950/35 p-4 sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-labelledby="registration-review-title"><div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><Badge className={decision === "approve" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}>{decision === "approve" ? "Aprobar solicitud" : "Rechazar solicitud"}</Badge><h2 id="registration-review-title" className="mt-3 text-xl font-semibold">{active.companyName}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{decision === "approve" ? "Esta acción creará la empresa, la suscripción de prueba, la sede y el acceso TENANT_ADMIN de forma transaccional." : "Explica al solicitante qué debe corregir antes de enviar una nueva solicitud."}</p><label className="mt-5 block text-sm font-medium">Observación {decision === "reject" ? "(obligatoria)" : "(opcional)"}<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-2 min-h-28 w-full rounded-2xl border border-border bg-surface-elevated p-3 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20" placeholder={decision === "approve" ? "Ej. Aprobada para trial de 14 días" : "Indica el motivo del rechazo"} /></label>{review.isError ? <p className="mt-3 text-sm text-red-600">No fue posible guardar la decisión. Inténtalo nuevamente.</p> : null}<div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button variant="secondary" onClick={() => { setActive(null); setDecision(null); }}>Cancelar</Button><Button variant={decision === "approve" ? "default" : "destructive"} disabled={review.isPending || (decision === "reject" && !notes.trim())} onClick={() => review.mutate()}>{review.isPending ? "Guardando..." : decision === "approve" ? "Confirmar aprobación" : "Confirmar rechazo"}</Button></div></div></div> : null}</div>;
+  function close() {
+    setActive(null);
+    setDecision(null);
+    setNotes("");
+  }
+
+  if (!can("tenants.view")) {
+    return (
+      <BlockedState
+        title="Sin acceso a las solicitudes"
+        cause="Revisar altas de empresa es una tarea de la administración de la plataforma."
+        owner="Quien administra la plataforma"
+        resolution="Si necesitas revisarlas, pide el permiso «Ver empresas»."
+      />
+    );
+  }
+
+  const all = registrations.data ?? [];
+  const pending = all.filter((item) => item.status === "PENDING");
+  const approved = all.filter((item) => item.status === "APPROVED");
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Gobierno de la plataforma"
+        title="Solicitudes de empresa"
+        description="Revisa cada registro antes de crear la empresa, su suscripción, su sede principal y el acceso de quien la administrará."
+      />
+
+      {registrations.isLoading ? (
+        <SkeletonRows rows={4} label="Cargando las solicitudes" />
+      ) : registrations.isError ? (
+        <ErrorState
+          title="No fue posible cargar las solicitudes"
+          detail={getApiErrorMessage(registrations.error, "Reintenta la consulta para continuar.")}
+          onRetry={() => void registrations.refetch()}
+        />
+      ) : (
+        <>
+          <MetricRow>
+            <Metric
+              label="Pendientes de revisar"
+              value={String(pending.length)}
+              tone={pending.length > 0 ? "warning" : undefined}
+            />
+            <Metric label="Aprobadas" value={String(approved.length)} tone="success" />
+            <Metric label="Recibidas en total" value={String(all.length)} />
+          </MetricRow>
+
+          {all.length === 0 ? (
+            <EmptyState
+              reason="no-records"
+              title="No hay solicitudes"
+              description="Las altas enviadas desde el registro público aparecerán aquí para que alguien las revise."
+            />
+          ) : (
+            <PageSection
+              title={pending.length ? "Por revisar" : "Solicitudes"}
+              description={
+                pending.length
+                  ? "Cada aprobación crea una empresa real con su suscripción y su primer acceso."
+                  : "Historial de altas revisadas."
+              }
+            >
+              <ul className="grid gap-4 xl:grid-cols-2">
+                {all.map((item) => (
+                  <li key={item.id} className="rounded-lg border border-line bg-surface-1 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="flex size-11 shrink-0 items-center justify-center rounded-md border border-line bg-surface-2 text-ink-2"
+                        >
+                          <Building2 className="size-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <h2 className="truncate font-semibold text-ink-1">{item.companyName}</h2>
+                          <p className="text-sm text-ink-2">Plan {PLAN_LABELS[item.plan] ?? item.plan}</p>
+                        </div>
+                      </div>
+                      <StatusBadge size="sm" tone={STATUS[item.status].tone} label={STATUS[item.status].label} />
+                    </div>
+
+                    <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                      <div className="min-w-0 rounded-md border border-line bg-surface-2 p-3">
+                        <dt className="flex items-center gap-2 text-2xs text-ink-3">
+                          <MapPin className="size-3.5" aria-hidden="true" />
+                          Sede principal
+                        </dt>
+                        <dd className="mt-1 truncate font-medium text-ink-1">{item.branchName}</dd>
+                        <dd className="truncate text-ink-2">{item.branchLocation}</dd>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-line bg-surface-2 p-3">
+                        <dt className="flex items-center gap-2 text-2xs text-ink-3">
+                          <Mail className="size-3.5" aria-hidden="true" />
+                          Quien la administrará
+                        </dt>
+                        <dd className="mt-1 truncate font-medium text-ink-1">{item.adminName}</dd>
+                        <dd className="truncate text-ink-2">{item.adminEmail}</dd>
+                      </div>
+                    </dl>
+
+                    <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-3">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock3 className="size-3.5" aria-hidden="true" />
+                        {new Date(item.requestedAt).toLocaleString("es", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </span>
+                      {item.reviewNotes ? <span className="min-w-0 break-words">{item.reviewNotes}</span> : null}
+                    </p>
+
+                    {item.status === "PENDING" ? (
+                      <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                        <Button className="sm:flex-1" onClick={() => open(item, "approve")}>
+                          <Check className="size-4" aria-hidden="true" />
+                          Aprobar
+                        </Button>
+                        <Button className="sm:flex-1" variant="secondary" onClick={() => open(item, "reject")}>
+                          <X className="size-4" aria-hidden="true" />
+                          Rechazar
+                        </Button>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </PageSection>
+          )}
+        </>
+      )}
+
+      <Dialog open={Boolean(active && decision)} onOpenChange={(next) => !next && close()}>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <DialogHeader>
+            <DialogTitle>
+              {decision === "approve" ? "¿Aprobar la solicitud?" : "¿Rechazar la solicitud?"}
+            </DialogTitle>
+            <DialogDescription>{active?.companyName}</DialogDescription>
+          </DialogHeader>
+
+          {decision === "approve" ? (
+            <InlineNote tone="warning" title="Qué se crea al aprobar">
+              La empresa, su suscripción de prueba, la sede «{active?.branchName}» y el acceso de{" "}
+              {active?.adminName} como {roleLabels.admin_empresa.toLocaleLowerCase("es")}. Se crea todo junto o no se
+              crea nada: si algo falla, no queda una empresa a medias.
+            </InlineNote>
+          ) : (
+            <InlineNote tone="info" title="Qué pasa al rechazar">
+              La solicitud queda cerrada. Tu observación es lo único que quien la envió va a leer para saber qué
+              corregir antes de volver a intentarlo.
+            </InlineNote>
+          )}
+
+          <div>
+            <Label htmlFor="registration-notes">
+              Observación {decision === "reject" ? "(obligatoria)" : "(opcional)"}
+            </Label>
+            <textarea
+              id="registration-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder={
+                decision === "approve"
+                  ? "Aprobada para prueba de 14 días"
+                  : "Indica qué debe corregir antes de volver a solicitarla"
+              }
+              className="min-h-28 w-full rounded-md border border-line-control bg-surface-1 p-3 text-base text-ink-1 sm:text-sm"
+            />
+          </div>
+
+          {review.isError ? (
+            <InlineNote tone="danger" title="No se pudo guardar la decisión">
+              {getApiErrorMessage(review.error, "El servidor rechazó la operación.")}
+            </InlineNote>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={close}>
+              Cancelar
+            </Button>
+            <Button
+              variant={decision === "approve" ? "default" : "destructive"}
+              disabled={decision === "reject" && !notes.trim()}
+              loading={review.isPending}
+              loadingLabel="Guardando…"
+              onClick={() => review.mutate()}
+            >
+              {decision === "approve" ? "Aprobar y crear la empresa" : "Rechazar la solicitud"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

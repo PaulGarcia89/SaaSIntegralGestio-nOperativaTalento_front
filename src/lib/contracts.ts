@@ -272,6 +272,28 @@ export const PERMISSION_KEYS = [
   "platform.tenant.switch",
   "platform.tenant.impersonate",
   "platform.integrations.manage",
+  // Estos diecisiete existían en el tipo `PermissionKey` y los concede el
+  // backend, pero faltaban aquí. La matriz de roles recorre ESTE array, así
+  // que no se podían asignar desde ninguna parte del producto y las once
+  // pantallas de inventario que los exigen eran inalcanzables para cualquier
+  // persona de una empresa.
+  "restaurant_inventory.adjustments.create",
+  "restaurant_inventory.audit.read",
+  "restaurant_inventory.budgets.manage",
+  "restaurant_inventory.commercial.view",
+  "restaurant_inventory.commissary.manage",
+  "restaurant_inventory.counts.approve",
+  "restaurant_inventory.counts.schedule",
+  "restaurant_inventory.expiry_alerts.view",
+  "restaurant_inventory.operations.confirm",
+  "restaurant_inventory.operations.create",
+  "restaurant_inventory.receipts.confirm",
+  "restaurant_inventory.receipts.create",
+  "restaurant_inventory.recipes.manage",
+  "restaurant_inventory.settings.manage",
+  "restaurant_inventory.shrinkage.view",
+  "restaurant_inventory.transfers.manage",
+  "restaurant_inventory.variance.view",
 ] as const satisfies readonly PermissionKey[];
 
 export interface TenantDto {

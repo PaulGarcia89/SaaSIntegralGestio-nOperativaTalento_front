@@ -16,7 +16,7 @@ import {
 
 describe("navigation policy", () => {
   it("resolves the most specific route policy", () => {
-    expect(getRoutePolicy("/admin/users")?.permission).toBe("users.view");
+    expect(getRoutePolicy("/admin/users")?.permission).toBe("admin.users");
     expect(getRoutePolicy("/admin/users/invitations")?.href).toBe("/admin/users");
   });
 
@@ -304,9 +304,9 @@ describe("navigation policy", () => {
     };
 
     expect(evaluateRouteAccess(policy, context).code).toBe("PERMISSION_DENIED");
-    permissions.add("users.view");
+    permissions.add("admin.users");
     expect(evaluateRouteAccess(policy, context).code).toBe("ALLOWED");
-    permissions.delete("users.view");
+    permissions.delete("admin.users");
     expect(evaluateRouteAccess(policy, context).code).toBe("PERMISSION_DENIED");
   });
 
@@ -413,5 +413,33 @@ describe("secciones de navegación", () => {
 
   it("sectionForPath cae en inicio ante una ruta desconocida", () => {
     expect(sectionForPath(appNavigation, "/ruta/que/no/existe")).toBe("inicio");
+  });
+});
+
+describe("el menú promete lo que la pantalla concede", () => {
+  /**
+   * `/admin/users` aparecía en el menú con `users.view` mientras la pantalla
+   * exigía `admin.users`, y lo mismo pasaba en roles y en auditoría: quien
+   * tuviera el primer permiso y no el segundo veía la entrada y se topaba con
+   * el bloqueo al entrar. El menú no debe ofrecer lo que no se puede abrir.
+   */
+  it("cada ruta del menú pide el mismo permiso que su pantalla", async () => {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const mismatches: string[] = [];
+
+    for (const item of appNavigation) {
+      const file = join(process.cwd(), "src/app/(app)", item.href, "page.tsx");
+      if (!existsSync(file)) continue;
+      const body = readFileSync(file, "utf8");
+      // Solo la comprobación que corta la pantalla entera, no los permisos
+      // de un botón suelto dentro de ella.
+      const gates = [...body.matchAll(/if\s*\(\s*!\s*can\("([a-z_.]+)"\)\s*\)/g)].map((match) => match[1]);
+      if (gates.length > 0 && !gates.includes(item.permission)) {
+        mismatches.push(`${item.href}: menú pide ${item.permission}, la pantalla exige ${gates.join(" o ")}`);
+      }
+    }
+
+    expect(mismatches).toEqual([]);
   });
 });

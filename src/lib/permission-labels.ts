@@ -273,6 +273,112 @@ const CATALOG: Partial<Record<PermissionKey, PermissionInfo>> = {
     kind: "manage",
   },
 
+  // Los concede el backend, pero faltaban en PERMISSION_KEYS, así que la
+  // matriz de roles no los ofrecía y once pantallas de inventario eran
+  // inalcanzables para cualquier persona de una empresa.
+  "restaurant_inventory.adjustments.create": {
+    label: "Ajustar existencias",
+    detail: "Corregir a mano lo que hay en stock cuando el recuento no cuadra. Queda registrado con su motivo.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.audit.read": {
+    label: "Ver la auditoría del inventario",
+    detail: "Consultar quién movió cada cosa y cuándo, sin poder alterar el registro.",
+    group: "restaurant",
+    kind: "view",
+  },
+  "restaurant_inventory.budgets.manage": {
+    label: "Gestionar el presupuesto de compras",
+    detail: "Fijar cuánto se puede gastar por periodo y ver cuánto queda disponible.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.commercial.view": {
+    label: "Ver costes y márgenes",
+    detail: "Acceder al dinero: coste por sucursal, margen por receta y comparativo entre unidades.",
+    group: "restaurant",
+    kind: "view",
+  },
+  "restaurant_inventory.commissary.manage": {
+    label: "Gestionar el comisariato",
+    detail: "Operar la cocina central que abastece al resto de sucursales.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.counts.approve": {
+    label: "Aprobar conteos físicos",
+    detail: "Dar por bueno un recuento y trasladar sus diferencias al stock real.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.counts.schedule": {
+    label: "Programar conteos",
+    detail: "Dejar planificados los recuentos periódicos y a quién le tocan.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.expiry_alerts.view": {
+    label: "Ver alertas de caducidad",
+    detail: "Consultar qué lotes están por vencer antes de que haya que tirarlos.",
+    group: "restaurant",
+    kind: "view",
+  },
+  "restaurant_inventory.operations.confirm": {
+    label: "Confirmar operaciones de inventario",
+    detail: "Dar por firme un movimiento que otra persona registró. Es el segundo par de ojos.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.operations.create": {
+    label: "Registrar operaciones de inventario",
+    detail: "Anotar entradas, salidas y consumos, dejándolos pendientes de confirmación.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.receipts.confirm": {
+    label: "Confirmar recepciones",
+    detail: "Dar por recibida una entrega, con lo que la mercancía entra al stock.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.receipts.create": {
+    label: "Registrar recepciones",
+    detail: "Anotar lo que llega del proveedor antes de confirmarlo contra la orden.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.recipes.manage": {
+    label: "Gestionar recetas",
+    detail: "Definir de qué se compone cada plato, que es lo que descuenta el stock al vender.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.settings.manage": {
+    label: "Configurar el módulo de restaurante",
+    detail: "Cambiar parámetros que afectan a cómo opera todo el inventario de la empresa.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.shrinkage.view": {
+    label: "Ver mermas",
+    detail: "Consultar cuánto se pierde por caducidad, rotura o desperdicio, y dónde.",
+    group: "restaurant",
+    kind: "view",
+  },
+  "restaurant_inventory.transfers.manage": {
+    label: "Gestionar traslados entre sucursales",
+    detail: "Mover existencias de una sucursal a otra y confirmar su llegada.",
+    group: "restaurant",
+    kind: "manage",
+  },
+  "restaurant_inventory.variance.view": {
+    label: "Ver la varianza teórico contra real",
+    detail: "Comparar lo que debería haber según las ventas con lo que hay de verdad.",
+    group: "restaurant",
+    kind: "view",
+  },
+
   /* ── Reportes ───────────────────────────────────────────────────────── */
   "reports.view": { label: "Ver reportes", detail: "Los informes de la sucursal o el alcance que tenga la persona.", group: "reports", kind: "view" },
   "reports.export": {

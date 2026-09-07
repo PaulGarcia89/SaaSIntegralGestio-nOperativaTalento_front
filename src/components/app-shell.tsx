@@ -353,18 +353,30 @@ function SidebarContent({
 
                   {open ? (
                     <div id={panelId} className="mt-1 space-y-3 pb-2 pl-2">
-                      {groups.map((group) => (
+                      {/* Los elementos se calculan ANTES de rotular. El rótulo
+                          salía de `group.items` y la lista de
+                          `group.items.filter(...)`, así que un área cuyos
+                          elementos se filtran enteros dejaba el encabezado
+                          solo: es el «Inventario de restaurante» vacío que
+                          aparecía bajo Administración. */}
+                      {groups
+                        .map((group) => ({
+                          group: group.group,
+                          items: group.items.filter((item) => !isInventorySubmenuItem(item)),
+                          all: group.items,
+                        }))
+                        .filter((group) => group.items.length > 0)
+                        .map((group, _index, visibleGroups) => (
                         <div key={group.group}>
                           {/* El área solo se rotula si la sección tiene más de
                               una: con una sola, el rótulo repite la sección. */}
-                          {groups.length > 1 ? (
+                          {visibleGroups.length > 1 ? (
                             <p className="px-2.5 pb-1 text-2xs font-medium uppercase tracking-[0.12em] text-sidebar-foreground/45">
                               {localizedNavGroup(group.group, t)}
                             </p>
                           ) : null}
                           <ul className="space-y-0.5">
                             {group.items
-                              .filter((item) => !isInventorySubmenuItem(item))
                               .map((item) => {
                                 const active = item.href === activeHref;
                                 const NavIcon = navigationIcons[item.icon];

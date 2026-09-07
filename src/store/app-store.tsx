@@ -340,6 +340,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         can,
         branchAvailable: Boolean(currentBranch),
       }).allowed).map((item) => {
+        // El reetiquetado agrupa el inventario OPERATIVO bajo su módulo. Un
+        // ítem que ya pertenece a Administración —la configuración del
+        // módulo— tiene que quedarse ahí: al moverlo, dejaba de estar en el
+        // grupo de Administración, el filtro de submenú lo ocultaba por no
+        // ser una raíz, y su raíz vive en otra sección, así que no aparecía
+        // en ningún sitio.
+        if (item.group === "Administración") return item;
         if (item.module === "asset_inventory") return { ...item, group: "Inventario de activos" as const, ...(item.href === "/inventory/assets" ? { label: "Inventario de activos" } : {}) };
         if (item.module === "restaurant_inventory") return { ...item, group: "Inventario de restaurante" as const, ...(item.href === "/inventory/restaurant" ? { label: "Inventario de restaurante" } : {}) };
         return item;

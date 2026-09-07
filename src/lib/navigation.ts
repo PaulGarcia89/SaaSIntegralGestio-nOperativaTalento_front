@@ -172,8 +172,8 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/notifications", label: "Alertas", group: "Analítica", module: "notifications", permission: "notifications.view", audience: "shared", icon: "notifications" },
   { href: "/admin/company", label: "Configuración de empresa", group: "Administración", module: "admin", permission: "admin.company", audience: "tenant", icon: "company" },
   { href: "/admin/branches", label: "Sucursales", group: "Administración", module: "admin", permission: "branches.view", audience: "tenant", requiresCommercialModule: false, icon: "branches" },
-  { href: "/admin/users", label: "Usuarios", group: "Administración", module: "admin", permission: "users.view", audience: "tenant", icon: "users" },
-  { href: "/admin/roles", label: "Roles y permisos", group: "Administración", module: "admin", permission: "roles.view", audience: "tenant", icon: "roles" },
+  { href: "/admin/users", label: "Usuarios", group: "Administración", module: "admin", permission: "admin.users", audience: "tenant", icon: "users" },
+  { href: "/admin/roles", label: "Roles y permisos", group: "Administración", module: "admin", permission: "admin.roles", audience: "tenant", icon: "roles" },
   { href: "/admin/automations", label: "Automatizaciones", group: "Administración", module: "admin", permission: "admin.view", audience: "tenant", icon: "queues", roles: ["admin_saas", "admin_empresa"] },
   { href: "/admin/company/subscription", label: "Suscripción", group: "Administración", module: "admin", permission: "admin.subscription", audience: "tenant", icon: "subscription", roles: ["admin_saas", "admin_empresa"] },
   { href: "/admin", label: "Resumen administrativo", group: "Administración", module: "admin", permission: "admin.view", audience: "tenant", icon: "admin" },
@@ -185,7 +185,7 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/admin/subscription", label: "Suscripciones", group: "Gobierno de plataforma", module: "admin", permission: "admin.subscription", audience: "saas", icon: "subscription" },
   { href: "/admin/billing", label: "Facturación", group: "Gobierno de plataforma", module: "admin", permission: "admin.subscription", audience: "saas", icon: "subscription" },
   { href: "/admin/global-users", label: "Usuarios globales", group: "Gobierno de plataforma", module: "admin", permission: "admin.users", audience: "saas", icon: "users" },
-  { href: "/admin/audit", label: "Auditoría", group: "Gobierno de plataforma", module: "admin", permission: "admin.view", audience: "saas", icon: "reports" },
+  { href: "/admin/audit", label: "Auditoría", group: "Gobierno de plataforma", module: "admin", permission: "audit.view", audience: "saas", icon: "reports" },
   { href: "/admin/settings", label: "Configuración", group: "Gobierno de plataforma", module: "admin", permission: "admin.company", audience: "saas", icon: "company" },
 ];
 

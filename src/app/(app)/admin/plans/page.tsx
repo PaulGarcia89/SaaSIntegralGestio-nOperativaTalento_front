@@ -18,6 +18,7 @@ import { AsyncState } from "@/components/async-state";
 import { StateCard } from "@/components/domain";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
+import { confirmAction } from "@/components/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -196,7 +197,16 @@ export default function PlansPage() {
                   variant="destructive"
                   disabled={plan.subscriptions > 0 || remove.isPending}
                   title={plan.subscriptions > 0 ? "El plan tiene suscripciones asociadas" : undefined}
-                  onClick={() => remove.mutate(plan.id)}
+                  onClick={() =>
+                    void confirmAction({
+                      title: `¿Eliminar el plan «${plan.name}»?`,
+                      description: "Deja de poder contratarse y desaparece del catálogo.",
+                      consequence:
+                        "Solo se puede eliminar un plan sin suscripciones. Las empresas que ya contrataron otro plan no se ven afectadas.",
+                      confirmLabel: "Eliminar el plan",
+                      irreversible: true,
+                    }).then((ok) => ok && remove.mutate(plan.id))
+                  }
                 >
                   <Trash2 className="size-4" />Eliminar
                 </Button>

@@ -2,9 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchModuleAssignments, fetchTenants, updateModuleAssignment } from "@/lib/backend";
+import { toast } from "sonner";
+import {
+  fetchModuleAssignments,
+  fetchTenants,
+  getApiErrorMessage,
+  updateModuleAssignment,
+} from "@/lib/backend";
 import { CrudHeader, CrudPanel } from "@/components/admin-crud";
 import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
+import { confirmAction } from "@/components/confirm-action";
 import { Button } from "@/components/ui/button";
 import { moduleLabels, moduleSourceLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
@@ -44,7 +51,9 @@ export default function ModulesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["module-assignments"] });
       queryClient.invalidateQueries({ queryKey: ["admin-tenants"] });
+      toast.success("Módulo actualizado");
     },
+    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar el módulo.")),
   });
 
   if (!can("admin.company")) {
@@ -112,7 +121,20 @@ export default function ModulesPage() {
                     <Button
                       size="sm"
                       variant={assignment.enabled ? "destructive" : "secondary"}
-                      onClick={() => toggleMutation.mutate(assignment)}
+                      onClick={() =>
+                        void confirmAction({
+                          title: assignment.enabled
+                            ? `¿Deshabilitar ${moduleLabels[assignment.module]}?`
+                            : `¿Habilitar ${moduleLabels[assignment.module]}?`,
+                          description: assignment.enabled
+                            ? "El módulo desaparece del menú de todas las personas de esta empresa."
+                            : "El módulo aparece en el menú de quien tenga permiso para verlo.",
+                          consequence: assignment.enabled
+                            ? "Quien esté trabajando dentro ahora mismo perderá el acceso en cuanto recargue. Los datos no se borran: vuelven a estar disponibles si se rehabilita."
+                            : "Los datos que ya existieran del módulo vuelven a estar accesibles.",
+                          confirmLabel: assignment.enabled ? "Deshabilitar el módulo" : "Habilitar el módulo",
+                        }).then((ok) => ok && toggleMutation.mutate(assignment))
+                      }
                     >
                       {assignment.enabled ? "Deshabilitar" : "Habilitar"}
                     </Button>

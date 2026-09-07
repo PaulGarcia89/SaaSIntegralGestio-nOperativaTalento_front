@@ -2038,4 +2038,7 @@
   ,"nav.section.asset_inventory": "Asset inventory"
   ,"nav.section.restaurant_inventory": "Restaurant inventory"
   ,"nav.section.notifications": "Alerts"
+  ,"jobs.noVacancies": "No openings published yet"
+  ,"jobs.noVacanciesHelp": "When this company posts a role it will show up here. Check back in a few days."
+  ,"jobs.requestCodeResolution": "Ask for the invitation code from whoever contacted you at this company."
 }

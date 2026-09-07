@@ -2038,4 +2038,7 @@
   ,"nav.section.asset_inventory": "Inventario de activos"
   ,"nav.section.restaurant_inventory": "Inventario de restaurante"
   ,"nav.section.notifications": "Alertas"
+  ,"jobs.noVacancies": "Todavía no hay vacantes publicadas"
+  ,"jobs.noVacanciesHelp": "Cuando esta empresa publique una oferta aparecerá aquí. Vuelve en unos días."
+  ,"jobs.requestCodeResolution": "Pide el código de invitación a quien te contactó desde esta empresa."
 }

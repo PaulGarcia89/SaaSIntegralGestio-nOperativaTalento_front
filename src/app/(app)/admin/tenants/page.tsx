@@ -303,7 +303,6 @@ export default function TenantsPage() {
               data={filtered}
               getKey={(tenant) => tenant.id}
               exportable
-              tableClassName="table-fixed text-[13px] [&_th]:px-2.5 [&_td]:px-2.5"
               columns={[
                 {
                   key: "name",

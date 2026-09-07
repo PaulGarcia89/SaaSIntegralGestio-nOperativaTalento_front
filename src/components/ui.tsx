@@ -2,10 +2,39 @@
 
 import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { DomainTable } from "@/components/domain";
-import { PageHeader } from "@/components/design-system";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  SkeletonBlock,
+  SkeletonRows,
+  StatusBadge,
+} from "@/components/system";
+
+/**
+ * Primitivas heredadas que todavía usan nueve pantallas.
+ *
+ * Se conservan los nombres y las props para no editar esas pantallas una por
+ * una; lo que cambia es de qué están hechas por dentro.
+ *
+ * Qué cambia
+ * ----------
+ * · `MetricCard` era una tarjeta de 28 px de relleno con borde y fondo
+ *   propios, y siempre imprimía «Periodo: no informado» aunque nadie hubiera
+ *   pasado un periodo: una línea de ruido en todas las métricas del producto.
+ *   Ahora es `Metric` del sistema, y el periodo solo aparece cuando existe.
+ * · `ModuleHeader` colocaba las métricas en una rejilla de hasta tres
+ *   columnas con 32 px de separación; en un iPhone eso es una columna de
+ *   tarjetas altísimas con mucho aire desperdiciado. `MetricRow` las pone en
+ *   dos columnas desde 320 px y las separa con una línea, no con un hueco.
+ * · `LoadingPanel` era una maqueta falsa de treinta bloques `animate-pulse`
+ *   que no se parecía a la pantalla que venía después, así que al llegar el
+ *   contenido todo saltaba. Ahora son las siluetas del sistema.
+ * · Los colores (`border-border/70`, `bg-card/90`, `bg-secondary/40`) venían
+ *   de la paleta anterior y no respondían a los tokens.
+ */
 
 type PageIntroProps = {
   eyebrow: string;
@@ -28,18 +57,20 @@ export function ModuleHeader({
   metrics,
 }: PageIntroProps & { metrics: ModuleMetric[] }) {
   return (
-    <div className="space-y-8 pb-4 xl:space-y-10 xl:pb-6">
+    <div className="space-y-6">
       <PageHeader eyebrow={eyebrow} title={title} description={description} actions={actions} />
-      <div className="grid gap-x-8 gap-y-8 md:grid-cols-2 2xl:grid-cols-3">
-        {metrics.map((metric) => (
-          <MetricCard
-            key={`${metric.label}-${metric.value}`}
-            label={metric.label}
-            value={metric.value}
-            detail={metric.detail}
-          />
-        ))}
-      </div>
+      {metrics.length ? (
+        <MetricRow>
+          {metrics.map((metric) => (
+            <Metric
+              key={`${metric.label}-${metric.value}`}
+              label={metric.label}
+              value={metric.value}
+              detail={metric.detail}
+            />
+          ))}
+        </MetricRow>
+      ) : null}
     </div>
   );
 }
@@ -53,14 +84,13 @@ type MetricCardProps = {
 
 export function MetricCard({ label, value, detail, period }: MetricCardProps) {
   return (
-    <Card className="overflow-hidden border-border/70 bg-card/90">
-      <CardContent className="space-y-4 p-7">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <div className="text-3xl font-semibold tracking-tight">{value}</div>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-        <p className="border-t pt-3 text-xs text-muted-foreground">Periodo: {period ?? "no informado"}</p>
-      </CardContent>
-    </Card>
+    <Metric
+      label={label}
+      value={value}
+      // El periodo se decía siempre, incluso para afirmar que no se sabe.
+      // Cuando no lo hay, la procedencia es simplemente el detalle.
+      detail={period ? `${detail} · ${period}` : detail}
+    />
   );
 }
 
@@ -73,17 +103,14 @@ type SectionCardProps = {
 
 export function SectionCard({ title, subtitle, children, className }: SectionCardProps) {
   return (
-    <Card className={cn("border-border/70 bg-card/85", className)}>
-      <CardHeader className="pb-5">
-        {subtitle ? (
-          <Badge variant="outline" className="w-fit rounded-full">
-            {subtitle}
-          </Badge>
-        ) : null}
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <PageSection title={title} boxed className={className}>
+      {subtitle ? (
+        <div className="mb-4">
+          <StatusBadge size="sm" tone="neutral" label={subtitle} />
+        </div>
+      ) : null}
+      {children}
+    </PageSection>
   );
 }
 
@@ -97,24 +124,24 @@ type InfoListProps = {
 
 export function InfoList({ items }: InfoListProps) {
   return (
-    <div className="space-y-3">
+    <ul className="divide-y divide-line">
       {items.map((item) => (
-        <div
+        <li
           key={`${item.title}-${item.description}`}
-          className="flex flex-col gap-3 rounded-xl border border-border/70 bg-secondary/40 p-4 md:flex-row md:items-start md:justify-between"
+          className="flex flex-col gap-2 py-4 md:flex-row md:items-start md:justify-between md:gap-4"
         >
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">{item.title}</p>
-            <p className="text-sm leading-6 text-muted-foreground">{item.description}</p>
+          <div className="min-w-0 space-y-1">
+            <p className="font-medium text-ink-1">{item.title}</p>
+            <p className="text-sm leading-6 text-ink-2">{item.description}</p>
           </div>
           {item.badge ? (
-            <Badge variant="secondary" className="w-fit rounded-full">
-              {item.badge}
-            </Badge>
+            <div className="shrink-0">
+              <StatusBadge size="sm" tone="neutral" label={item.badge} />
+            </div>
           ) : null}
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -126,7 +153,20 @@ type DataTableProps = {
 
 export function DataTable({ columns, rows, pageSize = 10 }: DataTableProps) {
   const data = rows.map((cells, index) => ({ id: `${index}-${cells.join("-")}`, cells }));
-  return <DomainTable<{ id: string; cells: string[] }> data={data} getKey={(row) => row.id} pageSize={pageSize} columns={columns.map((header, index) => ({ key: `${index}-${header}`, header, render: (row) => row.cells[index] ?? "", exportValue: (row) => row.cells[index] ?? "" }))} />;
+  return (
+    <DomainTable<{ id: string; cells: string[] }>
+      data={data}
+      getKey={(row) => row.id}
+      pageSize={pageSize}
+      caption={columns.join(", ")}
+      columns={columns.map((header, index) => ({
+        key: `${index}-${header}`,
+        header,
+        render: (row) => row.cells[index] ?? "",
+        exportValue: (row) => row.cells[index] ?? "",
+      }))}
+    />
+  );
 }
 
 type SplitPanelProps = {
@@ -135,56 +175,42 @@ type SplitPanelProps = {
 };
 
 export function SplitPanel({ left, right }: SplitPanelProps) {
-  return <div className="grid gap-x-8 gap-y-10 2xl:gap-x-10 2xl:gap-y-12 xl:grid-cols-[1.15fr_0.85fr]">{left}{right}</div>;
+  // Una sola columna hasta `xl`: en tablet vertical y en teléfono, dos
+  // columnas obligan a leer en zigzag.
+  return (
+    <div className={cn("grid min-w-0 gap-5", "xl:grid-cols-[1.15fr_0.85fr] xl:gap-8")}>
+      <div className="min-w-0">{left}</div>
+      <div className="min-w-0">{right}</div>
+    </div>
+  );
 }
 
+/**
+ * Espera de una pantalla de módulo.
+ *
+ * La versión anterior dibujaba treinta bloques pulsando que no guardaban
+ * ninguna relación con la pantalla real, así que al llegar el contenido la
+ * maqueta saltaba entera. Estas siluetas tienen la forma de lo que viene:
+ * encabezado, fila de cifras y una lista.
+ */
 export function LoadingPanel() {
   return (
-    <div className="space-y-8 xl:space-y-10">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-5">
-          <div className="h-7 w-24 animate-pulse rounded-full bg-secondary" />
-          <div className="space-y-4">
-            <div className="h-9 w-80 animate-pulse rounded-xl bg-secondary" />
-            <div className="h-5 w-96 animate-pulse rounded-lg bg-secondary" />
-          </div>
-        </div>
-        <div className="h-10 w-32 animate-pulse rounded-full bg-secondary" />
+    <div aria-busy="true" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Cargando la pantalla</span>
+      <div className="space-y-3">
+        <SkeletonBlock className="h-4 w-24" />
+        <SkeletonBlock className="h-8 w-72 max-w-full" />
+        <SkeletonBlock className="h-4 w-96 max-w-full" />
       </div>
-      <div className="grid gap-8 md:grid-cols-2 2xl:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="overflow-hidden border-border/70 bg-card/90">
-            <CardContent className="space-y-4 p-7">
-              <div className="h-4 w-28 animate-pulse rounded bg-secondary" />
-              <div className="h-9 w-20 animate-pulse rounded-lg bg-secondary" />
-              <div className="h-4 w-48 animate-pulse rounded bg-secondary" />
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5 rounded-xl border border-line bg-surface-1 p-5 sm:grid-cols-3 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="space-y-2">
+            <SkeletonBlock className="h-3 w-20" />
+            <SkeletonBlock className="h-7 w-16" />
+          </div>
         ))}
       </div>
-      <div className="grid gap-8 2xl:gap-10 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-dashed border-border/70 bg-card/80">
-          <CardContent className="space-y-3 p-6">
-            <div className="h-5 w-28 animate-pulse rounded-full bg-secondary" />
-            <div className="h-8 w-48 animate-pulse rounded-xl bg-secondary" />
-            <div className="grid gap-3 pt-4 md:grid-cols-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-secondary" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-dashed border-border/70 bg-card/80">
-          <CardContent className="space-y-3 p-6">
-            <div className="h-5 w-36 animate-pulse rounded-full bg-secondary" />
-            <div className="space-y-3 pt-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-xl bg-secondary" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <SkeletonRows rows={5} label="Cargando los registros" />
     </div>
   );
 }

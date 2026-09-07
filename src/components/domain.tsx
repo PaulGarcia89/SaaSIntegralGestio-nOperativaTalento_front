@@ -1,14 +1,57 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search, SlidersHorizontal } from "lucide-react";
-import { type ReactNode, useEffect, useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Download } from "lucide-react";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { InlineFeedback, Pagination, ResponsiveDataView } from "@/components/design-system";
+import {
+  BlockedState,
+  DataView,
+  EmptyState,
+  FilterBar,
+  PageSection,
+  Pagination,
+  type ColumnPriority,
+  type DataColumn as SystemColumn,
+  type SortState,
+} from "@/components/system";
 import { fetchMyPreferences, updateMyPreference } from "@/lib/backend";
+
+/**
+ * Primitivas de dominio compartidas por doce pantallas de administración.
+ *
+ * Este archivo es la palanca más larga del rediseño: `DomainTable`,
+ * `FilterToolbar` y `StateCard` los usan Usuarios, Roles, Sucursales,
+ * Empresas, Suscripciones, Planes, Módulos, Colas, Auditoría, Solicitudes de
+ * empresa y Notificaciones. Migrarlo pasa esas pantallas al sistema sin
+ * editarlas una por una, así que la API pública se conserva ENTERA: mismos
+ * nombres, mismas props, mismo comportamiento observable.
+ *
+ * Qué cambia por dentro
+ * ---------------------
+ * · La tabla mantenía DOS listas: una cuadrícula de fichas para móvil, con
+ *   cada columna en una fila etiqueta/valor, y una tabla para escritorio. En
+ *   un iPhone eso producía una torre de seis filas por registro, con la
+ *   información importante —el nombre— al mismo peso visual que el resto.
+ *   Ahora es `DataView`: una sola declaración de columnas, tabla en
+ *   escritorio y ficha jerarquizada en el teléfono, donde el identificador es
+ *   el título y las dos columnas siguientes se leen a su lado.
+ * · El estado vacío era una caja gris con la frase «No hay registros para
+ *   mostrar», sin distinguir «no hay nada» de «no hay nada con estos
+ *   filtros», que son dos situaciones con salidas distintas.
+ * · Los botones de filtro se apilaban en tres o cuatro filas en pantallas
+ *   estrechas. Ahora se pliegan tras un botón «Filtros» que muestra cuántos
+ *   hay activos, y solo en el teléfono: en escritorio siguen a la vista.
+ * · La barra inferior mezclaba el tamaño de página, la exportación y la
+ *   paginación en una fila que en 320 px se desbordaba.
+ * · Los colores venían de la paleta anterior (`bg-secondary/60`, `border/70`,
+ *   `bg-card/82`) y no respondían a los tokens del sistema.
+ *
+ * Lo que se conserva sin tocar: el orden por columna, la persistencia de
+ * columnas visibles y de orden en las preferencias del usuario, la
+ * exportación a CSV, el tamaño de página y la búsqueda con normalización de
+ * acentos.
+ */
 
 type ToolbarOption = {
   label: string;
@@ -20,15 +63,23 @@ export function matchesSearchAndFilter(
   searchValue: string,
   filterValue: string,
 ) {
-  const normalize = (value: string) => value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es")
-    .trim();
+  const normalize = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("es")
+      .trim();
   const searchable = normalize(values.join(" "));
   return searchable.includes(normalize(searchValue)) && searchable.includes(normalize(filterValue));
 }
 
+/**
+ * Búsqueda más un grupo de filtros excluyentes.
+ *
+ * En un iPhone los botones de filtro ocupaban tres o cuatro filas antes de
+ * llegar al contenido. Ahora viven detrás de «Filtros», con el número de
+ * filtros activos, y se despliegan solos en escritorio.
+ */
 export function FilterToolbar({
   searchPlaceholder,
   options,
@@ -44,44 +95,38 @@ export function FilterToolbar({
   filterValue: string;
   onFilterChange: (value: string) => void;
 }) {
-  const activeFilterLabel = options.find((o) => o.value === filterValue)?.label ?? "";
+  // El primer valor de la lista es el «todos» de cada pantalla: solo cuenta
+  // como filtro activo lo que se aparta de él.
+  const defaultValue = options[0]?.value ?? "";
+  const active = filterValue !== defaultValue ? 1 : 0;
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-card/82 p-3 shadow-[0_16px_56px_-40px_rgba(15,23,42,0.24)]">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative w-full max-w-md">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            role="search"
-            aria-label={searchPlaceholder}
-            className="border-white/60 bg-background/80 pl-10"
-            placeholder={searchPlaceholder}
-            value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtros">
-          {options.map((option) => (
-            <Button
-              key={option.value}
-              type="button"
-              size="sm"
-              variant={filterValue === option.value ? "default" : "secondary"}
-              onClick={() => onFilterChange(option.value)}
-              aria-pressed={filterValue === option.value}
-            >
-              {option.label}
-            </Button>
-          ))}
-        </div>
+    <FilterBar
+      search={searchValue}
+      onSearchChange={onSearchChange}
+      searchLabel={searchPlaceholder}
+      activeCount={active}
+      onClear={() => onFilterChange(defaultValue)}
+    >
+      <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="Filtros">
+        {options.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            size="sm"
+            variant={filterValue === option.value ? "default" : "secondary"}
+            onClick={() => onFilterChange(option.value)}
+            aria-pressed={filterValue === option.value}
+          >
+            {option.label}
+          </Button>
+        ))}
       </div>
-      <div aria-live="polite" className="sr-only">
-        {activeFilterLabel ? `Filtro activo: ${activeFilterLabel}` : ""}
-      </div>
-    </div>
+    </FilterBar>
   );
 }
 
+/** Vacío o sin permiso, con la forma que el sistema da a cada uno. */
 export function StateCard({
   title,
   description,
@@ -93,7 +138,18 @@ export function StateCard({
   tone: "empty" | "restricted";
   action?: ReactNode;
 }) {
-  return <InlineFeedback tone={tone === "restricted" ? "warning" : "info"} title={title} action={action}>{description}</InlineFeedback>;
+  if (tone === "restricted") {
+    return (
+      <BlockedState
+        title={title}
+        cause={description}
+        owner="Quien administra los permisos de tu empresa"
+        resolution="Pide que te asignen un rol con acceso a esta pantalla."
+        action={action}
+      />
+    );
+  }
+  return <EmptyState reason="no-records" title={title} description={description} action={action} />;
 }
 
 export function DrawerPreview({
@@ -106,13 +162,9 @@ export function DrawerPreview({
   children: ReactNode;
 }) {
   return (
-    <Card className="h-full border-border/70 bg-card/85">
-      <CardHeader>
-        <p className="text-sm font-medium text-muted-foreground">{subtitle}</p>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <PageSection title={title} description={subtitle} boxed className="h-full">
+      {children}
+    </PageSection>
   );
 }
 
@@ -126,15 +178,31 @@ type DataColumn<T> = {
   sortValue?: (row: T) => string | number | boolean | null | undefined;
   excludeFromExport?: boolean;
   sortable?: boolean;
+  /** Solo en la tabla de escritorio. */
   mobileHidden?: boolean;
   mobileLabel?: string;
   headerClassName?: string;
   cellClassName?: string;
+  /** Jerarquía explícita en la ficha del teléfono. Si falta, se deduce. */
+  priority?: ColumnPriority;
+  numeric?: boolean;
 };
 
 function primitiveRenderValue<T>(column: DataColumn<T>, row: T) {
   const rendered = column.render(row);
-  return typeof rendered === "string" || typeof rendered === "number" || typeof rendered === "boolean" ? rendered : "";
+  return typeof rendered === "string" || typeof rendered === "number" || typeof rendered === "boolean"
+    ? rendered
+    : "";
+}
+
+function sortableValue<T>(column: DataColumn<T>, row: T): string | number {
+  const raw = column.sortValue
+    ? column.sortValue(row)
+    : column.exportValue
+      ? column.exportValue(row)
+      : primitiveRenderValue(column, row);
+  if (typeof raw === "number") return raw;
+  return String(raw ?? "");
 }
 
 function exportCsv<T>(columns: DataColumn<T>[], data: T[]) {
@@ -143,7 +211,7 @@ function exportCsv<T>(columns: DataColumn<T>[], data: T[]) {
   const rows = data.map((row) =>
     exportColumns
       .map((c) => {
-        const val = String(c.exportValue ? c.exportValue(row) ?? "" : primitiveRenderValue(c, row));
+        const val = String(c.exportValue ? (c.exportValue(row) ?? "") : primitiveRenderValue(c, row));
         return val.includes(",") || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
       })
       .join(","),
@@ -158,6 +226,24 @@ function exportCsv<T>(columns: DataColumn<T>[], data: T[]) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Jerarquía de la ficha en el teléfono.
+ *
+ * Sin esto, `DataView` recibiría seis columnas del mismo peso y la ficha
+ * volvería a ser la torre de pares etiqueta/valor que había antes. La regla:
+ * la primera columna identifica el registro, las dos siguientes se leen a su
+ * lado, el resto va en el cuerpo, y lo marcado como `mobileHidden` solo se ve
+ * en la tabla de escritorio.
+ */
+function derivePriority<T>(column: DataColumn<T>, visible: DataColumn<T>[]): ColumnPriority {
+  if (column.priority) return column.priority;
+  if (column.mobileHidden) return "detail";
+  const rank = visible.filter((candidate) => !candidate.mobileHidden).indexOf(column);
+  if (rank === 0) return "identity";
+  if (rank <= 2) return "primary";
+  return "secondary";
+}
+
 export function DomainTable<T>({
   data,
   columns,
@@ -165,9 +251,11 @@ export function DomainTable<T>({
   getKey,
   pageSize: initialPageSize = 10,
   exportable,
-  tableClassName,
   mobileRender,
   preferencesKey,
+  caption = "Registros",
+  emptyAction,
+  onClearFilters,
 }: {
   data: T[];
   columns: DataColumn<T>[];
@@ -175,10 +263,18 @@ export function DomainTable<T>({
   getKey: (row: T) => string;
   pageSize?: number;
   exportable?: boolean;
-  tableClassName?: string;
+  /** Reservado: ninguna pantalla lo usa; `DataView` compone la ficha. */
   mobileRender?: (row: T) => ReactNode;
   preferencesKey?: string;
+  /** Título accesible de la tabla, para distinguirla cuando hay varias. */
+  caption?: string;
+  emptyAction?: ReactNode;
+  /** Si se pasa, el vacío se lee como «ningún resultado con estos filtros». */
+  onClearFilters?: () => void;
 }) {
+  void mobileRender;
+
+  const pageSizeId = useId();
   const [page, setPage] = useState(0);
   const dataIdentity = data.map(getKey).join("|");
   const [paginationIdentity, setPaginationIdentity] = useState(dataIdentity);
@@ -186,9 +282,9 @@ export function DomainTable<T>({
     setPaginationIdentity(dataIdentity);
     setPage(0);
   }
+
   const [pageSize, setPageSize] = useState(initialPageSize);
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sort, setSort] = useState<SortState>(null);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => columns.map((column) => column.key));
   const columnKeySignature = columns.map((column) => column.key).join("|");
   const visibleColumns = columns.filter((column) => visibleColumnKeys.includes(column.key));
@@ -196,146 +292,95 @@ export function DomainTable<T>({
   useEffect(() => {
     if (!preferencesKey) return;
     let active = true;
-    void fetchMyPreferences().then((preferences) => {
-      if (!active) return;
-      const stored = preferences[`table:${preferencesKey}`] as { visibleColumnKeys?: string[]; sortKey?: string | null; sortDir?: "asc" | "desc" } | undefined;
-      if (stored?.visibleColumnKeys?.length) setVisibleColumnKeys(stored.visibleColumnKeys.filter((key) => columns.some((column) => column.key === key)));
-      if (stored?.sortKey && columns.some((column) => column.key === stored.sortKey)) setSortKey(stored.sortKey);
-      if (stored?.sortDir) setSortDir(stored.sortDir);
-    }).catch(() => undefined);
-    return () => { active = false; };
+    void fetchMyPreferences()
+      .then((preferences) => {
+        if (!active) return;
+        const stored = preferences[`table:${preferencesKey}`] as
+          | { visibleColumnKeys?: string[]; sortKey?: string | null; sortDir?: "asc" | "desc" }
+          | undefined;
+        if (stored?.visibleColumnKeys?.length) {
+          setVisibleColumnKeys(
+            stored.visibleColumnKeys.filter((key) => columns.some((column) => column.key === key)),
+          );
+        }
+        if (stored?.sortKey && columns.some((column) => column.key === stored.sortKey)) {
+          setSort({ key: stored.sortKey, direction: stored.sortDir ?? "asc" });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [columnKeySignature, preferencesKey]);
 
   function persist(next: { visibleColumnKeys?: string[]; sortKey?: string | null; sortDir?: "asc" | "desc" }) {
-    if (preferencesKey) void updateMyPreference(`table:${preferencesKey}`, { visibleColumnKeys, sortKey, sortDir, ...next }).catch(() => undefined);
+    if (!preferencesKey) return;
+    void updateMyPreference(`table:${preferencesKey}`, {
+      visibleColumnKeys,
+      sortKey: sort?.key ?? null,
+      sortDir: sort?.direction ?? "asc",
+      ...next,
+    }).catch(() => undefined);
   }
 
+  // El orden es CONTROLADO porque se guarda en las preferencias del usuario:
+  // si la vista lo llevase por dentro, se perdería en cada montaje.
   const sortedData = useMemo(() => {
-    if (!sortKey) return data;
-    const col = columns.find((c) => c.key === sortKey);
-    if (!col) return data;
+    if (!sort) return data;
+    const column = columns.find((candidate) => candidate.key === sort.key);
+    if (!column) return data;
+    const factor = sort.direction === "asc" ? 1 : -1;
     return [...data].sort((a, b) => {
-      const aVal = String(col.sortValue ? col.sortValue(a) ?? "" : col.exportValue ? col.exportValue(a) ?? "" : primitiveRenderValue(col, a));
-      const bVal = String(col.sortValue ? col.sortValue(b) ?? "" : col.exportValue ? col.exportValue(b) ?? "" : primitiveRenderValue(col, b));
-      const cmp = aVal.localeCompare(bVal, "es", { numeric: true });
-      return sortDir === "asc" ? cmp : -cmp;
+      const left = sortableValue(column, a);
+      const right = sortableValue(column, b);
+      if (typeof left === "number" && typeof right === "number") return factor * (left - right);
+      return factor * String(left).localeCompare(String(right), "es", { numeric: true });
     });
-  }, [data, sortKey, sortDir, columns]);
+  }, [data, sort, columns]);
 
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-  const effectivePage = Math.min(page, Math.max(0, totalPages - 1));
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize));
+  const effectivePage = Math.min(page, totalPages - 1);
   const paginatedData = useMemo(
     () => sortedData.slice(effectivePage * pageSize, (effectivePage + 1) * pageSize),
     [sortedData, effectivePage, pageSize],
   );
-  const rangeStart = sortedData.length ? effectivePage * pageSize + 1 : 0;
-  const rangeEnd = Math.min((effectivePage + 1) * pageSize, sortedData.length);
 
-  function handleSort(key: string) {
-    if (sortKey === key) {
-      const nextDirection = sortDir === "asc" ? "desc" : "asc";
-      setSortDir(nextDirection);
-      persist({ sortKey: key, sortDir: nextDirection });
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-      persist({ sortKey: key, sortDir: "asc" });
-    }
-  }
-
-  if (sortedData.length === 0) {
-    return (
-      <div className="overflow-hidden rounded-xl border border-border/70">
-        <div className="p-8 text-center text-sm text-muted-foreground">
-          No hay registros para mostrar
-        </div>
-      </div>
-    );
-  }
+  const systemColumns: Array<SystemColumn<T>> = visibleColumns.map((column) => ({
+    key: column.key,
+    header: column.header,
+    priority: derivePriority(column, visibleColumns),
+    render: column.render,
+    numeric: column.numeric,
+    // `DataView` solo ofrece ordenar la columna que declara un valor de orden:
+    // así una columna no ordenable no presenta una cabecera que no responde.
+    sortValue: column.sortable ? (row: T) => sortableValue(column, row) : undefined,
+  }));
 
   return (
     <div className="space-y-3">
-      <ResponsiveDataView data={paginatedData} getKey={getKey} desktop={null} mobile={(row) => <div className="space-y-3">
-              {mobileRender
-                ? mobileRender(row)
-                : visibleColumns.filter((column) => !column.mobileHidden).map((column) => (
-                    <div key={`${getKey(row)}-mobile-${column.key}`} className="grid grid-cols-[minmax(90px,0.4fr)_1fr] gap-3 border-b border-border/60 pb-2 last:border-0 last:pb-0">
-                      <span className="text-xs font-medium text-muted-foreground">{column.mobileLabel ?? column.header}</span>
-                      <div className="min-w-0 text-sm text-foreground">{column.render(row)}</div>
-                    </div>
-                  ))}
-              {onSelect ? (
-                <Button type="button" variant="secondary" className="w-full" onClick={() => onSelect(row)}>
-                  Ver detalle
-                </Button>
-              ) : null}
-            </div>} />
+      <DataView
+        rows={paginatedData}
+        columns={systemColumns}
+        getKey={getKey}
+        caption={caption}
+        sort={sort}
+        onSortChange={(next) => {
+          setSort(next);
+          persist({ sortKey: next?.key ?? null, sortDir: next?.direction ?? "asc" });
+        }}
+        onRowAction={onSelect}
+        rowActionLabel={() => "Ver detalle"}
+        emptyReason={onClearFilters ? "no-matches" : "no-records"}
+        emptyAction={emptyAction}
+        onClearFilters={onClearFilters}
+      />
 
-      <div className="hidden overflow-hidden rounded-xl border border-border/70 md:block">
-        <div className="overflow-x-auto">
-          <table className={cn("w-full text-left text-sm", tableClassName)}>
-            <thead className="bg-secondary/60">
-              <tr>
-                {visibleColumns.map((column) => (
-                  <th
-                    key={column.key}
-                    className={cn(
-                      "px-4 py-3 font-medium text-muted-foreground",
-                      column.headerClassName,
-                    )}
-                    aria-sort={column.sortable && sortKey === column.key ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
-                  >
-                    {column.sortable ? (
-                    <button type="button" className="flex items-center gap-1.5 rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" onClick={() => handleSort(column.key)}>
-                      {column.header}
-                      {sortKey === column.key ? (
-                          sortDir === "asc" ? (
-                            <ArrowUp className="size-3" aria-hidden="true" />
-                          ) : (
-                            <ArrowDown className="size-3" aria-hidden="true" />
-                          )
-                        ) : (
-                          <ArrowUpDown className="size-3 opacity-40" aria-hidden="true" />
-                        )}
-                    </button>
-                    ) : <span>{column.header}</span>}
-                  </th>
-                ))}
-                {onSelect ? <th scope="col" className="px-4 py-3 text-right font-medium text-muted-foreground">Acciones</th> : null}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/70 bg-card">
-              {paginatedData.map((row) => (
-                <tr
-                  key={getKey(row)}
-                  className="transition-colors hover:bg-accent/20"
-                >
-                  {visibleColumns.map((column) => (
-                    <td
-                      key={`${getKey(row)}-${column.key}`}
-                      className={cn("px-4 py-3 align-middle", column.cellClassName)}
-                    >
-                      {column.render(row)}
-                    </td>
-                  ))}
-                  {onSelect ? (
-                    <td className="px-4 py-3 text-right">
-                      <Button type="button" variant="secondary" size="sm" onClick={() => onSelect(row)} aria-label={`Ver detalle del registro ${getKey(row)}`}>
-                        Ver detalle
-                      </Button>
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Mostrar</span>
+      {/* Solo aparece cuando hay más de una página o algo que exportar: antes
+          la barra se pintaba entera y en 320 px se desbordaba. */}
+      {sortedData.length > pageSize || exportable ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-2xs text-ink-2">
+            <label htmlFor={pageSizeId}>Mostrar</label>
             <Select
               value={String(pageSize)}
               onValueChange={(value) => {
@@ -343,7 +388,7 @@ export function DomainTable<T>({
                 setPage(0);
               }}
             >
-              <SelectTrigger className="h-11 w-20 rounded-lg text-xs">
+              <SelectTrigger id={pageSizeId} className="w-20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -354,25 +399,65 @@ export function DomainTable<T>({
                 ))}
               </SelectContent>
             </Select>
-            <span>{rangeStart}–{rangeEnd} de {sortedData.length}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {exportable ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => exportCsv(columns, sortedData)}
-                className="gap-1.5 text-xs"
-              >
-                <Download className="size-3" />
-                CSV
+              <Button variant="secondary" size="sm" onClick={() => exportCsv(columns, sortedData)}>
+                <Download className="size-4" aria-hidden="true" />
+                Exportar CSV
               </Button>
             ) : null}
-            <Pagination page={effectivePage} totalPages={totalPages} totalItems={sortedData.length} pageSize={pageSize} onPageChange={setPage} />
+            {sortedData.length > pageSize ? (
+              <Pagination
+                page={effectivePage}
+                totalItems={sortedData.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+              />
+            ) : null}
           </div>
         </div>
-      )}
-      {preferencesKey ? <details className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm"><summary className="flex cursor-pointer list-none items-center gap-2 font-medium"><SlidersHorizontal className="size-4" />Columnas visibles</summary><div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">{columns.filter((column) => column.key !== "actions").map((column) => <label key={column.key} className="flex items-center gap-2"><input type="checkbox" checked={visibleColumnKeys.includes(column.key)} disabled={visibleColumnKeys.length === 1 && visibleColumnKeys.includes(column.key)} onChange={(event) => { const next = event.target.checked ? [...visibleColumnKeys, column.key] : visibleColumnKeys.filter((key) => key !== column.key); setVisibleColumnKeys(next); persist({ visibleColumnKeys: next }); }} />{column.header}</label>)}</div></details> : null}
+      ) : null}
+
+      {preferencesKey ? (
+        <details className="rounded-md border border-line bg-surface-1 px-3 py-2 text-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-ink-1">
+            Columnas visibles
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-3">
+            {columns
+              .filter((column) => column.key !== "actions")
+              .map((column) => {
+                const checked = visibleColumnKeys.includes(column.key);
+                const onlyOne = visibleColumnKeys.length === 1 && checked;
+                return (
+                  <label
+                    key={column.key}
+                    className="flex items-center gap-2 text-ink-1"
+                    style={{ minHeight: "var(--control-h-touch)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-[hsl(var(--accent-fill))]"
+                      checked={checked}
+                      disabled={onlyOne}
+                      onChange={(event) => {
+                        const next = event.target.checked
+                          ? [...visibleColumnKeys, column.key]
+                          : visibleColumnKeys.filter((key) => key !== column.key);
+                        setVisibleColumnKeys(next);
+                        persist({ visibleColumnKeys: next });
+                      }}
+                    />
+                    {column.mobileLabel ?? column.header}
+                  </label>
+                );
+              })}
+          </div>
+        </details>
+      ) : null}
+
     </div>
   );
 }

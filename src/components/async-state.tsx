@@ -1,45 +1,37 @@
-import { AlertTriangle, Inbox, LoaderCircle, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  EmptyState,
+  ErrorState,
+  SkeletonRows,
+} from "@/components/system";
 import { SkeletonCards, SkeletonTable, SkeletonText } from "@/components/ui/skeleton";
 
 /**
  * Silueta de carga acorde al contenido que se espera.
  *
- * `spinner` se conserva por compatibilidad, pero prefiere una silueta: el
- * spinner centrado ocupa una altura fija y provoca un salto de diseño cuando
- * llega el contenido real, que casi siempre es más alto.
+ * `spinner` se conserva por compatibilidad, pero ya no dibuja un spinner: se
+ * comprobó que **ninguna** de las 35 pantallas que usan `AsyncState` pasa
+ * `shape`, así que todas caían en el valor por defecto y todas mostraban el
+ * spinner centrado dentro de una caja de 240 px de alto —exactamente el salto
+ * de diseño contra el que advertía el comentario original de este archivo—.
+ * Ahora el valor por defecto es la silueta de filas del sistema, que ocupa el
+ * sitio del contenido real.
  */
 export type LoadingShape = "spinner" | "table" | "cards" | "text";
-
-function LoadingBody({ shape, title, description }: { shape: LoadingShape; title?: string; description?: string }) {
-  if (shape === "table") return <SkeletonTable />;
-  if (shape === "cards") return <SkeletonCards />;
-  if (shape === "text") return <SkeletonText lines={4} />;
-
-  return (
-    <Card className="w-full border-dashed border-border/70 bg-card/80 shadow-sm">
-      <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-4 px-6 py-10 text-center sm:px-8">
-        <LoaderCircle className="size-8 animate-spin text-primary" aria-hidden="true" />
-        <div>
-          <h2 className="text-xl font-semibold">{title ?? "Cargando información"}</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            {description ?? "Espera mientras consultamos los datos más recientes."}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 /**
  * Estado de una consulta: cargando, con error o sin resultados.
  *
- * `empty` se añadió porque no existía: cada pantalla resolvía el vacío por su
- * cuenta con `InlineFeedback`, y el resultado era desigual —unas ofrecían una
- * acción para salir del vacío y otras solo un texto—. Aquí la acción es parte
- * de la firma para que sea lo normal, no la excepción.
+ * Ya no dibuja nada propio: reenvía a `SkeletonRows`, `ErrorState` y
+ * `EmptyState` del sistema. Antes tenía sus propias tarjetas de error y de
+ * vacío, con otra tipografía y otro icono que las del sistema, así que una
+ * pantalla de reclutamiento y una de administración mostraban el mismo estado
+ * de dos formas distintas.
+ *
+ * `empty` se añadió en su día porque no existía: cada pantalla resolvía el
+ * vacío por su cuenta con `InlineFeedback`, y el resultado era desigual. La
+ * acción sigue siendo parte de la firma para que ofrecer una salida sea lo
+ * normal y no la excepción.
  */
 export function AsyncState({
   state,
@@ -58,46 +50,28 @@ export function AsyncState({
   shape?: LoadingShape;
 }) {
   if (state === "loading") {
+    if (shape === "table") return <SkeletonTable />;
+    if (shape === "cards") return <SkeletonCards />;
+    if (shape === "text") return <SkeletonText lines={4} />;
+    return <SkeletonRows rows={6} label={title ?? "Cargando información"} />;
+  }
+
+  if (state === "error") {
     return (
-      <div aria-live="polite" aria-busy="true">
-        <span className="sr-only">{title ?? "Cargando información"}</span>
-        <LoadingBody shape={shape} title={title} description={description} />
-      </div>
+      <ErrorState
+        title={title ?? "No fue posible cargar la información"}
+        detail={description ?? "Conservamos tu contexto. Reintenta la consulta para continuar."}
+        onRetry={onRetry}
+      />
     );
   }
 
-  const isEmpty = state === "empty";
-
   return (
-    <Card className="w-full border-dashed border-border/70 bg-card/80 shadow-sm" aria-live="polite">
-      <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-4 px-6 py-10 text-center sm:px-8">
-        {isEmpty ? (
-          <Inbox className="size-8 text-text-secondary" aria-hidden="true" />
-        ) : (
-          <AlertTriangle className="size-8 text-destructive" aria-hidden="true" />
-        )}
-        <div>
-          <h2 className="text-xl font-semibold">
-            {title ?? (isEmpty ? "Todavía no hay registros" : "No fue posible cargar la información")}
-          </h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            {description ??
-              (isEmpty
-                ? "Cuando exista información dentro de tu alcance, aparecerá aquí."
-                : "Conservamos tu contexto. Reintenta la consulta para continuar.")}
-          </p>
-        </div>
-        {isEmpty
-          ? action
-          : onRetry
-            ? (
-                <Button type="button" variant="secondary" onClick={onRetry}>
-                  <RefreshCw className="size-4" aria-hidden="true" />
-                  Reintentar
-                </Button>
-              )
-            : null}
-      </CardContent>
-    </Card>
+    <EmptyState
+      reason="no-records"
+      title={title}
+      description={description}
+      action={action}
+    />
   );
 }

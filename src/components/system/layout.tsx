@@ -232,8 +232,9 @@ export function Metric({
 }: {
   label: string;
   value: string;
-  /** Procedencia o matiz: "en los últimos 30 días", "sobre 120 activos". */
-  detail?: string;
+  /** Procedencia o matiz: "en los últimos 30 días", "sobre 120 activos".
+   *  Acepta nodos para poder colgar un enlace al listado de origen. */
+  detail?: ReactNode;
   /** Variación ya formateada. El signo lo pone quien llama. */
   trend?: { value: string; direction: "up" | "down" | "flat"; adverse?: boolean };
   tone?: Extract<Tone, "success" | "warning" | "danger">;
@@ -274,7 +275,7 @@ export function Metric({
           </span>
         </p>
       ) : null}
-      {detail ? <p className="text-2xs text-ink-3">{detail}</p> : null}
+      {detail ? <div className="text-2xs text-ink-3">{detail}</div> : null}
     </div>
   );
 }

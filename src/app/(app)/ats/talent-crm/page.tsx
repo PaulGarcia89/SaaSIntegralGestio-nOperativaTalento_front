@@ -172,7 +172,7 @@ function CreatePoolDialog({ open, onOpenChange, branchId, onCreated }: { open: b
 
 function CreateTagDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: () => Promise<void> }) {
   const { t } = useLocale();
-  const [name, setName] = useState(""); const [color, setColor] = useState("#2563eb");
+  const [name, setName] = useState(""); const [color, setColor] = useState("hsl(205_80%_45%)");
   const mutation = useMutation({ mutationFn: () => createTalentTag({ name, color }), onSuccess: async () => { setName(""); onOpenChange(false); toast.success(t("talent.tagCreated")); await onCreated(); }, onError: (error: unknown) => showError(error, t("talent.operationFailed")) });
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>{t("talent.newTag")}</DialogTitle><DialogDescription>{t("talent.tagHelp")}</DialogDescription></DialogHeader><div className="space-y-4"><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ej. Disponible inmediatamente" /><label className="flex items-center gap-3 text-sm font-medium">Color<Input type="color" className="h-11 w-20 p-1" value={color} onChange={(event) => setColor(event.target.value)} /></label><Button className="w-full" disabled={name.trim().length < 2 || mutation.isPending} onClick={() => mutation.mutate()}>Crear etiqueta</Button></div></DialogContent></Dialog>;
 }

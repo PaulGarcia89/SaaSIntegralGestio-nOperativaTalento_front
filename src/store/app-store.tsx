@@ -224,7 +224,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           branchCount: 0,
           employeeCount: 0,
           branding: {
-            accent: "#0EA5B7",
+            accent: "#0F766E",
             supportEmail: "",
           },
         } satisfies TenantDto
@@ -238,7 +238,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       status: "suspended",
       enabledModules: [],
       branding: {
-        accent: "#0EA5B7",
+        accent: "#0F766E",
         supportEmail: "",
       },
     } satisfies TenantDto);

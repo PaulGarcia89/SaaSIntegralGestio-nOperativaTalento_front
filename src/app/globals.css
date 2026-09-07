@@ -78,10 +78,10 @@
   --color-focus: hsl(var(--focus));
 
   /* ---- Color: portada pública ------------------------------------------- */
-  --color-landing-deep: hsl(var(--landing-deep));
-  --color-landing-mid: hsl(var(--landing-mid));
-  --color-landing-far: hsl(var(--landing-far));
-  --color-landing-ink: hsl(var(--landing-ink));
+  --color-surface-dark-1: hsl(var(--surface-dark-1));
+  --color-surface-dark-2: hsl(var(--surface-dark-2));
+  --color-surface-dark-3: hsl(var(--surface-dark-3));
+  --color-surface-dark-ink: hsl(var(--surface-dark-ink));
 
   /* ---- Color: nombres heredados (reasignados) --------------------------- */
   --color-background: hsl(var(--background));
@@ -308,10 +308,10 @@
      sitio del producto, así que la página que ve un cliente y el producto que
      compra no parecían de la misma empresa. Estos tonos son el mismo grafito
      del resto de la interfaz; el acento sigue siendo el ámbar. */
-  --landing-deep: 213 40% 10%;
-  --landing-mid: 213 34% 15%;
-  --landing-far: 206 30% 21%;
-  --landing-ink: 210 22% 96%;
+  --surface-dark-1: 213 40% 10%;
+  --surface-dark-2: 213 34% 15%;
+  --surface-dark-3: 206 30% 21%;
+  --surface-dark-ink: 210 22% 96%;
 
   --status-info: 205 80% 30%;
   --status-success: 158 80% 23%;

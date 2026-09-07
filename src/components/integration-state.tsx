@@ -7,7 +7,7 @@ export function DemoModeBanner() {
   if (!DEMO_MODE_ENABLED) return null;
 
   return (
-    <div className="sticky top-0 z-[100000] flex min-h-11 items-center justify-center gap-2 border-b border-amber-300 bg-amber-100 px-4 py-2 text-center text-sm font-medium text-amber-950" role="status">
+    <div className="sticky top-0 z-[100000] flex min-h-11 items-center justify-center gap-2 border-b border-status-warning/40 bg-status-warning/15 px-4 py-2 text-center text-sm font-medium text-status-warning" role="status">
       <FlaskConical className="size-4" aria-hidden="true" />
       Modo de prueba local: los datos y acciones de esta sesión no son productivos.
     </div>

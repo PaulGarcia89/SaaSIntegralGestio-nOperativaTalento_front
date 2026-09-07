@@ -48,7 +48,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
 
   return <>
     {children}
-    {dirty ? <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-950 shadow-lg" role="status">Cambios sin guardar</div> : null}
+    {dirty ? <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border border-status-warning/40 bg-status-warning/15 px-4 py-2 text-sm font-medium text-status-warning shadow-lg" role="status">Cambios sin guardar</div> : null}
     <UnsavedChangesDialog open={Boolean(target)} onContinue={() => setTarget(null)} onDiscard={discard} onSave={save} />
   </>;
 }

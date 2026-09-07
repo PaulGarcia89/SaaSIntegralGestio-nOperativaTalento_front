@@ -17,7 +17,7 @@ export type FormSummaryError = { fieldId: string; label: string; message: string
  * vacante». Ahora el asunto del formulario es una prop y por defecto es
  * neutro.
  *
- * El aviso de éxito estaba pintado con `border-emerald-300 bg-emerald-50
+ * El aviso de éxito estaba pintado con `border-emerald-300 bg-status-success/10
  * text-emerald-950`: un recuadro verde claro fijo, que en tema oscuro
  * aparecía como un bloque luminoso en medio de una pantalla oscura. Ahora usa
  * el aviso del sistema, que responde al tema.

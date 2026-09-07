@@ -38,7 +38,7 @@ import { useAppStore } from "@/store/app-store";
  * Qué cambió
  * ----------
  * · 28 colores crudos de Tailwind y dos hexadecimales fijos —`bg-white`,
- *   `text-slate-600`, `bg-slate-950/35`, un degradado `#ecfeff → #f8fafc`—
+ *   `text-slate-600`, `bg-surface-dark-1/35`, un degradado `#ecfeff → #f8fafc`—
  *   hacían que la pantalla estuviera pintada solo para tema claro: en modo
  *   oscuro el modal quedaba blanco con texto gris claro encima. Ahora todo
  *   pasa por tokens.

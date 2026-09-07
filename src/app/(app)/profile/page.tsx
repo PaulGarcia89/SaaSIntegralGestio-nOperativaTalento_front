@@ -41,7 +41,7 @@ export default function ProfilePage() {
           <SectionCard title="Cuenta personal" subtitle="Identidad y acceso">
             <div className="space-y-5">
               <div className="flex items-start gap-4 rounded-3xl border border-border/70 bg-secondary/35 p-5">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400 to-indigo-500 text-lg font-semibold text-white">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-fill to-accent-line text-lg font-semibold text-surface-dark-ink">
                   AT
                 </div>
                 <div className="space-y-1">

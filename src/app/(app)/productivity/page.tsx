@@ -48,40 +48,40 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
           </div>
           <Badge variant={session.running ? "success" : "secondary"}>{session.running ? "Simulación activa" : "Pausada"}</Badge>
         </div>
-        <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-border-default bg-slate-950">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.26),transparent_28%),radial-gradient(circle_at_top_right,rgba(34,197,94,0.2),transparent_24%),linear-gradient(180deg,rgba(15,23,42,0.55),rgba(2,6,23,0.9))]" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:42px_42px] opacity-35" />
+        <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-border-default bg-surface-dark-1">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(38_94%_52%_/_0.26),transparent_28%),radial-gradient(circle_at_top_right,hsl(158_62%_45%_/_0.2),transparent_24%),linear-gradient(180deg,hsl(213_40%_10%_/_0.55),hsl(213_44%_7%_/_0.9))]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,hsl(210_22%_96%_/_0.03)_1px,transparent_1px),linear-gradient(hsl(210_22%_96%_/_0.03)_1px,transparent_1px)] bg-[size:42px_42px] opacity-35" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-[78%] w-[82%] rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(17,24,39,0.8),rgba(30,41,59,0.58))] shadow-2xl backdrop-blur-sm">
-              <div className="flex h-full flex-col justify-between p-5 text-white">
+            <div className="h-[78%] w-[82%] rounded-[2rem] border border-surface-dark-ink/10 bg-[linear-gradient(135deg,hsl(213_38%_12%_/_0.8),hsl(213_34%_15%_/_0.58))] shadow-2xl backdrop-blur-sm">
+              <div className="flex h-full flex-col justify-between p-5 text-surface-dark-ink">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="rounded-full bg-black/45 px-3 py-1 text-xs uppercase tracking-[0.32em] text-white/80">Cámara {session.cameras[0]?.name ?? "demo"}</div>
-                  <div className="flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-100">
-                    <span className="size-2 rounded-full bg-emerald-400" />
+                  <div className="rounded-full bg-black/45 px-3 py-1 text-xs uppercase tracking-[0.32em] text-surface-dark-ink/80">Cámara {session.cameras[0]?.name ?? "demo"}</div>
+                  <div className="flex items-center gap-2 rounded-full border border-status-success/40 bg-status-success/15 px-3 py-1 text-xs font-medium text-status-success">
+                    <span className="size-2 rounded-full bg-status-success" />
                     En grabación
                   </div>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr]">
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm">
-                    <p className="text-xs uppercase tracking-[0.3em] text-white/60">Zona activa</p>
+                  <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
+                    <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">Zona activa</p>
                     <p className="mt-2 text-2xl font-semibold">{activeEvent?.zoneName ?? "Sin eventos registrados"}</p>
-                    <p className="mt-2 text-sm text-white/80">La cámara está registrando ocupación, flujo y tiempos de permanencia para generar productividad demo.</p>
+                    <p className="mt-2 text-sm text-surface-dark-ink/80">La cámara está registrando ocupación, flujo y tiempos de permanencia para generar productividad demo.</p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Personas {activeEvent?.peopleDetected ?? 0}</Badge>
-                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Productividad {activeEvent?.productivityScore ?? 0}%</Badge>
-                      <Badge variant="secondary" className="border-white/15 bg-white/10 text-white">Eventos {summary.totalEvents}</Badge>
+                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">Personas {activeEvent?.peopleDetected ?? 0}</Badge>
+                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">Productividad {activeEvent?.productivityScore ?? 0}%</Badge>
+                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">Eventos {summary.totalEvents}</Badge>
                     </div>
                   </div>
                   <div className="grid gap-3">
-                    <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm">
-                      <p className="text-xs uppercase tracking-[0.3em] text-white/60">Estado</p>
+                    <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
+                      <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">Estado</p>
                       <p className="mt-2 text-lg font-semibold">Flujo operativo controlado</p>
-                      <p className="text-sm text-white/80">{activeEvent?.note ?? "El demo simula capturas continuas con zonas activas."}</p>
+                      <p className="text-sm text-surface-dark-ink/80">{activeEvent?.note ?? "El demo simula capturas continuas con zonas activas."}</p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm">
-                      <p className="text-xs uppercase tracking-[0.3em] text-white/60">Última marca</p>
+                    <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
+                      <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">Última marca</p>
                       <p className="mt-2 text-lg font-semibold">{formatTime(summary.latestEvent?.occurredAt)}</p>
-                      <p className="text-sm text-white/80">La simulación avanza automáticamente mientras esté activa.</p>
+                      <p className="text-sm text-surface-dark-ink/80">La simulación avanza automáticamente mientras esté activa.</p>
                     </div>
                   </div>
                 </div>

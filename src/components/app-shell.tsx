@@ -266,7 +266,7 @@ function SidebarContent({
         <div className="flex items-center gap-3">
           <span
             aria-hidden="true"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-white"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-surface-dark-ink"
             style={{ backgroundColor: brandAccent }}
           >
             {brandName.charAt(0).toUpperCase()}
@@ -782,7 +782,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <Bell className="size-4" aria-hidden="true" />
                   {unreadNotifications > 0 ? (
-                    <span className="absolute -right-0.5 -top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-status-danger px-1 font-mono text-2xs font-semibold text-white tabular-figures">
+                    <span className="absolute -right-0.5 -top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-status-danger px-1 font-mono text-2xs font-semibold text-surface-dark-ink tabular-figures">
                       {unreadNotifications > 99 ? "99+" : unreadNotifications}
                     </span>
                   ) : null}
@@ -1036,7 +1036,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Icon className="size-4 shrink-0" aria-hidden="true" />
               <span className="max-w-full truncate">{localizedNavLabel(item.label, t)}</span>
               {isNotifications && unreadNotifications ? (
-                <span className="absolute right-1.5 top-1 min-w-3.5 rounded-full bg-status-danger px-1 text-center font-mono text-[9px] font-bold text-white tabular-figures">
+                <span className="absolute right-1.5 top-1 min-w-3.5 rounded-full bg-status-danger px-1 text-center font-mono text-[9px] font-bold text-surface-dark-ink tabular-figures">
                   {unreadNotifications > 9 ? "9+" : unreadNotifications}
                 </span>
               ) : null}

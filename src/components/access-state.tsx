@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
  * queda parado sin saber qué hacer, así que ahora usa `BlockedState`, que
  * exige por firma decir la causa, el responsable y la salida.
  *
- * El icono estaba pintado con `bg-amber-100 / text-amber-700` y su variante
+ * El icono estaba pintado con `bg-status-warning/15 / text-amber-700` y su variante
  * oscura escrita a mano; ahora sale del tono de aviso del sistema.
  */
 

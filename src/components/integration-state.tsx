@@ -1,4 +1,7 @@
+"use client";
+
 import { FlaskConical } from "lucide-react";
+import { useLocale } from "@/components/locale-provider";
 import { InlineFeedback } from "@/components/design-system";
 
 export const DEMO_MODE_ENABLED = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_MOCK_BACKEND === "true";
@@ -21,5 +24,6 @@ export function IntegrationUnavailable({
   title: string;
   description: string;
 }) {
-  return <InlineFeedback tone="info" title={`${title} · Disponible próximamente`}><p>{description}</p><p className="mt-2 text-xs">Esta vista no muestra datos simulados ni confirma acciones sin persistencia real.</p></InlineFeedback>;
+  const { t } = useLocale();
+  return <InlineFeedback tone="info" title={t("integration.comingSoon", { title })}><p>{description}</p><p className="mt-2 text-xs">{t("integration.noMockData")}</p></InlineFeedback>;
 }

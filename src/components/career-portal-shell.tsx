@@ -130,7 +130,7 @@ export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string })
           <div className="mb-5 flex items-center gap-3">
             <Image
               src={portal.branding.logo}
-              alt={`Logo de ${portal.company?.name ?? "la empresa"}`}
+              alt={t("jobs.logoAlt", { company: portal.company?.name ?? t("applicant.portalFallback") })}
               width={40}
               height={40}
               unoptimized

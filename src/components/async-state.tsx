@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import {
   EmptyState,
@@ -5,6 +7,7 @@ import {
   SkeletonRows,
 } from "@/components/system";
 import { SkeletonCards, SkeletonTable, SkeletonText } from "@/components/ui/skeleton";
+import { useLocale } from "@/components/locale-provider";
 
 /**
  * Silueta de carga acorde al contenido que se espera.
@@ -49,18 +52,19 @@ export function AsyncState({
   action?: ReactNode;
   shape?: LoadingShape;
 }) {
+  const { t } = useLocale();
   if (state === "loading") {
     if (shape === "table") return <SkeletonTable />;
     if (shape === "cards") return <SkeletonCards />;
     if (shape === "text") return <SkeletonText lines={4} />;
-    return <SkeletonRows rows={6} label={title ?? "Cargando información"} />;
+    return <SkeletonRows rows={6} label={title ?? t("states.loading")} />;
   }
 
   if (state === "error") {
     return (
       <ErrorState
-        title={title ?? "No fue posible cargar la información"}
-        detail={description ?? "Conservamos tu contexto. Reintenta la consulta para continuar."}
+        title={title ?? t("states.loadError")}
+        detail={description ?? t("states.loadErrorDetail")}
         onRetry={onRetry}
       />
     );

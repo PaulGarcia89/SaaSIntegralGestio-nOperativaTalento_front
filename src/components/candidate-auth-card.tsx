@@ -28,7 +28,7 @@ function candidateAuthErrorMessage(error: unknown, mode: "login" | "register", t
   return t("candidate.accessError");
 }
 
-export function CandidateAuthCard({ onAuthenticated, returnPath = "/application-status", portalLabel = "portal del candidato", defaultMode = "login", allowRegistration = true }: { onAuthenticated: () => void; returnPath?: string; portalLabel?: string; defaultMode?: "login" | "register"; allowRegistration?: boolean; lang?: "es" | "en" }) {
+export function CandidateAuthCard({ onAuthenticated, returnPath = "/application-status", portalLabel, defaultMode = "login", allowRegistration = true }: { onAuthenticated: () => void; returnPath?: string; portalLabel?: string; defaultMode?: "login" | "register"; allowRegistration?: boolean; lang?: "es" | "en" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [recovering, setRecovering] = useState(false);
@@ -41,7 +41,7 @@ export function CandidateAuthCard({ onAuthenticated, returnPath = "/application-
     onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
   });
   return <Card className="mx-auto w-full max-w-lg" aria-labelledby="candidate-access-title"><CardHeader><CardTitle id="candidate-access-title">{mode === "register" ? t("candidate.createAccount") : t("candidate.secureAccess")}</CardTitle></CardHeader><CardContent className="space-y-4">
-    <p className="text-sm text-muted-foreground">{t(mode === "register" ? "candidate.createDescription" : "candidate.loginDescription", { portal: portalLabel })}</p>
+    <p className="text-sm text-muted-foreground">{t(mode === "register" ? "candidate.createDescription" : "candidate.loginDescription", { portal: portalLabel ?? t("applicant.portalFallback") })}</p>
     <div className="space-y-2"><Label htmlFor="candidate-email">{t("candidate.email")}</Label><Input id="candidate-email" autoComplete="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
     {!recovering ? <div className="space-y-2"><Label htmlFor="candidate-password">{t("auth.password")}</Label><Input id="candidate-password" autoComplete={mode === "register" ? "new-password" : "current-password"} type="password" value={password} onChange={(event) => setPassword(event.target.value)} /><p className="text-xs text-muted-foreground">{t("candidate.usePassword")}</p></div> : null}
     {login.isError || social.isError ? <p role="alert" className="text-sm text-destructive">{candidateAuthErrorMessage(login.error ?? social.error, mode, t)}</p> : null}

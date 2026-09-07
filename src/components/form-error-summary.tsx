@@ -3,6 +3,9 @@
 import { useEffect, useRef } from "react";
 import { ApiError } from "@/lib/backend";
 import { InlineNote } from "@/components/system";
+import { useLocale } from "@/components/locale-provider";
+
+type Traducir = (key: string, params?: Record<string, string | number>) => string;
 
 export type FormSummaryError = { fieldId: string; label: string; message: string };
 
@@ -23,28 +26,28 @@ export type FormSummaryError = { fieldId: string; label: string; message: string
  * el aviso del sistema, que responde al tema.
  */
 
-function getServerFormTitle(error: unknown, context: "form" | "authentication", subject: string) {
-  if (context === "authentication") return "No pudimos iniciar sesión";
-  if (error instanceof ApiError && error.status >= 500) return `El servidor no pudo guardar ${subject}`;
-  if (error instanceof ApiError && error.status === 403) return `No tienes permiso para guardar ${subject}`;
-  return "Revisa el formulario";
+function getServerFormTitle(error: unknown, context: "form" | "authentication", subject: string, t: Traducir) {
+  if (context === "authentication") return t("formError.signInFailed");
+  if (error instanceof ApiError && error.status >= 500) return t("formError.serverCouldNotSave", { subject });
+  if (error instanceof ApiError && error.status === 403) return t("formError.noPermission", { subject });
+  return t("formError.checkForm");
 }
 
-export function getServerFormMessage(error: unknown, context: "form" | "authentication" = "form") {
-  const fallback = context === "authentication"
-    ? "No pudimos iniciar sesión. Verifica tu conexión e inténtalo nuevamente."
-    : "No pudimos guardar los cambios. Inténtalo nuevamente.";
+export function getServerFormMessage(error: unknown, context: "form" | "authentication", t: Traducir) {
+  const fallback = context === "authentication" ? t("formError.signInFallback") : t("formError.saveFallback");
   if (!(error instanceof ApiError)) return fallback;
-  if (error.status === 401) return "El correo o la contraseña no son correctos.";
-  if (error.status === 403) return "Tu cuenta no tiene acceso a este espacio de trabajo.";
-  if (error.status === 400) return `Revisa los datos ingresados. ${error.message}`;
-  if (error.status === 409) return "Otro registro utiliza estos datos. Revisa los valores e inténtalo nuevamente.";
-  if (error.status === 422) return "El servidor encontró datos que necesitan corrección.";
-  if (error.status === 429) return "Has realizado demasiados intentos. Espera un momento antes de continuar.";
+  if (error.status === 401) return t("formError.badCredentials");
+  if (error.status === 403) return t("formError.noWorkspace");
+  // El mensaje del servidor NO se oculta: se antepone la orientación y se
+  // conserva lo que respondió, que es lo único que dice qué campo corregir.
+  if (error.status === 400) return t("formError.checkValues", { detail: error.message });
+  if (error.status === 409) return t("formError.conflict");
+  if (error.status === 422) return t("formError.unprocessable");
+  if (error.status === 429) return t("formError.tooMany");
   if (error.status >= 500) {
-    const reference = error.requestId ? ` Referencia de soporte: ${error.requestId}.` : "";
+    const reference = error.requestId ? t("formError.supportReference", { id: error.requestId }) : "";
     const code = error.code ? ` (${error.code})` : "";
-    return `El servidor rechazó la operación con HTTP ${error.status}${code}: ${error.message}.${reference}`;
+    return t("formError.serverRejected", { status: error.status, code, message: error.message, reference });
   }
   return error.message || fallback;
 }
@@ -54,7 +57,7 @@ export function FormErrorSummary({
   serverError,
   success,
   context = "form",
-  subject = "los cambios",
+  subject,
 }: {
   errors?: FormSummaryError[];
   serverError?: unknown;
@@ -63,6 +66,8 @@ export function FormErrorSummary({
   /** Qué se está guardando, en minúscula y con artículo: "la vacante", "el curso". */
   subject?: string;
 }) {
+  const { t } = useLocale();
+  const asunto = subject ?? t("formError.defaultSubject");
   const ref = useRef<HTMLDivElement>(null);
   const hasError = Boolean(errors?.length || serverError);
   useEffect(() => {
@@ -78,9 +83,9 @@ export function FormErrorSummary({
     <div ref={ref} tabIndex={-1} className="outline-none">
       <InlineNote
         tone="danger"
-        title={serverError ? getServerFormTitle(serverError, context, subject) : "Revisa el formulario"}
+        title={serverError ? getServerFormTitle(serverError, context, asunto, t) : t("formError.checkForm")}
       >
-        {serverError ? <p>{getServerFormMessage(serverError, context)}</p> : null}
+        {serverError ? <p>{getServerFormMessage(serverError, context, t)}</p> : null}
         {errors?.length ? (
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {errors.map((error) => (

@@ -46,6 +46,14 @@ def limpiar(f):
     f = re.sub(r'\bt\(\s*(["\'`])[^"\'`]*\1', 't(KEY', f)
     f = re.sub(r'\bt\(\s*`[^`]*`', 't(KEY', f)
     f = re.sub(r'\btx\(\s*"[^"]*"\s*,\s*"[^"]*"\s*\)', 'tx(BI)', f)
+    # Mapa bilingüe escrito a mano —`const copy = { es: {…}, en: {…} }`—: no pasa
+    # por el diccionario, pero SÍ cambia de idioma, así que no es un hallazgo.
+    f = re.sub(r'\n\s*es:\s*\{[\s\S]*?\n\s*en:\s*\{[\s\S]*?\n\} as const;', '\n// mapa bilingüe\n', f)
+    # Un `throw new Error("…")` no llega nunca a pantalla: es un mensaje para
+    # quien programa. Sin esta línea, la única excepción de `locale-provider`
+    # bastaba para marcar «a medias» las 108 pantallas, porque ese archivo está
+    # en el árbol de todas.
+    return re.sub(r'throw new Error\([^)]*\)', 'throw new Error(DEV)', f)
     return f
 
 def esp(t): return bool(ACENTOS.search(t) or PALABRAS.search(t))

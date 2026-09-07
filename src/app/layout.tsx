@@ -3,6 +3,7 @@ import { Providers } from "@/components/providers";
 import { PortalContextProvider } from "@/components/portal-context";
 import { PortalThemeProvider } from "@/components/portal-theme";
 import { PwaRegistration } from "@/components/pwa-registration";
+import { LocalizedDocumentTitle } from "@/components/localized-document-title";
 import { APPEARANCE_BOOT_SCRIPT } from "@/components/appearance";
 import { fontVariables } from "@/lib/fonts";
 import "./globals.css";
@@ -62,6 +63,8 @@ export default function RootLayout({
           <PortalContextProvider>
             <PortalThemeProvider>
               <PwaRegistration />
+              {/* Único escritor del título de la pestaña; elige por ruta. */}
+              <LocalizedDocumentTitle />
               {children}
             </PortalThemeProvider>
           </PortalContextProvider>

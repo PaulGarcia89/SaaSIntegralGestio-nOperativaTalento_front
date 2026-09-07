@@ -31,15 +31,20 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
+import {
+  DataView,
+  ErrorState,
+  Pagination,
+  SkeletonRows,
+  type DataColumn,
+} from "@/components/system";
+import { courseDifficultyLabel } from "@/lib/training-labels";
 import { ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
 import {
   ActionBar,
   InlineFeedback,
   PageHeader,
-  Pagination,
   ResponsiveDialog,
-  ResponsiveDataView,
 } from "@/components/design-system";
 import { FormErrorSummary } from "@/components/form-error-summary";
 import { TrainingCourseFoundation } from "@/components/training-course-foundation";
@@ -225,6 +230,7 @@ export function TrainingCourseManager() {
   }
 
   const canCreate = can("courses.create");
+  const hasFilters = Boolean(search || status || scope || categoryId);
 
   return (
     <div className="space-y-6">
@@ -234,24 +240,12 @@ export function TrainingCourseManager() {
         description="Diseña, revisa y publica experiencias formativas con trazabilidad editorial."
         actions={
           canCreate ? (
-            <>
-              <Button asChild type="button" variant="secondary">
-                <Link href="/training/integrations">
-                  <Link2 className="size-4" aria-hidden="true" />
-                  Ayuda SCORM e integraciones
-                </Link>
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setCategoryOpen(true)}>
-                <Plus className="size-4" aria-hidden="true" />
-                Categoría
-              </Button>
-              <Button asChild type="button">
-                <Link href="/training/content/new">
+            <Button asChild type="button">
+              <Link href="/training/content/new">
                 <Plus className="size-4" aria-hidden="true" />
                 Nuevo curso
-                </Link>
-              </Button>
-            </>
+              </Link>
+            </Button>
           ) : undefined
         }
       />
@@ -305,6 +299,14 @@ export function TrainingCourseManager() {
               })),
             ]}
           />
+          {canCreate ? (
+            <div className="flex items-end">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setCategoryOpen(true)}>
+                <Plus className="size-4" aria-hidden="true" />
+                Nueva categoría
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -324,57 +326,51 @@ export function TrainingCourseManager() {
         ) : <span className="text-text-secondary">Mostrando el catálogo completo</span>}
       </div>
 
-      {coursesQuery.isLoading ? <AsyncState state="loading" title="Cargando cursos" /> : null}
       {coursesQuery.isError ? (
-        <AsyncState
-          state="error"
+        <ErrorState
           title="No fue posible cargar los cursos"
-          description={getApiErrorMessage(coursesQuery.error, "Reintenta la consulta.")}
+          detail={getApiErrorMessage(coursesQuery.error, "Reintenta la consulta para continuar.")}
           onRetry={() => void coursesQuery.refetch()}
         />
       ) : null}
-      {coursesQuery.data ? (
+      {!coursesQuery.isError ? (
         <div className="space-y-4">
-          <ResponsiveDataView
-            data={coursesQuery.data.items}
+          <DataView
+            rows={coursesQuery.data?.items ?? []}
+            loading={coursesQuery.isLoading}
+            columns={courseColumns}
             getKey={(course) => course.id}
-            empty={
-              <InlineFeedback tone="info" title="No hay cursos">
-                Ajusta los filtros o crea el primer curso autorizado.
-              </InlineFeedback>
+            caption="Catálogo de cursos"
+            emptyReason={hasFilters ? "no-matches" : "no-records"}
+            emptyAction={
+              !hasFilters && canCreate ? (
+                <Button asChild>
+                  <Link href="/training/content/new">
+                    <Plus className="size-4" aria-hidden="true" />
+                    Crear el primer curso
+                  </Link>
+                </Button>
+              ) : undefined
             }
-            desktop={
-              <CourseTable
-                courses={coursesQuery.data.items}
-                canEdit={can("courses.update")}
-                canDelete={can("courses.delete")}
-                canDuplicate={canCreate}
-                onEdit={(courseId) => router.push(`/training/content/${encodeURIComponent(courseId)}`)}
-                onPreview={(courseId) => {
-                  if (coursesQuery.data?.items.some((course) => course.id === courseId)) setPreviewId(courseId);
-                }}
-                onDelete={setDeleteTarget}
-              />
-            }
-            mobile={(course) => (
-              <CourseCard
+            onClearFilters={hasFilters ? () => router.replace(pathname, { scroll: false }) : undefined}
+            rowActions={(course) => (
+              <CourseActions
                 course={course}
                 canEdit={can("courses.update")}
                 canDelete={can("courses.delete")}
                 canDuplicate={canCreate}
                 onEdit={(courseId) => router.push(`/training/content/${encodeURIComponent(courseId)}`)}
                 onPreview={(courseId) => {
-                  if (coursesQuery.data?.items.some((course) => course.id === courseId)) setPreviewId(courseId);
+                  if (coursesQuery.data?.items.some((item) => item.id === courseId)) setPreviewId(courseId);
                 }}
                 onDelete={setDeleteTarget}
               />
             )}
           />
           <Pagination
-            page={coursesQuery.data.page - 1}
-            totalPages={Math.max(1, coursesQuery.data.totalPages)}
-            totalItems={coursesQuery.data.total}
-            pageSize={coursesQuery.data.pageSize}
+            page={(coursesQuery.data?.page ?? 1) - 1}
+            totalItems={coursesQuery.data?.total ?? 0}
+            pageSize={coursesQuery.data?.pageSize ?? 20}
             onPageChange={(nextPage) => setFilter("page", String(nextPage + 1))}
           />
         </div>
@@ -490,6 +486,57 @@ function FilterSelect({
   );
 }
 
+const courseColumns: Array<DataColumn<TrainingCourseDto>> = [
+  {
+    key: "title",
+    header: "Curso",
+    priority: "identity",
+    render: (course) => (
+      <div className="min-w-0">
+        <p className="truncate font-medium text-ink-1">{course.title}</p>
+        <p className="line-clamp-2 text-2xs text-ink-3">{course.summary || "Sin resumen"}</p>
+      </div>
+    ),
+    sortValue: (course) => course.title,
+  },
+  {
+    key: "status",
+    header: "Estado",
+    priority: "primary",
+    render: (course) => <CourseStatusBadge status={course.status} />,
+    sortValue: (course) => course.status,
+  },
+  {
+    key: "scope",
+    header: "Alcance",
+    priority: "secondary",
+    render: (course) => (course.tenantId ? "Empresa" : "Global"),
+    sortValue: (course) => (course.tenantId ? "Empresa" : "Global"),
+  },
+  {
+    key: "difficulty",
+    header: "Dificultad",
+    priority: "secondary",
+    render: (course) => courseDifficultyLabel(course.difficulty),
+    sortValue: (course) => course.difficulty,
+  },
+  {
+    key: "modules",
+    header: "Módulos",
+    priority: "detail",
+    numeric: true,
+    render: (course) => course._count?.modules ?? course.modules?.length ?? 0,
+    sortValue: (course) => course._count?.modules ?? course.modules?.length ?? 0,
+  },
+  {
+    key: "updated",
+    header: "Actualizado",
+    priority: "secondary",
+    render: (course) => formatDate(course.updatedAt),
+    sortValue: (course) => course.updatedAt,
+  },
+];
+
 type CourseActionsProps = {
   course: TrainingCourseDto;
   canEdit: boolean;
@@ -534,58 +581,7 @@ function CourseActions(props: CourseActionsProps) {
   );
 }
 
-function CourseTable(props: Omit<CourseActionsProps, "course"> & { courses: TrainingCourseDto[] }) {
-  return (
-    <><div className="grid gap-3 md:hidden">{props.courses.map((course) => <Card key={course.id} level={2}><CardContent className="p-4"><CourseCard {...props} course={course} /></CardContent></Card>)}</div><div className="hidden overflow-x-auto rounded-2xl border border-border-default md:block">
-      <table className="w-full min-w-[900px] text-left text-sm">
-        <thead className="bg-surface-section text-text-secondary">
-          <tr>
-            <th className="px-4 py-3">Curso</th>
-            <th className="px-4 py-3">Estado</th>
-            <th className="px-4 py-3">Alcance</th>
-            <th className="px-4 py-3">Estructura</th>
-            <th className="px-4 py-3">Actualizado</th>
-            <th className="px-4 py-3">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.courses.map((course) => (
-            <tr key={course.id} className="border-t border-border-default align-top">
-              <td className="px-4 py-4">
-                <p className="font-semibold">{course.title}</p>
-                <p className="mt-1 max-w-sm text-text-secondary">{course.summary || "Sin resumen"}</p>
-              </td>
-              <td className="px-4 py-4"><CourseStatusBadge status={course.status} /></td>
-              <td className="px-4 py-4">{course.tenantId ? "Empresa" : "Global"}</td>
-              <td className="px-4 py-4">{course._count?.modules ?? course.modules?.length ?? 0} módulos</td>
-              <td className="px-4 py-4">{formatDate(course.updatedAt)}</td>
-              <td className="px-4 py-4"><CourseActions {...props} course={course} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div></>
-  );
-}
 
-function CourseCard(props: CourseActionsProps) {
-  const { course } = props;
-  return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold">{course.title}</h2>
-          <p className="mt-1 text-sm text-text-secondary">{course.summary || "Sin resumen"}</p>
-        </div>
-        <CourseStatusBadge status={course.status} />
-      </div>
-      <dl className="grid grid-cols-2 gap-3 text-sm">
-        <div><dt className="text-text-secondary">Alcance</dt><dd>{course.tenantId ? "Empresa" : "Global"}</dd></div>
-      </dl>
-      <CourseActions {...props} />
-    </div>
-  );
-}
 
 function VisualCourseHint({ thresholdPercent = 90 }: { thresholdPercent?: number }) {
   return (
@@ -889,8 +885,8 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
         <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
           {query.data && wizard ? <WizardSidebar step={step} wizard={wizard} onSelect={selectStep} /> : null}
           <div className="min-w-0 p-5 sm:p-6">
-          {query.isLoading ? <AsyncState state="loading" /> : null}
-          {query.isError || design.isError ? <AsyncState state="error" onRetry={() => { void query.refetch(); void design.refetch(); }} /> : null}
+          {query.isLoading ? <SkeletonRows rows={4} label="Cargando el curso" /> : null}
+          {query.isError || design.isError ? <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error ?? design.error, "Reintenta la consulta para continuar.")} onRetry={() => { void query.refetch(); void design.refetch(); }} /> : null}
           {query.data && design.data && wizard ? (
             <div className="space-y-6">
               <div>
@@ -1076,8 +1072,8 @@ function CertificationWizardStep({ course, onChanged, onContinue }: { course: Tr
       badgeImageUrl: String(data.get("badgeImageUrl") || "") || undefined,
     });
   }
-  if (query.isLoading) return <AsyncState state="loading" />;
-  if (query.isError || !query.data) return <AsyncState state="error" onRetry={() => void query.refetch()} />;
+  if (query.isLoading) return <SkeletonRows rows={4} label="Cargando el curso" />;
+  if (query.isError || !query.data) return <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} />;
   const policy = query.data.policy;
   return (
     <Card level={2}>
@@ -1238,8 +1234,8 @@ function CourseQualityGate({ course, canApprove, onChanged }: { course: Training
     onSuccess: async () => { toast.success("Estado del piloto actualizado"); await refresh(); },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar el piloto.")),
   });
-  if (query.isLoading) return <AsyncState state="loading" />;
-  if (query.isError || !query.data) return <AsyncState state="error" onRetry={() => void query.refetch()} />;
+  if (query.isLoading) return <SkeletonRows rows={4} label="Cargando el curso" />;
+  if (query.isError || !query.data) return <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} />;
   const quality = query.data;
   return (
     <Card level={2}>
@@ -1675,9 +1671,9 @@ function CoursePreviewDialog({ courseId, open, onOpenChange }: { courseId: strin
       className="sm:h-[min(52rem,calc(100dvh-3rem))] sm:max-w-5xl"
       footer={<div className="flex justify-end"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cerrar vista previa</Button></div>}
     >
-      {query.isLoading ? <AsyncState state="loading" title="Preparando vista previa" /> : null}
-      {query.isError ? <AsyncState state="error" title="No fue posible abrir la vista previa" onRetry={() => void query.refetch()} /> : null}
-      {query.data ? <article className="mx-auto max-w-4xl space-y-6 pb-2">{query.data.coverImageUrl ? <div role="img" aria-label={`Portada de ${query.data.title}`} className="aspect-[16/6] w-full rounded-2xl bg-cover bg-center shadow-sm" style={{ backgroundImage: `url("${query.data.coverImageUrl.replace(/"/g, "%22")}")` }} /> : null}<div><div className="flex flex-wrap gap-2"><CourseStatusBadge status={query.data.status} /><Badge>{query.data.difficulty}</Badge><Badge>{query.data.estimatedMinutes} min</Badge><Badge variant="secondary">Solo lectura</Badge>{query.data.introVideoUrl ? <Badge variant="success">Curso visual</Badge> : null}</div><h2 className="mt-4 text-3xl font-semibold">{query.data.title}</h2><p className="mt-2 text-text-secondary">{query.data.summary}</p>{query.data.introVideoUrl ? <div className="mt-4 rounded-2xl border border-border-default bg-surface-section p-4"><p className="text-sm font-medium">Video introductorio</p><p className="mt-1 text-sm text-text-secondary">Recurso de apoyo visual para arrancar el curso.</p><video className="mt-3 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(query.data.introVideoUrl) ?? query.data.introVideoUrl} aria-label={`Video introductorio de ${query.data.title}`} /></div> : null}</div>{query.data.modules.map((module, moduleIndex) => <section key={module.id} className="space-y-3 rounded-2xl border border-border-default bg-surface-section/40 p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-brand">{moduleIndex + 1}</span><h3 className="text-xl font-semibold">{module.title}</h3></div>{module.lessons.map((lesson, lessonIndex) => { const externalVideoUrl = lesson.videoUrl ?? lesson.blocks.find((block) => block.type === "VIDEO" && block.resourceUrl)?.resourceUrl; const storedVideo = lesson.type === "VIDEO" && !externalVideoUrl && Boolean(lesson.durationSeconds); const completionThreshold = lesson.requiredCompletionPercentage ?? 90; return <div key={lesson.id} className="rounded-xl border border-border-default bg-card p-4"><p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Lección {moduleIndex + 1}.{lessonIndex + 1}</p><h4 className="mt-1 font-medium">{lesson.title}</h4>{lesson.type === "VIDEO" ? <p className="mt-1 text-xs font-medium text-brand">Se completa con {completionThreshold}% de visualización</p> : null}{externalVideoUrl ? <video className="mt-4 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(externalVideoUrl) ?? externalVideoUrl} aria-label={`Video de ${lesson.title}`} /> : storedVideo && courseId ? <AuthenticatedTrainingVideo courseId={courseId} lessonId={lesson.id} title={lesson.title} /> : null}<ul className="mt-3 space-y-2">{lesson.blocks.map((block) => <li key={block.id} className="flex gap-2 text-sm text-text-secondary"><FileText className="size-4 shrink-0" />{block.title || blockLabels[block.type]}</li>)}</ul></div>; })}</section>)}</article> : null}
+      {query.isLoading ? <SkeletonRows rows={4} label="Preparando la vista previa" /> : null}
+      {query.isError ? <ErrorState title="No fue posible abrir la vista previa" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} /> : null}
+      {query.data ? <article className="mx-auto max-w-4xl space-y-6 pb-2">{query.data.coverImageUrl ? <div role="img" aria-label={`Portada de ${query.data.title}`} className="aspect-[16/6] w-full rounded-2xl bg-cover bg-center shadow-sm" style={{ backgroundImage: `url("${query.data.coverImageUrl.replace(/"/g, "%22")}")` }} /> : null}<div><div className="flex flex-wrap gap-2"><CourseStatusBadge status={query.data.status} /><Badge>{courseDifficultyLabel(query.data.difficulty)}</Badge><Badge>{query.data.estimatedMinutes} min</Badge><Badge variant="secondary">Solo lectura</Badge>{query.data.introVideoUrl ? <Badge variant="success">Curso visual</Badge> : null}</div><h2 className="mt-4 text-3xl font-semibold">{query.data.title}</h2><p className="mt-2 text-text-secondary">{query.data.summary}</p>{query.data.introVideoUrl ? <div className="mt-4 rounded-2xl border border-border-default bg-surface-section p-4"><p className="text-sm font-medium">Video introductorio</p><p className="mt-1 text-sm text-text-secondary">Recurso de apoyo visual para arrancar el curso.</p><video className="mt-3 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(query.data.introVideoUrl) ?? query.data.introVideoUrl} aria-label={`Video introductorio de ${query.data.title}`} /></div> : null}</div>{query.data.modules.map((module, moduleIndex) => <section key={module.id} className="space-y-3 rounded-2xl border border-border-default bg-surface-section/40 p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-brand">{moduleIndex + 1}</span><h3 className="text-xl font-semibold">{module.title}</h3></div>{module.lessons.map((lesson, lessonIndex) => { const externalVideoUrl = lesson.videoUrl ?? lesson.blocks.find((block) => block.type === "VIDEO" && block.resourceUrl)?.resourceUrl; const storedVideo = lesson.type === "VIDEO" && !externalVideoUrl && Boolean(lesson.durationSeconds); const completionThreshold = lesson.requiredCompletionPercentage ?? 90; return <div key={lesson.id} className="rounded-xl border border-border-default bg-card p-4"><p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Lección {moduleIndex + 1}.{lessonIndex + 1}</p><h4 className="mt-1 font-medium">{lesson.title}</h4>{lesson.type === "VIDEO" ? <p className="mt-1 text-xs font-medium text-brand">Se completa con {completionThreshold}% de visualización</p> : null}{externalVideoUrl ? <video className="mt-4 aspect-video w-full rounded-xl bg-black" controls playsInline preload="metadata" src={resolveTrainingAssetUrl(externalVideoUrl) ?? externalVideoUrl} aria-label={`Video de ${lesson.title}`} /> : storedVideo && courseId ? <AuthenticatedTrainingVideo courseId={courseId} lessonId={lesson.id} title={lesson.title} /> : null}<ul className="mt-3 space-y-2">{lesson.blocks.map((block) => <li key={block.id} className="flex gap-2 text-sm text-text-secondary"><FileText className="size-4 shrink-0" />{block.title || blockLabels[block.type]}</li>)}</ul></div>; })}</section>)}</article> : null}
     </ResponsiveDialog>
   );
 }

@@ -19,6 +19,7 @@ import { useRestaurantInventoryContext } from "@/components/restaurant-inventory
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
+import { RowTable } from "@/components/row-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,14 @@ export function RestaurantCommercialIntelligenceWorkspace({ initialView = "forec
 
 function CommercialCard({ title, description, children }: { title: string; description: string; children: ReactNode }) { return <Card level={1}><CardContent className="space-y-4 p-5"><div><h2 className="font-semibold">{title}</h2><p className="text-sm text-text-secondary">{description}</p></div>{children}</CardContent></Card>; }
 function QueryState({ query, children }: { query: { isLoading: boolean; error: unknown; refetch: () => unknown }; children: ReactNode }) { if (query.isLoading) return <AsyncState state="loading" />; if (query.error) return <AsyncState state="error" onRetry={() => void query.refetch()} description={getApiErrorMessage(query.error, "El contrato de inteligencia comercial aún no está disponible.")} />; return <>{children}</>; }
-function Table({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-x-auto rounded-2xl border border-border-default"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-surface-interactive"><tr>{headers.map((header) => <th key={header} className="px-3 py-3 font-medium">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{children}</tbody></table></div>; }
+/**
+ * Puente al puente: el ayudante local conserva su firma para no tocar ninguna
+ * de las llamadas, y delega en `RowTable`, que en el teléfono descompone cada
+ * fila en una ficha en vez de mandarla a un carrusel horizontal.
+ */
+function Table({ headers, children }: { headers: string[]; children: ReactNode }) {
+  return <RowTable caption={headers.join(", ")} headers={headers}>{children}</RowTable>;
+}
 
 function CommercialFilters() { const { currentBranch } = useAppStore(); const { warehouseId } = useRestaurantInventoryContext(); return <div className="flex flex-wrap gap-2 text-sm text-text-secondary"><Badge variant="secondary">Sucursal: {currentBranch?.name ?? "Todas"}</Badge><Badge variant="secondary">Almacén: {warehouseId ? "Seleccionado" : "Todos"}</Badge></div>; }
 function ForecastView() { const { currentBranch } = useAppStore(); const { warehouseId } = useRestaurantInventoryContext(); const query = useQuery({ queryKey: ["restaurant-demand-forecast", currentBranch?.id, warehouseId], queryFn: () => fetchRestaurantDemandForecast({ branchId: currentBranch?.id, warehouseId, horizon: 30 }) }); return <CommercialCard title="Pronóstico de demanda" description="Proyección de consumo para anticipar compras y reducir quiebres o sobreinventario."><CommercialFilters /><QueryState query={query}><Table headers={["Periodo", "Ingrediente", "Pronóstico", "Rango", "Confianza"]}>{(query.data ?? []).map((item, index) => <tr key={`${item.period}-${item.ingredientId ?? index}`}><td>{item.period}</td><td>{item.ingredientName ?? item.ingredientId ?? "-"}</td><td>{item.predictedQuantity} {item.unit ?? ""}</td><td>{item.lowerBound ?? "-"} - {item.upperBound ?? "-"}</td><td>{item.confidence == null ? "-" : `${item.confidence.toFixed(0)}%`}</td></tr>)}</Table></QueryState></CommercialCard>; }

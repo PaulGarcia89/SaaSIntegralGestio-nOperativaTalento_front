@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, CalendarClock } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { acknowledgeRestaurantExpiryAlert, createRestaurantCountSchedule, fetchRestaurantAuditLog, fetchRestaurantCountSchedules, fetchRestaurantExpiryAlerts, fetchRestaurantShrinkageAlerts, fetchRestaurantVariance, getApiErrorMessage } from "@/lib/backend";
@@ -9,6 +9,7 @@ import { useRestaurantInventoryContext } from "@/components/restaurant-inventory
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
+import { RowTable } from "@/components/row-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,4 +33,11 @@ function ShrinkageView() { const { currentBranch } = useAppStore(); const { ware
 function AuditView() { const { currentBranch } = useAppStore(); const { warehouseId } = useRestaurantInventoryContext(); const query = useQuery({ queryKey: ["restaurant-audit-log", currentBranch?.id, warehouseId], queryFn: () => fetchRestaurantAuditLog({ branchId: currentBranch?.id, warehouseId }) }); return <Card level={1}><CardContent className="space-y-4 p-5"><div><h2 className="font-semibold">Auditoría inmutable</h2><p className="text-sm text-text-secondary">Registro de cambios de inventario que no puede editarse desde el cliente.</p></div><DataState query={query}>{<Table headers={["Fecha", "Actor", "Acción", "Entidad", "Motivo", "Integridad"]}>{(query.data ?? []).map((item) => <tr key={item.id}><td>{item.createdAt}</td><td>{item.actorName ?? "-"}</td><td>{item.action}</td><td>{item.entityType} · {item.entityId}</td><td>{item.reason ?? "-"}</td><td><Badge variant={item.immutable ? "default" : "destructive"}>{item.immutable ? "Inmutable" : "Revisar"}</Badge></td></tr>)}</Table>}</DataState></CardContent></Card>; }
 
 function DataState({ query, children }: { query: { isLoading: boolean; error: unknown; refetch: () => unknown }; children: React.ReactNode }) { if (query.isLoading) return <AsyncState state="loading" />; if (query.error) return <AsyncState state="error" onRetry={() => void query.refetch()} description={getApiErrorMessage(query.error, "El contrato de control avanzado aún no está disponible.")} />; return <>{children}</>; }
-function Table({ headers, children }: { headers: string[]; children: React.ReactNode }) { return <div className="overflow-x-auto rounded-2xl border border-border-default"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-surface-interactive"><tr>{headers.map((header) => <th key={header} className="px-3 py-3 font-medium">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{children}</tbody></table></div>; }
+/**
+ * Puente al puente: el ayudante local conserva su firma para no tocar ninguna
+ * de las llamadas, y delega en `RowTable`, que en el teléfono descompone cada
+ * fila en una ficha en vez de mandarla a un carrusel horizontal.
+ */
+function Table({ headers, children }: { headers: string[]; children: ReactNode }) {
+  return <RowTable caption={headers.join(", ")} headers={headers}>{children}</RowTable>;
+}

@@ -8,6 +8,7 @@ import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, File
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
+import { RowTable } from "@/components/row-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -964,32 +965,33 @@ export function EmployeeImportPage() {
                   Todas las filas son válidas. La carga se ejecutará en una sola operación.
                 </InlineFeedback>
               )}
-              <div className="max-h-64 overflow-auto rounded-xl border border-border-default">
-                <table className="w-full min-w-[680px] text-left text-sm">
-                  <thead className="sticky top-0 bg-surface-section text-text-secondary">
-                    <tr>
-                      <th className="px-3 py-2">Fila</th>
-                      <th className="px-3 py-2">Empleado</th>
-                      <th className="px-3 py-2">Sucursal</th>
-                      <th className="px-3 py-2">Cargo</th>
-                      <th className="px-3 py-2">Validación</th>
+              {/* La previsualización de la carga masiva tenía 680px de ancho
+                  mínimo: justo la pantalla donde alguien revisa fila a fila si
+                  el archivo está bien antes de crear decenas de personas. */}
+              <div className="max-h-96 overflow-y-auto">
+                <RowTable
+                  caption="Previsualización de las filas del archivo"
+                  headers={["Fila", "Empleado", "Sucursal", "Cargo", "Validación"]}
+                >
+                  {rows.slice(0, 20).map((row) => (
+                    <tr key={row.row}>
+                      <td className="px-4 py-3 align-top font-mono tabular-figures">{row.row}</td>
+                      <td className="px-4 py-3 align-top">
+                        <p className="font-medium">{row.name || "Sin nombre"}</p>
+                        <p className="text-2xs text-ink-3">{row.email || "Sin correo"}</p>
+                      </td>
+                      <td className="px-4 py-3 align-top">{row.branchLabel || "—"}</td>
+                      <td className="px-4 py-3 align-top">{row.primaryRole || "—"}</td>
+                      <td className="px-4 py-3 align-top">
+                        {row.errors.length ? (
+                          <span className="text-status-danger">{row.errors.join(" · ")}</span>
+                        ) : (
+                          <span className="text-status-success">Lista</span>
+                        )}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, 20).map((row) => (
-                      <tr key={row.row} className="border-t border-border-default">
-                        <td className="px-3 py-2">{row.row}</td>
-                        <td className="px-3 py-2">
-                          <p className="font-medium">{row.name || "Sin nombre"}</p>
-                          <p className="text-xs text-text-secondary">{row.email || "Sin correo"}</p>
-                        </td>
-                        <td className="px-3 py-2">{row.branchLabel || "-"}</td>
-                        <td className="px-3 py-2">{row.primaryRole || "-"}</td>
-                        <td className="px-3 py-2">{row.errors.length ? <span className="text-status-danger">{row.errors.join(" · ")}</span> : <span className="text-status-success">Lista</span>}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))}
+                </RowTable>
               </div>
               {rows.length > 20 ? <p className="text-xs text-text-secondary">Se muestran las primeras 20 filas de {rows.length}.</p> : null}
             </>

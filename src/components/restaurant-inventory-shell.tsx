@@ -18,6 +18,7 @@ import { AsyncState } from "@/components/async-state";
 import { InlineFeedback } from "@/components/design-system";
 import { PageHeader } from "@/components/system";
 import { Badge } from "@/components/ui/badge";
+import { RowTable } from "@/components/row-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -214,4 +215,4 @@ function StockScreen({ branchId, warehouseId }: { branchId?: string; warehouseId
 
 function MovementsScreen({ branchId, warehouseId }: { branchId?: string; warehouseId?: string }) { const query = useQuery({ queryKey: ["restaurant-movements", branchId, warehouseId], queryFn: () => fetchRestaurantMovements({ branchId, warehouseId }) }); return <div className="space-y-4"><PageHeader eyebrow="Auditoría" title="Movimientos" description="Consulta de solo lectura con documento de referencia y usuario." /><QueryState loading={query.isLoading} error={query.error} retry={() => void query.refetch()}><ResponsiveTable headers={["Fecha", "Ingrediente", "Tipo", "Entrada", "Salida", "Saldo", "Costo", "Referencia", "Usuario"]}>{(query.data ?? []).map((item) => <tr key={item.id}><td>{item.date}</td><td>{item.ingredientName}</td><td>{item.type}</td><td>{item.entry}</td><td>{item.exit}</td><td>{item.balance}</td><td>${item.cost.toFixed(2)}</td><td>{item.reference ?? "-"}</td><td>{item.userName ?? "-"}</td></tr>)}</ResponsiveTable></QueryState></div>; }
 
-function ResponsiveTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-x-auto rounded-2xl border border-border-default"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-surface-interactive text-text-secondary"><tr>{headers.map((header) => <th key={header} className="px-4 py-3 font-medium">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{children}</tbody></table></div>; }
+function ResponsiveTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <RowTable caption="Registros" headers={headers}>{children}</RowTable>; }

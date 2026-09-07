@@ -8,6 +8,7 @@ import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
+import { RowTable } from "@/components/row-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -51,4 +52,11 @@ function AdjustmentsScreen({ branchId }: { branchId: string }) { const catalog =
 function Lines({ title, lines, options, onChange, showReason, showLot }: { title: string; lines: Line[]; options: Array<{ id: string; label: string }>; onChange: (lines: Line[]) => void; showReason?: boolean; showLot?: boolean }) { return <div className="space-y-3"><h2 className="font-semibold">{title}</h2>{lines.map((line, index) => <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 sm:grid-cols-[2fr_1fr_1.5fr_auto]"><Select id={`line-ingredient-${index}`} label="Ingrediente" value={line.ingredientId} options={options} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, ingredientId: value } : item))} /><Field id={`line-quantity-${index}`} label={showReason ? "Cantidad física" : "Cantidad"} type="number" value={line.quantity} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, quantity: value } : item))} />{showReason ? <Field id={`line-reason-${index}`} label="Motivo" value={line.reason ?? ""} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, reason: value } : item))} /> : showLot ? <Field id={`line-lot-${index}`} label="Lote (opcional)" value={line.lotId ?? ""} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, lotId: value } : item))} /> : <span />}{lines.length > 1 ? <Button variant="ghost" size="sm" className="self-end" aria-label="Eliminar línea" onClick={() => onChange(lines.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button> : null}</div>)}</div>; }
 function Select({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Array<{ id: string; label: string }>; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-2xl border border-border-default bg-surface-elevated px-3"><option value="">Seleccionar</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
 function Field({ id, label, value, onChange, type = "text" }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string }) { return <div><Label htmlFor={id}>{label}</Label><Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} /></div>; }
-function Table({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-x-auto rounded-2xl border border-border-default"><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-surface-interactive text-text-secondary"><tr>{headers.map((header) => <th key={header} className="px-4 py-3 font-medium">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{children}</tbody></table></div>; }
+/**
+ * Puente al puente: el ayudante local conserva su firma para no tocar ninguna
+ * de las llamadas, y delega en `RowTable`, que en el teléfono descompone cada
+ * fila en una ficha en vez de mandarla a un carrusel horizontal.
+ */
+function Table({ headers, children }: { headers: string[]; children: ReactNode }) {
+  return <RowTable caption={headers.join(", ")} headers={headers}>{children}</RowTable>;
+}

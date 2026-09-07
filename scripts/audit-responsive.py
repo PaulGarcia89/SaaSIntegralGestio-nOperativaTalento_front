@@ -71,10 +71,20 @@ for path in collect():
                 findings.append((path, number, "rejilla-fija", f"columnas suman {total}px > {NARROW}px"))
 
     # 4 — hijos de flex/grid con contenido desbordable y sin `min-w-0`.
-    text = "".join(lines)
-    if overflowable.search(text) and not has_min_w0.search(text):
-        if re.search(r"className=\"[^\"]*(flex|grid)[^\"]*\"", text):
-            findings.append((path, 0, "sin-min-w-0", "contiene tabla o scroll horizontal dentro de flex/grid sin min-w-0"))
+    #
+    # Se mira una ventana corta: que en el mismo archivo haya un flex por un
+    # lado y una tabla por otro no prueba nada. Lo que desborda es una tabla
+    # DENTRO de un contenedor flex o grid cercano que no declare `min-w-0`.
+    WINDOW = 12
+    for number, line in enumerate(lines, start=1):
+        if not re.search(r"className=[\"{`][^\"}`]*(flex|grid-cols)", line):
+            continue
+        window = "".join(lines[number - 1 : number - 1 + WINDOW])
+        if not overflowable.search(window):
+            continue
+        if has_min_w0.search(window):
+            continue
+        findings.append((path, number, "sin-min-w-0", "tabla o scroll horizontal dentro de flex/grid sin min-w-0"))
 
 by_kind = {}
 for path, number, kind, detail in findings:

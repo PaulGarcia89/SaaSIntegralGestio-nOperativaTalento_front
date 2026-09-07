@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight, FileText, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
 import { ReasonDialog } from "@/components/simple/reason-dialog";
-import { PhaseChip, SimpleSection, SimpleScreen, TAP_TARGET } from "@/components/simple/simple-ui";
+import { SimpleSection } from "@/components/simple/simple-ui";
+import { ErrorState, SkeletonRows, StatusBadge, Timeline, type TimelineEntry } from "@/components/system";
+import { Button } from "@/components/ui/button";
 import {
   createHiringContract,
   fetchApplication,
@@ -20,6 +21,7 @@ import {
 import type { VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import { formatApplicationDate } from "@/lib/applications";
 import {
+  MAIN_PHASES,
   firstNameOf,
   recruitmentPhase,
   recruitmentPhaseOf,
@@ -43,6 +45,13 @@ import { useLocale } from "@/components/locale-provider";
  * Esta responde primero las tres preguntas del rediseño: quién es, en qué fase
  * va y qué hago ahora. Todo lo demás está plegado, y las herramientas de
  * especialista siguen intactas en la ficha avanzada.
+ *
+ * Qué cambió con el rediseño visual
+ * ---------------------------------
+ * La fase deja de ser solo un distintivo y pasa a ser un RECORRIDO: se ve de un
+ * vistazo cuánto queda por delante, que es la pregunta que el distintivo no
+ * respondía. Y la historia del expediente se muestra como línea de tiempo en
+ * vez de como una fecha suelta dentro de una lista de datos.
  */
 
 function initials(name: string) {
@@ -51,10 +60,49 @@ function initials(name: string) {
 
 function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="border-b border-border-default py-3 last:border-b-0">
-      <dt className="text-text-secondary">{label}</dt>
-      <dd className="mt-1 text-text-primary">{value}</dd>
+    <div className="border-b border-line py-2.5 last:border-b-0">
+      <dt className="text-xs text-ink-3">{label}</dt>
+      <dd className="mt-0.5 text-ink-1">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * Recorrido por las fases del proceso.
+ *
+ * Se dibuja como una `<ol>` real para que se anuncie como una secuencia. El
+ * estado no depende del color: la fase hecha lleva una marca, la actual lleva
+ * `aria-current="step"` y el texto «Aquí».
+ *
+ * Quien fue descartado sale del camino principal, así que no se le dibuja un
+ * recorrido con fases futuras que ya no va a recorrer.
+ */
+function PhaseProgress({ currentStep, locale }: { currentStep: number; locale: "es" | "en" }) {
+  return (
+    <ol className="flex flex-wrap gap-1.5">
+      {MAIN_PHASES.map((phase) => {
+        const step = phase.step ?? 0;
+        const done = step < currentStep;
+        const active = step === currentStep;
+        return (
+          <li key={phase.id}>
+            <span
+              aria-current={active ? "step" : undefined}
+              className={cn(
+                "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
+                active && "border-accent-line/50 bg-accent-fill/10 font-medium text-ink-1",
+                done && "border-status-success/30 bg-status-success/10 text-status-success",
+                !active && !done && "border-line text-ink-3",
+              )}
+            >
+              {done ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+              {phaseTitle(phase.id, locale)}
+              {active ? <span className="text-2xs uppercase tracking-[0.1em] text-accent-ink">Aquí</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -122,186 +170,272 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
   });
 
   const readyToHire = application.status === "APPROVED" && can("applications.hire");
+  const discarded = phase.id === "DESCARTADOS";
+
+  /* Historia del expediente. Solo con lo que el registro afirma de verdad: si
+     el backend no manda un historial de transiciones, no se inventa uno. */
+  const timeline: TimelineEntry[] = [
+    {
+      id: "applied",
+      title: `${firstName} se postuló`,
+      when: formatApplicationDate(application.appliedAt),
+      detail: application.vacancy.title,
+      tone: "neutral",
+    },
+    {
+      id: "current",
+      title: application.currentStage?.name ?? phaseTitle(phase.id, locale),
+      when: waitingLabel(application.appliedAt),
+      detail: phaseMeaning(phase.id, locale),
+      tone: discarded ? "danger" : phase.id === "TRABAJANDO" ? "success" : "warning",
+    },
+  ];
 
   return (
-    <SimpleScreen>
+    <div className="space-y-5 pb-4">
       <nav aria-label={t("profile.backAria")}>
-        <Link href="/ats/candidates" className={cn(TAP_TARGET, "inline-flex items-center gap-2 rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-          <ArrowLeft className="size-5" aria-hidden="true" />
-          {t("profile.back")}
-        </Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/ats/candidates">
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            {t("profile.back")}
+          </Link>
+        </Button>
       </nav>
 
-      <header className="rounded-2xl border border-border-default bg-surface-elevated p-5 sm:p-7">
+      {/* ---- Quién es ---------------------------------------------------- */}
+      <header className="rounded-xl border border-line bg-surface-1 p-5 shadow-e1 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden="true" className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary text-xl font-semibold text-text-on-accent">
+            <span
+              aria-hidden="true"
+              className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-action font-display text-lg font-semibold text-on-action"
+            >
               {initials(name)}
             </span>
             <div className="min-w-0">
-              <h1 className="text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{name}</h1>
-              <p className="mt-2 text-lg text-text-primary">Se postuló para {application.vacancy.title}</p>
-              <p className="mt-1 text-text-secondary">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
-              <p className="mt-1 text-text-secondary">{waitingLabel(application.appliedAt)}</p>
+              <h1 className="text-2xl font-semibold text-ink-1 sm:text-3xl">{name}</h1>
+              <p className="mt-1 text-ink-1">Se postuló para {application.vacancy.title}</p>
+              <p className="text-sm text-ink-2">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
+              <p className="font-mono text-xs text-ink-3 tabular-figures">{waitingLabel(application.appliedAt)}</p>
             </div>
           </div>
-          <PhaseChip label={phaseTitle(phase.id, locale)} tone={phase.id === "DESCARTADOS" ? "neutral" : "waiting"} />
+          <StatusBadge
+            label={phaseTitle(phase.id, locale)}
+            tone={discarded ? "neutral" : phase.id === "TRABAJANDO" ? "success" : "progress"}
+          />
         </div>
 
-        <dl className="mt-6 grid gap-4 border-t border-border-default pt-5 sm:grid-cols-3">
-          <div>
-            <dt className="text-text-secondary">{t("profile.email")}</dt>
-            <dd className="mt-1 flex items-center gap-2 text-text-primary">
-              <Mail className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
-              <a href={`mailto:${application.candidate.email}`} className="underline underline-offset-4">{application.candidate.email}</a>
+        {/* ---- En qué fase va ------------------------------------------- */}
+        <div className="mt-5 border-t border-line pt-4">
+          {discarded ? (
+            <p className="text-sm text-ink-2">
+              {firstName} salió del proceso. Su expediente se conserva y sigue apareciendo en la fase
+              «{phaseTitle(phase.id, locale)}».
+            </p>
+          ) : (
+            <PhaseProgress currentStep={phase.step ?? 1} locale={locale} />
+          )}
+        </div>
+
+        <dl className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-3">
+          <div className="min-w-0">
+            <dt className="text-xs text-ink-3">{t("profile.email")}</dt>
+            <dd className="mt-1 flex items-center gap-2 text-ink-1">
+              <Mail className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+              <a href={`mailto:${application.candidate.email}`} className="truncate underline underline-offset-4">
+                {application.candidate.email}
+              </a>
             </dd>
           </div>
-          <div>
-            <dt className="text-text-secondary">{t("profile.phone")}</dt>
-            <dd className="mt-1 flex items-center gap-2 text-text-primary">
-              <Phone className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
-              {application.candidate.phone ? <a href={`tel:${application.candidate.phone}`} className="underline underline-offset-4">{application.candidate.phone}</a> : t("profile.notGivenM")}
+          <div className="min-w-0">
+            <dt className="text-xs text-ink-3">{t("profile.phone")}</dt>
+            <dd className="mt-1 flex items-center gap-2 text-ink-1">
+              <Phone className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+              {application.candidate.phone ? (
+                <a href={`tel:${application.candidate.phone}`} className="underline underline-offset-4">
+                  {application.candidate.phone}
+                </a>
+              ) : (
+                <span className="text-ink-2">{t("profile.notGivenM")}</span>
+              )}
             </dd>
           </div>
-          <div>
-            <dt className="text-text-secondary">{t("profile.city")}</dt>
-            <dd className="mt-1 flex items-center gap-2 text-text-primary">
-              <MapPin className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
-              {application.candidate.city ?? t("profile.notGivenF")}
+          <div className="min-w-0">
+            <dt className="text-xs text-ink-3">{t("profile.city")}</dt>
+            <dd className="mt-1 flex items-center gap-2 text-ink-1">
+              <MapPin className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+              {application.candidate.city ?? <span className="text-ink-2">{t("profile.notGivenF")}</span>}
             </dd>
           </div>
         </dl>
 
         {application.candidate.resumeAvailable ? (
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            className="mt-4 w-full sm:w-auto"
             onClick={() => resume.mutate()}
-            disabled={resume.isPending}
-            className={cn(TAP_TARGET, "mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-border-default px-5 font-semibold text-text-primary disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus sm:w-auto")}
+            loading={resume.isPending}
+            loadingLabel="Abriendo…"
           >
-            <FileText className="size-5" aria-hidden="true" />
-            {resume.isPending ? "Abriendo…" : `Ver el currículum de ${firstName}`}
-          </button>
+            <FileText className="size-4" aria-hidden="true" />
+            Ver el currículum de {firstName}
+          </Button>
         ) : null}
       </header>
 
-      <section aria-labelledby="que-hago" className="rounded-2xl border border-primary/30 bg-primary/[0.04] p-5 sm:p-7">
-        <h2 id="que-hago" className="text-2xl font-semibold text-text-primary">{t("profile.whatNow")}</h2>
+      {/* ---- Qué hago ahora --------------------------------------------- */}
+      <section
+        aria-labelledby="que-hago"
+        className="relative overflow-hidden rounded-xl border border-accent-line/40 bg-surface-1 p-5 shadow-e2 sm:p-6"
+      >
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-accent-fill" />
+        <div className="pl-3">
+          <h2 id="que-hago" className="text-lg font-semibold text-ink-1">
+            {t("profile.whatNow")}
+          </h2>
 
-        {!canUpdate ? (
-          <p className="mt-3 text-text-secondary">{t("profile.readOnly")}</p>
-        ) : readyToHire ? (
-          <>
-            <p className="mt-2 text-text-primary">{t("profile.decidedToHire", { name: firstName })}</p>
-            <button
-              type="button"
-              onClick={() => contract.mutate()}
-              disabled={contract.isPending}
-              className={cn(TAP_TARGET, "mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-semibold text-text-on-accent disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus sm:w-auto")}
-            >
-              {contract.isPending ? t("profile.preparing") : t("profile.prepareHiring", { name: firstName })}
-              <ChevronRight className="size-5" aria-hidden="true" />
-            </button>
-          </>
-        ) : moves.primary ? (
-          <>
-            <p className="mt-2 text-text-primary">{phaseMeaning(phase.id, locale)}</p>
-            <button
-              type="button"
-              onClick={() => move.mutate({ stage: moves.primary!.stage })}
-              disabled={move.isPending}
-              className={cn(TAP_TARGET, "mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-semibold text-text-on-accent disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus sm:w-auto")}
-            >
-              {moves.primary.label}
-            </button>
-          </>
-        ) : (
-          <p className="mt-3 text-text-secondary">{t("profile.nothingPending", { name: firstName })}</p>
-        )}
+          {!canUpdate ? (
+            <p className="mt-2 text-sm text-ink-2">{t("profile.readOnly")}</p>
+          ) : readyToHire ? (
+            <>
+              <p className="mt-1 text-ink-2">{t("profile.decidedToHire", { name: firstName })}</p>
+              <Button
+                type="button"
+                size="lg"
+                className="mt-4 w-full sm:w-auto"
+                onClick={() => contract.mutate()}
+                loading={contract.isPending}
+                loadingLabel={t("profile.preparing")}
+              >
+                {t("profile.prepareHiring", { name: firstName })}
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </Button>
+            </>
+          ) : moves.primary ? (
+            <>
+              <p className="mt-1 text-ink-2">{phaseMeaning(phase.id, locale)}</p>
+              <Button
+                type="button"
+                size="lg"
+                className="mt-4 w-full sm:w-auto"
+                onClick={() => move.mutate({ stage: moves.primary!.stage })}
+                loading={move.isPending}
+              >
+                {moves.primary.label}
+              </Button>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-ink-2">{t("profile.nothingPending", { name: firstName })}</p>
+          )}
 
-        {canUpdate && moves.others.length ? (
-          <div className="mt-4">
-            <SimpleSection title={t("people.otherOptions")} hint={moves.others.length === 1 ? t("people.availableOne") : t("people.availableMany", { count: moves.others.length })}>
-              <div className="flex flex-col gap-2">
-                {moves.others.map((option) => (
-                  <button
-                    key={option.stage.code}
-                    type="button"
-                    disabled={move.isPending}
-                    onClick={() => (option.needsReason ? setRejecting(option) : move.mutate({ stage: option.stage }))}
-                    className={cn(TAP_TARGET, "rounded-full border px-5 font-semibold disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus", option.needsReason ? "border-status-danger/50 text-text-primary" : "border-border-default text-text-primary")}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </SimpleSection>
-          </div>
-        ) : null}
+          {canUpdate && moves.others.length ? (
+            <div className="mt-4">
+              <SimpleSection
+                title={t("people.otherOptions")}
+                hint={moves.others.length === 1 ? t("people.availableOne") : t("people.availableMany", { count: moves.others.length })}
+              >
+                <div className="flex flex-wrap gap-2">
+                  {moves.others.map((option) => (
+                    <Button
+                      key={option.stage.code}
+                      type="button"
+                      variant={option.needsReason ? "destructive" : "secondary"}
+                      disabled={move.isPending}
+                      onClick={() => (option.needsReason ? setRejecting(option) : move.mutate({ stage: option.stage }))}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </SimpleSection>
+            </div>
+          ) : null}
+        </div>
       </section>
 
-      <section aria-labelledby="mas-de" className="space-y-3">
-        <h2 id="mas-de" className="text-xl font-semibold text-text-primary">{t("profile.moreAbout", { name: firstName })}</h2>
+      {/* ---- Historia --------------------------------------------------- */}
+      <section aria-labelledby="historia" className="space-y-3">
+        <h2 id="historia" className="text-base font-semibold text-ink-1">
+          Cómo llegó hasta aquí
+        </h2>
+        <Timeline entries={timeline} />
+      </section>
+
+      {/* ---- El resto, plegado ------------------------------------------ */}
+      <section aria-labelledby="mas-de" className="space-y-2">
+        <h2 id="mas-de" className="text-base font-semibold text-ink-1">
+          {t("profile.moreAbout", { name: firstName })}
+        </h2>
 
         <SimpleSection title={t("profile.theirApplication")} hint={formatApplicationDate(application.appliedAt)}>
           <dl>
             <DataRow label={t("profile.role")} value={application.vacancy.title} />
             <DataRow label={t("profile.currentStage")} value={application.currentStage?.name ?? phaseTitle(phase.id, locale)} />
             <DataRow label={t("profile.appliedOn")} value={formatApplicationDate(application.appliedAt)} />
-            <DataRow label={t("profile.owner")} value={application.assignedRecruiter ? `${application.assignedRecruiter.firstName} ${application.assignedRecruiter.lastName}` : t("profile.unassigned")} />
+            <DataRow
+              label={t("profile.owner")}
+              value={application.assignedRecruiter ? `${application.assignedRecruiter.firstName} ${application.assignedRecruiter.lastName}` : t("profile.unassigned")}
+            />
             {application.coverLetter ? <DataRow label={t("profile.whatTheyWrote")} value={application.coverLetter} /> : null}
           </dl>
         </SimpleSection>
 
         <SimpleSection title={t("profile.internalNotes")} hint={t("profile.internalNotesHint")}>
-          <label className="block space-y-2 font-medium text-text-primary" htmlFor="person-notes">
+          <label className="block space-y-2 font-medium text-ink-1" htmlFor="person-notes">
             Escribe lo que quieras recordar
             <textarea
               id="person-notes"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               disabled={!canUpdate}
-              className="min-h-32 w-full rounded-xl border border-border-default bg-surface-elevated p-3 text-base disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="min-h-32 w-full rounded-md border border-line-control bg-surface-1 p-3 text-base font-normal text-ink-1 disabled:bg-surface-2 disabled:text-ink-disabled sm:text-sm"
               placeholder={t("profile.notesPlaceholder")}
             />
           </label>
           {canUpdate ? (
-            <button
+            <Button
               type="button"
+              className="mt-3"
               onClick={() => saveNotes.mutate()}
-              disabled={saveNotes.isPending || notes === (application.notes ?? "")}
-              className={cn(TAP_TARGET, "mt-3 rounded-full bg-primary px-5 font-semibold text-text-on-accent disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+              disabled={notes === (application.notes ?? "")}
+              loading={saveNotes.isPending}
+              loadingLabel={t("vacancies.saving")}
             >
-              {saveNotes.isPending ? t("vacancies.saving") : t("profile.saveNote")}
-            </button>
+              {t("profile.saveNote")}
+            </Button>
           ) : null}
         </SimpleSection>
 
-        <SimpleSection title={t("profile.messages")} hint={communications.data?.length ? t("profile.messagesCount", { count: communications.data.length }) : t("profile.noneYet")}>
+        <SimpleSection
+          title={t("profile.messages")}
+          hint={communications.data?.length ? t("profile.messagesCount", { count: communications.data.length }) : t("profile.noneYet")}
+        >
           {communications.data?.length ? (
             <ol className="space-y-3">
               {communications.data.slice(0, 10).map((message) => (
-                <li key={message.id} className="border-l-2 border-border-default pl-3">
-                  <p className="font-medium text-text-primary">{message.subject}</p>
-                  <p className="mt-0.5 text-text-secondary">{formatApplicationDate(message.createdAt)}</p>
+                <li key={message.id} className="border-l-2 border-line pl-3">
+                  <p className="font-medium text-ink-1">{message.subject}</p>
+                  <p className="mt-0.5 font-mono text-xs text-ink-3 tabular-figures">
+                    {formatApplicationDate(message.createdAt)}
+                  </p>
                 </li>
               ))}
             </ol>
           ) : (
-            <p className="text-text-secondary">{t("profile.noMessages")}</p>
+            <p className="text-sm text-ink-2">{t("profile.noMessages")}</p>
           )}
         </SimpleSection>
 
         <SimpleSection title={t("people.advancedTools")} hint={t("profile.advancedHint")}>
-          <p className="mb-3 text-text-secondary">
+          <p className="mb-3 text-sm text-ink-2">
             La ficha completa tiene todo lo anterior más las evaluaciones de entrevista, el comité de decisión, el gestor de ofertas y la agenda. Nada se perdió: sigue ahí.
           </p>
-          <Link
-            href={`/ats/candidates/${application.id}/avanzado`}
-            className={cn(TAP_TARGET, "flex items-center justify-center rounded-full border border-border-default px-5 font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
-          >
-            {t("profile.openFullRecord", { name: firstName })}
-          </Link>
+          <Button asChild variant="secondary" className="w-full sm:w-auto">
+            <Link href={`/ats/candidates/${application.id}/avanzado`}>
+              {t("profile.openFullRecord", { name: firstName })}
+            </Link>
+          </Button>
         </SimpleSection>
       </section>
 
@@ -317,14 +451,16 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
           setRejecting(null);
         }}
       />
-    </SimpleScreen>
+    </div>
   );
 }
 
 export function PersonProfilePage({ applicationId }: { applicationId: string }) {
   const { t } = useLocale();
   const application = useQuery({ queryKey: ["application", applicationId], queryFn: () => fetchApplication(applicationId), enabled: Boolean(applicationId) });
-  if (application.isLoading) return <AsyncState state="loading" title={t("profile.loading")} />;
-  if (application.isError || !application.data) return <AsyncState state="error" title={t("profile.errorTitle")} onRetry={() => void application.refetch()} />;
+  if (application.isLoading) return <SkeletonRows rows={4} label={t("profile.loading")} />;
+  if (application.isError || !application.data) {
+    return <ErrorState title={t("profile.errorTitle")} onRetry={() => void application.refetch()} />;
+  }
   return <PersonProfile application={application.data} />;
 }

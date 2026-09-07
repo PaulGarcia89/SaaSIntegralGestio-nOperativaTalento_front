@@ -11,6 +11,7 @@ import type { CreateVacancyInput, PersonnelRequisitionDto, PersonnelRequisitionI
 import { useAppStore } from "@/store/app-store";
 import { technicalLabel } from "@/lib/ui-labels";
 import { ActionBar, InlineFeedback, PageHeader, Wizard } from "@/components/design-system";
+import { DataView, StatusBadge, type DataColumn } from "@/components/system";
 import { SIMPLE_TEXT, SimpleSection } from "@/components/simple/simple-ui";
 import { VACANCY_STEPS, stepForVacancyError, vacancyStepHelp, vacancyStepTitle } from "@/lib/vacancy-wizard";
 import { translate } from "@/i18n";
@@ -228,7 +229,7 @@ export function VacanciesPage({ createPage = false, editId }: { createPage?: boo
     {vacancies.isLoading ? <AsyncState state="loading" title={t("vacancies.loading")} /> : null}{vacancies.isError ? <AsyncState state="error" onRetry={() => void vacancies.refetch()} /> : null}
     {vacancies.isSuccess && !items.length ? <InlineFeedback tone="info" title={t("vacancies.noRecords")}>{t("vacancies.createDraft")}</InlineFeedback> : null}
     <RequisitionsPanel onCreateVacancy={() => router.push("/ats/vacancies/new")} />
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((vacancy) => <Card level={2} key={vacancy.id} className="overflow-hidden"><VacancyImage imageUrl={vacancy.imageUrl} title={vacancy.title} /><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{vacancy.title}</CardTitle><Badge variant="secondary">{vacancy.status ?? "PAUSED"}</Badge></div></CardHeader><CardContent className="space-y-3 text-sm text-text-secondary"><p>{vacancy.department || t("vacancies.noArea")} · {vacancy.workMode ?? t("vacancies.noWorkMode")}</p><p>{vacancy.locations?.map((item) => item.branch.name).join(", ") || [vacancy.city, vacancy.country].filter(Boolean).join(", ") || t("vacancies.noLocation")}</p>{vacancy.requisition ? <p className="rounded-lg bg-surface-section px-3 py-2"><ClipboardCheck className="mr-2 inline size-4" />{vacancy.requisition.title}</p> : null}<div className="flex flex-wrap gap-2 pt-2">{vacancy.status === "ARCHIVED" ? <Button size="sm" variant="secondary" onClick={() => restore.mutate(vacancy)} disabled={restore.isPending}><RotateCcw className="size-4" />{t("vacancies.restore")}</Button> : <><Button size="sm" variant="secondary" asChild><Link href={`/ats/vacancies/${vacancy.id}/edit`}><Pencil className="size-4" />{t("actions.edit")}</Link></Button><Button size="sm" variant="secondary" onClick={() => clone.mutate(vacancy.id)} disabled={clone.isPending}><Copy className="size-4" />{t("vacancies.clone")}</Button><Button size="sm" variant="ghost" onClick={() => setArchiveTarget(vacancy)}><Archive className="size-4" />{t("vacancies.archive")}</Button></>}<Button size="sm" variant="ghost" onClick={() => setHistoryId(vacancy.id)}><History className="size-4" />{t("vacancies.history")}</Button></div></CardContent></Card>)}</section></> : null}
+    <VacancyList items={items} canCreate={can("jobs.create")} cloning={clone.isPending} restoring={restore.isPending} onClone={(id) => clone.mutate(id)} onRestore={(vacancy) => restore.mutate(vacancy)} onArchive={setArchiveTarget} onHistory={setHistoryId} /></> : null}
       {/*
         Los campos del paso 1 (sucursal, título, plazas, más detalles e imagen)
         estaban FUERA de `VacancyWizardSurface`, con `step === 0` como única
@@ -378,12 +379,183 @@ function TextArea({ label, value, onChange }: { label: string; value: string; on
 function Summary({ label, value }: { label: string; value?: string }) {
   const { t } = useLocale();
   return <div><dt className="text-xs text-text-secondary">{label}</dt><dd className="mt-1 font-medium">{value || t("vacancies.notReported")}</dd></div>; }
-function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) {
+/*
+ * `VacancyImage` (la cabecera de 16:7 con degradado) se eliminó al sustituir la
+ * cuadrícula de tarjetas por la lista: era su único consumidor. Sus tres claves
+ * de traducción —`vacancies.imageAltReal`, `vacancies.imageAltFallback` e
+ * `vacancies.illustrativeImage`— se conservan en los catálogos porque el portal
+ * público de empleo sigue mostrando la imagen grande.
+ */
+
+/**
+ * Lista de vacantes.
+ *
+ * Antes era una cuadrícula de hasta tres columnas donde cada vacante ocupaba
+ * una tarjeta con una imagen de 16:7 arriba. Con quince vacantes, la pantalla
+ * eran quince fotografías y había que desplazarse tres veces para leer los
+ * títulos; la imagen es del portal de empleo, no un dato de trabajo.
+ *
+ * Ahora la imagen es una miniatura y la información se lee en columnas
+ * alineadas: en escritorio como una tabla, y por debajo de `md` como fichas,
+ * que es lo que `DataView` resuelve. Las acciones no cambian.
+ */
+function VacancyList({
+  items,
+  canCreate,
+  cloning,
+  restoring,
+  onClone,
+  onRestore,
+  onArchive,
+  onHistory,
+}: {
+  items: PublicVacancyDto[];
+  canCreate: boolean;
+  cloning: boolean;
+  restoring: boolean;
+  onClone: (id: string) => void;
+  onRestore: (vacancy: PublicVacancyDto) => void;
+  onArchive: (vacancy: PublicVacancyDto) => void;
+  onHistory: (id: string) => void;
+}) {
   const { t } = useLocale();
+
+  const columns: DataColumn<PublicVacancyDto>[] = [
+    {
+      key: "title",
+      header: t("vacancies.title"),
+      priority: "identity",
+      sortValue: (vacancy) => vacancy.title,
+      render: (vacancy) => (
+        <span className="flex min-w-0 items-center gap-3">
+          <VacancyThumb imageUrl={vacancy.imageUrl} title={vacancy.title} />
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-ink-1">{vacancy.title}</span>
+            {vacancy.requisition ? (
+              <span className="block truncate text-2xs text-ink-3">
+                <ClipboardCheck className="mr-1 inline size-3" aria-hidden="true" />
+                {vacancy.requisition.title}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: t("vacancies.statusLabel"),
+      priority: "primary",
+      sortValue: (vacancy) => vacancy.status ?? "PAUSED",
+      render: (vacancy) => {
+        const status = vacancy.status ?? "PAUSED";
+        return (
+          <StatusBadge
+            size="sm"
+            label={technicalLabel(status)}
+            tone={status === "PUBLISHED" ? "success" : status === "ARCHIVED" ? "neutral" : "progress"}
+          />
+        );
+      },
+    },
+    {
+      key: "area",
+      header: t("vacancies.department"),
+      priority: "secondary",
+      sortValue: (vacancy) => vacancy.department ?? "",
+      render: (vacancy) => (
+        <span className="truncate">
+          {vacancy.department || t("vacancies.noArea")} · {vacancy.workMode ?? t("vacancies.noWorkMode")}
+        </span>
+      ),
+    },
+    {
+      key: "location",
+      header: t("vacancies.city"),
+      priority: "secondary",
+      render: (vacancy) => (
+        <span className="truncate">
+          {vacancy.locations?.map((item) => item.branch.name).join(", ") ||
+            [vacancy.city, vacancy.country].filter(Boolean).join(", ") ||
+            t("vacancies.noLocation")}
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <DataView
+      rows={items}
+      columns={columns}
+      getKey={(vacancy) => vacancy.id}
+      caption={t("vacancies.list")}
+      emptyReason="no-records"
+      emptyAction={
+        canCreate ? (
+          <Button asChild>
+            <Link href="/ats/vacancies/new">
+              <Plus className="size-4" aria-hidden="true" />
+              {t("vacancies.new")}
+            </Link>
+          </Button>
+        ) : undefined
+      }
+      rowActions={(vacancy) => (
+        <span className="flex flex-wrap gap-1.5">
+          {vacancy.status === "ARCHIVED" ? (
+            <Button size="sm" variant="secondary" onClick={() => onRestore(vacancy)} disabled={restoring}>
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              {t("vacancies.restore")}
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" asChild>
+                <Link href={`/ats/vacancies/${vacancy.id}/edit`}>
+                  <Pencil className="size-3.5" aria-hidden="true" />
+                  {t("actions.edit")}
+                </Link>
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onClone(vacancy.id)} disabled={cloning}>
+                <Copy className="size-3.5" aria-hidden="true" />
+                {t("vacancies.clone")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onArchive(vacancy)}>
+                <Archive className="size-3.5" aria-hidden="true" />
+                {t("vacancies.archive")}
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => onHistory(vacancy.id)}>
+            <History className="size-3.5" aria-hidden="true" />
+            {t("vacancies.history")}
+          </Button>
+        </span>
+      )}
+    />
+  );
+}
+
+/**
+ * Miniatura de la vacante.
+ *
+ * La imagen es decorativa aquí: el título ya está al lado en texto, así que
+ * lleva `alt=""` y no compite en el orden de lectura. La versión grande de
+ * `VacancyImage`, que sí es contenido, conserva su texto alternativo.
+ */
+function VacancyThumb({ imageUrl, title }: { imageUrl?: string | null; title: string }) {
   const [hasError, setHasError] = useState(false);
   const source = !imageUrl || hasError ? "/images/vacancies/operations-leadership-fallback.png" : imageUrl;
-  const alt = imageUrl
-    ? t("vacancies.imageAltReal", { title })
-    : t("vacancies.imageAltFallback", { title });
-  return <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-primary/15 via-surface-section to-info/15"><Image src={source} alt={alt} fill unoptimized className="object-cover" onError={() => setHasError(true)} /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-transparent" />{!imageUrl || hasError ? <span className="absolute bottom-3 left-3 rounded-full bg-slate-950/65 px-3 py-1 text-xs font-medium text-white">{t("vacancies.illustrativeImage")}</span> : null}</div>;
+  return (
+    <span className="relative block size-10 shrink-0 overflow-hidden rounded-md border border-line bg-surface-2">
+      <Image
+        src={source}
+        alt=""
+        title={title}
+        fill
+        unoptimized
+        sizes="40px"
+        className="object-cover"
+        onError={() => setHasError(true)}
+      />
+    </span>
+  );
 }

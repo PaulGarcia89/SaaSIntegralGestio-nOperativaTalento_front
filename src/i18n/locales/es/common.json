@@ -2006,4 +2006,6 @@
   ,"hiring.impact.agreedSalary": "Salario acordado"
   ,"hiring.impact.warnPendingDocs": "El expediente nacerá con {{count}} documento(s) sin aprobar."
   ,"hiring.impact.warnNoSalary": "La oferta no fija un salario, así que no quedará registrado."
+  ,"vacancies.statusLabel": "Estado"
+  ,"vacancies.locationLabel": "Ubicación"
 }

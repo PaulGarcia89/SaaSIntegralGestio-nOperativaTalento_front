@@ -2006,4 +2006,6 @@
   ,"hiring.impact.agreedSalary": "Agreed salary"
   ,"hiring.impact.warnPendingDocs": "The record will start with {{count}} unapproved document(s)."
   ,"hiring.impact.warnNoSalary": "The offer does not set a salary, so none will be recorded."
+  ,"vacancies.statusLabel": "Status"
+  ,"vacancies.locationLabel": "Location"
 }

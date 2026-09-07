@@ -79,3 +79,7 @@ export type { EntityCardProps, EntityFact } from "./entity-card";
    Ver `status-tile.tsx`. */
 export { StatusTile, StatusTileRow } from "./status-tile";
 export type { StatusTileProps } from "./status-tile";
+
+/* Contexto activo: empresa y sucursal sobre las que hablan las cifras.
+   Ver `active-context.tsx`. */
+export { ActiveContext } from "./active-context";

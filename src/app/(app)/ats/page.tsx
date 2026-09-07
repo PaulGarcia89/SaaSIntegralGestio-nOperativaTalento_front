@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowRight, Building2, Plus } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { MobileActionBar, TaskCard } from "@/components/simple/simple-ui";
 import {
+  ActiveContext,
   ErrorState,
   EmptyState,
   InlineNote,
@@ -395,16 +396,8 @@ export default function TodayPage() {
         }
       />
 
-      {/* ---- 0. Contexto activo -----------------------------------------
-          Las cifras de abajo cambian con la empresa y la sucursal elegidas.
-          Sin decirlo, la misma pantalla enseña números distintos y no hay
-          forma de saber por qué. */}
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
-        <Building2 className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
-        <span className="font-medium text-ink-1">{currentTenant.name}</span>
-        <span aria-hidden="true" className="text-ink-3">·</span>
-        <span>{currentBranch?.name ?? "Todas las sucursales"}</span>
-      </p>
+      {/* ---- 0. Contexto activo ---------------------------------------- */}
+      <ActiveContext />
 
       {/* ---- 1. Lo siguiente ------------------------------------------- */}
       {dashboard.isLoading ? (

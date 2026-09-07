@@ -3,15 +3,26 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { HiringCaseHeader, initials, longDate } from "@/components/hiring/hiring-case-header";
-import { HiringQueueMetrics } from "@/components/hiring/hiring-queue-metrics";
+import { FormSelect } from "@/components/ui/form-select";
+import {
+  ActiveContext,
+  EmptyState,
+  EntityCard,
+  EntityCardList,
+  ErrorState,
+  FilterBar,
+  InlineNote,
+  NextAction,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+  StatusTile,
+  StatusTileRow,
+} from "@/components/system";
+import { HiringCaseHeader, longDate } from "@/components/hiring/hiring-case-header";
 import { HiringSecondaryDetails } from "@/components/hiring/hiring-details";
 import {
   CancelledPanel,
@@ -27,6 +38,7 @@ import type { HiringContractDto } from "@/lib/contracts";
 import {
   HIRING_GUIDED_QUEUE_ENABLED,
   HIRING_STAGES,
+  hiringDeadlineState,
   hiringPriorityLabel,
   hiringStageIndex,
   hiringStatusLabel,
@@ -50,170 +62,405 @@ const VIEWS: Array<[HiringListView, string]> = [
   ["COMPLETED", "hiring.metrics.completed"],
 ];
 
-/* ================================ Lista ================================= */
+/** Valor de «sin filtrar» en los selectores. Radix no admite cadena vacía. */
+const TODOS = "ALL";
 
-function HiringCaseCard({ item }: { item: HiringContractDto }) {
+/* ============================ Panel del módulo ========================== */
+
+/**
+ * Contratación abre en su panel.
+ *
+ * Antes abría en una bandeja: seis cifras arriba, traídas por una consulta
+ * propia que repetía la que ya hacía la lista, y debajo todas las
+ * contrataciones en tarjetas del mismo peso. Para saber por dónde empezar
+ * había que leerlas todas, y las cifras y las tarjetas podían discrepar
+ * porque venían de dos peticiones distintas.
+ *
+ * Ahora responde en el orden en que se pregunta:
+ *
+ *   1. ¿Dónde estoy?            empresa y sucursal activas
+ *   2. ¿Qué hago ahora?         una acción, la más urgente
+ *   3. ¿Cómo va el módulo?      cuatro cifras con su acción
+ *   4. ¿Qué está atrasado?      aviso de fuera de plazo, solo si lo hay
+ *   5. ¿En qué punto está todo? reparto por etapa
+ *   6. ¿Y el detalle?           la lista, con sus filtros
+ *
+ * Todo sale de la MISMA consulta. Cuando no hay búsqueda escrita, la clave de
+ * las cifras y la de la lista coinciden y React Query hace una sola petición.
+ */
+function HiringModuleDashboard() {
   const { locale, t } = useLocale();
-  const state = resolveHiringCase(item);
-  const stage = HIRING_STAGES[state.stageIndex];
-  const firstName = item.candidate.fullName.split(" ")[0] || "la persona";
-  return (
-    <Card level={2}>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex items-start gap-4">
-          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-semibold text-text-primary">
-            {initials(item.candidate.fullName)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-text-primary">
-              <Link href={`/hiring/${item.id}`} className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-                {item.candidate.fullName}
-              </Link>
-            </h3>
-            <p className="mt-1 text-base text-text-primary">{item.roleTitle ?? item.vacancy.title}</p>
-            <p className="mt-1 text-base text-text-secondary">{item.vacancy.tenant?.name ?? t("hiring.activeCompany")} · {item.branch.name}</p>
-          </div>
-          <Badge variant={state.completed ? "success" : state.cancelled ? "destructive" : state.blockers.length ? "warning" : "secondary"} className="text-sm">
-            {hiringStatusLabel(item.status, locale)}
-          </Badge>
-        </div>
-
-        <dl className="grid gap-3 border-t border-border-default pt-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-base text-text-secondary">{t("hiring.list.stage")}</dt>
-            <dd className="mt-0.5 text-base font-medium text-text-primary">{t("hiring.stepOfTitle", { step: stage.step, total: HIRING_STAGES.length, title: hiringStageTitle(stage.id, locale) })}</dd>
-          </div>
-          <div>
-            <dt className="text-base text-text-secondary">{t("hiring.list.whatNext")}</dt>
-            <dd className="mt-0.5 text-base font-medium text-text-primary">{state.primaryAction.label}</dd>
-          </div>
-          <div>
-            <dt className="text-base text-text-secondary">{t("hiring.list.whoActs")}</dt>
-            <dd className="mt-0.5 text-base text-text-primary">{hiringWaitingLabel(state.waitingOn, firstName)}</dd>
-          </div>
-          <div>
-            <dt className="text-base text-text-secondary">{t("hiring.list.deadline")}</dt>
-            <dd className="mt-0.5 text-base text-text-primary">{longDate(item.deadlineAt) ?? t("hiring.header.noDeadline")}</dd>
-          </div>
-        </dl>
-
-        <Button asChild size="lg" className="w-full sm:w-auto">
-          <Link href={`/hiring/${item.id}`}>
-            Abrir contratación de {firstName}
-            <ArrowRight className="size-5" aria-hidden="true" />
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function HiringContractListContent() {
-  const { locale, t } = useLocale();
+  const { can, tenantBranches } = useAppStore();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<HiringListView>(HIRING_GUIDED_QUEUE_ENABLED ? "ATTENTION" : "ALL");
-  const [status, setStatus] = useState("");
-  const [branch, setBranch] = useState("");
-  const [priority, setPriority] = useState("");
-  const { can } = useAppStore();
-  const query = useQuery({ queryKey: ["hiring-contracts", search], queryFn: () => fetchHiringContracts({ search: search || undefined }), enabled: can("applications.view") });
+  const [status, setStatus] = useState(TODOS);
+  const [branch, setBranch] = useState(TODOS);
+  const [priority, setPriority] = useState(TODOS);
+  const allowed = can("applications.view");
 
-  const all = useMemo(() => query.data?.data ?? [], [query.data]);
-  const items = useMemo(() => all
-    .filter((item) => hiringViewMatches(item, view) && (!status || item.status === status) && (!branch || item.branchId === branch) && (!priority || item.priority === priority))
-    .sort((left, right) => {
-      const weight = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 } as Record<string, number>;
-      const overdue = (item: HiringContractDto) => (item.deadlineAt && new Date(item.deadlineAt).getTime() < Date.now() ? 1 : 0);
-      return overdue(right) - overdue(left) || (weight[right.priority ?? ""] ?? 0) - (weight[left.priority ?? ""] ?? 0) || new Date(left.deadlineAt ?? "9999-12-31").getTime() - new Date(right.deadlineAt ?? "9999-12-31").getTime();
-    }), [all, branch, priority, status, view]);
+  // Cifras del módulo: siempre sin búsqueda. Un panel que cambia sus totales
+  // al escribir en el buscador deja de ser el estado del módulo.
+  const panel = useQuery({
+    queryKey: ["hiring-contracts", ""],
+    queryFn: () => fetchHiringContracts(),
+    enabled: allowed,
+  });
 
-  const statuses = [...new Set(all.map((item) => item.status))];
-  const branches = [...new Map(all.map((item) => [item.branchId, item.branch])).values()];
-  const selectClass = "min-h-11 w-full rounded-xl border border-border-default bg-surface-elevated px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
+  // Lista operativa. Con el buscador vacío es exactamente la consulta de
+  // arriba, así que no hay segunda petición.
+  const lista = useQuery({
+    queryKey: ["hiring-contracts", search],
+    queryFn: () => fetchHiringContracts({ search: search || undefined }),
+    enabled: allowed,
+  });
+
+  const todas = useMemo(() => panel.data?.data ?? [], [panel.data]);
+  const encontradas = useMemo(() => lista.data?.data ?? [], [lista.data]);
+
+  const items = useMemo(
+    () =>
+      encontradas
+        .filter(
+          (item) =>
+            hiringViewMatches(item, view) &&
+            (status === TODOS || item.status === status) &&
+            (branch === TODOS || item.branchId === branch) &&
+            (priority === TODOS || item.priority === priority),
+        )
+        .sort(porUrgencia),
+    [branch, encontradas, priority, status, view],
+  );
+
+  const cuenta = (vista: HiringListView) => todas.filter((item) => hiringViewMatches(item, vista)).length;
+  const fueraDePlazo = todas.filter((item) => hiringDeadlineState(item.deadlineAt) === "OVERDUE").length;
+  const vencenPronto = todas.filter((item) => hiringDeadlineState(item.deadlineAt) === "DUE_SOON").length;
+
+  // Las cifras se cuentan sobre lo que el servidor devolvió. Si hay más de una
+  // página, decirlo es obligatorio: un total parcial presentado como total
+  // engaña más que no enseñarlo.
+  const parcial = Boolean(panel.data && panel.data.meta.total > todas.length);
+
+  /** `undefined` mientras carga, `null` si el servidor no responde. */
+  const cifra = (valor: number) => (panel.isError ? null : panel.data ? valor : undefined);
+
+  const tarjetas = [
+    {
+      title: t("hiring.metrics.yours"),
+      value: cifra(cuenta("ATTENTION")),
+      context: t("hiring.panel.yoursContext"),
+      status:
+        cuenta("ATTENTION") > 0 && panel.data
+          ? { label: t("hiring.panel.needsYou"), tone: "warning" as const }
+          : undefined,
+    },
+    {
+      title: t("hiring.metrics.waiting"),
+      value: cifra(cuenta("WAITING")),
+      context: t("hiring.panel.waitingContext"),
+    },
+    {
+      title: t("hiring.metrics.ready"),
+      value: cifra(cuenta("READY")),
+      context: t("hiring.panel.readyContext"),
+      status:
+        cuenta("READY") > 0 && panel.data
+          ? { label: t("hiring.panel.canFinish"), tone: "success" as const }
+          : undefined,
+    },
+    {
+      title: t("hiring.metrics.overdue"),
+      value: cifra(fueraDePlazo),
+      context: t("hiring.panel.overdueContext"),
+      status:
+        fueraDePlazo > 0 && panel.data
+          ? { label: t("hiring.panel.late"), tone: "danger" as const }
+          : undefined,
+    },
+  ];
+
+  // El primero de la cola de «te toca a ti», ya ordenado por urgencia.
+  const siguiente = todas.filter((item) => hiringViewMatches(item, "ATTENTION")).sort(porUrgencia)[0];
+
+  const reparto = HIRING_STAGES.map((etapa) => ({
+    id: etapa.id,
+    title: hiringStageTitle(etapa.id, locale),
+    total: todas.filter((item) => resolveHiringCase(item).stage === etapa.id && !resolveHiringCase(item).cancelled).length,
+  }));
+  const maximo = Math.max(1, ...reparto.map((etapa) => etapa.total));
+
+  const filtrosActivos = [status, branch, priority].filter((valor) => valor !== TODOS).length;
+  const estados = [...new Set(todas.map((item) => item.status))];
+
+  if (!allowed) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow={t("hiring.list.eyebrow")} title={t("hiring.list.title")} />
+        <EmptyState reason="no-records" title={t("hiring.panel.noAccessTitle")} description={t("hiring.panel.noAccessHelp")} />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6 pb-4">
       <PageHeader
         eyebrow={t("hiring.list.eyebrow")}
         title={t("hiring.list.title")}
         description={t("hiring.list.description")}
-        actions={<Button asChild variant="secondary"><Link href="/ats/candidates">{t("hiring.list.seeCandidates")}</Link></Button>}
+        actions={
+          <Button asChild variant="secondary">
+            <Link href="/ats/candidates">{t("hiring.list.seeCandidates")}</Link>
+          </Button>
+        }
       />
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t("hiring.list.viewsAria")}>
-        {VIEWS.map(([id, labelKey]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`hiring-tab-${id}`}
-            aria-selected={view === id}
-            aria-controls="hiring-tabpanel"
-            tabIndex={view === id ? 0 : -1}
-            onClick={() => setView(id)}
-            className={`min-h-11 rounded-full border px-4 text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${view === id ? "border-primary bg-primary text-text-on-accent" : "border-border-default bg-surface-elevated text-text-primary"}`}
-          >
-            {t(labelKey)}
-          </button>
+      <ActiveContext />
+
+      {/* ---- 1. Qué hago ahora ------------------------------------------ */}
+      {panel.isLoading ? (
+        <SkeletonRows rows={3} label={t("hiring.list.loading")} />
+      ) : panel.isError ? (
+        <ErrorState title={t("hiring.list.error")} onRetry={() => void panel.refetch()} />
+      ) : siguiente ? (
+        <NextAction
+          label={t("hiring.panel.nextLabel")}
+          title={t("hiring.panel.openFor", { name: siguiente.candidate.fullName })}
+          detail={[
+            resolveHiringCase(siguiente, undefined, locale).primaryAction.label,
+            longDate(siguiente.deadlineAt) ?? undefined,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          href={`/hiring/${siguiente.id}`}
+          actionLabel={t("common.open")}
+          tone={hiringDeadlineState(siguiente.deadlineAt) === "OVERDUE" ? "danger" : "progress"}
+        />
+      ) : (
+        <EmptyState
+          reason="no-records"
+          title={t("hiring.panel.nothingPendingTitle")}
+          description={t("hiring.panel.nothingPendingHelp")}
+        />
+      )}
+
+      {/* ---- 2. Cómo va el módulo --------------------------------------- */}
+      <StatusTileRow label={t("hiring.panel.tilesLabel")}>
+        {tarjetas.map((tarjeta) => (
+          <li key={tarjeta.title} className="min-w-0">
+            <StatusTile {...tarjeta} />
+          </li>
         ))}
-      </div>
+      </StatusTileRow>
 
-      <Card level={2}>
-        <CardContent className="space-y-4 p-4">
-          <label className="block space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-search">
-            Buscar una contratación
-            <span className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
-              <Input id="hiring-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("hiring.list.searchPlaceholder")} className="pl-10 text-base" />
-            </span>
-          </label>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-filter-status">
-              Estado
-              <select id="hiring-filter-status" aria-label={t("hiring.list.filterStatus")} value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass}>
-                <option value="">{t("hiring.list.allM")}</option>
-                {statuses.map((value) => <option key={value} value={value}>{hiringStatusLabel(value, locale)}</option>)}
-              </select>
-            </label>
-            <label className="space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-filter-branch">
-              Sucursal
-              <select id="hiring-filter-branch" aria-label={t("hiring.list.filterBranch")} value={branch} onChange={(event) => setBranch(event.target.value)} className={selectClass}>
-                <option value="">{t("hiring.list.allF")}</option>
-                {branches.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
-              </select>
-            </label>
-            <label className="space-y-2 text-base font-medium text-text-primary" htmlFor="hiring-filter-priority">
-              Prioridad
-              <select id="hiring-filter-priority" aria-label={t("hiring.list.filterPriority")} value={priority} onChange={(event) => setPriority(event.target.value)} className={selectClass}>
-                <option value="">{t("hiring.list.allF")}</option>
-                {["URGENT", "HIGH", "MEDIUM", "LOW"].map((value) => <option key={value} value={value}>{hiringPriorityLabel(value)}</option>)}
-              </select>
-            </label>
+      {parcial ? (
+        <InlineNote tone="info" title={t("hiring.panel.partialTitle", { shown: todas.length, total: panel.data?.meta.total ?? 0 })}>
+          {t("hiring.panel.partialHelp")}
+        </InlineNote>
+      ) : null}
+
+      {vencenPronto > 0 ? (
+        <InlineNote tone="warning" title={t("hiring.metrics.dueSoon")}>
+          {t("hiring.panel.dueSoonHelp", { count: vencenPronto })}
+        </InlineNote>
+      ) : null}
+
+      {/* ---- 3. En qué etapa está cada una ------------------------------
+          Cinco etapas fijas: el reparto se lee de un vistazo y no compite con
+          las cifras de arriba, que son estados y no etapas. */}
+      <PageSection title={t("hiring.panel.stagesTitle")} description={t("hiring.panel.stagesHelp")} id="etapas">
+        <ul className="space-y-1">
+          {reparto.map((etapa) => (
+            <li
+              key={etapa.id}
+              className="flex items-center gap-4 rounded-lg border border-line bg-surface-1 px-4 py-3"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-1">{etapa.title}</span>
+              <span aria-hidden="true" className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 xs:block lg:w-40">
+                <span
+                  className="block h-full rounded-full bg-accent-fill"
+                  style={{ width: `${Math.round((etapa.total / maximo) * 100)}%` }}
+                />
+              </span>
+              <span className="w-12 shrink-0 text-right font-mono text-lg font-semibold tabular-figures text-ink-1">
+                {etapa.total}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </PageSection>
+
+      {/* ---- 4. La lista, con sus filtros ------------------------------- */}
+      <PageSection title={t("hiring.panel.listTitle")} id="contrataciones">
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label={t("hiring.list.viewsAria")}>
+            {VIEWS.map(([id, labelKey]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`hiring-tab-${id}`}
+                aria-selected={view === id}
+                aria-controls="hiring-tabpanel"
+                tabIndex={view === id ? 0 : -1}
+                onClick={() => setView(id)}
+                className={`min-h-[var(--control-h-touch)] rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus sm:min-h-[var(--control-h-base)] ${
+                  view === id
+                    ? "border-action bg-action text-on-action"
+                    : "border-line-control bg-surface-1 text-ink-1 hover:border-line-strong hover:bg-surface-2"
+                }`}
+              >
+                {t(labelKey)}
+              </button>
+            ))}
           </div>
-        </CardContent>
-      </Card>
 
-      <div id="hiring-tabpanel" role="tabpanel" aria-labelledby={`hiring-tab-${view}`} tabIndex={-1} className="space-y-4">
-        {query.isLoading ? <AsyncState state="loading" title={t("hiring.list.loading")} /> : null}
-        {query.isError ? <AsyncState state="error" title={t("hiring.list.error")} onRetry={() => void query.refetch()} /> : null}
-        {query.isSuccess && !items.length ? (
-          <InlineFeedback tone="info" title={t("hiring.list.empty")}>
-            Prueba con otra pestaña o quita los filtros. Las contrataciones aparecen aquí cuando una postulación es aprobada.
-          </InlineFeedback>
-        ) : null}
-        {items.map((item) => <HiringCaseCard key={item.id} item={item} />)}
-      </div>
+          <FilterBar
+            search={search}
+            onSearchChange={setSearch}
+            searchLabel={t("hiring.list.searchPlaceholder")}
+            activeCount={filtrosActivos}
+            onClear={() => {
+              setStatus(TODOS);
+              setBranch(TODOS);
+              setPriority(TODOS);
+            }}
+          >
+            <FormSelect
+              aria-label={t("hiring.list.filterStatus")}
+              value={status}
+              onValueChange={setStatus}
+              options={[
+                { value: TODOS, label: t("hiring.list.allM") },
+                ...estados.map((valor) => ({ value: valor, label: hiringStatusLabel(valor, locale) })),
+              ]}
+            />
+            <FormSelect
+              aria-label={t("hiring.list.filterBranch")}
+              value={branch}
+              onValueChange={setBranch}
+              options={[
+                { value: TODOS, label: t("common.allBranches") },
+                ...tenantBranches.map((sucursal) => ({ value: sucursal.id, label: sucursal.name })),
+              ]}
+            />
+            <FormSelect
+              aria-label={t("hiring.list.filterPriority")}
+              value={priority}
+              onValueChange={setPriority}
+              options={[
+                { value: TODOS, label: t("hiring.list.allF") },
+                ...["URGENT", "HIGH", "MEDIUM", "LOW"].map((valor) => ({
+                  value: valor,
+                  label: hiringPriorityLabel(valor, locale),
+                })),
+              ]}
+            />
+          </FilterBar>
+
+          <div id="hiring-tabpanel" role="tabpanel" aria-labelledby={`hiring-tab-${view}`} tabIndex={-1}>
+            {lista.isLoading ? <SkeletonRows rows={4} label={t("hiring.list.loading")} /> : null}
+            {lista.isError ? <ErrorState title={t("hiring.list.error")} onRetry={() => void lista.refetch()} /> : null}
+            {lista.isSuccess && !items.length ? (
+              <EmptyState
+                reason={search || filtrosActivos > 0 || view !== "ALL" ? "no-matches" : "no-records"}
+                title={t("hiring.list.empty")}
+                description={t("hiring.panel.emptyHelp")}
+                onClearFilters={
+                  filtrosActivos > 0 || search
+                    ? () => {
+                        setStatus(TODOS);
+                        setBranch(TODOS);
+                        setPriority(TODOS);
+                        setSearch("");
+                      }
+                    : undefined
+                }
+              />
+            ) : null}
+            {items.length ? (
+              <EntityCardList label={t("hiring.panel.listTitle")} columns={2}>
+                {items.map((item) => (
+                  <HiringCaseCard key={item.id} item={item} />
+                ))}
+              </EntityCardList>
+            ) : null}
+          </div>
+        </div>
+      </PageSection>
     </div>
   );
 }
 
-export function HiringContractListPage() {
+/** Fuera de plazo primero, luego prioridad, luego la fecha límite más cercana. */
+function porUrgencia(left: HiringContractDto, right: HiringContractDto) {
+  const peso = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 } as Record<string, number>;
+  const vencido = (item: HiringContractDto) =>
+    item.deadlineAt && new Date(item.deadlineAt).getTime() < Date.now() ? 1 : 0;
   return (
-    <div className="space-y-5">
-      <HiringQueueMetrics />
-      <HiringContractListContent />
-    </div>
+    vencido(right) - vencido(left) ||
+    (peso[right.priority ?? ""] ?? 0) - (peso[left.priority ?? ""] ?? 0) ||
+    new Date(left.deadlineAt ?? "9999-12-31").getTime() - new Date(right.deadlineAt ?? "9999-12-31").getTime()
   );
+}
+
+/**
+ * Ficha de una contratación.
+ *
+ * Tres datos y un próximo paso. Antes eran cuatro pares etiqueta/valor en una
+ * `<dl>` de dos columnas más un botón de ancho completo: la misma información
+ * ocupando el doble y sin nada que destacara.
+ */
+function HiringCaseCard({ item }: { item: HiringContractDto }) {
+  const { locale, t } = useLocale();
+  const state = resolveHiringCase(item, undefined, locale);
+  const stage = HIRING_STAGES[state.stageIndex];
+  const nombre = item.candidate.fullName.split(" ")[0] || item.candidate.fullName;
+  const plazo = hiringDeadlineState(item.deadlineAt);
+
+  return (
+    <EntityCard
+      title={item.candidate.fullName}
+      subtitle={`${item.roleTitle ?? item.vacancy.title} · ${item.branch.name}`}
+      avatarName={item.candidate.fullName}
+      href={`/hiring/${item.id}`}
+      status={{
+        label: hiringStatusLabel(item.status, locale),
+        tone: state.completed
+          ? "success"
+          : state.cancelled
+            ? "neutral"
+            : state.blockers.length
+              ? "warning"
+              : "progress",
+      }}
+      facts={[
+        {
+          label: t("hiring.list.stage"),
+          value: t("hiring.stepOfTitle", {
+            step: stage.step,
+            total: HIRING_STAGES.length,
+            title: hiringStageTitle(stage.id, locale),
+          }),
+        },
+        { label: t("hiring.list.whoActs"), value: hiringWaitingLabel(state.waitingOn, nombre, locale) },
+        {
+          label: t("hiring.list.deadline"),
+          value: plazo === "OVERDUE"
+            ? `${longDate(item.deadlineAt)} · ${t("hiring.metrics.overdue")}`
+            : (longDate(item.deadlineAt) ?? t("hiring.header.noDeadline")),
+        },
+      ]}
+      progress={{
+        label: t("common.progress"),
+        value: state.progressPercent,
+        detail: t("hiring.panel.stageOf", { step: stage.step, total: HIRING_STAGES.length }),
+      }}
+      nextStep={state.primaryAction.label}
+    />
+  );
+}
+
+export function HiringContractListPage() {
+  return <HiringModuleDashboard />;
 }
 
 /* =============================== Detalle ================================ */

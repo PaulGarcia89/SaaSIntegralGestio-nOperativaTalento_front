@@ -1,20 +1,99 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AlertCircle, CheckCircle2, Clock3, PackageX } from "lucide-react";
-import { AsyncState } from "@/components/async-state";
-import { Badge } from "@/components/ui/badge";
+import { ErrorState, SkeletonRows, StatusBadge, type Tone } from "@/components/system";
 
-export function RestaurantQueryState({ loading, error, retry, children }: { loading: boolean; error: unknown; retry: () => void; children: ReactNode }) {
-  if (loading) return <AsyncState state="loading" />;
-  if (error) return <AsyncState state="error" onRetry={retry} description="No fue posible cargar la información. Intenta nuevamente." />;
+/**
+ * Estado de una consulta del módulo de restaurante.
+ *
+ * Pasa a las siluetas del sistema: un spinner centrado ocupa una altura fija y
+ * provoca un salto de maqueta cuando llega el contenido real, que casi siempre
+ * es más alto.
+ */
+export function RestaurantQueryState({
+  loading,
+  error,
+  retry,
+  children,
+  label = "Cargando información",
+}: {
+  loading: boolean;
+  error: unknown;
+  retry: () => void;
+  children: ReactNode;
+  label?: string;
+}) {
+  if (loading) return <SkeletonRows rows={5} label={label} />;
+  if (error) {
+    return (
+      <ErrorState
+        title="No fue posible cargar la información"
+        detail="Conservamos tu contexto. Reintenta la consulta para continuar."
+        onRetry={retry}
+      />
+    );
+  }
   return <>{children}</>;
 }
 
-export function RestaurantStatusBadge({ status }: { status: string }) {
+/**
+ * Estados de los documentos de inventario, en lenguaje de persona.
+ *
+ * El mapa de rótulos se conserva íntegro: son los términos que la operación ya
+ * usa («Aplicado», «Esperando recepción», «Pendiente de aprobación»).
+ *
+ * Lo que cambia es el TONO. Antes «Aplicado», «Activo», «Aprobado» y «Recibido»
+ * salían con la variante de marca del tenant, que es el color que configura
+ * cada empresa: un final feliz se pintaba del color corporativo en vez de
+ * verde, y en una empresa con marca roja se leía como un problema. Ahora el
+ * tono lo decide el significado.
+ */
+const LABELS: Record<string, string> = {
+  CONFIRMED: "Aplicado",
+  ACTIVE: "Activo",
+  AVAILABLE: "Disponible",
+  APPROVED: "Aprobado",
+  DRAFT: "Pendiente de confirmación",
+  PENDING: "Pendiente",
+  IN_PROGRESS: "En progreso",
+  IN_REVIEW: "Pendiente de aprobación",
+  REVIEW: "Pendiente de aprobación",
+  SENT: "Esperando recepción",
+  IN_TRANSIT: "En tránsito",
+  RECEIVED: "Recibido",
+  CANCELLED: "Cancelado",
+  ARCHIVED: "Archivado",
+  DEPLETED: "Agotado",
+  INACTIVE: "Inactivo",
+  UNKNOWN: "Sin estado",
+  EXPIRED: "Vencido",
+  BLOCKED: "Bloqueado",
+};
+
+/** Terminado y bien. */
+const DONE = new Set(["CONFIRMED", "ACTIVE", "AVAILABLE", "APPROVED", "RECEIVED"]);
+/** En curso: nadie tiene que alarmarse, pero tampoco está cerrado. */
+const IN_FLIGHT = new Set(["DRAFT", "PENDING", "IN_PROGRESS", "IN_REVIEW", "REVIEW", "SENT", "IN_TRANSIT"]);
+/** Terminado sin efecto. Neutro: ni éxito ni problema. */
+const CLOSED = new Set(["CANCELLED", "ARCHIVED", "DEPLETED", "INACTIVE", "UNKNOWN"]);
+/** Exige actuar. */
+const NEEDS_ACTION = new Set(["EXPIRED", "BLOCKED"]);
+
+export function restaurantStatusTone(status: string): Tone {
   const normalized = status.toUpperCase();
-  const labels: Record<string, string> = { CONFIRMED: "Aplicado", ACTIVE: "Activo", AVAILABLE: "Disponible", APPROVED: "Aprobado", DRAFT: "Pendiente de confirmación", PENDING: "Pendiente", IN_PROGRESS: "En progreso", IN_REVIEW: "Pendiente de aprobación", REVIEW: "Pendiente de aprobación", SENT: "Esperando recepción", IN_TRANSIT: "En tránsito", RECEIVED: "Recibido", CANCELLED: "Cancelado", ARCHIVED: "Archivado", DEPLETED: "Agotado", INACTIVE: "Inactivo", UNKNOWN: "Sin estado", EXPIRED: "Vencido", BLOCKED: "Bloqueado" };
-  const config = normalized === "CONFIRMED" || normalized === "ACTIVE" || normalized === "AVAILABLE" || normalized === "APPROVED" || normalized === "RECEIVED" ? { label: labels[normalized], icon: CheckCircle2, variant: "default" as const } : normalized === "DRAFT" || normalized === "PENDING" || normalized === "IN_PROGRESS" || normalized === "IN_REVIEW" || normalized === "REVIEW" || normalized === "SENT" || normalized === "IN_TRANSIT" ? { label: labels[normalized], icon: Clock3, variant: "secondary" as const } : normalized === "CANCELLED" || normalized === "ARCHIVED" || normalized === "DEPLETED" ? { label: labels[normalized], icon: PackageX, variant: "outline" as const } : normalized === "INACTIVE" || normalized === "UNKNOWN" ? { label: labels[normalized], icon: AlertCircle, variant: "secondary" as const } : normalized === "EXPIRED" || normalized === "BLOCKED" ? { label: labels[normalized], icon: AlertCircle, variant: "destructive" as const } : { label: status, icon: AlertCircle, variant: "destructive" as const };
-  const Icon = config.icon;
-  return <Badge variant={config.variant}><Icon className="mr-1 size-3" />{config.label}</Badge>;
+  if (DONE.has(normalized)) return "success";
+  if (IN_FLIGHT.has(normalized)) return "progress";
+  if (CLOSED.has(normalized)) return "neutral";
+  if (NEEDS_ACTION.has(normalized)) return "danger";
+  // Un estado que el frontend no conoce no es un error del usuario: se muestra
+  // tal cual y en neutro, en vez de pintarlo de rojo como hacía antes.
+  return "neutral";
+}
+
+export function restaurantStatusLabel(status: string): string {
+  return LABELS[status.toUpperCase()] ?? status;
+}
+
+export function RestaurantStatusBadge({ status, size = "md" }: { status: string; size?: "sm" | "md" }) {
+  return <StatusBadge size={size} label={restaurantStatusLabel(status)} tone={restaurantStatusTone(status)} />;
 }

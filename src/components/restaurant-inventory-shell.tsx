@@ -15,7 +15,8 @@ import {
 import { useAppStore } from "@/store/app-store";
 import { ModuleRouteGuard } from "@/components/module-route-guard";
 import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { InlineFeedback } from "@/components/design-system";
+import { PageHeader } from "@/components/system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,24 +61,65 @@ function RestaurantInventoryInner() {
   const { warehouseId, warehouseName, compactMode } = useRestaurantInventoryContext();
   const visibleTasks = taskGroups.map((task) => ({ ...task, items: task.items.filter((item) => can(item.permission)) })).filter((task) => task.items.length);
   const activeTask = visibleTasks.find((task) => task.items.some((item) => item.key === section))?.key ?? "overview";
-  const [selectedTask, setSelectedTask] = useState(activeTask);
-  const effectiveTask = visibleTasks.some((item) => item.key === selectedTask && (section === "dashboard" ? item.key === "overview" : item.items.some((child) => child.key === section))) ? selectedTask : activeTask;
-  const task = visibleTasks.find((item) => item.key === effectiveTask) ?? visibleTasks[0];
+  const task = visibleTasks.find((item) => item.key === activeTask) ?? visibleTasks[0];
+  const currentItem = task?.items.find((item) => item.key === section);
   return <div className={compactMode ? "space-y-4 text-sm" : "space-y-6"} data-compact={compactMode ? "true" : "false"}>
-    <PageHeader eyebrow={task?.label ?? "Operaciones"} title="Inventario de restaurante" description="Ingredientes, recetas y movimientos con trazabilidad de backend." />
-    <nav aria-label="Tareas de inventario de restaurante">
-      <label className="sr-only" htmlFor="inventory-task-mobile">Sección de inventario</label>
-      <select id="inventory-task-mobile" className="h-11 w-full rounded-2xl border border-border-default bg-surface-elevated px-3 md:hidden" value={effectiveTask} onChange={(event) => setSelectedTask(event.target.value)}>
-        {visibleTasks.map((item) => <option key={item.key} value={item.key}>{item.label} · {item.description}</option>)}
-      </select>
-      <div className="hidden gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 md:grid">
-        {visibleTasks.map((item) => <button key={item.key} type="button" onClick={() => setSelectedTask(item.key)} className={`min-h-14 rounded-2xl border px-4 py-3 text-left transition ${effectiveTask === item.key ? "border-primary bg-primary/10 shadow-sm" : "border-border-default bg-surface-elevated hover:border-primary/40"}`}><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-xs text-text-secondary">{item.description}</span></button>)}
-      </div>
-    </nav>
-    {task ? <section className={`space-y-3 rounded-2xl border bg-surface-elevated p-4 ${task.key === "daily" ? "border-primary/40" : task.key === "control" ? "border-warning/40" : task.key === "configuration" ? "border-success/40" : "border-border-default"}`} aria-labelledby="inventory-area-title"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">Área activa</p><h2 id="inventory-area-title" className="mt-1 font-semibold">{task.label}</h2><p className="mt-1 text-sm text-text-secondary">{task.description}. Los accesos de otras áreas permanecen fuera de este flujo.</p></div><nav className="flex flex-wrap gap-2" aria-label={`Accesos de ${task.label}`}>{task.items.map((item) => <Button key={item.key} asChild size="sm" className="min-h-10" variant={section === item.key ? "default" : "secondary"}><Link href={item.href}>{item.label}</Link></Button>)}</nav></section> : null}
+    {/*
+      Una sola capa de navegación dentro de la página.
+
+      Antes había tres apiladas antes del contenido: una cuadrícula de seis
+      botones para elegir «área», debajo una sección «Área activa» que repetía
+      el nombre y la descripción de esa área, y dentro de ella otra fila de
+      botones con las pantallas. Y encima, la barra lateral ya lleva estas
+      mismas rutas agrupadas por intención desde el rediseño de navegación.
+
+      Queda lo único que la barra lateral no da: saltar entre las pantallas
+      HERMANAS del área en la que ya estás. El área la decide la ruta, no un
+      selector: elegir un área sin ir a ninguna de sus pantallas no hacía nada.
+
+      El filtro por permiso (`can(item.permission)`) se conserva intacto.
+    */}
+    <PageHeader
+      eyebrow={task?.label ?? "Inventario de restaurante"}
+      title={currentItem?.label ?? "Inventario de restaurante"}
+      description={task?.description}
+      meta={
+        <>
+          <span>{currentBranch?.name ?? "Sin sucursal"}</span>
+          <span>Almacén: {warehouseName}</span>
+        </>
+      }
+    />
+
+    {task && task.items.length > 1 ? (
+      <nav aria-label={`Pantallas de ${task.label}`}>
+        <ul className="flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {task.items.map((item) => {
+            const active = section === item.key;
+            return (
+              <li key={item.key} className="shrink-0">
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center whitespace-nowrap rounded-md border px-3 text-sm transition-colors ${
+                    active
+                      ? "border-accent-line/50 bg-accent-fill/10 font-medium text-ink-1"
+                      : "border-line bg-surface-1 text-ink-2 hover:border-line-strong hover:text-ink-1"
+                  }`}
+                  style={{ minHeight: "var(--control-h-base)" }}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    ) : null}
+
     {section === "dashboard" ? <RestaurantInventoryQuickStart canAny={canAny} /> : null}
     <RestaurantInventoryContextBar />
-    <Card level={1}><CardContent className="flex flex-wrap gap-4 p-4 text-sm text-text-secondary"><span>Empresa: contexto actual</span><span>Sucursal: {currentBranch?.name ?? "Sin sucursal"}</span><span>Almacén: {warehouseName}</span><span>Stock y costos: fuente de verdad del backend</span></CardContent></Card>
+
     {section === "dashboard" ? <RestaurantDecisionDashboard /> : null}
     {section === "ingredients" ? <RestaurantInventoryCatalog kind="ingredients" /> : null}
     {section === "purchase-orders" ? <RestaurantPurchasingWorkspace initialView="orders" /> : null}
@@ -97,12 +139,12 @@ function RestaurantInventoryInner() {
     {section === "purchase-budget" ? <RestaurantCommercialIntelligenceWorkspace initialView="budget" /> : null}
     {section === "receipts" ? <RestaurantReceiptsScreen /> : null}
     {section === "recipes" ? <RestaurantRecipesWorkspace /> : null}
-    {section === "consumption" ? <RestaurantOperations section="consumption" warehouseId={warehouseId} /> : null}
-    {section === "waste" ? <RestaurantOperations section="waste" warehouseId={warehouseId} /> : null}
+    {section === "consumption" ? <RestaurantOperations section="consumption" warehouseId={warehouseId} warehouseName={warehouseName} /> : null}
+    {section === "waste" ? <RestaurantOperations section="waste" warehouseId={warehouseId} warehouseName={warehouseName} /> : null}
     {section === "stock" ? <RestaurantStockControlWorkspace view="stock" /> : null}
     {section === "movements" ? <RestaurantStockControlWorkspace view="movements" /> : null}
     {["lots", "stock-counts", "adjustments", "transfers"].includes(section) ? <RestaurantPhase2View section={section} /> : null}
-    {section === "production" ? <RestaurantOperations section="production" warehouseId={warehouseId} /> : null}
+    {section === "production" ? <RestaurantOperations section="production" warehouseId={warehouseId} warehouseName={warehouseName} /> : null}
     {section === "sales-import" ? <RestaurantSalesImport /> : null}
     {section === "settings" ? <RestaurantInventorySettings /> : null}
     {["reports", "analytics", "costs", "audit"].includes(section) ? <RestaurantReportsView section={section} /> : null}

@@ -27,7 +27,7 @@ type Option = { id: string; label: string; unitId?: string; purchaseUnitId?: str
 type Line = { ingredientId: string; unitId: string; quantity: string; wastePercentage: string };
 type Preview = Record<string, unknown> & { ingredients?: Array<Record<string, unknown>>; totalCost?: number };
 
-export function RestaurantOperations({ section, warehouseId }: { section: "recipes" | "consumption" | "waste" | "production"; warehouseId?: string }) {
+export function RestaurantOperations({ section, warehouseId, warehouseName }: { section: "recipes" | "consumption" | "waste" | "production"; warehouseId?: string; warehouseName?: string }) {
   const { currentBranch, can } = useAppStore();
   const canManage = can("restaurant_inventory.manage");
   const ingredients = useQuery({ queryKey: ["restaurant-ops-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) });
@@ -42,7 +42,7 @@ export function RestaurantOperations({ section, warehouseId }: { section: "recip
   const recipeOptions = (recipes.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; return { id: String(record.id), label: `${String(record.code ?? "")} · ${String(record.name ?? "")}` }; });
   if (section === "recipes") return <RecipesView canManage={canManage} ingredientOptions={ingredientOptions} unitOptions={unitOptions} />;
   if (section === "production") return <RestaurantProductionWorkflow branchId={currentBranch.id} warehouseId={warehouseId} recipeOptions={recipeOptions} canManage={canManage} />;
-  if (section === "waste") return <RestaurantWasteWorkflow branchId={currentBranch.id} warehouseId={warehouseId} ingredients={ingredientOptions} units={unitOptions} canManage={canManage} />;
+  if (section === "waste") return <RestaurantWasteWorkflow branchId={currentBranch.id} warehouseId={warehouseId} warehouseName={warehouseName} ingredients={ingredientOptions} units={unitOptions} canManage={canManage} />;
   return <DocumentOperationView section={section} canManage={canManage} branchId={currentBranch.id} warehouseId={warehouseId} ingredientOptions={ingredientOptions} unitOptions={unitOptions} recipeOptions={recipeOptions} />;
 }
 

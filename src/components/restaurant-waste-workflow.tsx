@@ -1,38 +1,466 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { confirmRestaurantWaste, createRestaurantWaste, fetchRestaurantWastes, getApiErrorMessage, previewRestaurantWaste } from "@/lib/backend";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
+import {
+  confirmRestaurantWaste,
+  createRestaurantWaste,
+  fetchRestaurantWastes,
+  getApiErrorMessage,
+  previewRestaurantWaste,
+} from "@/lib/backend";
+import {
+  ConfirmPanel,
+  ImpactReview,
+  InlineNote,
+  OperationResultView,
+  OperationStepper,
+  PageHeader,
+  PageSection,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppStore } from "@/store/app-store";
+import { cn } from "@/lib/utils";
+import {
+  formatMoney,
+  restaurantOperationImpact,
+} from "@/lib/restaurant-operation";
+import {
+  initialOperationState,
+  type OperationOutcome,
+  type OperationState,
+  type OperationStepId,
+} from "@/lib/operation-flow";
+
+/**
+ * Registro de merma, con el patrón universal de operaciones.
+ *
+ * Qué cambió
+ * ----------
+ * · La etapa de confirmación mostraba el IDENTIFICADOR del documento en un
+ *   distintivo: «Documento pendiente de confirmación · 7f3c1a…». Un
+ *   identificador de base de datos no le dice nada a quien registra una merma,
+ *   y el encargo pide estados comprensibles para personas, no códigos técnicos.
+ * · No se avisaba de que la operación es IRREVERSIBLE. Confirmar aplica la
+ *   salida al almacén y queda en la auditoría inmutable; revertirlo exige otra
+ *   operación en sentido contrario, que no es un «deshacer».
+ * · El resumen de impacto era una tabla de 580px de ancho mínimo dentro de un
+ *   `overflow-x-auto`: en un teléfono había que arrastrarla a ciegas.
+ * · Una existencia resultante negativa se mostraba como un número más. Ahora es
+ *   un BLOQUEO: sacar más de lo que hay dejaría el inventario mintiendo sobre
+ *   el almacén.
+ *
+ * El contrato del backend no cambia: se siguen usando previsualizar → crear
+ * borrador → confirmar, en ese orden.
+ */
 
 type WasteLine = { ingredientId: string; unitId: string; quantity: string };
 type Option = { id: string; label: string; unitId?: string };
-const reasons = ["Vencimiento", "Producto dañado", "Error de preparación", "Merma de producción", "Derrame", "Conteo físico", "Otro"];
 
-export function RestaurantWasteWorkflow({ branchId, warehouseId, ingredients, units, canManage }: { branchId: string; warehouseId?: string; ingredients: Option[]; units: Option[]; canManage: boolean }) {
+const reasons = [
+  "Vencimiento",
+  "Producto dañado",
+  "Error de preparación",
+  "Merma de producción",
+  "Derrame",
+  "Conteo físico",
+  "Otro",
+];
+
+const SELECT_CLASS = cn(
+  "w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3",
+  "min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)]",
+  "text-base text-ink-1 sm:text-sm",
+);
+
+export function RestaurantWasteWorkflow({
+  branchId,
+  warehouseId,
+  warehouseName,
+  ingredients,
+  units,
+  canManage,
+}: {
+  branchId: string;
+  warehouseId?: string;
+  warehouseName?: string;
+  ingredients: Option[];
+  units: Option[];
+  canManage: boolean;
+}) {
   const queryClient = useQueryClient();
-  const [stage, setStage] = useState(1);
-  const [reason, setReason] = useState(""); const [notes, setNotes] = useState(""); const [lines, setLines] = useState<WasteLine[]>([{ ingredientId: "", unitId: "", quantity: "" }]); const [preview, setPreview] = useState<Record<string, unknown> | null>(null); const [documentId, setDocumentId] = useState("");
-  const payload = () => ({ branchId, warehouseId, wasteDate: new Date().toISOString(), reason, notes: notes || undefined, items: lines.map((line) => ({ ingredientId: line.ingredientId, quantity: Number(line.quantity), unitId: line.unitId })) });
-  const save = useMutation({ mutationFn: () => createRestaurantWaste(payload()), onSuccess: (data) => { setDocumentId(String((data as Record<string, unknown>).id ?? "")); setStage(3); } });
-  const calculate = useMutation({ mutationFn: () => previewRestaurantWaste(payload()), onSuccess: (data) => { setPreview(data as Record<string, unknown>); setStage(2); } });
-  const confirm = useMutation({ mutationFn: () => confirmRestaurantWaste(documentId), onSuccess: async () => { setPreview(null); setDocumentId(""); setLines([{ ingredientId: "", unitId: "", quantity: "" }]); setReason(""); setNotes(""); setStage(4); toast.success("Merma confirmada", { description: "La existencia y el costo fueron actualizados." }); await Promise.all([queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }), queryClient.invalidateQueries({ queryKey: ["restaurant-wastes"] })]); } });
-  const pending = useQuery({ queryKey: ["restaurant-wastes", branchId, "pending"], queryFn: () => fetchRestaurantWastes({ branchId, status: "DRAFT" }) });
-  const invalid = !warehouseId || !reason || !lines.length || lines.some((line) => !line.ingredientId || !line.unitId || Number(line.quantity) <= 0);
-  const updateLine = (index: number, key: keyof WasteLine, value: string) => setLines(lines.map((line, current) => current === index ? { ...line, [key]: value } : line));
-  const selectIngredient = (index: number, value: string) => { const ingredient = ingredients.find((item) => item.id === value); setLines(lines.map((line, current) => current === index ? { ...line, ingredientId: value, unitId: ingredient?.unitId ?? line.unitId } : line)); };
-  return <div className="space-y-5"><PageHeader eyebrow="Operación diaria" title="Captura rápida de merma" description="Registra, revisa, confirma y recibe el resultado de la operación." />{!warehouseId ? <InlineFeedback tone="warning" title="Almacén requerido">Selecciona un almacén global antes de registrar desperdicios.</InlineFeedback> : null}{calculate.error || save.error || confirm.error ? <InlineFeedback tone="danger" title="No se pudo registrar la merma">{getApiErrorMessage(calculate.error ?? save.error ?? confirm.error, "Revisa las líneas y vuelve a intentarlo.")}</InlineFeedback> : null}<WasteStages stage={stage} /><Card level={2}><CardContent className="space-y-4 p-4 md:p-5">{stage === 1 ? <><div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="waste-reason">Motivo predefinido</Label><select id="waste-reason" className="h-12 w-full rounded-2xl border border-border-default bg-surface-elevated px-3 text-base" value={reason} onChange={(event) => setReason(event.target.value)}><option value="">Seleccionar motivo</option>{reasons.map((item) => <option key={item} value={item}>{item}</option>)}</select></div><div><Label htmlFor="waste-notes">Observaciones</Label><Input id="waste-notes" className="h-12 text-base" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Detalle opcional de la merma" /></div></div><div className="space-y-3"><div className="flex items-center justify-between"><h2 className="font-semibold">1. Registrar líneas</h2><Button size="sm" variant="secondary" onClick={() => setLines([...lines, { ingredientId: "", unitId: "", quantity: "" }])}><Plus className="size-4" />Agregar línea</Button></div>{lines.map((line, index) => <div key={index} className="grid gap-3 rounded-2xl border border-border-default p-3 sm:grid-cols-[2fr_1.2fr_1fr_auto]"><Select id={`waste-ingredient-${index}`} label="Ingrediente" value={line.ingredientId} options={ingredients} onChange={(value) => selectIngredient(index, value)} /><Select id={`waste-unit-${index}`} label="Unidad" value={line.unitId} options={units} onChange={(value) => updateLine(index, "unitId", value)} /><div><Label htmlFor={`waste-quantity-${index}`}>Cantidad</Label><Input id={`waste-quantity-${index}`} className="h-12 text-base" type="number" min="0.01" step="0.01" value={line.quantity} onChange={(event) => updateLine(index, "quantity", event.target.value)} /></div><Button variant="ghost" className="self-end" onClick={() => setLines(lines.filter((_, current) => current !== index))} disabled={lines.length === 1} aria-label="Eliminar línea"><Trash2 className="size-4" /></Button></div>)}</div><Button className="w-full sm:w-auto" disabled={!canManage || invalid || calculate.isPending} onClick={() => calculate.mutate()}>{calculate.isPending ? "Calculando…" : "Revisar impacto"}</Button></> : null}{stage === 2 && preview ? <WastePreview preview={preview} documentId="" saving={save.isPending} confirming={false} onSave={() => save.mutate()} onConfirm={() => undefined} /> : null}{stage === 3 ? <><h2 className="font-semibold">3. Confirmar merma</h2><Badge>Documento pendiente de confirmación · {documentId}</Badge><p className="text-sm text-text-secondary">El documento está preparado y aplicará la salida al confirmar.</p><div className="flex flex-wrap gap-2"><Button disabled={!canManage || confirm.isPending} onClick={() => confirm.mutate()}>{confirm.isPending ? "Confirmando…" : "Confirmar merma"}</Button><Button variant="secondary" onClick={() => { setStage(1); setDocumentId(""); }}>Editar registro</Button></div></> : null}{stage === 4 ? <div className="rounded-2xl border border-success/40 bg-success/5 p-4"><h2 className="font-semibold">4. Resultado</h2><p className="mt-1 text-sm text-text-secondary">La merma fue confirmada y el inventario se está actualizando.</p><Button className="mt-4" onClick={() => setStage(1)}>Registrar otra merma</Button></div> : null}</CardContent></Card><PendingWasteInbox query={pending} /></div>;
+  const { currentUser } = useAppStore();
+
+  const [step, setStep] = useState<OperationStepId>("record");
+  const [reason, setReason] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<WasteLine[]>([{ ingredientId: "", unitId: "", quantity: "" }]);
+  const [preview, setPreview] = useState<unknown>(null);
+  const [documentId, setDocumentId] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [outcome, setOutcome] = useState<OperationOutcome | null>(null);
+
+  const payload = () => ({
+    branchId,
+    warehouseId,
+    wasteDate: new Date().toISOString(),
+    reason,
+    notes: notes || undefined,
+    items: lines.map((line) => ({
+      ingredientId: line.ingredientId,
+      quantity: Number(line.quantity),
+      unitId: line.unitId,
+    })),
+  });
+
+  const calculate = useMutation({
+    mutationFn: () => previewRestaurantWaste(payload()),
+    onSuccess: (data) => {
+      setPreview(data);
+      setStep("review");
+    },
+  });
+
+  const prepare = useMutation({
+    mutationFn: () => createRestaurantWaste(payload()),
+    onSuccess: (data) => {
+      setDocumentId(String((data as Record<string, unknown>).id ?? ""));
+      setStep("confirm");
+    },
+  });
+
+  const confirm = useMutation({
+    mutationFn: () => confirmRestaurantWaste(documentId),
+    onSuccess: async () => {
+      setOutcome({
+        status: "success",
+        headline: "Merma registrada",
+        detail: "La existencia y el costo del almacén ya reflejan la salida.",
+        nextAction: { label: "Ver los movimientos", href: "/inventory/restaurant/movements" },
+      });
+      setStep("result");
+      toast.success("Merma confirmada");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["restaurant-stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-movements"] }),
+        queryClient.invalidateQueries({ queryKey: ["restaurant-wastes"] }),
+      ]);
+    },
+    onError: (error) => {
+      setOutcome({
+        status: "error",
+        headline: "No se pudo confirmar la merma",
+        detail: getApiErrorMessage(error, "El servidor rechazó la operación."),
+        retryable: true,
+      });
+      setStep("result");
+    },
+  });
+
+  const pending = useQuery({
+    queryKey: ["restaurant-wastes", branchId, "pending"],
+    queryFn: () => fetchRestaurantWastes({ branchId, status: "DRAFT" }),
+  });
+
+  const invalid =
+    !warehouseId ||
+    !reason ||
+    !lines.length ||
+    lines.some((line) => !line.ingredientId || !line.unitId || Number(line.quantity) <= 0);
+
+  const updateLine = (index: number, key: keyof WasteLine, value: string) =>
+    setLines(lines.map((line, current) => (current === index ? { ...line, [key]: value } : line)));
+
+  const selectIngredient = (index: number, value: string) => {
+    const ingredient = ingredients.find((item) => item.id === value);
+    setLines(
+      lines.map((line, current) =>
+        current === index ? { ...line, ingredientId: value, unitId: ingredient?.unitId ?? line.unitId } : line,
+      ),
+    );
+  };
+
+  const impact = preview
+    ? restaurantOperationImpact({
+        headline: `Registrar merma${warehouseName ? ` en ${warehouseName}` : ""}${reason ? ` · ${reason}` : ""}`,
+        affectedLabel: lines.length === 1 ? "producto" : "productos",
+        preview,
+        responsible: currentUser.fullName,
+        reducesStock: true,
+      })
+    : undefined;
+
+  // «Seleccionar» se marca completado en cuanto hay al menos un producto
+  // elegido: en esta operación elegir y registrar ocurren en la misma pantalla,
+  // y fingir dos pasos separados sería inventarse un recorrido que no existe.
+  const completed: OperationStepId[] = [];
+  if (lines.some((line) => line.ingredientId)) completed.push("select");
+  if (step === "review" || step === "confirm" || step === "result") completed.push("record");
+  if (step === "confirm" || step === "result") completed.push("review");
+  if (step === "result") completed.push("confirm");
+
+  const operationState: OperationState = {
+    ...initialOperationState(),
+    step,
+    completed,
+    impact,
+    submitting: confirm.isPending,
+    outcome: outcome ?? undefined,
+  };
+
+  const reset = () => {
+    setLines([{ ingredientId: "", unitId: "", quantity: "" }]);
+    setReason("");
+    setNotes("");
+    setPreview(null);
+    setDocumentId("");
+    setAcknowledged(false);
+    setOutcome(null);
+    setStep("record");
+  };
+
+  const errorDeRegistro = calculate.error ?? prepare.error;
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Operación diaria"
+        title="Registrar merma"
+        description="Anota lo que se perdió, revisa cómo queda el almacén y confirma."
+        meta={warehouseName ? <span>Almacén: {warehouseName}</span> : null}
+      />
+
+      <OperationStepper
+        state={operationState}
+        onStepChange={(target) => {
+          // Solo hacia atrás y solo a un paso ya recorrido: `canNavigateTo` lo
+          // decide, así que aquí basta con aplicarlo.
+          setStep(target);
+        }}
+      />
+
+      {!warehouseId ? (
+        <InlineNote tone="warning" title="Falta elegir el almacén">
+          Selecciona un almacén antes de registrar la merma: sin él no se sabe de dónde sale el producto.
+        </InlineNote>
+      ) : null}
+
+      {errorDeRegistro ? (
+        <InlineNote tone="danger" title="No se pudo preparar la merma">
+          {getApiErrorMessage(errorDeRegistro, "Revisa las líneas y vuelve a intentarlo.")}
+        </InlineNote>
+      ) : null}
+
+      {/* ---- Registrar --------------------------------------------------- */}
+      {step === "record" ? (
+        <PageSection title="Qué se perdió" boxed>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="waste-reason">Motivo</Label>
+              <select
+                id="waste-reason"
+                className={SELECT_CLASS}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              >
+                <option value="">Seleccionar motivo</option>
+                {reasons.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="waste-notes">Observaciones</Label>
+              <Input
+                id="waste-notes"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Detalle opcional de la merma"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-ink-1">Productos</h3>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setLines([...lines, { ingredientId: "", unitId: "", quantity: "" }])}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                Agregar
+              </Button>
+            </div>
+
+            {lines.map((line, index) => (
+              <div
+                key={index}
+                className="grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-[2fr_1.2fr_1fr_auto]"
+              >
+                <NativeSelect
+                  id={`waste-ingredient-${index}`}
+                  label="Producto"
+                  value={line.ingredientId}
+                  options={ingredients}
+                  onChange={(value) => selectIngredient(index, value)}
+                />
+                <NativeSelect
+                  id={`waste-unit-${index}`}
+                  label="Unidad"
+                  value={line.unitId}
+                  options={units}
+                  onChange={(value) => updateLine(index, "unitId", value)}
+                />
+                <div>
+                  <Label htmlFor={`waste-quantity-${index}`}>Cantidad</Label>
+                  <Input
+                    id={`waste-quantity-${index}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={line.quantity}
+                    onChange={(event) => updateLine(index, "quantity", event.target.value)}
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="self-end"
+                  onClick={() => setLines(lines.filter((_, current) => current !== index))}
+                  disabled={lines.length === 1}
+                  aria-label={`Quitar la línea ${index + 1}`}
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            className="mt-5 w-full sm:w-auto"
+            size="lg"
+            disabled={!canManage || invalid}
+            loading={calculate.isPending}
+            loadingLabel="Calculando…"
+            onClick={() => calculate.mutate()}
+          >
+            Revisar impacto
+          </Button>
+        </PageSection>
+      ) : null}
+
+      {/* ---- Revisar impacto --------------------------------------------- */}
+      {step === "review" && impact ? (
+        <div className="space-y-4">
+          <ImpactReview impact={impact} />
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setStep("record")}>
+              Corregir el registro
+            </Button>
+            <Button
+              size="lg"
+              disabled={!canManage || impact.blockers.length > 0}
+              loading={prepare.isPending}
+              loadingLabel="Preparando…"
+              onClick={() => prepare.mutate()}
+            >
+              Continuar
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ---- Confirmar ---------------------------------------------------- */}
+      {step === "confirm" && impact ? (
+        <ConfirmPanel
+          state={operationState}
+          operationName="Registrar merma"
+          onConfirm={() => confirm.mutate()}
+          onBack={() => setStep("review")}
+          acknowledged={acknowledged}
+          onAcknowledgedChange={setAcknowledged}
+        />
+      ) : null}
+
+      {/* ---- Resultado ---------------------------------------------------- */}
+      {step === "result" && outcome ? (
+        <OperationResultView
+          outcome={outcome}
+          onRetry={() => confirm.mutate()}
+          onStartAnother={reset}
+          startAnotherLabel="Registrar otra merma"
+        />
+      ) : null}
+
+      <PendingWasteInbox query={pending} />
+    </div>
+  );
 }
 
-function WasteStages({ stage }: { stage: number }) { const labels = ["Registrar", "Revisar", "Confirmar", "Resultado"]; return <div className="grid gap-2 sm:grid-cols-4" aria-label="Etapas de la merma">{labels.map((label, index) => { const number = index + 1; return <div key={label} className={`rounded-xl border p-3 text-xs font-semibold ${stage === number ? "border-primary bg-primary/10" : number < stage ? "border-success/40 bg-success/5" : "border-border-default"}`}><span className="mr-1 inline-grid size-5 place-items-center rounded-full bg-surface-interactive">{number < stage ? <Check className="size-3" /> : number}</span>{label}</div>; })}</div>; }
+function NativeSelect({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: Option[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      {/* `<select>` nativo a propósito: en un teléfono abre el selector del
+          sistema operativo, que es más usable que cualquier lista a medida. */}
+      <select id={id} className={SELECT_CLASS} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Seleccionar</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
-function WastePreview({ preview, documentId, saving, confirming, onSave, onConfirm }: { preview: Record<string, unknown>; documentId: string; saving: boolean; confirming: boolean; onSave: () => void; onConfirm: () => void }) { const items = Array.isArray(preview.items) ? preview.items as Array<Record<string, unknown>> : Array.isArray(preview.ingredients) ? preview.ingredients as Array<Record<string, unknown>> : []; const total = Number(preview.totalCost ?? preview.wasteCost ?? 0); return <Card level={1}><CardContent className="space-y-4 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">Resumen de impacto</h2><p className="text-sm text-text-secondary">Estas cantidades saldrán del almacén al confirmar.</p></div><Badge variant="destructive">-${total.toFixed(2)}</Badge></div><div className="overflow-x-auto"><table className="w-full min-w-[580px] text-left text-sm"><thead className="bg-surface-interactive"><tr>{["Ingrediente", "Cantidad", "Existencia resultante", "Costo"].map((header) => <th key={header} className="px-3 py-2">{header}</th>)}</tr></thead><tbody className="divide-y divide-border-default">{items.map((item, index) => <tr key={String(item.ingredientId ?? index)}><td className="px-3 py-2">{String(item.ingredientName ?? item.ingredientId ?? "-")}</td><td className="px-3 py-2">{String(item.quantity ?? item.requiredQuantity ?? "-")}</td><td className="px-3 py-2">{String(item.resultingStock ?? item.resultingQuantity ?? "-")}</td><td className="px-3 py-2">${Number(item.totalCost ?? item.wasteCost ?? 0).toFixed(2)}</td></tr>)}</tbody></table></div>{!documentId ? <Button disabled={saving} onClick={onSave}>{saving ? "Guardando…" : "Guardar borrador"}</Button> : <div className="flex flex-wrap items-center gap-2"><Badge>Documento DRAFT</Badge><Button disabled={confirming} onClick={onConfirm}>{confirming ? "Confirmando…" : "Confirmar merma"}</Button></div>}</CardContent></Card>; }
-function Select({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Option[]; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><select id={id} className="h-12 w-full rounded-2xl border border-border-default bg-surface-elevated px-3 text-base" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Seleccionar</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
-function PendingWasteInbox({ query }: { query: ReturnType<typeof useQuery<Record<string, unknown>[]>> }) { if (query.isLoading || query.error || !query.data?.length) return null; return <Card level={1}><CardContent className="space-y-2 p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">Merma pendiente</h2><Badge variant="secondary">{query.data.length}</Badge></div>{query.data.map((item) => <div key={String(item.id)} className="flex justify-between gap-3 border-b border-border-default py-2 text-sm"><span>{String(item.reason ?? "Sin motivo")}</span><span>${Number(item.totalCost ?? item.wasteCost ?? 0).toFixed(2)}</span></div>)}</CardContent></Card>; }
+/**
+ * Mermas registradas y todavía sin confirmar.
+ *
+ * Se muestra siempre que haya alguna, también durante el registro: si alguien
+ * dejó un borrador a medias, lo primero que conviene saber es que existe, para
+ * no registrar dos veces la misma pérdida.
+ */
+function PendingWasteInbox({ query }: { query: ReturnType<typeof useQuery<Record<string, unknown>[]>> }) {
+  if (query.isLoading || query.error || !query.data?.length) return null;
+  return (
+    <PageSection
+      title="Mermas sin confirmar"
+      description="Quedaron preparadas pero todavía no salieron del almacén."
+      boxed
+    >
+      <ul className="divide-y divide-line">
+        {query.data.map((item) => (
+          <li key={String(item.id)} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+            <span className="min-w-0 truncate text-ink-1">{String(item.reason ?? "Sin motivo")}</span>
+            <span className="shrink-0 font-mono text-ink-2 tabular-figures">
+              {formatMoney(Number(item.totalCost ?? item.wasteCost ?? 0))}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </PageSection>
+  );
+}

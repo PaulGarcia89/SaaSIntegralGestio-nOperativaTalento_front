@@ -134,6 +134,13 @@ export type EntityCardProps = {
   /** Avatar por nombre, o un icono para objetos que no son personas. */
   avatarName?: string;
   avatarSrc?: string | null;
+  /**
+   * Portada rectangular, para objetos que se reconocen por su imagen: un
+   * curso, un artículo de inventario, un documento escaneado. Un rectángulo y
+   * no un círculo, porque recortar una portada en redondo se come justo lo
+   * que la hace reconocible.
+   */
+  coverSrc?: string | null;
   icon?: ReactNode;
   status?: { label: string; tone?: Tone };
   /** Hasta tres. Más que eso deja de leerse de un vistazo y vuelve a ser una tabla. */
@@ -154,6 +161,7 @@ export function EntityCard({
   subtitle,
   avatarName,
   avatarSrc,
+  coverSrc,
   icon,
   status,
   facts,
@@ -197,7 +205,16 @@ export function EntityCard({
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        {avatarName ? (
+        {coverSrc ? (
+          // Decorativa: el título va escrito al lado y repetirlo hace que un
+          // lector de pantalla lo lea dos veces.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverSrc}
+            alt=""
+            className="size-12 shrink-0 rounded-lg border border-line bg-surface-2 object-cover"
+          />
+        ) : avatarName ? (
           <Avatar name={avatarName} src={avatarSrc} />
         ) : icon ? (
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-2">

@@ -39,6 +39,7 @@ import {
   type DataColumn,
 } from "@/components/system";
 import { progressStatusTone } from "@/lib/training-labels";
+import { AdminTrainingPanel, LearnerTrainingPanel } from "@/components/training/training-module-panel";
 import {
   ConfirmPanel,
   ImpactReview,
@@ -141,6 +142,18 @@ export function TrainingLearningHub() {
         title="Centro de aprendizaje"
         description="Continúa tus cursos y consulta claramente qué formación requiere tu atención."
       />
+
+      {/*
+        Panel del módulo, en singular.
+
+        Quien administra ve el estado del PROGRAMA; quien aprende ve SU
+        formación. Son dos preguntas distintas y enseñarlas juntas obliga a
+        leer la pantalla dos veces para saber cuál se está mirando. Quien
+        administra y además tiene cursos asignados los encuentra en «Mis
+        cursos», que es el conmutador explícito entre los dos papeles.
+      */}
+      {canManageTraining ? <AdminTrainingPanel /> : <LearnerTrainingPanel />}
+
       <Tabs defaultValue={canManageTraining ? "priorities" : "mine"}>
         <TabsList aria-label="Secciones de aprendizaje">
           {canManageTraining ? (
@@ -206,7 +219,6 @@ function AdminLearningPriorities({ can }: { can: (permission: PermissionKey) => 
   const draftCourses = courses.data?.items.filter((course) => course.status === "DRAFT").length ?? 0;
   const reviewCourses = courses.data?.items.filter((course) => course.status === "IN_REVIEW").length ?? 0;
   const incompleteAssessments = assessments.data?.items.filter((assessment) => !assessment.readiness?.ready).length ?? 0;
-  const attentionCount = (assignmentSummary?.overdue ?? 0) + reviewCourses + incompleteAssessments;
   const loading = assignments.isLoading || courses.isLoading || assessments.isLoading;
 
   if (loading) return <SkeletonRows rows={4} label="Cargando las prioridades de aprendizaje" />;
@@ -216,22 +228,15 @@ function AdminLearningPriorities({ can }: { can: (permission: PermissionKey) => 
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-primary/20 bg-primary/5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">Administración</p>
-            <h2 className="mt-1 text-2xl font-semibold">Qué requiere atención</h2>
-            <p className="mt-1 max-w-2xl text-sm text-text-secondary">Gestiona el ciclo completo: crea, valida, publica, asigna y supervisa desde una única bandeja.</p>
-          </div>
-          <Badge variant={attentionCount ? "warning" : "success"}>{attentionCount ? `${attentionCount} pendientes` : "Todo al día"}</Badge>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <PriorityMetric label="Asignaciones vencidas" value={assignmentSummary?.overdue ?? 0} tone="danger" />
-          <PriorityMetric label="Cursos en revisión" value={reviewCourses} tone="warning" />
-          <PriorityMetric label="Evaluaciones incompletas" value={incompleteAssessments} tone="warning" />
-        </div>
-      </section>
-
+      {/*
+        Aquí vivía una segunda cabecera con «Asignaciones vencidas», «Cursos en
+        revisión» y «Evaluaciones incompletas» dentro de una caja teñida de
+        `primary/5` con esquinas de 3rem. Las dos primeras cifras ya están en
+        el panel del módulo, arriba; repetirlas obligaba a comprobar si decían
+        lo mismo. Lo que NO estaba arriba —cursos en revisión y evaluaciones
+        incompletas— se conserva en las tarjetas de acción de abajo, que son
+        además el sitio desde el que se resuelven.
+      */}
       <section aria-labelledby="learning-admin-actions" className="space-y-3">
         <div>
           <h2 id="learning-admin-actions" className="text-lg font-semibold">Acciones del ciclo</h2>
@@ -357,16 +362,48 @@ function TrackingMetric({ label, value, tone = "normal" }: { label: string; valu
   return <Card><CardContent className="p-4"><p className="text-xs text-text-secondary">{label}</p><p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p></CardContent></Card>;
 }
 
-function PriorityMetric({ label, value, tone }: { label: string; value: number; tone: "danger" | "warning" }) {
-  return <div className="rounded-2xl border border-border-default bg-card p-4"><p className="text-xs text-text-secondary">{label}</p><p className={`mt-1 text-3xl font-semibold ${tone === "danger" ? "text-status-danger" : "text-status-warning"}`}>{value}</p></div>;
-}
-
+/**
+ * Acceso frecuente del ciclo formativo.
+ *
+ * Deja de teñirse con `primary` —el color que configura cada empresa, así que
+ * el contraste dependía de una decisión del cliente— y pasa a la superficie y
+ * las líneas del sistema. El icono va acompañado de texto, nunca solo.
+ */
 function AdminActionCard({ icon, title, description, href }: { icon: ReactNode; title: string; description: string; href: string }) {
-  return <Link href={href} className="group rounded-2xl border border-border-default bg-card p-4 transition-colors hover:border-primary/50 hover:bg-primary/5"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-brand">{icon}</span><span className="mt-4 block font-semibold">{title}</span><span className="mt-1 block text-sm text-text-secondary">{description}</span><span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand">Abrir <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></span></Link>;
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-[var(--control-h-touch)] flex-col rounded-lg border border-line bg-surface-1 p-4 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+    >
+      <span className="flex size-10 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-2">{icon}</span>
+      <span className="mt-4 block text-sm font-semibold text-ink-1">{title}</span>
+      <span className="mt-1 block text-sm text-ink-2">{description}</span>
+      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent-ink">
+        Abrir
+        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+      </span>
+    </Link>
+  );
 }
 
 function PriorityNextStep({ icon, title, description, href }: { icon: ReactNode; title: string; description: string; href: string }) {
-  return <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-card text-brand">{icon}</span><div><p className="font-semibold">{title}</p><p className="mt-1 text-sm text-text-secondary">{description}</p><Button asChild className="mt-4" size="sm"><Link href={href}>Resolver <ArrowRight className="size-4" /></Link></Button></div></div></div>;
+  return (
+    <div className="rounded-lg border border-accent-line/40 bg-surface-1 p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-accent-ink">{icon}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink-1">{title}</p>
+          <p className="mt-1 text-sm text-ink-2">{description}</p>
+          <Button asChild className="mt-4" size="sm">
+            <Link href={href}>
+              Resolver
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function MyPilots({ onOpen }: { onOpen: (courseId: string) => void }) {

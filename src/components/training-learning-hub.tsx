@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
-  BookOpen,
   Award,
   CalendarDays,
   CheckCircle2,
@@ -19,15 +18,40 @@ import {
   Rocket,
   RotateCcw,
   Trash2,
-  Users,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
-import { PageHeader, Pagination } from "@/components/design-system";
+import {
+  DataView,
+  EmptyState,
+  ErrorState,
+  InlineNote,
+  Metric,
+  MetricRow,
+  NextAction,
+  PageHeader,
+  Pagination,
+  SkeletonRows,
+  StatusBadge,
+  type DataColumn,
+} from "@/components/system";
+import { progressStatusTone } from "@/lib/training-labels";
+import {
+  ConfirmPanel,
+  ImpactReview,
+  OperationResultView,
+  OperationStepper,
+} from "@/components/system";
+import {
+  initialOperationState,
+  type OperationImpact,
+  type OperationOutcome,
+  type OperationState,
+  type OperationStepId,
+} from "@/lib/operation-flow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,7 +140,6 @@ export function TrainingLearningHub() {
         eyebrow="Aprendizaje"
         title="Centro de aprendizaje"
         description="Continúa tus cursos y consulta claramente qué formación requiere tu atención."
-        actions={<div className="flex flex-wrap gap-2"><Button asChild variant="secondary"><Link href="/training/evaluations"><ClipboardCheck className="size-4" />Mis evaluaciones</Link></Button><Button asChild variant="secondary"><Link href="/training/certificates"><Award className="size-4" />Mis certificados</Link></Button></div>}
       />
       <Tabs defaultValue={canManageTraining ? "priorities" : "mine"}>
         <TabsList aria-label="Secciones de aprendizaje">
@@ -186,9 +209,9 @@ function AdminLearningPriorities({ can }: { can: (permission: PermissionKey) => 
   const attentionCount = (assignmentSummary?.overdue ?? 0) + reviewCourses + incompleteAssessments;
   const loading = assignments.isLoading || courses.isLoading || assessments.isLoading;
 
-  if (loading) return <AsyncState state="loading" title="Cargando prioridades de aprendizaje" />;
+  if (loading) return <SkeletonRows rows={4} label="Cargando las prioridades de aprendizaje" />;
   if (assignments.isError) {
-    return <AsyncState state="error" title="No fue posible cargar las prioridades" description={getApiErrorMessage(assignments.error, "Reintenta para continuar.")} onRetry={() => void assignments.refetch()} />;
+    return <ErrorState title="No fue posible cargar las prioridades" detail={getApiErrorMessage(assignments.error, "Reintenta la consulta para continuar.")} onRetry={() => void assignments.refetch()} />;
   }
 
   return (
@@ -305,8 +328,8 @@ function AdminLearningTracking() {
   const certificates = useQuery({ queryKey: ["training-admin-tracking-certificates"], queryFn: fetchTrainingAdminCertificates });
   const results = useQuery({ queryKey: ["training-admin-tracking-results"], queryFn: () => fetchTrainingAssessmentResults(1) });
 
-  if (assignments.isLoading || courses.isLoading || certificates.isLoading || results.isLoading) return <AsyncState state="loading" title="Cargando supervisión" />;
-  if (assignments.isError) return <AsyncState state="error" title="No fue posible cargar la supervisión" description={getApiErrorMessage(assignments.error, "Reintenta para continuar.")} onRetry={() => void assignments.refetch()} />;
+  if (assignments.isLoading || courses.isLoading || certificates.isLoading || results.isLoading) return <SkeletonRows rows={5} label="Cargando la supervisión" />;
+  if (assignments.isError) return <ErrorState title="No fue posible cargar la supervisión" detail={getApiErrorMessage(assignments.error, "Reintenta la consulta para continuar.")} onRetry={() => void assignments.refetch()} />;
 
   const allAssignments = assignments.data?.items ?? [];
   const owners = Array.from(new Map(allAssignments.filter((item) => item.assignedBy).map((item) => [item.assignedBy!.id, `${item.assignedBy!.firstName} ${item.assignedBy!.lastName}`])).entries());
@@ -417,14 +440,13 @@ function MyCourses({ onOpen }: { onOpen: (courseId: string) => void }) {
     },
   });
 
-  if (query.isLoading) return <AsyncState state="loading" title="Cargando tus cursos" />;
+  if (query.isLoading) return <SkeletonRows rows={5} label="Cargando tus cursos" />;
   if (query.isError)
     return (
-      <AsyncState
-        state="error"
+      <ErrorState
         title="No fue posible cargar tus cursos"
-        description={getApiErrorMessage(query.error, "Reintenta para continuar.")}
-        onRetry={() => query.refetch()}
+        detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+        onRetry={() => void query.refetch()}
       />
     );
 
@@ -468,18 +490,19 @@ function MyCourses({ onOpen }: { onOpen: (courseId: string) => void }) {
               <AssignmentCard key={assignment.id} assignment={assignment} onOpen={onOpen} />
             ))}
           </div>
-          <Pagination page={page} totalPages={query.data.totalPages ?? 1} totalItems={query.data.total} pageSize={20} onPageChange={setPage} />
+          <Pagination page={page} totalItems={query.data.total} pageSize={20} onPageChange={setPage} />
         </>
       ) : (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <BookOpen className="mx-auto size-9 text-muted-foreground" />
-            <h2 className="mt-4 text-lg font-semibold">No tienes cursos en esta vista</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Cuando te asignen una formación aparecerá aquí con su fecha y progreso.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          reason={status || search ? "no-matches" : "no-records"}
+          title={status || search ? "Ningún curso con estos filtros" : "Todavía no tienes cursos"}
+          description={
+            status || search
+              ? "Prueba con otro estado o quita la búsqueda."
+              : "Cuando te asignen una formación aparecerá aquí, con su fecha y su avance."
+          }
+          onClearFilters={status || search ? () => { setStatus(""); setSearch(""); setPage(1); } : undefined}
+        />
       )}
     </div>
   );
@@ -500,70 +523,58 @@ function LearnerTrainingSummary({
 
   if (!summary?.total && !nextAssignment) return null;
 
-  return (
-    <section aria-labelledby="training-summary-title" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
-      <Card className="bg-surface-section">
-        <CardHeader className="pb-3">
-          <CardTitle id="training-summary-title" className="text-base">Tu formación</CardTitle>
-          <p className="text-sm text-muted-foreground">Una vista rápida de lo que requiere tu atención.</p>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <SummaryMetric label="Pendientes" value={summary?.notStarted ?? 0} />
-          <SummaryMetric label="En progreso" value={summary?.inProgress ?? 0} />
-          <SummaryMetric label="Completados" value={summary?.completed ?? 0} tone="success" />
-          <SummaryMetric label="Vencidos" value={summary?.overdue ?? 0} tone="danger" />
-        </CardContent>
-      </Card>
+  const status = nextAssignment?.effectiveStatus ?? nextAssignment?.status;
+  const blocker = nextAssignment ? getTrainingStartBlocker(nextAssignment) : null;
 
-      <Card className={nextAssignment?.effectiveStatus === "OVERDUE" ? "border-status-danger/40 bg-status-danger/5" : "border-primary/30 bg-primary/5"}>
-        <CardHeader className="pb-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-brand">Siguiente paso</p>
-          <CardTitle className="text-base">{nextAssignment ? nextAssignment.title : "No hay acciones pendientes"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {nextAssignment ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                {nextAssignment.effectiveStatus === "OVERDUE"
-                  ? "Esta formación necesita atención porque ya superó su fecha límite."
-                  : nextAssignment.effectiveStatus === "IN_PROGRESS"
-                    ? "Retoma donde lo dejaste para mantener tu avance."
-                    : "Empieza esta formación cuando tengas disponibilidad."}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={nextAssignment.effectiveStatus === "OVERDUE" ? "destructive" : nextAssignment.effectiveStatus === "COMPLETED" ? "success" : "secondary"}>
-                  {statusLabels[nextAssignment.effectiveStatus ?? nextAssignment.status]}
-                </Badge>
-                <span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" />{nextAssignment.estimatedMinutes} min</span>
-                {nextAssignment.dueAt ? <span className={`inline-flex items-center gap-1 ${nextAssignment.effectiveStatus === "OVERDUE" ? "font-semibold text-status-danger" : "text-muted-foreground"}`}><CalendarDays className="size-3.5" />{nextAssignment.effectiveStatus === "OVERDUE" ? "Venció" : "Vence"} {formatDate(nextAssignment.dueAt)}</span> : <span className="text-xs text-muted-foreground">Sin fecha límite</span>}
-                {nextAssignment.isRequired ? <Badge variant="secondary">Obligatorio</Badge> : null}
-              </div>
-              {getTrainingStartBlocker(nextAssignment) ? (
-                <div className="flex items-start gap-2 rounded-xl border border-status-warning/30 bg-status-warning-soft/40 p-3 text-sm text-status-warning" role="status">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  <div><strong>Bloqueo:</strong> {getTrainingStartBlocker(nextAssignment)}</div>
-                </div>
-              ) : null}
-              <Button className="w-full sm:w-auto" disabled={!nextAssignment.courseId} onClick={() => nextAssignment.courseId && onOpen(nextAssignment.courseId)}>
-                <PlayCircle className="size-4" />
-                {nextAssignment.effectiveStatus === "IN_PROGRESS" ? "Continuar formación" : nextAssignment.effectiveStatus === "OVERDUE" ? "Revisar formación" : "Iniciar formación"}
-              </Button>
-            </>
-          ) : <p className="text-sm text-muted-foreground">Has completado todas las formaciones asignadas.</p>}
-        </CardContent>
-      </Card>
+  return (
+    <section aria-labelledby="training-summary-title" className="space-y-4">
+      <h2 id="training-summary-title" className="sr-only">Tu formación</h2>
+
+      <MetricRow>
+        <Metric label="Pendientes" value={String(summary?.notStarted ?? 0)} />
+        <Metric label="En progreso" value={String(summary?.inProgress ?? 0)} />
+        <Metric label="Completados" value={String(summary?.completed ?? 0)} tone="success" />
+        <Metric
+          label="Vencidos"
+          value={String(summary?.overdue ?? 0)}
+          tone={(summary?.overdue ?? 0) > 0 ? "danger" : undefined}
+        />
+      </MetricRow>
+
+      {/* Una sola acción recomendada, con su porqué. Antes la formación
+          pendiente se anunciaba en una tarjeta más entre otras, y el botón de
+          continuar competía con dos enlaces del encabezado que ya estaban en
+          el menú. */}
+      {nextAssignment ? (
+        <NextAction
+          label={status === "OVERDUE" ? "Lo más urgente" : "Lo siguiente"}
+          title={nextAssignment.title}
+          detail={
+            status === "OVERDUE"
+              ? `Superó su fecha límite${nextAssignment.dueAt ? ` el ${formatDate(nextAssignment.dueAt)}` : ""}.`
+              : status === "IN_PROGRESS"
+                ? `Ya llevas un ${nextAssignment.progressPercent} %. Retómalo donde lo dejaste.`
+                : `Son unos ${nextAssignment.estimatedMinutes} minutos${nextAssignment.dueAt ? `, y vence el ${formatDate(nextAssignment.dueAt)}` : ""}.`
+          }
+          tone={status === "OVERDUE" ? "danger" : "progress"}
+          actionLabel={status === "IN_PROGRESS" ? "Continuar" : status === "OVERDUE" ? "Revisar ahora" : "Empezar"}
+          onAction={() => nextAssignment.courseId && onOpen(nextAssignment.courseId)}
+        />
+      ) : (
+        <InlineNote tone="success" title="No tienes formación pendiente">
+          Has completado todo lo que te asignaron.
+        </InlineNote>
+      )}
+
+      {blocker ? (
+        <InlineNote tone="warning" title="Antes de empezar">
+          {blocker}
+        </InlineNote>
+      ) : null}
     </section>
   );
 }
 
-function SummaryMetric({ label, value, tone = "normal" }: { label: string; value: number; tone?: "normal" | "success" | "danger" }) {
-  return (
-    <div className="rounded-xl border bg-card p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p>
-    </div>
-  );
-}
 
 function getTrainingStartBlocker(assignment: TrainingAssignmentDto) {
   const status = assignment.effectiveStatus ?? assignment.status;
@@ -596,9 +607,7 @@ function AssignmentCard({
             <CardTitle className="text-lg">{assignment.title}</CardTitle>
             {assignment.isRequired ? <Badge className="mt-2" variant="secondary">Obligatorio</Badge> : null}
           </div>
-          <Badge variant={effectiveStatus === "OVERDUE" ? "destructive" : effectiveStatus === "COMPLETED" ? "success" : "default"}>
-            {statusLabels[effectiveStatus]}
-          </Badge>
+          <StatusBadge size="sm" tone={progressStatusTone(effectiveStatus)} label={statusLabels[effectiveStatus]} />
         </div>
         <p className="line-clamp-2 text-sm text-muted-foreground">{assignment.description}</p>
       </CardHeader>
@@ -607,8 +616,15 @@ function AssignmentCard({
           <div className="mb-2 flex justify-between text-sm">
             <span>Progreso</span><strong>{assignment.progressPercent}%</strong>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${assignment.progressPercent}%` }} />
+          <div
+            className="h-2 overflow-hidden rounded-full bg-surface-3"
+            role="progressbar"
+            aria-valuenow={assignment.progressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Avance de ${assignment.title}`}
+          >
+            <div className="h-full rounded-full bg-accent-fill" style={{ width: `${assignment.progressPercent}%` }} />
           </div>
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
@@ -678,8 +694,8 @@ function LaunchManagement() {
         </div>
         <Button onClick={() => setCreateOpen(true)}><Rocket className="size-4" />Nueva campaña</Button>
       </div>
-      {query.isLoading ? <AsyncState state="loading" title="Cargando lanzamientos" /> : null}
-      {query.isError ? <AsyncState state="error" title="No fue posible cargar los lanzamientos" onRetry={() => query.refetch()} /> : null}
+      {query.isLoading ? <SkeletonRows rows={4} label="Cargando las campañas" /> : null}
+      {query.isError ? <ErrorState title="No fue posible cargar las campañas" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} /> : null}
       {query.data?.items.length ? (
         <>
           <div className="grid gap-4 xl:grid-cols-2">
@@ -695,20 +711,18 @@ function LaunchManagement() {
           </div>
           <Pagination
             page={page}
-            totalPages={query.data.totalPages}
             totalItems={query.data.total}
             pageSize={12}
             onPageChange={setPage}
           />
         </>
       ) : query.isSuccess ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Rocket className="mx-auto size-9 text-muted-foreground" />
-            <p className="mt-3 font-medium">Todavía no hay campañas de lanzamiento</p>
-            <p className="text-sm text-muted-foreground">Crea una para distribuir un curso publicado con control de alcance.</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          reason="no-records"
+          title="Todavía no hay campañas"
+          description="Una campaña congela la audiencia y reparte el curso por lotes, para que puedas medir la adopción sin perder el rastro de a quién le llegó."
+          action={<Button onClick={() => setCreateOpen(true)}><Rocket className="size-4" aria-hidden="true" />Crear la primera campaña</Button>}
+        />
       ) : null}
       <CreateLaunchDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
@@ -726,6 +740,8 @@ function LaunchCard({
   onDeploy: () => void;
   onStatus: (status: TrainingLaunchStatus) => void;
 }) {
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const remaining = Math.max(0, launch.metrics.audience - launch.metrics.processed);
   const rolloutPercent = launch.metrics.audience
     ? Math.round((launch.metrics.processed / launch.metrics.audience) * 100)
     : 0;
@@ -753,8 +769,15 @@ function LaunchCard({
             <span>Despliegue de audiencia</span>
             <strong>{launch.metrics.processed}/{launch.metrics.audience}</strong>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${rolloutPercent}%` }} />
+          <div
+            className="h-2 overflow-hidden rounded-full bg-surface-3"
+            role="progressbar"
+            aria-valuenow={rolloutPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Despliegue de ${launch.name}`}
+          >
+            <div className="h-full rounded-full bg-accent-fill transition-all" style={{ width: `${rolloutPercent}%` }} />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             Lotes de {launch.batchSize}{launch.rolloutIntervalHours ? ` cada ${launch.rolloutIntervalHours} h` : " sin espera"}
@@ -793,94 +816,370 @@ function LaunchCard({
               </Button>
             ) : null}
             {["DRAFT", "SCHEDULED", "ACTIVE", "PAUSED"].includes(launch.status) ? (
-              <Button size="sm" variant="ghost" onClick={() => { if (window.confirm("¿Cancelar esta campaña? Las personas aún no asignadas ya no recibirán el curso.")) onStatus("CANCELLED"); }} disabled={pending}>
-                Cancelar
+              <Button size="sm" variant="ghost" onClick={() => setConfirmCancel(true)} disabled={pending}>
+                Cancelar campaña
               </Button>
             ) : null}
           </div>
         </div>
       </CardContent>
+
+      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cancelar la campaña «{launch.name}»?</DialogTitle>
+            <DialogDescription>
+              Quienes ya la recibieron conservan su curso y su avance. Lo que se detiene es el reparto de lo que
+              queda. No se puede reanudar: habría que crear otra campaña.
+            </DialogDescription>
+          </DialogHeader>
+          <InlineNote tone="warning" title="A quién afecta">
+            {remaining === 0
+              ? "Toda la audiencia ya recibió el curso, así que cancelar no deja a nadie fuera."
+              : `${remaining} ${remaining === 1 ? "persona" : "personas"} de la audiencia congelada dejarán de recibirlo.`}
+          </InlineNote>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setConfirmCancel(false)}>Mantener la campaña</Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => {
+                setConfirmCancel(false);
+                onStatus("CANCELLED");
+              }}
+            >
+              Cancelar la campaña
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
 
+/**
+ * Nueva campaña de lanzamiento, con el patrón universal de operaciones.
+ *
+ * Antes eran nueve campos en un modal, un botón «Crear campaña» y un aviso
+ * flotante. No se decía a cuánta gente iba a afectar, ni en cuántos lotes, ni
+ * que la audiencia se CONGELA al crear la campaña: quien entrara después a la
+ * empresa o al rol ya no la recibiría, y eso no se puede corregir sin crear
+ * otra campaña.
+ *
+ * Ahora: registrar → revisar impacto → confirmar → ver resultado. El impacto
+ * dice sólo lo que el formulario sabe con certeza; la cifra REAL de personas
+ * la devuelve el servidor y se muestra en el resultado, en vez de estimarla.
+ */
 function CreateLaunchDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient();
+  const { currentUser } = useAppStore();
+  const [step, setStep] = useState<OperationStepId>("record");
   const [courseId, setCourseId] = useState("");
   const [audience, setAudience] = useState<TrainingLaunchAudience>("USERS");
   const [targets, setTargets] = useState<string[]>([]);
+  const [draft, setDraft] = useState<{
+    name: string;
+    batchSize: number;
+    rolloutIntervalHours: number;
+    startAt: string;
+    dueAt: string;
+    isRequired: boolean;
+  } | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [outcome, setOutcome] = useState<OperationOutcome | null>(null);
+
   const courses = useQuery({ queryKey: ["launch-courses"], queryFn: () => fetchTrainingCourses({ status: "PUBLISHED", pageSize: 100 }), enabled: open });
   const users = useQuery({ queryKey: ["launch-users"], queryFn: fetchUsers, enabled: open && audience === "USERS" });
   const branches = useQuery({ queryKey: ["launch-branches"], queryFn: () => fetchBranches(), enabled: open && audience === "BRANCHES" });
+
   const mutation = useMutation({
     mutationFn: createTrainingLaunch,
     onSuccess: async (launch) => {
-      toast.success(launch.status === "SCHEDULED" ? "Lanzamiento programado" : "Campaña preparada");
-      onOpenChange(false);
-      setCourseId("");
-      setTargets([]);
+      const reached = launch.resolvedUserIds?.length ?? launch.metrics?.audience ?? 0;
+      setOutcome({
+        status: "success",
+        headline: launch.status === "SCHEDULED" ? "Campaña programada" : "Campaña preparada",
+        detail: `La audiencia quedó congelada en ${reached} ${reached === 1 ? "persona" : "personas"}. ${
+          launch.status === "SCHEDULED"
+            ? "Empezará a repartirse en la fecha que indicaste."
+            : "Usa «Iniciar» en la campaña para repartir el primer lote."
+        }`,
+      });
+      setStep("result");
       await queryClient.invalidateQueries({ queryKey: ["training-launches"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible crear la campaña.")),
+    onError: (error) => {
+      setOutcome({
+        status: "error",
+        headline: "No se pudo crear la campaña",
+        detail: getApiErrorMessage(error, "El servidor rechazó la campaña."),
+        retryable: true,
+      });
+      setStep("result");
+    },
   });
+
   const options =
     audience === "USERS" ? (users.data ?? []).map((item) => ({ id: item.id, label: `${item.fullName} · ${item.email}` })) :
     audience === "BRANCHES" ? (branches.data ?? []).map((item) => ({ id: item.id, label: item.name })) :
     audience === "ROLES" ? roleTargets : [];
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  const course = courses.data?.items.find((item) => item.id === courseId);
+
+  const audienceLine =
+    audience === "TENANT"
+      ? "Todas las personas activas de la empresa, tal como estén en este momento"
+      : audience === "USERS"
+        ? `${targets.length} ${targets.length === 1 ? "persona elegida" : "personas elegidas"}`
+        : audience === "ROLES"
+          ? `Quienes tengan ${targets.length === 1 ? "el rol elegido" : `alguno de los ${targets.length} roles elegidos`}`
+          : `Quienes trabajen en ${targets.length === 1 ? "la sucursal elegida" : `alguna de las ${targets.length} sucursales elegidas`}`;
+
+  const impact: OperationImpact | undefined = draft
+    ? {
+        headline: `Crear la campaña «${draft.name}» del curso ${course?.title ?? "elegido"}`,
+        // Sólo con personas concretas se sabe el número exacto antes de crear.
+        // Con roles, sucursales o toda la empresa lo resuelve el servidor, y
+        // fingir una cifra aquí sería peor que no darla.
+        affectedCount: audience === "USERS" ? targets.length : 0,
+        affectedLabel: audience === "USERS" ? (targets.length === 1 ? "persona" : "personas") : "personas, según las resuelva el servidor",
+        lines: [
+          { label: "Audiencia", before: "Sin campaña", after: audienceLine },
+          {
+            label: "Reparto",
+            before: "—",
+            after:
+              audience === "USERS"
+                ? `${Math.max(1, Math.ceil(targets.length / Math.max(1, draft.batchSize)))} ${Math.ceil(targets.length / Math.max(1, draft.batchSize)) === 1 ? "lote" : "lotes"} de hasta ${draft.batchSize}${draft.rolloutIntervalHours ? `, cada ${draft.rolloutIntervalHours} h` : ", uno tras otro"}`
+                : `Lotes de hasta ${draft.batchSize}${draft.rolloutIntervalHours ? `, cada ${draft.rolloutIntervalHours} h` : ", uno tras otro"}`,
+          },
+          {
+            label: "Fecha límite",
+            before: "—",
+            after: draft.dueAt ? new Date(draft.dueAt).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" }) : "Sin fecha límite",
+            adverse: !draft.dueAt,
+          },
+          { label: "Carácter", before: "—", after: draft.isRequired ? "Obligatoria para toda la audiencia" : "Opcional" },
+        ],
+        warnings: [
+          {
+            code: "FROZEN_AUDIENCE",
+            message:
+              "La audiencia se congela ahora. Quien entre después en la empresa, el rol o la sucursal no la recibirá con esta campaña.",
+          },
+          ...(draft.dueAt
+            ? []
+            : [{ code: "NO_DUE_DATE", message: "Sin fecha límite, ninguna asignación llegará a marcarse como vencida." }]),
+        ],
+        blockers: [],
+        responsible: currentUser.fullName,
+        // Crear la campaña deja asignaciones y trazabilidad; deshacerla exige
+        // cancelarla, que no devuelve las asignaciones ya repartidas.
+        irreversible: true,
+      }
+    : undefined;
+
+  const operationState: OperationState = {
+    ...initialOperationState(),
+    step,
+    completed: step === "record" ? [] : step === "review" ? ["select", "record"] : step === "confirm" ? ["select", "record", "review"] : ["select", "record", "review", "confirm"],
+    impact,
+    submitting: mutation.isPending,
+    outcome: outcome ?? undefined,
+  };
+
+  function review(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const startAt = String(data.get("startAt") || "");
-    const dueAt = String(data.get("dueAt") || "");
+    setDraft({
+      name: String(data.get("name") ?? ""),
+      batchSize: Number(data.get("batchSize")) || 100,
+      rolloutIntervalHours: Number(data.get("rolloutIntervalHours")) || 0,
+      startAt: String(data.get("startAt") || ""),
+      dueAt: String(data.get("dueAt") || ""),
+      isRequired: data.get("isRequired") === "on",
+    });
+    setAcknowledged(false);
+    setStep("review");
+  }
+
+  function create() {
+    if (!draft) return;
     mutation.mutate({
-      name: String(data.get("name")),
+      name: draft.name,
       courseId,
       audience,
       targetIds: audience === "TENANT" ? undefined : targets,
-      batchSize: Number(data.get("batchSize")) || 100,
-      rolloutIntervalHours: Number(data.get("rolloutIntervalHours")) || 0,
-      startAt: startAt ? new Date(startAt).toISOString() : undefined,
-      dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
-      isRequired: data.get("isRequired") === "on",
+      batchSize: draft.batchSize,
+      rolloutIntervalHours: draft.rolloutIntervalHours,
+      startAt: draft.startAt ? new Date(draft.startAt).toISOString() : undefined,
+      dueAt: draft.dueAt ? new Date(draft.dueAt).toISOString() : undefined,
+      isRequired: draft.isRequired,
     });
   }
 
+  function reset() {
+    setStep("record");
+    setCourseId("");
+    setTargets([]);
+    setDraft(null);
+    setAcknowledged(false);
+    setOutcome(null);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) reset();
+      }}
+    >
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nueva campaña de lanzamiento</DialogTitle>
-          <DialogDescription>La audiencia se congela al crear la campaña para conservar una trazabilidad exacta.</DialogDescription>
+          <DialogDescription>Registra los datos, revisa a quién afecta y confirma.</DialogDescription>
         </DialogHeader>
-        <form className="space-y-5" onSubmit={submit}>
-          <div><Label htmlFor="launch-name">Nombre de campaña</Label><Input id="launch-name" name="name" maxLength={140} placeholder="Cumplimiento anual 2026" required /></div>
-          <div><Label>Curso publicado</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label>Audiencia</Label><Select value={audience} onValueChange={(value) => { setAudience(value as TrainingLaunchAudience); setTargets([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USERS">Personas específicas</SelectItem><SelectItem value="ROLES">Roles</SelectItem><SelectItem value="BRANCHES">Sucursales</SelectItem><SelectItem value="TENANT">Toda la empresa</SelectItem></SelectContent></Select></div>
-          {audience !== "TENANT" ? (
-            <fieldset className="max-h-48 space-y-1 overflow-y-auto rounded-xl border p-3">
-              <legend className="px-1 text-sm font-medium">Destinatarios</legend>
-              {options.map((option) => <label key={option.id} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-muted"><input type="checkbox" checked={targets.includes(option.id)} onChange={(event) => setTargets(event.target.checked ? [...targets, option.id] : targets.filter((id) => id !== option.id))}/><span>{option.label}</span></label>)}
-            </fieldset>
-          ) : <p className="rounded-xl bg-muted p-4 text-sm">Se congelará la lista actual de personas activas de la empresa.</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div><Label htmlFor="launch-batch">Personas por lote</Label><Input id="launch-batch" name="batchSize" type="number" min={1} max={1000} defaultValue={100} /></div>
-            <div><Label htmlFor="launch-interval">Intervalo entre lotes (horas)</Label><Input id="launch-interval" name="rolloutIntervalHours" type="number" min={0} max={720} defaultValue={0} /></div>
-            <div><Label htmlFor="launch-start">Inicio programado</Label><Input id="launch-start" name="startAt" type="datetime-local" /></div>
-            <div><Label htmlFor="launch-due">Fecha límite</Label><Input id="launch-due" name="dueAt" type="datetime-local" /></div>
+
+        <OperationStepper state={operationState} onStepChange={setStep} />
+
+        {step === "select" || step === "record" ? (
+          <form className="space-y-5" onSubmit={review}>
+            <div><Label htmlFor="launch-name">Nombre de campaña</Label><Input id="launch-name" name="name" maxLength={140} placeholder="Cumplimiento anual 2026" defaultValue={draft?.name} required /></div>
+            <div><Label htmlFor="launch-course">Curso publicado</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger id="launch-course"><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((item) => <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label htmlFor="launch-audience">Audiencia</Label><Select value={audience} onValueChange={(value) => { setAudience(value as TrainingLaunchAudience); setTargets([]); }}><SelectTrigger id="launch-audience"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USERS">Personas específicas</SelectItem><SelectItem value="ROLES">Roles</SelectItem><SelectItem value="BRANCHES">Sucursales</SelectItem><SelectItem value="TENANT">Toda la empresa</SelectItem></SelectContent></Select></div>
+            {audience !== "TENANT" ? (
+              <fieldset className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-line p-3">
+                <legend className="px-1 text-sm font-medium">Destinatarios</legend>
+                {options.map((option) => (
+                  <label key={option.id} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-surface-2">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-[hsl(var(--accent-fill))]"
+                      checked={targets.includes(option.id)}
+                      onChange={(event) => setTargets(event.target.checked ? [...targets, option.id] : targets.filter((id) => id !== option.id))}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+            ) : (
+              <InlineNote tone="info" title="Toda la empresa">
+                Se congelará la lista de personas activas que haya en este momento.
+              </InlineNote>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><Label htmlFor="launch-batch">Personas por lote</Label><Input id="launch-batch" name="batchSize" type="number" min={1} max={1000} defaultValue={draft?.batchSize ?? 100} /></div>
+              <div><Label htmlFor="launch-interval">Intervalo entre lotes (horas)</Label><Input id="launch-interval" name="rolloutIntervalHours" type="number" min={0} max={720} defaultValue={draft?.rolloutIntervalHours ?? 0} /></div>
+              <div><Label htmlFor="launch-start">Inicio programado</Label><Input id="launch-start" name="startAt" type="datetime-local" defaultValue={draft?.startAt} /></div>
+              <div><Label htmlFor="launch-due">Fecha límite</Label><Input id="launch-due" name="dueAt" type="datetime-local" defaultValue={draft?.dueAt} /></div>
+            </div>
+            <label className="flex items-center gap-3 rounded-md border border-line p-4">
+              <input name="isRequired" type="checkbox" className="size-4 accent-[hsl(var(--accent-fill))]" defaultChecked={draft?.isRequired ?? true} />
+              <span>
+                <strong className="block text-sm">Formación obligatoria</strong>
+                <span className="text-xs text-ink-2">Se mostrará como requisito para toda la audiencia.</span>
+              </span>
+            </label>
+            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+              <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button type="submit" disabled={!courseId || (audience !== "TENANT" && !targets.length)}>Revisar impacto</Button>
+            </div>
+          </form>
+        ) : null}
+
+        {step === "review" && impact ? (
+          <div className="space-y-4">
+            <ImpactReview impact={impact} />
+            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+              <Button variant="secondary" onClick={() => setStep("record")}>Corregir los datos</Button>
+              <Button onClick={() => setStep("confirm")}>Continuar</Button>
+            </div>
           </div>
-          <label className="flex items-center gap-3 rounded-xl border p-4"><input name="isRequired" type="checkbox" defaultChecked /><span><strong className="block text-sm">Formación obligatoria</strong><span className="text-xs text-muted-foreground">Se mostrará como requisito para toda la audiencia.</span></span></label>
-          <div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" disabled={!courseId || (audience !== "TENANT" && !targets.length) || mutation.isPending}>{mutation.isPending ? "Preparando…" : "Crear campaña"}</Button></div>
-        </form>
+        ) : null}
+
+        {step === "confirm" && impact ? (
+          <ConfirmPanel
+            state={operationState}
+            operationName="Crear la campaña"
+            onConfirm={create}
+            onBack={() => setStep("review")}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+          />
+        ) : null}
+
+        {step === "result" && outcome ? (
+          <OperationResultView
+            outcome={outcome}
+            onRetry={create}
+            onStartAnother={() => onOpenChange(false)}
+            startAnotherLabel="Cerrar"
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
 }
 
+type AdminAssignmentRow = Awaited<ReturnType<typeof fetchTrainingAdminAssignments>>["items"][number];
+
+function personName(item: AdminAssignmentRow) {
+  return item.user ? `${item.user.firstName} ${item.user.lastName}` : "Persona sin identificar";
+}
+
+const assignmentColumns: Array<DataColumn<AdminAssignmentRow>> = [
+  {
+    key: "person",
+    header: "Persona",
+    priority: "identity",
+    render: (item) => (
+      <div className="min-w-0">
+        <p className="truncate font-medium text-ink-1">{personName(item)}</p>
+        <p className="truncate text-2xs text-ink-3">{item.user?.email}</p>
+      </div>
+    ),
+    sortValue: (item) => personName(item),
+  },
+  {
+    key: "course",
+    header: "Curso",
+    priority: "secondary",
+    render: (item) => item.course?.title ?? item.title,
+    sortValue: (item) => item.course?.title ?? item.title,
+  },
+  {
+    key: "status",
+    header: "Estado",
+    priority: "primary",
+    render: (item) => {
+      const status = item.effectiveStatus ?? item.status;
+      return <StatusBadge size="sm" tone={progressStatusTone(status)} label={statusLabels[status]} />;
+    },
+    sortValue: (item) => item.effectiveStatus ?? item.status,
+  },
+  {
+    key: "progress",
+    header: "Avance",
+    priority: "primary",
+    numeric: true,
+    render: (item) => <span className="font-mono tabular-figures">{item.progressPercent} %</span>,
+    sortValue: (item) => item.progressPercent,
+  },
+  {
+    key: "due",
+    header: "Vencimiento",
+    priority: "secondary",
+    render: (item) => (item.dueAt ? formatDate(item.dueAt) : "Sin fecha"),
+    sortValue: (item) => item.dueAt ?? "",
+  },
+];
+
 function AssignmentManagement() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState<AdminAssignmentRow | null>(null);
   const query = useQuery({
     queryKey: ["training-admin-assignments", page],
     queryFn: () => fetchTrainingAdminAssignments({ page, pageSize: 20 }),
@@ -888,6 +1187,7 @@ function AssignmentManagement() {
   const removeMutation = useMutation({
     mutationFn: deleteTrainingAssignment,
     onSuccess: async () => {
+      setPendingRemoval(null);
       toast.success("Asignación retirada");
       await queryClient.invalidateQueries({ queryKey: ["training-admin-assignments"] });
       await queryClient.invalidateQueries({ queryKey: ["my-training-assignments"] });
@@ -906,17 +1206,17 @@ function AssignmentManagement() {
       </div>
 
       {query.data?.summary ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {[
-            ["Total", query.data.summary.total],
-            ["Pendientes", query.data.summary.notStarted],
-            ["En progreso", query.data.summary.inProgress],
-            ["Completados", query.data.summary.completed],
-            ["Vencidos", query.data.summary.overdue],
-          ].map(([label, value]) => (
-            <Card key={label}><CardContent className="p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></CardContent></Card>
-          ))}
-        </div>
+        <MetricRow>
+          <Metric label="Total" value={String(query.data.summary.total)} />
+          <Metric label="Pendientes" value={String(query.data.summary.notStarted)} />
+          <Metric label="En progreso" value={String(query.data.summary.inProgress)} />
+          <Metric label="Completados" value={String(query.data.summary.completed)} tone="success" />
+          <Metric
+            label="Vencidos"
+            value={String(query.data.summary.overdue)}
+            tone={query.data.summary.overdue > 0 ? "danger" : undefined}
+          />
+        </MetricRow>
       ) : null}
 
       {query.data?.items.some((item) => ["OVERDUE", "IN_PROGRESS"].includes(item.effectiveStatus ?? item.status)) ? (
@@ -926,41 +1226,83 @@ function AssignmentManagement() {
         </Card>
       ) : null}
 
-      {query.isLoading ? <AsyncState state="loading" /> : query.isError ? (
-        <AsyncState state="error" onRetry={() => query.refetch()} />
-      ) : query.data?.items.length ? (
-        <>
-          <div className="grid gap-3 md:hidden">{query.data.items.map((item) => <Card key={item.id}><CardContent className="space-y-3 p-4"><div><p className="font-semibold">{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"}</p><p className="text-sm text-muted-foreground">{item.user?.email}</p></div><p className="text-sm font-medium">{item.course?.title ?? item.title}</p><div className="flex flex-wrap items-center justify-between gap-2"><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "default"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge><span className="text-sm">{item.progressPercent}%</span></div><dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-muted-foreground">Vencimiento</dt><dd>{item.dueAt ? formatDate(item.dueAt) : "Sin fecha"}</dd></div><div><dt className="text-muted-foreground">Acciones</dt><dd><Button variant="ghost" size="icon" aria-label={`Retirar asignación de ${item.user ? `${item.user.firstName} ${item.user.lastName}` : "usuario"}`} onClick={() => { if (window.confirm("¿Retirar esta asignación? El avance histórico se conservará, pero dejará de estar activa.")) removeMutation.mutate(item.id); }}><Trash2 className="size-4" /></Button></dd></div></dl></CardContent></Card>)}</div>
-          <div className="hidden overflow-x-auto rounded-2xl border bg-card md:block">
-            <table className="w-full min-w-[860px] text-sm">
-              <thead className="bg-muted/60 text-left">
-                <tr><th className="p-4">Persona</th><th className="p-4">Curso</th><th className="p-4">Estado</th><th className="p-4">Progreso</th><th className="p-4">Vencimiento</th><th className="p-4 text-right">Acciones</th></tr>
-              </thead>
-              <tbody>
-                {query.data.items.map((item) => (
-                  <tr key={item.id} className="border-t">
-                    <td className="p-4"><strong>{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Usuario"}</strong><br/><span className="text-muted-foreground">{item.user?.email}</span></td>
-                    <td className="p-4">{item.course?.title ?? item.title}</td>
-                    <td className="p-4"><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "default"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge></td>
-                    <td className="p-4">{item.progressPercent}%</td>
-                    <td className="p-4">{item.dueAt ? formatDate(item.dueAt) : "Sin fecha"}</td>
-                    <td className="p-4 text-right"><Button variant="ghost" size="icon" aria-label="Retirar asignación" onClick={() => { if (window.confirm("¿Retirar esta asignación? El avance histórico se conservará, pero dejará de estar activa.")) removeMutation.mutate(item.id); }}><Trash2 className="size-4" /></Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/*
+        Una sola declaración de columnas.
+
+        Antes esta lista existía dos veces: una cuadrícula de fichas para
+        móvil y, debajo, una tabla de 860px de ancho mínimo dentro de un
+        `overflow-x-auto` para escritorio, con los mismos datos escritos a
+        mano en los dos sitios —incluido el mismo `window.confirm`, duplicado.
+        Cualquier columna nueva había que añadirla dos veces, y en una se
+        olvidaba.
+      */}
+      <DataView
+        rows={query.data?.items ?? []}
+        loading={query.isLoading}
+        columns={assignmentColumns}
+        getKey={(item) => item.id}
+        caption="Asignaciones de formación"
+        emptyAction={<Button onClick={() => setCreateOpen(true)}><Plus className="size-4" aria-hidden="true" />Asignar el primer curso</Button>}
+        rowActions={(item) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Retirar la asignación de ${personName(item)}`}
+            onClick={() => setPendingRemoval(item)}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+          </Button>
+        )}
+      />
+
+      {query.isError ? (
+        <ErrorState
+          title="No fue posible cargar las asignaciones"
+          detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+          onRetry={() => void query.refetch()}
+        />
+      ) : null}
+
+      {query.data?.total ? (
+        <Pagination page={page} totalItems={query.data.total} pageSize={20} onPageChange={setPage} />
+      ) : null}
+
+      {/* Retirar una asignación deja de exigir el curso a esa persona: se
+          pregunta y se dice qué pasa con lo que ya avanzó. */}
+      <Dialog open={Boolean(pendingRemoval)} onOpenChange={(open) => !open && setPendingRemoval(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Retirar esta asignación?</DialogTitle>
+            <DialogDescription>
+              {pendingRemoval
+                ? `${personName(pendingRemoval)} dejará de tener asignado «${pendingRemoval.course?.title ?? pendingRemoval.title}».`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <InlineNote tone="info" title="Qué pasa con lo avanzado">
+            {pendingRemoval && pendingRemoval.progressPercent > 0
+              ? `El ${pendingRemoval.progressPercent} % que ya completó se conserva en el historial; lo que desaparece es la exigencia de terminarlo.`
+              : "El historial se conserva; lo que desaparece es la exigencia de completarlo."}
+          </InlineNote>
+          {removeMutation.error ? (
+            <InlineNote tone="danger" title="No se pudo retirar">
+              {getApiErrorMessage(removeMutation.error, "El servidor rechazó la operación.")}
+            </InlineNote>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setPendingRemoval(null)}>Mantenerla</Button>
+            <Button
+              variant="destructive"
+              loading={removeMutation.isPending}
+              loadingLabel="Retirando…"
+              onClick={() => pendingRemoval && removeMutation.mutate(pendingRemoval.id)}
+            >
+              Retirar la asignación
+            </Button>
           </div>
-          <Pagination
-            page={page}
-            totalPages={query.data.totalPages ?? 1}
-            totalItems={query.data.total}
-            pageSize={20}
-            onPageChange={setPage}
-          />
-        </>
-      ) : (
-        <Card className="border-dashed"><CardContent className="py-10 text-center"><Users className="mx-auto size-8 text-muted-foreground"/><p className="mt-3 font-medium">Todavía no hay asignaciones</p></CardContent></Card>
-      )}
+        </DialogContent>
+      </Dialog>
+
       <CreateAssignmentDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
@@ -1051,7 +1393,7 @@ function CoursePlayer({ courseId, open, onOpenChange }: { courseId: string | nul
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader><DialogTitle>{query.data?.title ?? "Curso"}</DialogTitle><DialogDescription>{query.data?.summary ?? "Contenido y progreso del curso."}</DialogDescription></DialogHeader>
-        {query.isLoading ? <AsyncState state="loading" /> : query.isError ? <AsyncState state="error" onRetry={() => query.refetch()} /> : query.data ? <CourseContent course={query.data} onVideoProgress={(event) => mutation.mutate({ event })} /> : null}
+        {query.isLoading ? <SkeletonRows rows={5} label="Cargando el contenido del curso" /> : query.isError ? <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} /> : query.data ? <CourseContent course={query.data} onVideoProgress={(event) => mutation.mutate({ event })} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -1073,7 +1415,7 @@ export function CourseContent({ course, onVideoProgress }: { course: LearnerTrai
   return <div className="space-y-5">
     <div className="rounded-xl bg-muted p-4" aria-live="polite"><div className="flex justify-between text-sm"><span>Avance general</span><strong>{course.progress?.progressPercent ?? 0}%</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-primary" style={{ width: `${course.progress?.progressPercent ?? 0}%` }} /></div></div>
     <CourseCurrentStep course={course} currentLesson={currentLesson} pendingQuiz={pendingQuiz} />
-    {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => { const index = lessons.findIndex((item) => item.id === lesson.id); const nextLesson = lessons[index + 1]; const isCurrent = currentLesson?.id === lesson.id; return <div id={`lesson-${lesson.id}`} key={lesson.id} aria-current={isCurrent ? "step" : undefined} className={`scroll-mt-6 rounded-xl border p-4 ${isCurrent ? "border-primary bg-primary/5 shadow-sm" : ""}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div>{isCurrent ? <Badge>Ahora</Badge> : lesson.completed ? <Badge variant="success">Completada</Badge> : null}</div><div className="mt-4 space-y-3">{lesson.videoUrl ? <VideoLesson key={`${lesson.id}-video`} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} /> : <LocalVideoLesson courseId={course.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} onProgress={onVideoProgress} />}{lesson.blocks.map((block) => lesson.type === "VIDEO" && block.type === "VIDEO" ? null : block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-brand underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="size-4" />Completada y guardada</p> : null}{nextLesson ? <a href={`#lesson-${nextLesson.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-brand underline-offset-4 hover:underline">Siguiente lección: {nextLesson.title} <span className="ml-1" aria-hidden="true">→</span></a> : lesson.completed ? <p className="mt-4 text-sm font-medium text-emerald-700">Has completado todo el contenido disponible.</p> : null}</div>; })}</CardContent></Card>)}
+    {course.modules.map((module) => <Card key={module.id}><CardHeader><CardTitle>{module.title}</CardTitle><p className="text-sm text-muted-foreground">{module.description}</p></CardHeader><CardContent className="space-y-3">{module.lessons.map((lesson) => { const index = lessons.findIndex((item) => item.id === lesson.id); const nextLesson = lessons[index + 1]; const isCurrent = currentLesson?.id === lesson.id; return <div id={`lesson-${lesson.id}`} key={lesson.id} aria-current={isCurrent ? "step" : undefined} className={`scroll-mt-6 rounded-xl border p-4 ${isCurrent ? "border-primary bg-primary/5 shadow-sm" : ""}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">{lesson.title}</h3><p className="mt-1 text-sm text-muted-foreground">{lesson.description}</p></div>{isCurrent ? <Badge>Ahora</Badge> : lesson.completed ? <Badge variant="success">Completada</Badge> : null}</div><div className="mt-4 space-y-3">{lesson.videoUrl ? <VideoLesson key={`${lesson.id}-video`} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} /> : <LocalVideoLesson courseId={course.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} onProgress={onVideoProgress} />}{lesson.blocks.map((block) => lesson.type === "VIDEO" && block.type === "VIDEO" ? null : block.type === "VIDEO" && block.resourceUrl ? <VideoLesson key={block.id} lesson={lesson} assignmentId={course.assignment?.id ?? ""} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} onProgress={onVideoProgress} /> : <div key={block.id} className="rounded-lg bg-muted/70 p-3"><strong className="text-sm">{block.title ?? block.type}</strong>{block.resourceUrl ? <p className="mt-2"><a className="text-sm text-brand underline" href={block.resourceUrl} target="_blank" rel="noreferrer">Abrir recurso</a></p> : null}{block.content ? <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{typeof block.content === "object" && "text" in block.content ? String(block.content.text) : JSON.stringify(block.content)}</p> : null}</div>)}</div>{lesson.completed ? <p className="mt-3 inline-flex items-center gap-2 text-sm text-status-success"><CheckCircle2 className="size-4" />Completada y guardada</p> : null}{nextLesson ? <a href={`#lesson-${nextLesson.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-brand underline-offset-4 hover:underline">Siguiente lección: {nextLesson.title} <span className="ml-1" aria-hidden="true">→</span></a> : lesson.completed ? <p className="mt-4 text-sm font-medium text-status-success">Has completado todo el contenido disponible.</p> : null}</div>; })}</CardContent></Card>)}
     {course.progress?.status === "COMPLETED" ? <Card className="border-status-success/30 bg-status-success-soft/30"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="font-semibold">Formación completada</p><p className="text-sm text-muted-foreground">Consulta si tienes una credencial disponible.</p></div><Button asChild variant="secondary"><Link href="/training/certificates"><Award className="size-4" />Ver certificado</Link></Button></CardContent></Card> : null}
   </div>;
 }
@@ -1107,7 +1449,7 @@ function LocalVideoLesson({ courseId, lesson, assignmentId, onProgress }: { cour
     };
   }, [courseId, lesson.id]);
   if (url) return <VideoLesson lesson={lesson} assignmentId={assignmentId} url={url} onProgress={onProgress} />;
-  return missing ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Este video se guardó localmente en el navegador del editor y todavía no está disponible en este navegador.</p> : <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">Cargando video local...</p>;
+  return missing ? <InlineNote tone="warning" title="Este video no está disponible aquí">Se guardó localmente en el navegador de quien lo editó y todavía no se ha subido.</InlineNote> : <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">Cargando video local...</p>;
 }
 
 export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
@@ -1173,7 +1515,7 @@ export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson:
     };
   }, [assignmentId, completionThreshold, lesson.id, savedPosition]);
 
-  return <div className="rounded-xl bg-black p-2"><video ref={videoRef} className="aspect-video w-full rounded-lg" controls playsInline preload="metadata" src={url} onError={() => { setMediaError(true); setSyncState("No fue posible reproducir este MP4"); }} aria-label={`Video de ${lesson.title}`} />{mediaError ? <p className="px-2 pt-2 text-xs text-amber-300">Verifica que el archivo sea un MP4 compatible (H.264/AAC) y vuelve a cargarlo desde el editor.</p> : null}<div className="px-2 pt-3"><div className="relative h-2 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label={`Avance del video ${watchPercent}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={watchPercent}><div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${watchPercent}%` }} /><span className="absolute inset-y-0 w-0.5 bg-white/80" style={{ left: `${completionThreshold}%` }} aria-hidden="true" /></div><div className="mt-1 flex justify-between text-[11px] text-white/70"><span>{watchPercent}% visto</span><span>Completa al {completionThreshold}%</span></div></div><p className="px-2 pb-1 pt-2 text-xs text-white/70" aria-live="polite">{syncState}</p></div>;
+  return <div className="rounded-xl bg-black p-2"><video ref={videoRef} className="aspect-video w-full rounded-lg" controls playsInline preload="metadata" src={url} onError={() => { setMediaError(true); setSyncState("No fue posible reproducir este MP4"); }} aria-label={`Video de ${lesson.title}`} />{mediaError ? <p className="px-2 pt-2 text-xs text-accent-fill">Verifica que el archivo sea un MP4 compatible (H.264/AAC) y vuelve a cargarlo desde el editor.</p> : null}<div className="px-2 pt-3"><div className="relative h-2 overflow-hidden rounded-full bg-white/20" role="progressbar" aria-label={`Avance del video ${watchPercent}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={watchPercent}><div className="h-full rounded-full bg-accent-fill transition-[width] duration-200" style={{ width: `${watchPercent}%` }} /><span className="absolute inset-y-0 w-0.5 bg-white/80" style={{ left: `${completionThreshold}%` }} aria-hidden="true" /></div><div className="mt-1 flex justify-between text-[11px] text-white/70"><span>{watchPercent}% visto</span><span>Completa al {completionThreshold}%</span></div></div><p className="px-2 pb-1 pt-2 text-xs text-white/70" aria-live="polite">{syncState}</p></div>;
 }
 
 function formatDate(value: string) {

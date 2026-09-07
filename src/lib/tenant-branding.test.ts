@@ -4,9 +4,9 @@ import { createTenantTheme, __testing } from "@/lib/tenant-branding";
 const { contrastRatio } = __testing;
 
 /** Deben coincidir con `globals.css`. */
-const SURFACE_LIGHT = { h: 210, s: 40, l: 98 };
-const SURFACE_DARK = { h: 222, s: 47, l: 7 };
-const SURFACE_SIDEBAR = { h: 220, s: 29, l: 12 };
+const SURFACE_LIGHT = { h: 210, s: 24, l: 97 };
+const SURFACE_DARK = { h: 213, s: 30, l: 6 };
+const SURFACE_SIDEBAR = { h: 213, s: 28, l: 8 };
 const WHITE = { h: 0, s: 0, l: 100 };
 
 /** Réplica de la mezcla sRGB que hace `bg-primary/10` sobre una superficie. */

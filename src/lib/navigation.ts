@@ -1,10 +1,99 @@
 import type { ModuleKey, PermissionKey, RoleKey, SubscriptionAccessState } from "@/lib/contracts";
 
 export type NavGroup = "Inicio" | "Personas" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Inventario de activos" | "Inventario de restaurante" | "Analítica" | "Administración" | "Gobierno de plataforma";
-export type NavItem = { href: string; label: string; group: NavGroup; module: ModuleKey; permission: PermissionKey; requiredPermissions: PermissionKey[]; audience: "shared" | "saas" | "tenant"; featureFlag: string; available: boolean; requiresCommercialModule?: boolean; showInNavigation?: boolean; subscriptionStates?: SubscriptionAccessState[]; branchRequired?: boolean; roles?: RoleKey[]; strictRoles?: boolean; icon: "dashboard" | "notifications" | "reports" | "profile" | "vacancies" | "candidates" | "interviews" | "documents" | "signatures" | "training" | "evaluations" | "productivity" | "inventory" | "admin" | "users" | "roles" | "company" | "tenants" | "branches" | "modules" | "subscription" | "queues" };
+export type NavItem = { href: string; label: string; group: NavGroup; section: NavSection; module: ModuleKey; permission: PermissionKey; requiredPermissions: PermissionKey[]; audience: "shared" | "saas" | "tenant"; featureFlag: string; available: boolean; requiresCommercialModule?: boolean; showInNavigation?: boolean; subscriptionStates?: SubscriptionAccessState[]; branchRequired?: boolean; roles?: RoleKey[]; strictRoles?: boolean; icon: "dashboard" | "notifications" | "reports" | "profile" | "vacancies" | "candidates" | "interviews" | "documents" | "signatures" | "training" | "evaluations" | "productivity" | "inventory" | "admin" | "users" | "roles" | "company" | "tenants" | "branches" | "modules" | "subscription" | "queues" };
 const live: SubscriptionAccessState[] = ["active", "trial", "grace_period"];
 
-const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "requiredPermissions">> = [
+
+/* ==========================================================================
+   SECCIONES POR INTENCIÓN
+   ==========================================================================
+   El menú tenía 90 entradas repartidas en 10 grupos que mezclaban intenciones:
+   «Operaciones» acumulaba 35 ítems de restaurante junto a productividad y
+   activos, y «Analítica» juntaba un panel de auditoría —algo que exige actuar—
+   con un comparativo multiunidad —algo que se va a consultar—. Además, dos
+   grupos declarados en el tipo (`Inventario de activos`, `Inventario de
+   restaurante`) no los usaba NINGÚN ítem.
+
+   La sección responde a «¿a qué vengo?», el grupo sigue respondiendo a «¿de
+   qué área es?». Son dos ejes distintos y ahora conviven: la barra lateral
+   muestra secciones, y dentro de cada sección agrupa por área.
+
+   Se AÑADE un campo; no se toca `group`, ni `href`, ni `permission`, ni
+   `module`, ni `roles`. Por eso ninguna política de acceso cambia y ningún
+   enlace guardado se rompe.
+   ========================================================================== */
+
+export type NavSection =
+  | "inicio"
+  | "operacion"
+  | "supervision"
+  | "reportes"
+  | "administracion"
+  | "plataforma";
+
+export const navSections: ReadonlyArray<{ id: NavSection; label: string; hint: string }> = [
+  { id: "inicio", label: "Inicio", hint: "Tu punto de partida" },
+  { id: "operacion", label: "Operación diaria", hint: "Lo que se registra hoy" },
+  { id: "supervision", label: "Supervisión", hint: "Lo que hay que vigilar" },
+  { id: "reportes", label: "Reportes y análisis", hint: "Lo que se consulta" },
+  { id: "administracion", label: "Administración", hint: "Cómo se configura la empresa" },
+  { id: "plataforma", label: "Gobierno de plataforma", hint: "Alcance multiempresa" },
+];
+
+/**
+ * Pantallas que vigilan, no que analizan.
+ *
+ * La diferencia práctica: una pantalla de supervisión existe porque algo puede
+ * estar mal y alguien tiene que actuar —un vencimiento, un descuadre, una
+ * merma, una alerta—. Una de reportes existe para responder una pregunta.
+ * Mezclarlas es lo que hacía que las alertas de vencimiento se perdieran entre
+ * los comparativos de margen.
+ */
+const supervisionRoutes = new Set([
+  "/notifications",
+  "/productivity",
+  "/inventory/assets/audit",
+  "/inventory/restaurant/audit",
+  "/inventory/restaurant/audit-log",
+  "/inventory/restaurant/variance",
+  "/inventory/restaurant/shrinkage",
+  "/inventory/restaurant/expiry-alerts",
+  "/inventory/restaurant/purchase-suggestions",
+]);
+
+/**
+ * Pantallas de análisis que viven en un grupo de área, no en «Analítica».
+ *
+ * `/ats/analytics` está declarada en el grupo «Reclutamiento» pese a ser una
+ * pantalla de análisis; lo detectó la prueba de secciones. Se corrige aquí y no
+ * cambiando su `group`, porque el grupo sigue respondiendo a «¿de qué área
+ * es?» y la respuesta —reclutamiento— es correcta.
+ */
+const reportRoutes = new Set([
+  "/ats/analytics",
+  "/training/results",
+  "/training/intelligence",
+]);
+
+/**
+ * Deriva la sección de un ítem.
+ *
+ * Se deriva en vez de declararse ítem a ítem porque 90 campos escritos a mano
+ * son 90 oportunidades de equivocarse, y porque la regla general acierta en la
+ * gran mayoría. Las excepciones están arriba, enumeradas y probadas.
+ */
+export function sectionForNavItem(item: { href: string; group: NavGroup }): NavSection {
+  if (supervisionRoutes.has(item.href)) return "supervision";
+  if (reportRoutes.has(item.href)) return "reportes";
+  if (item.group === "Inicio") return "inicio";
+  if (item.group === "Gobierno de plataforma") return "plataforma";
+  if (item.group === "Administración") return "administracion";
+  if (item.group === "Analítica") return "reportes";
+  return "operacion";
+}
+
+const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "requiredPermissions" | "section">> = [
   { href: "/dashboard", label: "Inicio", group: "Inicio", module: "dashboard", permission: "dashboard.view", audience: "shared", icon: "dashboard" },
   { href: "/profile", label: "Mi perfil", group: "Inicio", module: "profile", permission: "profile.view", audience: "shared", icon: "profile" },
   { href: "/employees", label: "Empleados", group: "Personas", module: "productivity", permission: "productivity.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "users", roles: ["admin_saas", "admin_empresa", "supervisor"] },
@@ -104,6 +193,7 @@ const unavailableRouteHrefs = new Set(["/admin/settings"]);
 
 export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
   ...item,
+  section: sectionForNavItem(item),
   requiredPermissions: [item.permission],
   featureFlag: `module.${item.module}`,
   // Inicio, administración y gobierno son capacidades base, no módulos comerciales.
@@ -162,3 +252,28 @@ export const candidateNavigation = [
   { href: "/candidate/evaluations", label: "Evaluaciones", available: false },
   { href: "/candidate/profile", label: "Perfil y privacidad", available: true },
 ] as const;
+
+
+/** Secciones que contienen al menos un ítem visible, en el orden canónico. */
+export function visibleSections(items: readonly NavItem[]): NavSection[] {
+  const present = new Set(items.filter((item) => item.showInNavigation !== false).map((item) => item.section));
+  return navSections.map((section) => section.id).filter((id) => present.has(id));
+}
+
+/** Ítems de una sección, agrupados por área y conservando el orden original. */
+export function itemsBySection(items: readonly NavItem[], section: NavSection) {
+  const visible = items.filter((item) => item.section === section && item.showInNavigation !== false);
+  const groups: Array<{ group: NavGroup; items: NavItem[] }> = [];
+  for (const item of visible) {
+    const existing = groups.find((candidate) => candidate.group === item.group);
+    if (existing) existing.items.push(item);
+    else groups.push({ group: item.group, items: [item] });
+  }
+  return groups;
+}
+
+/** Sección a la que pertenece una ruta, para saber qué abrir en la barra. */
+export function sectionForPath(items: readonly NavItem[], pathname: string): NavSection {
+  const policy = getRoutePolicy(pathname);
+  return policy?.section ?? "inicio";
+}

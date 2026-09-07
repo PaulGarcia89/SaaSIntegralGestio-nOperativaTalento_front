@@ -4,9 +4,12 @@ const FALLBACK = "#0EA5B7";
  * Fondos contra los que se valida el color de marca cuando se usa como TEXTO.
  * Deben coincidir con `--background` y `--sidebar` de `globals.css`.
  */
-const SURFACE_LIGHT = { h: 210, s: 40, l: 98 };
-const SURFACE_DARK = { h: 222, s: 47, l: 7 };
-const SURFACE_SIDEBAR = { h: 220, s: 29, l: 12 };
+const SURFACE_LIGHT = { h: 210, s: 24, l: 97 };
+const SURFACE_DARK = { h: 213, s: 30, l: 6 };
+// La barra lateral es grafito en LOS DOS temas. Se valida contra la variante
+// mas clara (tema claro, 8%), que es el peor caso para un texto de marca claro:
+// sobre la variante del tema oscuro (5%) el contraste solo puede ser mayor.
+const SURFACE_SIDEBAR = { h: 213, s: 28, l: 8 };
 
 /** Umbral WCAG 2.2 AA para texto normal. */
 const AA_NORMAL_TEXT = 4.5;
@@ -107,7 +110,7 @@ function ensureReadable(brand: Hsl, surfaces: Hsl | Hsl[], target = AA_NORMAL_TE
 }
 
 const WHITE: Hsl = { h: 0, s: 0, l: 100 };
-const NEAR_BLACK: Hsl = { h: 222, s: 47, l: 11 };
+const NEAR_BLACK: Hsl = { h: 213, s: 32, l: 12 };
 
 /** Mezcla `top` sobre `bottom` con la opacidad indicada, en sRGB. */
 function blend(top: Hsl, bottom: Hsl, alpha: number): Hsl {
@@ -180,7 +183,7 @@ export function createTenantTheme(input?: string) {
   return {
     hex,
     primary: format(fill),
-    foreground: onNearBlack > onWhite ? "222 47% 11%" : "0 0% 100%",
+    foreground: onNearBlack > onWhite ? "213 32% 12%" : "0 0% 100%",
     accent: `${Math.round(h)} ${Math.max(35, Math.round(s))}% 93%`,
     /** Marca legible como texto sobre el fondo claro. */
     textOnLight: format(

@@ -7,6 +7,10 @@ import {
   getRoutePolicy,
   isAudienceAllowed,
   isRoleAllowed,
+  itemsBySection,
+  navSections,
+  sectionForPath,
+  visibleSections,
   type RouteAccessContext,
 } from "./navigation";
 
@@ -309,5 +313,105 @@ describe("navigation policy", () => {
   it("declares a feature flag and operational state for every protected route", () => {
     expect(appNavigation.every((item) => item.featureFlag.startsWith("module.") && item.requiredPermissions.length > 0 && typeof item.available === "boolean")).toBe(true);
     expect(evaluateRouteAccess(getRoutePolicy("/reports")!, { ...({ sessionValid: true, tenantAllowed: true, subscriptionStatus: "active", role: "admin_saas", hasModule: () => true, hasFeature: () => true, can: () => true, branchAvailable: true } satisfies RouteAccessContext) }).code).toBe("ALLOWED");
+  });
+});
+
+/* ==========================================================================
+   SECCIONES POR INTENCIÓN
+   ==========================================================================
+   Documentan la reagrupación del menú: 90 entradas que estaban en 10 grupos
+   mezclando «de qué área es» con «a qué vengo». El grupo se conserva; la
+   sección es el eje nuevo.
+   ========================================================================== */
+
+describe("secciones de navegación", () => {
+  it("todo ítem tiene una sección de la lista canónica", () => {
+    const known = new Set(navSections.map((section) => section.id));
+    for (const item of appNavigation) {
+      expect(known.has(item.section), `${item.href} → ${item.section}`).toBe(true);
+    }
+  });
+
+  it("la reagrupación NO cambia ninguna política de acceso", () => {
+    // La garantía que hace segura esta refactorización: se añadió un campo,
+    // no se tocó ni una ruta, ni un permiso, ni un módulo, ni un rol.
+    for (const item of appNavigation) {
+      expect(item.requiredPermissions).toEqual([item.permission]);
+      expect(item.featureFlag).toBe(`module.${item.module}`);
+    }
+  });
+
+  it("separa lo que hay que vigilar de lo que se consulta", () => {
+    const section = (href: string) => appNavigation.find((item) => item.href === href)?.section;
+    // Vigilar: existen porque algo puede estar mal y alguien debe actuar.
+    expect(section("/notifications")).toBe("supervision");
+    expect(section("/inventory/restaurant/expiry-alerts")).toBe("supervision");
+    expect(section("/inventory/restaurant/shrinkage")).toBe("supervision");
+    expect(section("/inventory/restaurant/audit-log")).toBe("supervision");
+    // Consultar: existen para responder una pregunta.
+    expect(section("/inventory/restaurant/recipe-margins")).toBe("reportes");
+    expect(section("/inventory/restaurant/unit-comparison")).toBe("reportes");
+    expect(section("/ats/analytics")).toBe("reportes");
+  });
+
+  it("las pantallas de análisis fuera del grupo «Analítica» acaban en reportes", () => {
+    const section = (href: string) => appNavigation.find((item) => item.href === href)?.section;
+    expect(section("/training/results")).toBe("reportes");
+    expect(section("/training/intelligence")).toBe("reportes");
+    // …pero el resto de Aprendizaje sigue siendo operación diaria.
+    expect(section("/training")).toBe("operacion");
+    expect(section("/training/evaluations")).toBe("operacion");
+  });
+
+  it("administración y gobierno de plataforma no se mezclan", () => {
+    const section = (href: string) => appNavigation.find((item) => item.href === href)?.section;
+    expect(section("/admin/users")).toBe("administracion");
+    expect(section("/admin/branches")).toBe("administracion");
+    expect(section("/admin/tenants")).toBe("plataforma");
+    expect(section("/admin/plans")).toBe("plataforma");
+  });
+
+  it("el grueso del producto cae en operación diaria", () => {
+    const operacion = appNavigation.filter((item) => item.section === "operacion");
+    expect(operacion.length).toBeGreaterThan(30);
+    expect(operacion.some((item) => item.href === "/ats")).toBe(true);
+    expect(operacion.some((item) => item.href === "/hiring")).toBe(true);
+    expect(operacion.some((item) => item.href === "/inventory/restaurant/receipts")).toBe(true);
+  });
+
+  it("visibleSections respeta el orden canónico y omite las vacías", () => {
+    const soloAdmin = appNavigation.filter((item) => item.section === "administracion");
+    expect(visibleSections(soloAdmin)).toEqual(["administracion"]);
+
+    const mezcla = appNavigation.filter((item) =>
+      ["/admin/users", "/ats", "/dashboard"].includes(item.href),
+    );
+    // El orden sale de `navSections`, no del orden en que llegan los ítems.
+    expect(visibleSections(mezcla)).toEqual(["inicio", "operacion", "administracion"]);
+  });
+
+  it("visibleSections ignora los ítems ocultos del menú", () => {
+    // `/ats/pipeline` sigue existiendo como ruta pero no ocupa sitio en el menú.
+    const oculto = appNavigation.filter((item) => item.href === "/ats/pipeline");
+    expect(oculto[0]?.showInNavigation).toBe(false);
+    expect(visibleSections(oculto)).toEqual([]);
+  });
+
+  it("itemsBySection conserva el área como segundo nivel", () => {
+    const grupos = itemsBySection(appNavigation, "administracion");
+    expect(grupos.length).toBeGreaterThan(0);
+    for (const grupo of grupos) {
+      expect(grupo.items.every((item) => item.group === grupo.group)).toBe(true);
+      expect(grupo.items.every((item) => item.showInNavigation !== false)).toBe(true);
+    }
+  });
+
+  it("sectionForPath resuelve la sección de una subruta", () => {
+    expect(sectionForPath(appNavigation, "/ats/vacancies/nueva-vacante")).toBe("operacion");
+    expect(sectionForPath(appNavigation, "/admin/users")).toBe("administracion");
+  });
+
+  it("sectionForPath cae en inicio ante una ruta desconocida", () => {
+    expect(sectionForPath(appNavigation, "/ruta/que/no/existe")).toBe("inicio");
   });
 });

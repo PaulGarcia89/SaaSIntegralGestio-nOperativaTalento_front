@@ -1,11 +1,83 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
-@theme inline {
-  --font-sans: var(--font-body);
-  --font-heading: var(--font-heading);
-  --font-mono: var(--font-mono);
+/* ============================================================================
+   SISTEMA VISUAL · "Grafito y ámbar"
+   ============================================================================
 
+   Concepto: instrumento de precisión, no panel de administración. La jerarquía
+   la construyen las CAPAS DE SUPERFICIE y las LÍNEAS DE 1px, no las sombras
+   difusas ni los degradados. El ámbar es el único color cromático del sistema y
+   está reservado a tres papeles: la acción recomendada, el foco y la serie
+   principal de un gráfico. Todo lo demás es grafito.
+
+   Reglas del sistema
+   ------------------
+   1. Ningún componente escribe un color, un espacio, una sombra, un z-index ni
+      una duración literal. Todo sale de un token de este archivo.
+   2. Cada par texto/superficie de la paleta está verificado a WCAG 2.2 AA
+      (4,5:1 texto normal, 3:1 borde de control y foco), incluidos los chips
+      teñidos al 10 %. Si se cambia un valor hay que revalidar el par.
+   3. El ámbar CLARO (`--accent-fill`) nunca hace de borde sobre fondo claro:
+      1,91:1. Para eso existe `--accent-line`, que es el ámbar oscurecido.
+   4. La densidad es un token, no una reescritura. `[data-density]` reescala
+      espaciado, tipografía y alturas de control sin tocar un solo componente.
+
+   Herencia
+   --------
+   Los nombres antiguos (`--background`, `--card`, `--muted-foreground`,
+   `--surface-*`, `--text-*`, `--status-*`…) se CONSERVAN y se reasignan a la
+   paleta nueva. Así las ~300 pantallas existentes adoptan la dirección visual
+   sin editarlas una por una, y la migración a los nombres nuevos puede ser
+   gradual en vez de un cambio de golpe.
+   ========================================================================== */
+
+@theme inline {
+  /* ---- Tipografía ------------------------------------------------------- */
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display-family);
+  --font-mono: var(--font-mono-family);
+
+  --text-2xs: var(--type-2xs);
+  --text-2xs--line-height: var(--type-2xs-lh);
+  --text-xs: var(--type-xs);
+  --text-xs--line-height: var(--type-xs-lh);
+  --text-sm: var(--type-sm);
+  --text-sm--line-height: var(--type-sm-lh);
+  --text-base: var(--type-base);
+  --text-base--line-height: var(--type-base-lh);
+  --text-lg: var(--type-lg);
+  --text-lg--line-height: var(--type-lg-lh);
+  --text-xl: var(--type-xl);
+  --text-xl--line-height: var(--type-xl-lh);
+  --text-2xl: var(--type-2xl);
+  --text-2xl--line-height: var(--type-2xl-lh);
+  --text-3xl: var(--type-3xl);
+  --text-3xl--line-height: var(--type-3xl-lh);
+  --text-4xl: var(--type-4xl);
+  --text-4xl--line-height: var(--type-4xl-lh);
+
+  /* ---- Color: nombres nuevos -------------------------------------------- */
+  --color-canvas: hsl(var(--canvas));
+  --color-surface-1: hsl(var(--surface-1));
+  --color-surface-2: hsl(var(--surface-2));
+  --color-surface-3: hsl(var(--surface-3));
+  --color-ink-1: hsl(var(--ink-1));
+  --color-ink-2: hsl(var(--ink-2));
+  --color-ink-3: hsl(var(--ink-3));
+  --color-ink-disabled: hsl(var(--ink-disabled));
+  --color-line: hsl(var(--line-1));
+  --color-line-strong: hsl(var(--line-strong));
+  --color-line-control: hsl(var(--line-control));
+  --color-action: hsl(var(--action));
+  --color-on-action: hsl(var(--on-action));
+  --color-accent-ink: hsl(var(--accent-ink));
+  --color-accent-line: hsl(var(--accent-line));
+  --color-accent-fill: hsl(var(--accent-fill));
+  --color-on-accent-fill: hsl(var(--on-accent-fill));
+  --color-focus: hsl(var(--focus));
+
+  /* ---- Color: nombres heredados (reasignados) --------------------------- */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -14,8 +86,6 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-  /* Marca usable como TEXTO: contraste validado contra el fondo del tema
-     activo. `--color-primary` sigue siendo el RELLENO. Ver tenant-branding.ts. */
   --color-brand: hsl(var(--brand-text));
   --color-sidebar-brand: hsl(var(--sidebar-brand-text));
   --color-secondary: hsl(var(--secondary));
@@ -52,189 +122,544 @@
   --color-status-success: hsl(var(--status-success));
   --color-status-warning: hsl(var(--status-warning));
   --color-status-danger: hsl(var(--status-danger));
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  /* ---- Serie de gráficos ------------------------------------------------
+     Ordenada por prioridad de lectura. Nunca se distinguen series solo por
+     color: el motor de gráficos añade además trazo (sólido/discontinuo/
+     punteado) y etiqueta directa. Ver `components/chart/`. */
+  --color-series-1: hsl(var(--series-1));
+  --color-series-2: hsl(var(--series-2));
+  --color-series-3: hsl(var(--series-3));
+  --color-series-4: hsl(var(--series-4));
+  --color-series-5: hsl(var(--series-5));
+  --color-grid: hsl(var(--chart-grid));
+
+  /* ---- Espaciado --------------------------------------------------------
+     Ritmo de 4px. Los valores los reescala `[data-density]`. */
+  --spacing-e1: var(--space-1);
+  --spacing-e2: var(--space-2);
+  --spacing-e3: var(--space-3);
+  --spacing-e4: var(--space-4);
+  --spacing-e5: var(--space-5);
+  --spacing-e6: var(--space-6);
+  --spacing-e7: var(--space-7);
+  --spacing-e8: var(--space-8);
+  --spacing-e9: var(--space-9);
+  --spacing-e10: var(--space-10);
+
+  /* ---- Radios ----------------------------------------------------------- */
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-2xl);
+  --radius-3xl: var(--r-3xl);
+
+  /* ---- Elevación --------------------------------------------------------
+     e1 y e2 son las únicas permitidas en contenido. e3 y e4 quedan para lo que
+     flota sobre el resto (menús, hojas, diálogos). */
+  --shadow-e1: var(--elev-1);
+  --shadow-e2: var(--elev-2);
+  --shadow-e3: var(--elev-3);
+  --shadow-e4: var(--elev-4);
+
+  /* ---- Puntos de corte --------------------------------------------------
+     `xs` existe para el salto real entre un iPhone SE (320px) y un iPhone 12
+     en adelante (390px): es donde una fila de dos columnas empieza a caber. */
+  --breakpoint-xs: 23.75rem;
+
+  /* ---- Movimiento -------------------------------------------------------
+     La salida SIEMPRE es más rápida que la entrada: al volver atrás, la
+     interfaz tiene que sentirse instantánea. */
+  --animate-duration-instant: 80ms;
+  --animate-duration-exit: 120ms;
+  --animate-duration-fast: 140ms;
+  --animate-duration-base: 200ms;
+  --animate-duration-slow: 320ms;
 }
+
+/* ============================================================================
+   ESCALA DE DENSIDAD
+   ============================================================================
+   `comfortable` (por defecto) conserva la escala accesible acordada el 04-09:
+   cuerpo de 17-18px y objetivos de 56px, para que el producto siga siendo
+   usable por alguien sin experiencia informática. `compact` es el registro
+   profesional. Ningún componente conoce la densidad: solo lee estos tokens.
+   En ambas, el objetivo táctil en móvil nunca baja de 44px (WCAG 2.5.8).
+   ========================================================================== */
+
+:root,
+[data-density="comfortable"] {
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3.5rem;
+  --space-10: 4.5rem;
+
+  --type-2xs: 0.75rem;    --type-2xs-lh: 1.1rem;
+  --type-xs: 0.8125rem;   --type-xs-lh: 1.2rem;
+  --type-sm: 0.9375rem;   --type-sm-lh: 1.45rem;
+  --type-base: 1.0625rem; --type-base-lh: 1.65rem;
+  --type-lg: 1.1875rem;   --type-lg-lh: 1.75rem;
+  --type-xl: 1.375rem;    --type-xl-lh: 1.85rem;
+  --type-2xl: 1.75rem;    --type-2xl-lh: 2.1rem;
+  --type-3xl: 2.25rem;    --type-3xl-lh: 2.5rem;
+  --type-4xl: 2.875rem;   --type-4xl-lh: 3.1rem;
+
+  /* Alturas de control. `-touch` manda en móvil; `-base`, de `sm` hacia arriba. */
+  --control-h-touch: 3.5rem;
+  --control-h-base: 2.75rem;
+  --row-h: 3.5rem;
+  --pad-card: var(--space-6);
+  --pad-page: var(--space-5);
+}
+
+[data-density="compact"] {
+  --space-1: 0.25rem;
+  --space-2: 0.375rem;
+  --space-3: 0.5rem;
+  --space-4: 0.75rem;
+  --space-5: 0.875rem;
+  --space-6: 1rem;
+  --space-7: 1.25rem;
+  --space-8: 1.75rem;
+  --space-9: 2.25rem;
+  --space-10: 3rem;
+
+  --type-2xs: 0.6875rem;  --type-2xs-lh: 1rem;
+  --type-xs: 0.75rem;     --type-xs-lh: 1.1rem;
+  --type-sm: 0.8125rem;   --type-sm-lh: 1.25rem;
+  --type-base: 0.9375rem; --type-base-lh: 1.4rem;
+  --type-lg: 1.0625rem;   --type-lg-lh: 1.55rem;
+  --type-xl: 1.25rem;     --type-xl-lh: 1.65rem;
+  --type-2xl: 1.5rem;     --type-2xl-lh: 1.85rem;
+  --type-3xl: 1.875rem;   --type-3xl-lh: 2.15rem;
+  --type-4xl: 2.375rem;   --type-4xl-lh: 2.6rem;
+
+  /* 2,75rem = 44px: el mínimo de WCAG 2.5.8. La densidad compacta reduce el
+     espacio, nunca el objetivo táctil por debajo de lo accesible. */
+  --control-h-touch: 2.75rem;
+  --control-h-base: 2.25rem;
+  --row-h: 2.5rem;
+  --pad-card: var(--space-5);
+  --pad-page: var(--space-4);
+}
+
+/* ============================================================================
+   TEMA CLARO
+   ============================================================================
+   Papel frío, no blanco puro: el blanco queda reservado a la tarjeta, así la
+   jerarquía se lee sin necesidad de sombra.
+   ========================================================================== */
 
 :root {
-  --font-heading: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-body: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --primary: 190 87% 30%;
+  /* Familias. Las inyecta `next/font/local` desde `src/lib/fonts.ts`; estos
+     son los valores de reserva si la fuente no llega a cargar. */
+  --font-display-family: var(--font-geist-sans), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: var(--font-geist-sans), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono-family: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* -- Paleta base -- */
+  --canvas: 210 24% 97%;
+  --surface-1: 0 0% 100%;
+  --surface-2: 210 24% 94%;
+  --surface-3: 210 22% 90%;
+
+  --ink-1: 213 32% 12%;
+  --ink-2: 213 13% 38%;
+  --ink-3: 213 13% 43%;
+  /* Solo para controles inactivos. WCAG 1.4.3 exceptúa del contraste el texto
+     de un componente deshabilitado; no debe usarse para texto informativo. */
+  --ink-disabled: 213 12% 62%;
+
+  --line-1: 213 20% 87%;
+  --line-strong: 213 18% 76%;
+  /* Borde de CONTROL (campo, casilla, interruptor): 1.4.11 exige 3:1 contra la
+     superficie contigua. Por eso es mucho más oscuro que la línea decorativa. */
+  --line-control: 213 14% 46%;
+
+  /* La acción principal es GRAFITO, no la marca del tenant: garantiza 15:1 con
+     texto blanco sea cual sea el color que configure la empresa, y deja el
+     ámbar libre para señalar la acción RECOMENDADA. */
+  --action: 213 34% 14%;
+  --on-action: 0 0% 100%;
+
+  --accent-ink: 28 92% 30%;
+  --accent-line: 28 92% 34%;
+  --accent-fill: 38 94% 52%;
+  --on-accent-fill: 30 45% 10%;
+  --focus: 28 92% 36%;
+
+  --status-info: 205 80% 30%;
+  --status-success: 158 80% 23%;
+  --status-warning: 28 92% 30%;
+  --status-danger: 5 76% 38%;
+
+  --series-1: 38 94% 44%;
+  --series-2: 213 34% 24%;
+  --series-3: 188 62% 30%;
+  --series-4: 262 34% 42%;
+  --series-5: 5 62% 44%;
+  --chart-grid: 213 20% 87%;
+
+  /* -- Barra lateral: grafito en los dos temas. Un raíl oscuro sobre lienzo
+        claro es la firma de la dirección y da profundidad sin sombras. -- */
+  --sidebar: 213 28% 8%;
+  --sidebar-foreground: 210 22% 96%;
+  --sidebar-muted: 212 14% 64%;
+  --sidebar-primary: 38 94% 58%;
+  --sidebar-primary-foreground: 213 45% 7%;
+  --sidebar-accent: 213 24% 14%;
+  --sidebar-accent-foreground: 210 22% 96%;
+  --sidebar-border: 213 20% 16%;
+  --sidebar-ring: 38 96% 62%;
+
+  /* -- Elevación: en claro, sombra corta y fría; nada difuso. -- */
+  --elev-1: 0 1px 2px hsl(213 32% 12% / 0.06);
+  --elev-2: 0 1px 2px hsl(213 32% 12% / 0.05), 0 6px 16px -8px hsl(213 32% 12% / 0.12);
+  --elev-3: 0 2px 4px hsl(213 32% 12% / 0.05), 0 12px 32px -12px hsl(213 32% 12% / 0.18);
+  --elev-4: 0 4px 8px hsl(213 32% 12% / 0.06), 0 32px 64px -24px hsl(213 32% 12% / 0.26);
+
+  /* -- Radios -- */
+  --r-xs: 0.375rem;
+  --r-sm: 0.5rem;
+  --r-md: 0.625rem;
+  --r-lg: 0.875rem;
+  --r-xl: 1.125rem;
+  --r-2xl: 1.5rem;
+  --r-3xl: 2rem;
+  /* Heredado: varias pantallas usan `rounded-[var(--radius)]`. */
+  --radius: 0.875rem;
+
+  /* -- Curvas -- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.26, 0.64, 1);
+  --dur-instant: 80ms;
+  --dur-exit: 120ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* -- Z-index: una escala nombrada. Antes convivían `z-30`, `z-40`,
+        `z-[99999]` y `z-[999999]` decididos pantalla a pantalla. -- */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-mobile-nav: 30;
+  --z-action-bar: 40;
+  --z-overlay: 50;
+  --z-drawer: 60;
+  --z-modal: 70;
+  --z-popover: 80;
+  --z-toast: 90;
+  --z-tooltip: 100;
+  --z-skip-link: 200;
+
+  /* -- Alias heredados -------------------------------------------------- */
+  --background: var(--canvas);
+  --foreground: var(--ink-1);
+  --card: var(--surface-1);
+  --card-foreground: var(--ink-1);
+  --popover: var(--surface-1);
+  --popover-foreground: var(--ink-1);
+  --primary: 213 34% 14%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  /* 215 16% 46% daba 4,76:1 contra el fondo puro, pero por debajo de AA sobre
-     superficies teñidas (bg-status-info/5, bg-surface-section). Ahora 5,47:1
-     contra el fondo, con margen para esos tintes. */
-  --muted-foreground: 215 18% 42%;
-  --accent: 214 95% 93%;
-  --accent-foreground: 222 47% 11%;
-  /* Antes 0 84% 60%: el texto blanco encima daba 3,78:1 y fallaba AA tanto en
-     el badge de notificaciones (10 px) como en los botones destructivos.
-     Con 0 72% 45% sube a 5,83:1 conservando la lectura de "rojo de peligro". */
-  --destructive: 0 72% 45%;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink-1);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--surface-3);
+  --accent-foreground: var(--ink-1);
+  --destructive: var(--status-danger);
   --destructive-foreground: 0 0% 100%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 190 87% 39%;
-  --radius: 1rem;
-  --sidebar: 220 29% 12%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 190 87% 39%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 221 39% 18%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 221 39% 18%;
-  --sidebar-ring: 190 87% 39%;
-  --surface-page: var(--background);
-  --surface-section: 210 40% 97%;
-  --surface-elevated: var(--card);
-  --surface-interactive: 210 40% 96%;
-  --text-primary: var(--foreground);
-  --text-secondary: var(--muted-foreground);
-  --text-disabled: 215 16% 65%;
-  --text-on-accent: var(--primary-foreground);
-  --border-default: var(--border);
-  --border-strong: 215 25% 78%;
-  --border-focus: var(--ring);
-  --status-info: 205 90% 48%;
-  /* 152 69% 35% daba 3,72:1 como texto sobre superficies teñidas. */
-  --status-success: 152 69% 28%;
-  --status-warning: 35 92% 45%;
-  --status-danger: 0 72% 51%;
-  /* Marca como texto. El valor de relleno (--primary, 190 87% 30%) da 3,76:1
-     sobre el fondo oscuro, por debajo de AA; por eso el texto tiene su propio
-     token con un valor distinto por tema. */
-  /* `--brand-text-*` los inyecta AppShell con el color del tenant, ya validado
-     a 4,5:1 contra cada superficie. El CSS elige cual aplica segun el tema,
-     porque un estilo inline sobre :root ganaria a la regla `.dark`. */
-  --brand-text: var(--brand-text-light, 190 87% 27%);
-  --sidebar-brand-text: var(--brand-text-sidebar, 190 80% 62%);
+  --border: var(--line-1);
+  --input: var(--line-control);
+  --ring: var(--focus);
+  --surface-page: var(--canvas);
+  --surface-section: var(--surface-2);
+  --surface-elevated: var(--surface-1);
+  --surface-interactive: var(--surface-3);
+  --text-primary: var(--ink-1);
+  --text-secondary: var(--ink-2);
+  --text-disabled: var(--ink-disabled);
+  --text-on-accent: var(--on-action);
+  --border-default: var(--line-1);
+  --border-strong: var(--line-strong);
+  --border-focus: var(--focus);
+
+  /* Marca del tenant como TEXTO. La inyecta AppShell ya validada a 4,5:1
+     contra cada superficie; el CSS elige cuál aplica según el tema, porque un
+     estilo en línea sobre `:root` ganaría a la regla `.dark`. */
+  --brand-text: var(--brand-text-light, 213 34% 24%);
+  --sidebar-brand-text: var(--brand-text-sidebar, 38 94% 62%);
+
+  color-scheme: light;
 }
+
+/* ============================================================================
+   TEMA OSCURO — el registro nativo de esta dirección
+   ============================================================================
+   El ámbar cambia de papel: en claro es la señal, en oscuro es también el
+   relleno de la acción, porque sobre grafito rinde mejor que cualquier gris.
+   ========================================================================== */
 
 .dark {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 96%;
-  --card: 222 47% 9%;
-  --card-foreground: 210 40% 96%;
-  --popover: 222 47% 9%;
-  --popover-foreground: 210 40% 96%;
-  --primary: 190 87% 30%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 217 33% 14%;
-  --secondary-foreground: 210 40% 96%;
-  --muted: 217 33% 14%;
-  /* Mismo criterio que en tema claro: margen para superficies teñidas. */
-  --muted-foreground: 215 20% 60%;
-  --accent: 215 45% 18%;
-  --accent-foreground: 210 40% 96%;
-  --destructive: 0 72% 51%;
+  --canvas: 213 30% 6%;
+  --surface-1: 213 26% 9%;
+  --surface-2: 213 24% 12%;
+  --surface-3: 213 22% 16%;
+
+  --ink-1: 210 22% 96%;
+  --ink-2: 212 15% 69%;
+  --ink-3: 212 13% 62%;
+  --ink-disabled: 213 12% 42%;
+
+  --line-1: 213 18% 19%;
+  --line-strong: 213 16% 30%;
+  --line-control: 213 11% 48%;
+
+  --action: 38 94% 58%;
+  --on-action: 213 45% 7%;
+
+  --accent-ink: 38 94% 62%;
+  --accent-line: 38 94% 58%;
+  --accent-fill: 38 94% 58%;
+  --on-accent-fill: 213 45% 7%;
+  --focus: 38 96% 62%;
+
+  --status-info: 202 84% 66%;
+  --status-success: 158 62% 54%;
+  --status-warning: 40 94% 60%;
+  --status-danger: 5 88% 70%;
+
+  --series-1: 38 94% 58%;
+  --series-2: 210 20% 80%;
+  --series-3: 188 66% 56%;
+  --series-4: 262 62% 70%;
+  --series-5: 5 82% 66%;
+  --chart-grid: 213 18% 19%;
+
+  --sidebar: 213 32% 5%;
+  --sidebar-foreground: 210 22% 96%;
+  --sidebar-muted: 212 14% 62%;
+  --sidebar-primary: 38 94% 58%;
+  --sidebar-primary-foreground: 213 45% 7%;
+  --sidebar-accent: 213 24% 12%;
+  --sidebar-accent-foreground: 210 22% 96%;
+  --sidebar-border: 213 20% 14%;
+  --sidebar-ring: 38 96% 62%;
+
+  /* En oscuro la profundidad la da una luz superior de 1px, no una sombra:
+     es lo que hace que una tarjeta parezca una placa y no un recorte. */
+  --elev-1: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 1px 2px hsl(0 0% 0% / 0.5);
+  --elev-2: inset 0 1px 0 hsl(0 0% 100% / 0.05), 0 8px 20px -10px hsl(0 0% 0% / 0.7);
+  --elev-3: inset 0 1px 0 hsl(0 0% 100% / 0.06), 0 16px 40px -16px hsl(0 0% 0% / 0.8);
+  --elev-4: inset 0 1px 0 hsl(0 0% 100% / 0.07), 0 36px 72px -28px hsl(0 0% 0% / 0.9);
+
+  --primary: 38 94% 58%;
+  --primary-foreground: 213 45% 7%;
+  --destructive: 5 72% 44%;
   --destructive-foreground: 0 0% 100%;
-  --border: 217 33% 17%;
-  --input: 217 33% 17%;
-  --ring: 190 87% 42%;
-  --sidebar: 220 29% 10%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 190 87% 42%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 221 39% 16%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 221 39% 16%;
-  --sidebar-ring: 190 87% 42%;
-  --surface-page: var(--background);
-  --surface-section: 217 33% 11%;
-  --surface-elevated: var(--card);
-  --surface-interactive: 217 33% 15%;
-  --text-primary: var(--foreground);
-  --text-secondary: var(--muted-foreground);
-  --text-disabled: 215 15% 42%;
-  --text-on-accent: var(--primary-foreground);
-  --border-default: var(--border);
-  --border-strong: 215 20% 30%;
-  --border-focus: var(--ring);
-  --status-info: 205 90% 62%;
-  --status-success: 152 60% 50%;
-  --status-warning: 38 92% 58%;
-  --status-danger: 0 78% 62%;
-  --brand-text: var(--brand-text-dark, 190 80% 62%);
-  --sidebar-brand-text: var(--brand-text-sidebar, 190 80% 62%);
+  --input: var(--line-control);
+
+  --brand-text: var(--brand-text-dark, 38 94% 62%);
+  --sidebar-brand-text: var(--brand-text-sidebar, 38 94% 62%);
+
+  color-scheme: dark;
 }
 
-* {
-  border-color: hsl(var(--border));
+/* ============================================================================
+   BASE
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  border-color: hsl(var(--line-1));
 }
 
 html {
   scroll-behavior: smooth;
-  color-scheme: light;
-  background: hsl(var(--background));
+  background: hsl(var(--canvas));
+  /* Evita que iOS agrande el texto al girar el teléfono. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100svh;
   min-width: 320px;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 183, 0.16), transparent 28%),
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
-    hsl(var(--background));
-  color: hsl(var(--foreground));
+  color: hsl(var(--ink-1));
   font-family: var(--font-body), sans-serif;
+  font-size: var(--type-base);
+  line-height: var(--type-base-lh);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: start;
+  /* Profundidad sutil: una sola luz fría arriba a la izquierda y un velo cálido
+     casi imperceptible. Sin `background-attachment: fixed`, que en Safari de
+     iOS repinta en cada desplazamiento. */
+  background-color: hsl(var(--canvas));
+  background-image:
+    radial-gradient(80rem 40rem at 12% -10%, hsl(var(--accent-fill) / 0.05), transparent 60%),
+    linear-gradient(180deg, hsl(var(--surface-2) / 0.7) 0%, transparent 24rem);
 }
 
 .dark body {
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 183, 0.08), transparent 28%),
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.06), transparent 24%),
-    hsl(var(--background));
+  background-image:
+    radial-gradient(80rem 42rem at 12% -12%, hsl(var(--accent-fill) / 0.07), transparent 62%),
+    linear-gradient(180deg, hsl(var(--surface-2) / 0.55) 0%, transparent 28rem);
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-heading), sans-serif;
-  letter-spacing: -0.015em;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display-family), sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.021em;
   overflow-wrap: anywhere;
   text-wrap: balance;
+  color: hsl(var(--ink-1));
 }
 
-/* Keep operational content readable on narrow screens without justified gaps. */
-p,
-li,
-dd,
-dt,
-label,
-figcaption {
+/* Los titulares grandes cierran más el interletraje: es lo que separa una
+   tipografía "puesta" de una compuesta. */
+h1 { letter-spacing: -0.03em; }
+
+p, li, dd, dt, label, figcaption {
   overflow-wrap: anywhere;
   text-align: start;
   text-wrap: pretty;
 }
 
-input,
-select,
-textarea {
+/* Safari de iOS hace zoom sobre la página al enfocar un control nativo con
+   tipografía menor de 16px, y el usuario no tiene forma evidente de deshacerlo. */
+input, select, textarea {
   font-size: max(16px, 1em);
+  font-family: inherit;
 }
 
-button,
-a {
+button, a {
   -webkit-tap-highlight-color: transparent;
+}
+
+code, pre, .tabular, [data-numeric] {
+  font-family: var(--font-mono-family), monospace;
+}
+
+/* Cifras de ancho fijo: sin esto, una métrica que pasa de 199 a 200 salta. */
+.tabular-figures,
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: hsl(var(--accent-fill) / 0.28);
+  color: hsl(var(--ink-1));
+}
+
+/* ============================================================================
+   FOCO
+   ============================================================================
+   Un anillo de 2px con 2px de separación y 3:1 contra la superficie, en un
+   único sitio. Los componentes ya no declaran su propio foco.
+   ========================================================================== */
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--focus));
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* Sobre relleno ámbar u oscuro, el anillo cambia a la tinta contraria para no
+   desaparecer contra su propio color. */
+:where(.bg-action, .bg-accent-fill, .bg-primary):focus-visible {
+  outline-color: hsl(var(--ink-1));
+}
+.dark :where(.bg-action, .bg-accent-fill, .bg-primary):focus-visible {
+  outline-color: hsl(var(--ink-1));
+}
+
+/* ============================================================================
+   DESPLAZAMIENTO
+   ========================================================================== */
+
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--line-strong)) transparent;
+  }
+}
+
+/* ============================================================================
+   MOVIMIENTO
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Entrada corta y de una sola dirección. No hay rebote: sobre datos
+   operativos, el sobreimpulso se lee como descuido. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-rise-in {
+  animation: rise-in var(--dur-base) var(--ease-out) both;
+}
+
+/* Barrido del esqueleto de carga. Es un degradado desplazándose, no un pulso
+   de opacidad: se lee como "cargando" y no como "esto parpadea". */
+@keyframes skeleton-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.skeleton {
+  background-color: hsl(var(--surface-2));
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(var(--surface-3) / 0.9) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+}
+
+/* ============================================================================
+   ARMAZÓN
+   ========================================================================== */
+
+.operational-shell {
+  background: transparent;
 }
 
 @media (max-width: 639px) {
@@ -245,21 +670,16 @@ a {
   .operational-shell main {
     min-width: 0;
   }
-
-  table {
-    min-width: max-content;
-  }
 }
 
+/* Las tablas heredadas que aún no usan `DataTable` se desplazan dentro de su
+   propio contenedor en vez de ensanchar la página. La regla vive aquí y no en
+   `table` a secas para no forzar el ancho de las tablas ya adaptadas. */
+.table-legacy table {
+  min-width: max-content;
+}
+
+/* Heredado: varias pantallas dependen de esta clase para el interletraje. */
 .tracking-tight {
-  letter-spacing: -0.015em;
-}
-
-.operational-shell {
-  background: hsl(var(--background));
-}
-
-code,
-pre {
-  font-family: var(--font-mono), monospace;
+  letter-spacing: -0.021em;
 }

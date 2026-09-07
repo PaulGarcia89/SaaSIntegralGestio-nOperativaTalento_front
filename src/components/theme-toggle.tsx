@@ -1,56 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Rows3, Rows4, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchMyPreferences, updateMyPreference } from "@/lib/backend";
+import { useAppearance } from "@/components/appearance";
 
+/**
+ * Conmutador de tema.
+ *
+ * La preferencia y su persistencia viven ahora en `AppearanceProvider`. Este
+ * componente solo la lee y la cambia: antes hacía su propio `fetch` de
+ * preferencias al montar, que se repetía en cada pantalla.
+ */
 export function ThemeToggle({ className }: { className?: string }) {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [hasMounted, setHasMounted] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    // TalentOS starts in a bright, high-legibility workspace on every device.
-    void fetchMyPreferences()
-      .then((preferences) => {
-        if (cancelled) return;
-        const stored = preferences["ui-theme"] as { theme?: "light" | "dark" } | undefined;
-        setTheme(stored?.theme === "dark" ? "dark" : "light");
-        setHasMounted(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-        setHasMounted(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hasMounted) return;
-
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.style.colorScheme = theme;
-    void updateMyPreference("ui-theme", { theme }).catch(() => undefined);
-  }, [hasMounted, theme]);
-
-  function toggle() {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
-  }
+  const { theme, setTheme, ready } = useAppearance();
+  const nextTheme = theme === "dark" ? "light" : "dark";
 
   return (
     <Button
-      variant="secondary"
+      variant="ghost"
       size="icon"
-      onClick={toggle}
+      onClick={() => setTheme(nextTheme)}
       className={className}
-      disabled={!hasMounted}
+      disabled={!ready}
       aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
-      {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      {theme === "dark" ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
+    </Button>
+  );
+}
+
+/**
+ * Conmutador de densidad.
+ *
+ * Existe porque el producto atiende a dos usos legítimamente distintos: quien
+ * registra una operación desde el móvil necesita objetivos grandes y texto de
+ * 17-18px, y quien supervisa desde un escritorio amplio necesita ver más filas
+ * a la vez. Es la misma interfaz reescalada por tokens, no dos interfaces.
+ *
+ * El icono cambia para reflejar el estado ACTUAL, y la etiqueta accesible dice
+ * a qué se cambiará: sin eso, un icono solo no comunica cuál de los dos modos
+ * está activo.
+ */
+export function DensityToggle({ className }: { className?: string }) {
+  const { density, setDensity, ready } = useAppearance();
+  const isCompact = density === "compact";
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setDensity(isCompact ? "comfortable" : "compact")}
+      className={className}
+      disabled={!ready}
+      aria-pressed={isCompact}
+      aria-label={isCompact ? "Cambiar a vista cómoda" : "Cambiar a vista compacta"}
+      title={isCompact ? "Vista compacta activa" : "Vista cómoda activa"}
+    >
+      {isCompact ? <Rows4 className="size-4" aria-hidden="true" /> : <Rows3 className="size-4" aria-hidden="true" />}
     </Button>
   );
 }

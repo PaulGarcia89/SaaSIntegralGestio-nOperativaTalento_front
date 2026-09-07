@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Boxes, ChefHat, type LucideIcon } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { BlockedState, PageHeader, SkeletonRows } from "@/components/system";
@@ -18,12 +20,24 @@ import { BlockedState, PageHeader, SkeletonRows } from "@/components/system";
  * · Cuando solo había un módulo activo se añadía un aviso —«el otro inventario
  *   no está habilitado»— que no lleva a ninguna decisión. Fuera.
  * · Solo el botón era clicable, no la tarjeta entera.
+ * · Con un único inventario contratado seguía habiendo que elegir entre una
+ *   sola opción. Ahora se entra directamente: los dos inventarios son módulos
+ *   independientes, no dos variantes de uno.
  */
 export function InventoryEntry() {
+  const router = useRouter();
   const { hasModule, isBootstrapping, accessContextVerified, currentTenant } = useAppStore();
   const assetEnabled = hasModule("asset_inventory");
   const restaurantEnabled = hasModule("restaurant_inventory");
   const enabledCount = Number(assetEnabled) + Number(restaurantEnabled);
+  const ready = !isBootstrapping && accessContextVerified && Boolean(currentTenant.id);
+  const only = enabledCount === 1 ? (assetEnabled ? "/inventory/assets" : "/inventory/restaurant") : null;
+
+  // Elegir entre una sola opción no es elegir. Con un único inventario
+  // contratado esta pantalla era una tarjeta y un clic de más.
+  useEffect(() => {
+    if (ready && only) router.replace(only);
+  }, [only, ready, router]);
 
   return (
     <div className="space-y-6">
@@ -33,7 +47,7 @@ export function InventoryEntry() {
         description="Elige con qué inventario vas a trabajar."
       />
 
-      {isBootstrapping || !accessContextVerified ? (
+      {isBootstrapping || !accessContextVerified || only ? (
         <SkeletonRows rows={2} label="Cargando los módulos de inventario" />
       ) : !currentTenant.id ? (
         <BlockedState

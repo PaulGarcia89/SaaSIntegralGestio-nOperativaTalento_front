@@ -129,7 +129,11 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/training/integrations", label: "Integraciones formativas", group: "Aprendizaje", module: "training", permission: "training.integrations.manage", audience: "shared", subscriptionStates: live, icon: "training", roles: ["admin_saas", "admin_empresa", "rrhh", "instructor"] },
   { href: "/productivity", label: "Productividad", group: "Operaciones", module: "productivity", permission: "productivity.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "productivity", roles: ["admin_saas", "admin_empresa", "supervisor"] },
   { href: "/productivity/cameras", label: "Cámaras y zonas", group: "Operaciones", module: "productivity", permission: "productivity.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "productivity", roles: ["admin_saas", "admin_empresa"] },
-  { href: "/inventory", label: "Inventario", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, showInNavigation: false, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario", "empleado"] },
+  // El selector entre los dos inventarios. No pertenece a ninguno de los dos
+  // módulos: exigir `asset_inventory` hacía que una empresa con SOLO
+  // restaurante recibiera «este módulo no está habilitado», que es falso. La
+  // pantalla resuelve las cuatro combinaciones por su cuenta.
+  { href: "/inventory", label: "Inventario", group: "Operaciones", module: "dashboard", permission: "dashboard.view", audience: "shared", subscriptionStates: live, branchRequired: true, showInNavigation: false, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario", "empleado"] },
   { href: "/inventory/assets", label: "Activos", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario", "empleado"] },
   { href: "/inventory/assets/warehouse", label: "Almacén y stock", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/assets/purchases", label: "Compras y proveedores", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
@@ -214,16 +218,6 @@ export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
 }));
 
 export function getRoutePolicy(pathname: string) { return [...appNavigation].sort((a, b) => b.href.length - a.href.length).find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)); }
-export function getInventoryModuleFromPath(pathname: string) {
-  if (
-    pathname.startsWith("/inventory/assets") ||
-    ["/inventory/scan", "/inventory/my-assets", "/inventory/deliveries", "/inventory/returns"].some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`),
-    )
-  ) return "asset_inventory";
-  if (pathname.startsWith("/inventory/restaurant")) return "restaurant_inventory";
-  return null;
-}
 export function isAudienceAllowed(audience: NavItem["audience"], role: RoleKey) { if (audience === "saas") return role === "admin_saas" || role === "admin_plataforma"; if (audience === "tenant") return role === "admin_saas" || role === "admin_plataforma" || role === "admin_empresa"; return true; }
 export function isRoleAllowed(roles: NavItem["roles"], role: RoleKey, strictRoles = false) { if (!strictRoles && role === "admin_plataforma" && roles?.includes("admin_saas")) return true; return !roles || roles.includes(role); }
 export type RouteAccessContext = { sessionValid: boolean; tenantAllowed: boolean; globalContext?: boolean; subscriptionStatus: SubscriptionAccessState; role: RoleKey; hasModule: (module: ModuleKey) => boolean; hasFeature: (featureFlag: string) => boolean; can: (permission: PermissionKey) => boolean; branchAvailable: boolean };

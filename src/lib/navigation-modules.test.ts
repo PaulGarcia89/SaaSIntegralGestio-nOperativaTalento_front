@@ -139,3 +139,42 @@ describe("la puerta del módulo va antes que la del permiso", () => {
     expect(decision.code).toBe("PERMISSION_DENIED");
   });
 });
+
+describe("los dos inventarios son módulos independientes", () => {
+  const withOnly = (module: ModuleKey) => menuFor(["dashboard", "profile", "admin", module]);
+
+  it("contratar restaurante no exige contratar activos", () => {
+    const restaurant = withOnly("restaurant_inventory");
+    expect(restaurant.some((item) => item.href === "/inventory/restaurant")).toBe(true);
+    expect(restaurant.some((item) => item.module === "asset_inventory")).toBe(false);
+  });
+
+  it("contratar activos no exige contratar restaurante", () => {
+    const assets = withOnly("asset_inventory");
+    expect(assets.some((item) => item.href === "/inventory/assets")).toBe(true);
+    expect(assets.some((item) => item.module === "restaurant_inventory")).toBe(false);
+  });
+
+  it("el selector de inventario no pertenece a ninguno de los dos", () => {
+    // Estaba declarado con `module: "asset_inventory"`, así que una empresa
+    // con SOLO restaurante recibía «este módulo no está habilitado» al
+    // abrirlo, siendo falso: el que no tiene es el otro.
+    const entry = appNavigation.find((item) => item.href === "/inventory")!;
+    expect(entry.module).not.toBe("asset_inventory");
+    expect(entry.module).not.toBe("restaurant_inventory");
+
+    for (const moduleKey of ["asset_inventory", "restaurant_inventory"] as ModuleKey[]) {
+      const decision = evaluateRouteAccess(entry, {
+        sessionValid: true,
+        tenantAllowed: true,
+        subscriptionStatus: "active",
+        role: "admin_empresa",
+        hasModule: (candidate) => candidate === moduleKey,
+        hasFeature: () => true,
+        can: () => true,
+        branchAvailable: true,
+      });
+      expect(decision.code, `con solo ${moduleKey}`).toBe("ALLOWED");
+    }
+  });
+});

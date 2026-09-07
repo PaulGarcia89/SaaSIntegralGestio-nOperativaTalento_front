@@ -5,41 +5,76 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { toast } from "sonner";
 import type { BranchDto } from "@/lib/contracts";
-import { createBranch, deleteBranch, fetchBranchesForTenants, fetchSubscriptions, fetchTenants, updateBranch } from "@/lib/backend";
-import { CrudHeader, CrudPanel } from "@/components/admin-crud";
-import { DomainTable, FilterToolbar, StateCard, matchesSearchAndFilter } from "@/components/domain";
+import {
+  createBranch,
+  deleteBranch,
+  fetchBranchesForTenants,
+  fetchSubscriptions,
+  fetchTenants,
+  getApiErrorMessage,
+  updateBranch,
+} from "@/lib/backend";
+import { ConfirmDeleteDialog } from "@/components/admin-crud";
+import { DomainTable, FilterToolbar, matchesSearchAndFilter } from "@/components/domain";
+import {
+  BlockedState,
+  EmptyState,
+  ErrorState,
+  InlineNote,
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
 import { FormSelect } from "@/components/ui/form-select";
+import { billingCycleLabel, formatPrice, planTierLabel, subscriptionStatusInfo } from "@/lib/platform-labels";
 import { useAppStore } from "@/store/app-store";
-import { DataTable, InfoList, SectionCard } from "@/components/ui";
-import { AsyncState } from "@/components/async-state";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useLocale } from "@/components/locale-provider";
+
+/**
+ * Sucursales.
+ *
+ * El defecto grande era el mismo que en roles, pero en tres campos a la vez.
+ * El formulario pedía **responsable**, **empleados** y **estado**; zod los
+ * validaba; y `createBranch`/`updateBranch` solo envían `name` y `location`.
+ * Los tres se descartaban en silencio al guardar.
+ *
+ * Peor todavía: `mapBranch` los inventa al leer. Devuelve siempre
+ * `manager: "Pendiente"`, `employees: 0` y `status: "active"`. Es decir, la
+ * columna «Responsable» decía «Pendiente» en TODAS las filas, la de
+ * «Empleados» decía 0 en todas, la suma de dotación de la empresa daba
+ * siempre cero, y el filtro «Inactivas» no podía devolver nada nunca porque
+ * ninguna sucursal puede estar inactiva.
+ *
+ * Se dejan de pedir y de mostrar esos tres campos. No se pierde ninguna
+ * función: no existía. Lo que se gana es que la pantalla deje de afirmar
+ * cosas falsas sobre las sucursales de la empresa. `BranchDto` se conserva
+ * intacto, porque otras pantallas filtran por `status`.
+ *
+ * De paso: la columna «Empresa» imprimía el UUID cuando el nombre no estaba
+ * cargado; el plan y el estado de la suscripción salían en código; el borrado
+ * decía «esta acción es permanente» sin nombrar lo que arrastra; y los
+ * errores del servidor se sustituían por «Error al guardar la sucursal».
+ */
 
 const branchSchema = z.object({
   tenantId: z.string().min(1),
   name: z.string().min(2),
   city: z.string().min(2),
-  manager: z.string().min(2),
-  employees: z.coerce.number().min(0),
-  status: z.enum(["active", "inactive"]),
 });
 
 type BranchFormValues = z.output<typeof branchSchema>;
-type BranchFormInput = z.input<typeof branchSchema>;
-
-function localizedBranchStatus(status: BranchDto["status"], t: (key: string) => string) {
-  return status === "active" ? t("branches.active") : t("branches.inactive");
-}
 
 export default function BranchesPage() {
   const { t } = useLocale();
-  const { can, currentTenant, currentRole, canAccessGlobalGovernance } = useAppStore();
+  const { can, currentTenant, canAccessGlobalGovernance } = useAppStore();
   const canViewBranches = can("branches.view");
   const canCreateBranch = can("branches.create");
   const canUpdateBranch = can("branches.update");
@@ -48,13 +83,10 @@ export default function BranchesPage() {
   const hasGlobalGovernance = canAccessGlobalGovernance;
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", hasGlobalGovernance ? "global" : currentTenant.id],
-    queryFn: () => hasGlobalGovernance ? fetchTenants() : Promise.resolve([currentTenant]),
+    queryFn: () => (hasGlobalGovernance ? fetchTenants() : Promise.resolve([currentTenant])),
     enabled: Boolean(currentTenant.id),
   });
-  const tenantIds = useMemo(
-    () => (tenantsQuery.data ?? []).map((tenant) => tenant.id),
-    [tenantsQuery.data],
-  );
+  const tenantIds = useMemo(() => (tenantsQuery.data ?? []).map((tenant) => tenant.id), [tenantsQuery.data]);
   const branchesQuery = useQuery({
     queryKey: ["branches", "global", tenantIds],
     queryFn: () => fetchBranchesForTenants(tenantIds),
@@ -72,31 +104,21 @@ export default function BranchesPage() {
   const [deleting, setDeleting] = useState<BranchDto | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState("");
 
-  const form = useForm<BranchFormInput, unknown, BranchFormValues>({
+  const form = useForm<BranchFormValues>({
     resolver: zodResolver(branchSchema),
-    defaultValues: {
-      tenantId: currentTenant.id,
-      name: "",
-      city: "",
-      manager: "",
-      employees: 0,
-      status: "active",
-    },
+    defaultValues: { tenantId: currentTenant.id, name: "", city: "" },
   });
   useUnsavedChanges(open && form.formState.isDirty, "branch-form");
   const selectedTenantId = useWatch({ control: form.control, name: "tenantId" });
-  const selectedStatus = useWatch({ control: form.control, name: "status" });
 
   const filtered = useMemo(
     () =>
       (branchesQuery.data ?? []).filter((branch) =>
-        matchesSearchAndFilter([
-          branch.name,
-          branch.city,
-          branch.manager,
-          branch.status,
-          tenantsQuery.data?.find((tenant) => tenant.id === branch.tenantId)?.name ?? "",
-        ], query, activeFilter),
+        matchesSearchAndFilter(
+          [branch.name, branch.city, tenantsQuery.data?.find((tenant) => tenant.id === branch.tenantId)?.name ?? ""],
+          query,
+          activeFilter,
+        ),
       ),
     [activeFilter, branchesQuery.data, query, tenantsQuery.data],
   );
@@ -108,255 +130,334 @@ export default function BranchesPage() {
   const siblingBranches = (branchesQuery.data ?? []).filter(
     (branch) => branch.tenantId === selectedBranch?.tenantId && branch.id !== selectedBranch?.id,
   );
-  const tenantBranchTotal =
-    (branchesQuery.data ?? []).filter((branch) => branch.tenantId === selectedBranch?.tenantId).length;
-  const tenantEmployees =
-    (branchesQuery.data ?? [])
-      .filter((branch) => branch.tenantId === selectedBranch?.tenantId)
-      .reduce((total, branch) => total + branch.employees, 0);
+  const deletingTenant = tenantsQuery.data?.find((tenant) => tenant.id === deleting?.tenantId) ?? null;
+  const deletingSiblings = (branchesQuery.data ?? []).filter(
+    (branch) => branch.tenantId === deleting?.tenantId && branch.id !== deleting?.id,
+  ).length;
 
   const saveMutation = useMutation({
-    mutationFn: async (values: BranchFormValues) =>
-      editing
-        ? updateBranch(editing.id, values)
-        : createBranch(values),
+    // Se envía lo que el backend guarda: nombre y ciudad. Antes viajaban seis
+    // campos y llegaban dos.
+    mutationFn: async (values: BranchFormValues) => {
+      const payload = {
+        ...values,
+        manager: editing?.manager ?? "",
+        employees: editing?.employees ?? 0,
+        status: editing?.status ?? ("active" as const),
+      };
+      return editing ? updateBranch(editing.id, payload) : createBranch(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-tenants"] });
       toast.success(editing ? t("branches.updated") : t("branches.created"));
       setOpen(false);
       setEditing(null);
       form.reset();
     },
-    onError: () => toast.error(t("branches.saveError")),
+    onError: (error) => toast.error(getApiErrorMessage(error, t("branches.saveError"))),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (branch: BranchDto) => deleteBranch(branch.id, branch.tenantId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["branches"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-tenants"] });
       toast.success(t("branches.deleted"));
       setDeleting(null);
     },
-    onError: () => toast.error(t("branches.deleteError")),
+    onError: (error) => toast.error(getApiErrorMessage(error, t("branches.deleteError"))),
   });
 
   if (!canViewBranches) {
     return (
-      <StateCard
-        tone="restricted"
+      <BlockedState
         title={t("branches.noAccess")}
-        description={t("branches.noAccessDescription")}
+        cause={t("branches.noAccessCause")}
+        owner={t("branches.noAccessOwner")}
+        resolution={t("branches.noAccessResolution")}
       />
     );
   }
 
-  if (branchesQuery.isLoading || tenantsQuery.isLoading || subscriptionsQuery.isLoading) return <AsyncState state="loading" title={t("branches.loading")} />;
-  if (branchesQuery.isError || tenantsQuery.isError || subscriptionsQuery.isError) return <AsyncState state="error" title={t("branches.error")} onRetry={() => { void branchesQuery.refetch(); void tenantsQuery.refetch(); if (hasGlobalGovernance) void subscriptionsQuery.refetch(); }} />;
+  function startCreating() {
+    setEditing(null);
+    form.reset({ tenantId: currentTenant.id, name: "", city: "" });
+    setOpen(true);
+  }
+
+  function tenantName(tenantId: string) {
+    return tenantsQuery.data?.find((tenant) => tenant.id === tenantId)?.name ?? t("branches.unknownCompany");
+  }
+
+  const branches = branchesQuery.data ?? [];
 
   return (
-    <div className="space-y-5">
-      <CrudHeader
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={t("branches.eyebrow")}
         title={t("branches.title")}
-        description={t("branches.description")}
-        badge={t("branches.eyebrow")}
-        action={
-          canCreateBranch ? <Button onClick={() => {
-              form.reset({
-                tenantId: currentTenant.id,
-                name: "",
-                city: "",
-                manager: "",
-                employees: 0,
-                status: "active",
-              });
-              setOpen(true);
-            }}>{t("branches.new")}</Button> : null
-        }
-      />
-      {open ? (
-        <Card level={2}>
-          <CardContent className="space-y-4 p-6">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold">{editing ? t("branches.edit") : t("branches.create")}</h2>
-              <p className="text-sm text-text-secondary">{t("branches.manageDescription")}</p>
-            </div>
-            <form id="branch-form" className="space-y-4" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
-              <div className="space-y-2">
-                <Label>{t("branches.company")}</Label>
-                <FormSelect
-                  className="h-11 w-full rounded-2xl"
-                  placeholder={t("branches.selectCompany")}
-                  value={selectedTenantId}
-                  onValueChange={(v) => form.setValue("tenantId", v)}
-                  options={(tenantsQuery.data ?? []).map((tenant) => ({ label: tenant.name, value: tenant.id }))}
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>{t("branches.name")}</Label>
-                  <Input {...form.register("name")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("branches.city")}</Label>
-                  <Input {...form.register("city")} />
-                </div>
-                <div className="space-y-2">
-                <Label>{t("branches.manager")}</Label>
-                <Input {...form.register("manager")} />
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("branches.employees")}</Label>
-                  <Input type="number" {...form.register("employees")} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>{t("branches.status")}</Label>
-                <FormSelect
-                  className="h-11 w-full rounded-2xl"
-                  value={selectedStatus}
-                  onValueChange={(v) => form.setValue("status", v as "active" | "inactive")}
-                  options={[
-                    { label: t("branches.active"), value: "active" },
-                    { label: t("branches.inactive"), value: "inactive" },
-                  ]}
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={() => {
-                  setOpen(false);
-                  setEditing(null);
-                  form.reset();
-                }}>
-                  {t("branches.cancel")}
-                </Button>
-                <Button type="submit" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? t("branches.saving") : t("branches.save")}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <FilterToolbar
-        searchPlaceholder={t("branches.search")}
-        options={[
-          { label: t("branches.all"), value: "" },
-          { label: t("branches.activeFilter"), value: "active" },
-          { label: t("branches.inactiveFilter"), value: "inactive" },
-        ]}
-        searchValue={query}
-        onSearchChange={setQuery}
-        filterValue={activeFilter}
-        onFilterChange={setActiveFilter}
+        description={t("branches.pageDescription")}
+        actions={canCreateBranch ? <Button onClick={startCreating}>{t("branches.new")}</Button> : undefined}
       />
 
-      {filtered.length === 0 ? (
-        <CrudPanel>
-          <StateCard
-            tone="empty"
-            title={t("branches.empty")}
-            description={t("branches.emptyDescription")}
-          />
-        </CrudPanel>
+      {branchesQuery.isLoading || tenantsQuery.isLoading || subscriptionsQuery.isLoading ? (
+        <SkeletonRows rows={6} label={t("branches.loading")} />
+      ) : branchesQuery.isError || tenantsQuery.isError || subscriptionsQuery.isError ? (
+        <ErrorState
+          title={t("branches.error")}
+          detail={getApiErrorMessage(
+            branchesQuery.error ?? tenantsQuery.error ?? subscriptionsQuery.error,
+            t("branches.errorDetail"),
+          )}
+          onRetry={() => {
+            void branchesQuery.refetch();
+            void tenantsQuery.refetch();
+            if (hasGlobalGovernance) void subscriptionsQuery.refetch();
+          }}
+        />
       ) : (
-        <div className="grid gap-x-6 gap-y-8 2xl:gap-x-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.75fr)]">
-          <CrudPanel>
-            <DomainTable exportable
-              data={filtered}
-              getKey={(branch) => branch.id}
-              onSelect={(branch) => setSelectedBranchId(branch.id)}
-              columns={[
-                {
-                  key: "tenant",
-                  header: t("branches.company"),
-                  sortable: true,
-                  render: (branch) =>
-                    tenantsQuery.data?.find((tenant) => tenant.id === branch.tenantId)?.name ?? branch.tenantId,
-                },
-                { key: "name", header: t("branches.name"), sortable: true, render: (branch) => branch.name },
-                { key: "city", header: t("branches.city"), sortable: true, render: (branch) => branch.city },
-                { key: "manager", header: t("branches.manager"), sortable: true, render: (branch) => branch.manager },
-                { key: "employees", header: t("branches.employees"), sortable: true, render: (branch) => branch.employees },
-                { key: "status", header: t("branches.status"), sortable: true, render: (branch) => localizedBranchStatus(branch.status, t) },
-                {
-                  key: "actions",
-                  header: t("branches.actions"),
-                  render: (branch) => (
-                    <div className="flex gap-2">
-                      {canUpdateBranch ? <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditing(branch);
-                          form.reset(branch);
-                          setOpen(true);
-                        }}
-                      >
-                        {t("branches.edit")}
-                      </Button> : null}
-                      {canDeleteBranch ? <Button size="sm" variant="destructive" onClick={() => setDeleting(branch)}>
-                        {t("branches.delete")}
-                      </Button> : null}
-                    </div>
-                  ),
-                },
-              ]}
+        <>
+          <MetricRow>
+            <Metric label={t("branches.title")} value={String(branches.length)} />
+            {hasGlobalGovernance ? (
+              <Metric
+                label={t("branches.companiesWithBranches")}
+                value={String(new Set(branches.map((branch) => branch.tenantId)).size)}
+              />
+            ) : null}
+            <Metric
+              label={t("branches.citiesCovered")}
+              value={String(new Set(branches.map((branch) => branch.city.trim().toLocaleLowerCase("es"))).size)}
             />
-          </CrudPanel>
+          </MetricRow>
 
-          {selectedBranch ? (
-            <SectionCard title={selectedBranch.name} subtitle={t("branches.detail")} className="self-start">
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
-                  <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{t("branches.context")}</p>
-                    <h3 className="text-xl font-semibold tracking-tight text-foreground">{selectedBranch.name}</h3>
-                    <p className="text-xs text-muted-foreground">{selectedTenant?.name ?? t("branches.noCompany")} · {selectedBranch.city}</p>
+          {open ? (
+            <PageSection
+              boxed
+              title={editing ? t("branches.edit") : t("branches.create")}
+              description={t("branches.formDescription")}
+            >
+              <form
+                id="branch-form"
+                className="space-y-5"
+                onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}
+              >
+                {hasGlobalGovernance ? (
+                  <div className="min-w-0 space-y-2">
+                    <Label>{t("branches.company")}</Label>
+                    <FormSelect
+                      placeholder={t("branches.selectCompany")}
+                      value={selectedTenantId}
+                      onValueChange={(value) => form.setValue("tenantId", value, { shouldDirty: true })}
+                      options={(tenantsQuery.data ?? []).map((tenant) => ({ label: tenant.name, value: tenant.id }))}
+                    />
+                  </div>
+                ) : null}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor="branch-name">{t("branches.name")}</Label>
+                    <Input id="branch-name" autoComplete="off" {...form.register("name")} />
+                    {form.formState.errors.name ? (
+                      <p className="text-2xs text-status-danger">{t("branches.nameError")}</p>
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor="branch-city">{t("branches.city")}</Label>
+                    <Input id="branch-city" autoComplete="off" {...form.register("city")} />
+                    {form.formState.errors.city ? (
+                      <p className="text-2xs text-status-danger">{t("branches.cityError")}</p>
+                    ) : null}
                   </div>
                 </div>
 
-                <InfoList
-                  items={[
-                    { title: t("branches.manager"), description: selectedBranch.manager, badge: localizedBranchStatus(selectedBranch.status, t) },
-                    { title: t("branches.staffing"), description: t("branches.people", { count: String(selectedBranch.employees) }), badge: t("branches.total", { count: String(tenantEmployees) }) },
-                    { title: t("branches.subscription"), description: selectedSubscription?.plan ?? t("branches.noSubscription"), badge: selectedSubscription?.status ?? t("branches.pending") },
-                    { title: t("branches.network"), description: t("branches.count", { count: String(tenantBranchTotal) }), badge: t("branches.related", { count: String(siblingBranches.length) }) },
+                <InlineNote tone="info" title={t("branches.scopeNoteTitle")}>
+                  {t("branches.scopeNote")}
+                </InlineNote>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setOpen(false);
+                      setEditing(null);
+                      form.reset();
+                    }}
+                  >
+                    {t("branches.cancel")}
+                  </Button>
+                  <Button type="submit" loading={saveMutation.isPending} loadingLabel={t("branches.saving")}>
+                    {t("branches.save")}
+                  </Button>
+                </div>
+              </form>
+            </PageSection>
+          ) : null}
+
+          <FilterToolbar
+            searchPlaceholder={t("branches.searchPlaceholder")}
+            options={[{ label: t("branches.all"), value: "" }]}
+            searchValue={query}
+            onSearchChange={setQuery}
+            filterValue={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              reason={query ? "no-matches" : "no-records"}
+              title={query ? t("branches.noMatches") : t("branches.empty")}
+              description={query ? t("branches.noMatchesDescription") : t("branches.emptyDescription")}
+              onClearFilters={query ? () => setQuery("") : undefined}
+            />
+          ) : (
+            <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
+              <div className="min-w-0">
+                <DomainTable
+                  exportable
+                  data={filtered}
+                  getKey={(branch) => branch.id}
+                  onSelect={(branch) => setSelectedBranchId(branch.id)}
+                  columns={[
+                    { key: "name", header: t("branches.name"), sortable: true, render: (branch) => branch.name },
+                    { key: "city", header: t("branches.city"), sortable: true, render: (branch) => branch.city },
+                    ...(hasGlobalGovernance
+                      ? [
+                          {
+                            key: "tenant",
+                            header: t("branches.company"),
+                            sortable: true,
+                            render: (branch: BranchDto) => tenantName(branch.tenantId),
+                          },
+                        ]
+                      : []),
+                    {
+                      key: "actions",
+                      header: t("branches.actions"),
+                      render: (branch) => (
+                        <div className="flex flex-wrap gap-2">
+                          {canUpdateBranch ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setEditing(branch);
+                                form.reset({
+                                  tenantId: branch.tenantId,
+                                  name: branch.name,
+                                  city: branch.city,
+                                });
+                                setOpen(true);
+                              }}
+                            >
+                              {t("branches.edit")}
+                            </Button>
+                          ) : null}
+                          {canDeleteBranch ? (
+                            <Button size="sm" variant="destructive" onClick={() => setDeleting(branch)}>
+                              {t("branches.delete")}
+                            </Button>
+                          ) : null}
+                        </div>
+                      ),
+                    },
                   ]}
                 />
-
-                <DataTable
-                  columns={["Sucursal", "Ciudad"]}
-                  rows={siblingBranches.map((branch) => [branch.name, branch.city])}
-                  pageSize={4}
-                />
               </div>
-            </SectionCard>
-          ) : null}
-        </div>
+
+              {selectedBranch ? (
+                <PageSection
+                  boxed
+                  title={selectedBranch.name}
+                  description={`${selectedTenant?.name ?? t("branches.noCompany")} · ${selectedBranch.city}`}
+                  className="min-w-0 self-start"
+                >
+                  <div className="space-y-4">
+                    <dl className="divide-y divide-line rounded-md border border-line">
+                      <div className="flex items-baseline justify-between gap-3 px-4 py-3">
+                        <dt className="text-sm text-ink-2">{t("branches.company")}</dt>
+                        <dd className="text-right text-sm font-medium text-ink-1">
+                          {selectedTenant?.name ?? t("branches.noCompany")}
+                        </dd>
+                      </div>
+                      {hasGlobalGovernance ? (
+                        <div className="flex items-baseline justify-between gap-3 px-4 py-3">
+                          <dt className="text-sm text-ink-2">{t("branches.subscription")}</dt>
+                          <dd className="text-right text-sm font-medium text-ink-1">
+                            {selectedSubscription
+                              ? `${planTierLabel(selectedSubscription.plan)} · ${
+                                  subscriptionStatusInfo(selectedSubscription.status).label
+                                }`
+                              : t("branches.noSubscription")}
+                          </dd>
+                        </div>
+                      ) : null}
+                      {hasGlobalGovernance && selectedSubscription ? (
+                        <div className="flex items-baseline justify-between gap-3 px-4 py-3">
+                          <dt className="text-sm text-ink-2">{t("branches.billing")}</dt>
+                          <dd className="text-right text-sm font-medium text-ink-1">
+                            {formatPrice(selectedSubscription.price)} ·{" "}
+                            {billingCycleLabel(selectedSubscription.billingCycle)}
+                          </dd>
+                        </div>
+                      ) : null}
+                      <div className="flex items-baseline justify-between gap-3 px-4 py-3">
+                        <dt className="text-sm text-ink-2">{t("branches.network")}</dt>
+                        <dd className="text-right text-sm font-medium text-ink-1">
+                          {t("branches.count", { count: String(siblingBranches.length + 1) })}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    {siblingBranches.length > 0 ? (
+                      <div>
+                        <p className="mb-2 text-2xs text-ink-3">
+                          {t("branches.related", { count: String(siblingBranches.length) })}
+                        </p>
+                        <ul className="space-y-1">
+                          {siblingBranches.map((branch) => (
+                            <li
+                              key={branch.id}
+                              className="flex items-baseline justify-between gap-3 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm"
+                            >
+                              <span className="min-w-0 truncate text-ink-1">{branch.name}</span>
+                              <span className="shrink-0 text-2xs text-ink-3">{branch.city}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </PageSection>
+              ) : null}
+            </div>
+          )}
+        </>
       )}
 
-      {deleting ? (
-        <Card level={2}>
-          <CardContent className="space-y-4 p-6">
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold">{t("branches.deleteTitle")}</h2>
-              <p className="text-sm text-text-secondary">{t("branches.deleteDescription", { name: deleting.name ?? t("branches.branch") })}</p>
-            </div>
-            <div className="rounded-2xl border border-status-danger/20 bg-status-danger/5 px-4 py-3 text-sm leading-6 text-text-secondary">
-              {t("branches.permanent")}
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={() => setDeleting(null)} disabled={deleteMutation.isPending}>
-                {t("branches.cancel")}
-              </Button>
-              <Button type="button" variant="destructive" onClick={() => deleting && deleteMutation.mutate(deleting)} disabled={deleteMutation.isPending}>
-                {deleteMutation.isPending ? t("branches.deleting") : t("branches.deleteDefinitely")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <ConfirmDeleteDialog
+        open={Boolean(deleting)}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        title={deleting ? t("branches.deleteDescription", { name: deleting.name }) : t("branches.deleteTitle")}
+        description={t("branches.deleteIntro")}
+        confirmLabel={t("branches.deleteDefinitely")}
+        pending={deleteMutation.isPending}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
+        consequences={
+          deleting ? (
+            <ul className="list-disc space-y-1 pl-5">
+              <li>{t("branches.deleteConsequencePeople")}</li>
+              <li>{t("branches.deleteConsequenceHistory")}</li>
+              <li>
+                {deletingSiblings === 0
+                  ? t("branches.deleteConsequenceLast", { company: deletingTenant?.name ?? currentTenant.name })
+                  : t("branches.deleteConsequenceRemaining", { count: String(deletingSiblings) })}
+              </li>
+            </ul>
+          ) : null
+        }
+      />
     </div>
   );
 }

@@ -13,7 +13,12 @@ import { useAppearance } from "@/components/appearance";
  */
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme, ready } = useAppearance();
-  const nextTheme = theme === "dark" ? "light" : "dark";
+  // Hasta que se conoce la preferencia real se pinta el valor por defecto, que
+  // es el mismo que renderiza el servidor. Así el marcado que React hidrata
+  // coincide en los dos lados y no hay discrepancia. El tema VISIBLE ya es el
+  // correcto: lo aplicó el script de arranque sobre el DOM.
+  const shown = ready ? theme : "light";
+  const nextTheme = shown === "dark" ? "light" : "dark";
 
   return (
     <Button
@@ -22,9 +27,9 @@ export function ThemeToggle({ className }: { className?: string }) {
       onClick={() => setTheme(nextTheme)}
       className={className}
       disabled={!ready}
-      aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      aria-label={shown === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
     >
-      {theme === "dark" ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
+      {shown === "dark" ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
     </Button>
   );
 }
@@ -43,7 +48,9 @@ export function ThemeToggle({ className }: { className?: string }) {
  */
 export function DensityToggle({ className }: { className?: string }) {
   const { density, setDensity, ready } = useAppearance();
-  const isCompact = density === "compact";
+  // Mismo criterio que en el conmutador de tema: hasta conocer la preferencia
+  // real se pinta la densidad por defecto, que es la que renderiza el servidor.
+  const isCompact = ready && density === "compact";
 
   return (
     <Button

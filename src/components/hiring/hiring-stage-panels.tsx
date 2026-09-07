@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { HiringConfirmDialog, HiringReasonDialog } from "@/components/hiring/hiring-action-dialog";
+import { HiringReasonDialog } from "@/components/hiring/hiring-action-dialog";
+import { ConfirmPanel, ImpactReview } from "@/components/system";
+import { hiringConfirmationImpact } from "@/lib/hiring-operation";
+import { initialOperationState, type OperationStepId } from "@/lib/operation-flow";
 import { HiringBlockerList, currentOfferVersion, longDate, salaryText } from "@/components/hiring/hiring-case-header";
 import {
   configureHiringOffer,
@@ -22,7 +25,11 @@ import {
   sendHiringDocuments,
   sendHiringOffer,
 } from "@/lib/backend";
-import type { HiringContractDocumentDto, HiringContractDto } from "@/lib/contracts";
+import type {
+  HiringContractBlockerDto,
+  HiringContractDocumentDto,
+  HiringContractDto,
+} from "@/lib/contracts";
 import {
   HIRING_STAGES,
   hiringDocumentStatusLabel,
@@ -377,15 +384,58 @@ export function DocumentsPanel({ contract, state, documents, onBack, onRefresh }
 
 export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: { contract: HiringContractDto; state: HiringCaseState; documents: HiringContractDocumentDto[]; onBack?: () => void; onRefresh: () => Promise<void> }) {
   const { locale, t } = useLocale();
-  const { can } = useAppStore();
+  const { can, currentUser } = useAppStore();
   const canUpdate = can("applications.update");
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
   const client = useQueryClient();
   const confirm = useMutation({ mutationFn: () => confirmHiringContract(contract.id), onSuccess: async () => { await onRefresh(); await client.invalidateQueries({ queryKey: ["hiring-contracts"] }); } });
 
   const version = currentOfferVersion(contract);
   const approved = documents.filter((document) => ["APPROVED", "SIGNED", "WAIVED"].includes(document.status)).length;
   const firstName = contract.candidate.fullName.split(" ")[0] || "la persona";
+
+  /*
+   * Esta etapa pasa a usar el patrón universal de operaciones.
+   *
+   * Antes había un párrafo escrito a mano que enumeraba lo que iba a pasar y,
+   * por separado, la comprobación de si se podía confirmar; los dos podían
+   * discrepar y ninguno decía si la acción era reversible. Ahora el impacto se
+   * calcula en `hiringConfirmationImpact` —probado— y la decisión de si se
+   * puede confirmar la toma `canConfirm` a partir de ese mismo impacto.
+   *
+   * Se retira el diálogo de «¿Estás seguro?». Lo sustituye una casilla que
+   * exige reconocer que la operación es definitiva, junto al detalle de qué
+   * cambia: un modal con un sí y un no informa menos y se responde por reflejo.
+   */
+  const impact = hiringConfirmationImpact({
+    candidateName: contract.candidate.fullName,
+    roleTitle: contract.roleTitle ?? contract.vacancy.title,
+    branchName: contract.branch.name,
+    salaryText: salaryText(version) ?? null,
+    startDateText: longDate(version?.employmentStartDate) ?? null,
+    documentsTotal: documents.length,
+    documentsApproved: approved,
+    pendingDocuments: state.pendingDocuments,
+    hasOnboardingFlow: Boolean(contract.onboardingFlowId),
+    responsible: currentUser.fullName,
+    // El backend es la autoridad sobre si acepta la confirmación. Si no la
+    // acepta y no ha explicado por qué, se declara un bloqueo genérico en vez
+    // de mostrar un botón que el servidor va a rechazar.
+    blockers: state.canConfirm
+      ? []
+      : state.blockers.length > 0
+        ? state.blockers
+        : [{ code: "NOT_CONFIRMABLE", message: t("hiring.panel.needOfferAccepted") } as HiringContractBlockerDto],
+    locale,
+  });
+
+  const operationState = {
+    ...initialOperationState(),
+    step: "confirm" as const,
+    completed: ["select", "record", "review"] as OperationStepId[],
+    impact,
+    submitting: confirm.isPending,
+  };
 
   return (
     <StagePanel stage="REVISION" onBack={onBack}>
@@ -398,26 +448,20 @@ export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: {
         <DataRow label={t("hiring.panel.startDate")} value={longDate(version?.employmentStartDate) ?? t("hiring.panel.undefined")} />
         <DataRow label="Oferta" value={contract.jobOffer?.acceptedAt ? `Aceptada el ${longDate(contract.jobOffer.acceptedAt)}` : hiringOfferStatusLabel(contract.jobOffer?.status)} />
         <DataRow label={t("hiring.panel.docsLabel")} value={documents.length ? `${approved} de ${documents.length} aprobados` : t("hiring.panel.noDocsRequested")} />
-        <DataRow label={t("hiring.panel.pendingRequirements")} value={state.pendingDocuments ? `${state.pendingDocuments} documento(s) por aprobar` : "Ninguno"} />
-        <DataRow label={t("hiring.panel.accessGranted")} value={t("hiring.panel.accessDescription")} />
       </dl>
 
-      <HiringBlockerList state={state} candidateName={firstName} />
+      {/* Qué cambia si confirmo: estado actual, resultado esperado, avisos,
+          bloqueos con causa/responsable/salida, y quién queda registrado. */}
+      <ImpactReview impact={impact} />
 
-      {canUpdate && state.canConfirm ? (
-        <div className="space-y-3 border-t border-border-default pt-5">
-          <InlineFeedback tone="info" title={t("hiring.panel.whatHappens")}>
-            Se creará el perfil de empleado de {contract.candidate.fullName}, sus documentos pasarán a su expediente y se preparará su acceso a la plataforma. Si tu empresa tiene incorporación, también se abrirá su plan de bienvenida.
-          </InlineFeedback>
-          <Button size="lg" onClick={() => setConfirmOpen(true)} loading={confirm.isPending} loadingLabel="Confirmando…">
-            Confirmar contratación
-            <ArrowRight className="size-5" aria-hidden="true" />
-          </Button>
-        </div>
-      ) : canUpdate ? (
-        <InlineFeedback tone="warning" title={t("hiring.panel.cannotConfirm")}>
-          {state.pendingDocuments ? `Faltan ${state.pendingDocuments} documento(s) obligatorio(s) por aprobar. Vuelve al paso de documentos para revisarlos.` : t("hiring.panel.needOfferAccepted")}
-        </InlineFeedback>
+      {canUpdate ? (
+        <ConfirmPanel
+          state={operationState}
+          operationName={t("hiring.panel.confirmHiring")}
+          onConfirm={() => confirm.mutate()}
+          acknowledged={acknowledged}
+          onAcknowledgedChange={setAcknowledged}
+        />
       ) : (
         <InlineFeedback tone="info" title={t("hiring.panel.readOnly")}>
           Tu perfil permite revisar esta contratación, pero no cerrarla. Pídeselo a la persona responsable de recursos humanos.
@@ -426,14 +470,10 @@ export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: {
 
       {confirm.error ? <InlineFeedback tone="danger" title={t("hiring.panel.closeFailed")}>{hiringErrorMessage(confirm.error, locale)}</InlineFeedback> : null}
 
-      <HiringConfirmDialog
-        open={confirmOpen}
-        title={t("hiring.panel.confirmHiring")}
-        description={`Se creará el perfil de empleado de ${contract.candidate.fullName}, se vincularán sus documentos y se preparará su acceso a la plataforma.`}
-        confirmLabel={t("hiring.panel.confirmYes")}
-        onOpenChange={setConfirmOpen}
-        onConfirm={() => confirm.mutate()}
-      />
+      {/* El bloque de blockers específico de contratación ya no se pinta aparte:
+          `ImpactReview` los muestra con causa, responsable y cómo se resuelven.
+          `HiringBlockerList` sigue usándose en las etapas anteriores. */}
+      <span className="sr-only">{firstName}</span>
     </StagePanel>
   );
 }

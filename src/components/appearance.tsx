@@ -70,19 +70,33 @@ function writeMirror(theme: Theme, density: Density) {
   }
 }
 
+/**
+ * Valor inicial tomado del espejo local.
+ *
+ * Se lee en el inicializador perezoso de `useState` y NO en un efecto. Hacerlo
+ * en un efecto significaba pintar una vez con el valor por defecto y volver a
+ * pintar con el real: un render en cascada que además ESLint marca como error
+ * (`react-hooks/set-state-in-effect`).
+ *
+ * En el servidor no hay `window`, así que allí devuelve el valor por defecto.
+ * Eso haría que el primer render del cliente y el del servidor discrepasen, y
+ * por eso los controles que dependen del tema no lo muestran hasta que `ready`
+ * es cierto: `ready` vale `false` en los dos lados, de modo que el marcado que
+ * se hidrata es idéntico. El tema visible ya es el correcto desde el primer
+ * frame porque lo aplica `APPEARANCE_BOOT_SCRIPT` sobre el DOM.
+ */
+function initialAppearance(): { theme: Theme; density: Density } {
+  if (typeof window === "undefined") return { theme: "light", density: "comfortable" };
+  const mirror = readMirror();
+  return { theme: mirror.theme ?? "light", density: mirror.density ?? "comfortable" };
+}
+
 export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
-  const [density, setDensityState] = useState<Density>("comfortable");
+  const [theme, setThemeState] = useState<Theme>(() => initialAppearance().theme);
+  const [density, setDensityState] = useState<Density>(() => initialAppearance().density);
   const [ready, setReady] = useState(false);
 
-  // 1) Primer valor: el espejo local, que es síncrono y evita el fogonazo.
-  useEffect(() => {
-    const mirror = readMirror();
-    if (mirror.theme) setThemeState(mirror.theme);
-    if (mirror.density) setDensityState(mirror.density);
-  }, []);
-
-  // 2) Valor real: el backend. Corrige el espejo si difieren.
+  // Valor real: el backend. Corrige el espejo si difieren.
   useEffect(() => {
     let cancelled = false;
     void fetchMyPreferences()
@@ -109,8 +123,8 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // 3) Aplicar al documento. Se ejecuta también antes de `ready` para que el
-  //    valor del espejo llegue al DOM cuanto antes.
+  // Aplicar al documento. Se ejecuta también antes de `ready` para que el valor
+  // del espejo llegue al DOM cuanto antes.
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");

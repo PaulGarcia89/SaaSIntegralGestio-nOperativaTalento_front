@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { moduleLabels, moduleSourceLabels } from "@/lib/ui-labels";
 import { useAppStore } from "@/store/app-store";
 import { Badge } from "@/components/ui/badge";
+import { BlockedState } from "@/components/system";
+import { planTierLabel, shortId, tenantStatusInfo } from "@/lib/platform-labels";
 import { InfoList, SectionCard } from "@/components/ui";
 import { AsyncState } from "@/components/async-state";
 
@@ -58,10 +60,11 @@ export default function ModulesPage() {
 
   if (!can("admin.company")) {
     return (
-      <StateCard
-        tone="restricted"
-        title="Sin acceso a módulos"
-        description="El rol actual no puede configurar módulos por empresa."
+      <BlockedState
+        title="Sin acceso a los módulos por empresa"
+        cause="Habilitar o apagar un módulo afecta al menú de todas las personas de una empresa."
+        owner="Quien administra la plataforma"
+        resolution="Si necesitas consultarlo, pide el permiso «Configuración de empresa»."
       />
     );
   }
@@ -73,7 +76,7 @@ export default function ModulesPage() {
     <div className="space-y-5">
       <CrudHeader
         title="Gestión de módulos"
-        description="Consulta y modifica los módulos habilitados por empresa, de acuerdo con el plan o activacion manual."
+        description="Qué módulos ve cada empresa. Apagar uno lo quita del menú de todas sus personas de inmediato; los datos se conservan."
         badge="Gobierno SaaS"
       />
       <FilterToolbar
@@ -98,7 +101,7 @@ export default function ModulesPage() {
           />
         </CrudPanel>
       ) : (
-        <div className="grid gap-x-6 gap-y-8 2xl:gap-x-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.75fr)]">
+        <div className="grid min-w-0 gap-x-6 gap-y-8 2xl:gap-x-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)] [&>*]:min-w-0">
           <CrudPanel>
             <DomainTable
               data={filtered}
@@ -109,7 +112,8 @@ export default function ModulesPage() {
                   key: "tenant",
                   header: "Empresa",
                   render: (assignment) =>
-                    tenantsQuery.data?.find((tenant) => tenant.id === assignment.tenantId)?.name ?? assignment.tenantId,
+                    tenantsQuery.data?.find((tenant) => tenant.id === assignment.tenantId)?.name ??
+                    `Empresa sin cargar (${shortId(assignment.tenantId)})`,
                 },
                 { key: "module", header: "Módulo", render: (assignment) => moduleLabels[assignment.module] },
                 { key: "source", header: "Origen", render: (assignment) => moduleSourceLabels[assignment.source] },
@@ -160,8 +164,12 @@ export default function ModulesPage() {
                 <InfoList
                   items={[
                     { title: "Estado", description: selectedAssignment.enabled ? "Módulo habilitado" : "Módulo deshabilitado", badge: selectedAssignment.enabled ? "Activo" : "Inactivo" },
-                    { title: "Origen", description: moduleSourceLabels[selectedAssignment.source], badge: selectedAssignment.source },
-                    { title: "Plan de empresa", description: selectedTenant?.plan ?? "Sin plan", badge: selectedTenant?.status ?? "Sin estado" },
+                    { title: "Origen", description: moduleSourceLabels[selectedAssignment.source] },
+                    {
+                      title: "Plan de la empresa",
+                      description: selectedTenant ? planTierLabel(selectedTenant.plan) : "Sin plan",
+                      badge: tenantStatusInfo(selectedTenant?.status ?? "active").label,
+                    },
                   ]}
                 />
 

@@ -15,8 +15,9 @@ import {
 import type { PlanAdminDto, PlanLimitsDto } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
-import { StateCard } from "@/components/domain";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { BlockedState } from "@/components/system";
+import { formatPrice, planTierLabel } from "@/lib/platform-labels";
 import { Badge } from "@/components/ui/badge";
 import { confirmAction } from "@/components/confirm-action";
 import { Button } from "@/components/ui/button";
@@ -127,7 +128,14 @@ export default function PlansPage() {
   };
 
   if (!can("admin.subscription")) {
-    return <StateCard tone="restricted" title="Sin acceso al catálogo de planes" description="Tu rol no puede administrar precios, módulos ni límites globales." />;
+    return (
+      <BlockedState
+        title="Sin acceso al catálogo de planes"
+        cause="Los precios y los topes de cada plan alcanzan a todas las empresas de la plataforma."
+        owner="Quien administra la plataforma"
+        resolution="Si necesitas consultarlo, pide el permiso «Administrar suscripciones»."
+      />
+    );
   }
   if (plans.isPending || modules.isPending) return <AsyncState state="loading" title="Cargando catálogo de planes" />;
   if (plans.isError || modules.isError) {
@@ -153,11 +161,11 @@ export default function PlansPage() {
 
       <section className="grid gap-5 xl:grid-cols-3">
         {plans.data?.map((plan) => (
-          <Card key={plan.id} level={plan.code === "PRO" ? 1 : 2} className="flex flex-col">
+          <Card key={plan.id} level={2} className="flex min-w-0 flex-col">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <Badge variant="secondary">{plan.code}</Badge>
+                  <Badge variant="secondary">{catalogTierLabel(plan.code)}</Badge>
                   <CardTitle className="mt-3 text-2xl">{plan.name}</CardTitle>
                   <p className="mt-2 text-sm text-text-secondary">{plan.description || "Sin descripción"}</p>
                 </div>
@@ -190,13 +198,21 @@ export default function PlansPage() {
                   )) : <span className="text-sm text-text-secondary">Sin módulos incluidos</span>}
                 </div>
               </div>
-              <div className="mt-auto flex items-center justify-between border-t pt-4">
-                <span className="text-sm text-text-secondary">{plan.subscriptions} suscripciones</span>
+              <div className="mt-auto space-y-2 border-t pt-4">
+                {plan.subscriptions > 0 ? (
+                  <p className="text-xs text-text-secondary">
+                    No se puede eliminar: {plan.subscriptions === 1
+                      ? "una empresa lo tiene contratado"
+                      : `${plan.subscriptions} empresas lo tienen contratado`}.
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-secondary">Ninguna empresa lo tiene contratado.</p>
+                )}
                 <Button
                   size="sm"
                   variant="destructive"
+                  className="w-full sm:w-auto"
                   disabled={plan.subscriptions > 0 || remove.isPending}
-                  title={plan.subscriptions > 0 ? "El plan tiene suscripciones asociadas" : undefined}
                   onClick={() =>
                     void confirmAction({
                       title: `¿Eliminar el plan «${plan.name}»?`,
@@ -217,7 +233,7 @@ export default function PlansPage() {
       </section>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar plan" : "Crear plan"}</DialogTitle>
             <DialogDescription>Configura el catálogo comercial y los límites verificables del servicio.</DialogDescription>
@@ -225,12 +241,15 @@ export default function PlansPage() {
           <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Nombre"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field>
-              <Field label="Código">
+              <Field label="Nivel del plan">
                 <FormSelect
                   value={form.code}
                   disabled={Boolean(editing)}
                   onValueChange={(code) => setForm({ ...form, code: code as PlanAdminDto["code"] })}
-                  options={(editing ? [editing.code] : availableCodes).map((code) => ({ value: code, label: code }))}
+                  options={(editing ? [editing.code] : availableCodes).map((code) => ({
+                    value: code,
+                    label: `${catalogTierLabel(code)} (${code})`,
+                  }))}
                 />
               </Field>
               <Field label="Precio mensual"><Input type="number" min="0" step="0.01" value={form.priceMonthly} onChange={(event) => setForm({ ...form, priceMonthly: event.target.value })} /></Field>
@@ -291,7 +310,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Price({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl border p-3"><p className="text-xs text-text-secondary">{label}</p><p className="mt-1 text-xl font-semibold">${value.toLocaleString("es-ES")}</p></div>;
+  return (
+    <div className="rounded-xl border p-3">
+      <p className="text-xs text-text-secondary">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-figures">{formatPrice(value)}</p>
+    </div>
+  );
+}
+
+/**
+ * El catálogo del backend usa BASIC/PRO/ENTERPRISE y la suscripción usa
+ * starter/growth/enterprise. Aquí se muestra el nombre en español del nivel,
+ * dejando el código solo donde de verdad hace falta elegirlo.
+ */
+function catalogTierLabel(code: PlanAdminDto["code"]): string {
+  const tier = code === "BASIC" ? "starter" : code === "PRO" ? "growth" : "enterprise";
+  return planTierLabel(tier);
 }
 
 function parseLimits(values: FormState["limits"]): PlanLimitsDto {

@@ -2,46 +2,185 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarClock, CheckCircle2, CreditCard, PackageCheck, type LucideIcon } from "lucide-react";
-import { fetchSubscriptions } from "@/lib/backend";
+import { fetchSubscriptions, getApiErrorMessage } from "@/lib/backend";
 import { moduleLabels } from "@/lib/ui-labels";
+import {
+  billingCycleLabel,
+  formatDate,
+  formatPrice,
+  planTierLabel,
+  subscriptionStatusInfo,
+} from "@/lib/platform-labels";
 import { useAppStore } from "@/store/app-store";
-import { AsyncState } from "@/components/async-state";
-import { PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
+import {
+  BlockedState,
+  EmptyState,
+  ErrorState,
+  InlineNote,
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+  StatusBadge,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
-const statusLabel = { active: "Activa", trial: "En prueba", past_due: "Pago pendiente" } as const;
+/**
+ * Plan contratado, visto desde la propia empresa.
+ *
+ * · El plan se mostraba con `capitalize` sobre el código del backend, así que
+ *   se leía «Starter» —el código en inglés, con la primera letra en mayúscula
+ *   por CSS—.
+ * · El importe salía como `$49`, sin separadores ni moneda, bajo el rótulo
+ *   «Inversión».
+ * · Había un cuarto diccionario local de estados de suscripción, distinto de
+ *   los otros tres del proyecto.
+ * · El «sin acceso» era una tarjeta suelta que no decía quién puede
+ *   concederlo.
+ *
+ * Se añade lo que faltaba y aquí importa más que en la vista de plataforma:
+ * cuánto falta para la renovación, y un aviso claro si el pago está vencido
+ * —porque desde esta pantalla no se puede hacer nada al respecto, y conviene
+ * decir a quién avisar—.
+ */
 
 export default function CompanySubscriptionPage() {
   const { can, currentTenant } = useAppStore();
-  const subscriptionQuery = useQuery({ queryKey: ["subscriptions"], queryFn: fetchSubscriptions, enabled: can("admin.subscription") });
+  const subscriptionQuery = useQuery({
+    queryKey: ["subscriptions"],
+    queryFn: fetchSubscriptions,
+    enabled: can("admin.subscription"),
+  });
 
   if (!can("admin.subscription")) {
-    return <Card level={2}><CardContent className="p-6"><h1 className="font-semibold">Sin acceso a la suscripción</h1><p className="mt-2 text-sm text-text-secondary">Tu perfil no puede consultar el plan ni las condiciones de la empresa.</p></CardContent></Card>;
+    return (
+      <BlockedState
+        title="Sin acceso al plan contratado"
+        cause="El plan y sus condiciones económicas son información de administración."
+        owner="Quien administra la empresa"
+        resolution="Si necesitas consultarlo, pide el permiso «Administrar suscripción»."
+      />
+    );
   }
-  if (subscriptionQuery.isLoading) return <AsyncState state="loading" title="Cargando suscripción" />;
-  if (subscriptionQuery.isError) return <AsyncState state="error" title="No fue posible cargar la suscripción" onRetry={() => void subscriptionQuery.refetch()} />;
+
+  if (subscriptionQuery.isLoading) return <SkeletonRows rows={4} label="Cargando el plan contratado" />;
+  if (subscriptionQuery.isError) {
+    return (
+      <ErrorState
+        title="No fue posible cargar el plan contratado"
+        detail={getApiErrorMessage(subscriptionQuery.error, "Reintenta la consulta para continuar.")}
+        onRetry={() => void subscriptionQuery.refetch()}
+      />
+    );
+  }
 
   const subscription = subscriptionQuery.data?.find((item) => item.tenantId === currentTenant.id);
-  const renewal = subscription ? new Intl.DateTimeFormat("es", { dateStyle: "long" }).format(new Date(subscription.renewalDate)) : null;
+  const status = subscription ? subscriptionStatusInfo(subscription.status) : null;
+  const daysToRenewal = subscription ? daysUntil(subscription.renewalDate) : null;
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Administración" title="Suscripción de mi empresa" description="Consulta el plan vigente, módulos habilitados y próxima renovación." />
+      <PageHeader
+        eyebrow={currentTenant.name}
+        title="Plan contratado"
+        description="Qué está contratado, qué se paga, cuándo renueva y qué módulos cubre."
+      />
+
       {!subscription ? (
-        <Card level={2}><CardContent className="space-y-3 p-6"><CreditCard className="size-6 text-brand" /><h2 className="font-semibold">No hay una suscripción asociada</h2><p className="text-sm text-text-secondary">La empresa todavía no tiene un plan asignado. Contacta a la administración de la plataforma para regularizarla.</p></CardContent></Card>
+        <EmptyState
+          reason="no-records"
+          title="Esta empresa no tiene ningún plan asignado"
+          description="Sin plan no hay renovación ni cobro registrados. Quien administra la plataforma puede asignar uno."
+        />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card level={2} className="lg:col-span-2"><CardContent className="space-y-6 p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-text-secondary">Plan actual</p><h2 className="mt-1 text-2xl font-semibold capitalize">{subscription.plan}</h2></div><Badge variant={subscription.status === "active" ? "success" : subscription.status === "past_due" ? "destructive" : "secondary"}>{statusLabel[subscription.status]}</Badge></div><div className="grid gap-4 sm:grid-cols-3"><Summary icon={CreditCard} label="Ciclo" value={subscription.billingCycle === "annual" ? "Anual" : "Mensual"} /><Summary icon={CalendarClock} label="Renovación" value={renewal ?? "Sin fecha"} /><Summary icon={PackageCheck} label="Inversión" value={`$${subscription.price}`} /></div></CardContent></Card>
-          <Card level={2}><CardContent className="space-y-3 p-6"><CheckCircle2 className="size-6 text-brand" /><h2 className="font-semibold">Módulos habilitados</h2><div className="flex flex-wrap gap-2">{currentTenant.enabledModules.map((module) => <Badge key={module} variant="secondary">{moduleLabels[module]}</Badge>)}</div><Button asChild variant="secondary" className="mt-2 w-full"><Link href="/admin/company">Configuración de empresa</Link></Button></CardContent></Card>
-        </div>
+        <>
+          <MetricRow>
+            <Metric label="Plan" value={planTierLabel(subscription.plan)} />
+            <Metric
+              label="Estado del cobro"
+              value={status!.label}
+              detail={status!.detail}
+              tone={status!.tone === "danger" ? "danger" : undefined}
+            />
+            <Metric
+              label="Importe"
+              value={formatPrice(subscription.price)}
+              detail={billingCycleLabel(subscription.billingCycle)}
+            />
+            <Metric
+              label="Próxima renovación"
+              value={formatDate(subscription.renewalDate)}
+              detail={
+                daysToRenewal === null
+                  ? undefined
+                  : daysToRenewal < 0
+                    ? `Venció hace ${Math.abs(daysToRenewal)} días`
+                    : daysToRenewal === 0
+                      ? "Es hoy"
+                      : `Faltan ${daysToRenewal} días`
+              }
+              tone={daysToRenewal !== null && daysToRenewal < 0 ? "warning" : undefined}
+            />
+          </MetricRow>
+
+          {subscription.status === "past_due" ? (
+            <InlineNote tone="danger" title="El último cobro no se completó">
+              El acceso de tu gente sigue abierto por ahora, pero la empresa puede quedar suspendida si el pago no se
+              regulariza. Desde aquí no se puede pagar: avisa a quien administra la plataforma.
+            </InlineNote>
+          ) : subscription.status === "trial" ? (
+            <InlineNote tone="info" title="La empresa está en periodo de prueba">
+              El acceso termina cuando venza la prueba, el {formatDate(subscription.renewalDate)}. Para continuar hay
+              que contratar un plan con quien administra la plataforma.
+            </InlineNote>
+          ) : null}
+
+          <PageSection
+            title="Qué cubre el plan"
+            description="Los módulos habilitados son los que aparecen en el menú de las personas de la empresa."
+            actions={
+              <Button asChild variant="secondary">
+                <Link href="/admin/company">Configuración de empresa</Link>
+              </Button>
+            }
+          >
+            {currentTenant.enabledModules.length === 0 ? (
+              <p className="text-sm text-ink-2">
+                No hay ningún módulo habilitado. Quien administra la plataforma puede activarlos.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {currentTenant.enabledModules.map((module) => (
+                  <span
+                    key={module}
+                    className="rounded-md border border-line bg-surface-2 px-2 py-1 text-2xs text-ink-2"
+                  >
+                    {moduleLabels[module]}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <StatusBadge size="sm" tone={status!.tone} label={status!.label} />
+              <span className="text-2xs text-ink-3">
+                {currentTenant.branchCount ?? 0} sucursales · {currentTenant.employeeCount ?? 0} personas cubiertas
+              </span>
+            </div>
+          </PageSection>
+        </>
       )}
     </div>
   );
 }
 
-function Summary({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return <div className="rounded-xl bg-muted/60 p-4"><Icon className="size-4 text-brand" aria-hidden="true" /><p className="mt-3 text-xs text-text-secondary">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></div>;
+/** Días que faltan para una fecha, contando desde hoy a medianoche. */
+function daysUntil(value: string): number | null {
+  const target = new Date(value);
+  if (Number.isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }

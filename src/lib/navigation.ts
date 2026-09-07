@@ -26,17 +26,38 @@ const live: SubscriptionAccessState[] = ["active", "trial", "grace_period"];
 
 export type NavSection =
   | "inicio"
-  | "operacion"
-  | "supervision"
+  | "ats"
+  | "onboarding"
+  | "training"
+  | "productivity"
+  | "asset_inventory"
+  | "restaurant_inventory"
+  | "notifications"
   | "reportes"
   | "administracion"
   | "plataforma";
 
+/**
+ * Una sección por módulo.
+ *
+ * Contratar un módulo añade su sección entera; no contratarlo la quita entera.
+ * Antes las secciones agrupaban por intención y repartían cada módulo entre
+ * tres o cuatro sitios, así que al no contratar uno quedaban huecos por todo
+ * el menú en vez de desaparecer un bloque.
+ *
+ * «Inicio» es la excepción deliberada: reúne el panel y el perfil, que no se
+ * contratan —están siempre— y son una pantalla cada uno.
+ */
 export const navSections: ReadonlyArray<{ id: NavSection; label: string; hint: string }> = [
   { id: "inicio", label: "Inicio", hint: "Tu punto de partida" },
-  { id: "operacion", label: "Operación diaria", hint: "Lo que se registra hoy" },
-  { id: "supervision", label: "Supervisión", hint: "Lo que hay que vigilar" },
-  { id: "reportes", label: "Reportes y análisis", hint: "Lo que se consulta" },
+  { id: "ats", label: "Reclutamiento", hint: "Vacantes, candidatos y contratación" },
+  { id: "onboarding", label: "Incorporación", hint: "Documentos y firmas de quien entra" },
+  { id: "training", label: "Capacitación", hint: "Cursos, evaluaciones y certificados" },
+  { id: "productivity", label: "Personas y productividad", hint: "Equipo, turnos e indicadores" },
+  { id: "asset_inventory", label: "Inventario de activos", hint: "Equipos, entregas y devoluciones" },
+  { id: "restaurant_inventory", label: "Inventario de restaurante", hint: "Ingredientes, recetas y consumo" },
+  { id: "notifications", label: "Alertas", hint: "Lo que reclama tu atención" },
+  { id: "reportes", label: "Reportes", hint: "Lo que se consulta y se exporta" },
   { id: "administracion", label: "Administración", hint: "Cómo se configura la empresa" },
   { id: "plataforma", label: "Gobierno de plataforma", hint: "Alcance multiempresa" },
 ];
@@ -50,17 +71,6 @@ export const navSections: ReadonlyArray<{ id: NavSection; label: string; hint: s
  * Mezclarlas es lo que hacía que las alertas de vencimiento se perdieran entre
  * los comparativos de margen.
  */
-const supervisionRoutes = new Set([
-  "/notifications",
-  "/productivity",
-  "/inventory/assets/audit",
-  "/inventory/restaurant/audit",
-  "/inventory/restaurant/audit-log",
-  "/inventory/restaurant/variance",
-  "/inventory/restaurant/shrinkage",
-  "/inventory/restaurant/expiry-alerts",
-  "/inventory/restaurant/purchase-suggestions",
-]);
 
 /**
  * Pantallas de análisis que viven en un grupo de área, no en «Analítica».
@@ -70,11 +80,6 @@ const supervisionRoutes = new Set([
  * cambiando su `group`, porque el grupo sigue respondiendo a «¿de qué área
  * es?» y la respuesta —reclutamiento— es correcta.
  */
-const reportRoutes = new Set([
-  "/ats/analytics",
-  "/training/results",
-  "/training/intelligence",
-]);
 
 /**
  * Deriva la sección de un ítem.
@@ -83,14 +88,15 @@ const reportRoutes = new Set([
  * son 90 oportunidades de equivocarse, y porque la regla general acierta en la
  * gran mayoría. Las excepciones están arriba, enumeradas y probadas.
  */
-export function sectionForNavItem(item: { href: string; group: NavGroup }): NavSection {
-  if (supervisionRoutes.has(item.href)) return "supervision";
-  if (reportRoutes.has(item.href)) return "reportes";
-  if (item.group === "Inicio") return "inicio";
+export function sectionForNavItem(item: { href: string; group: NavGroup; module: ModuleKey }): NavSection {
+  // La sección es el módulo. Las dos excepciones son de audiencia, no de
+  // intención: el módulo `admin` sirve a dos públicos distintos —la empresa y
+  // la plataforma— y cada uno necesita su bloque.
   if (item.group === "Gobierno de plataforma") return "plataforma";
-  if (item.group === "Administración") return "administracion";
-  if (item.group === "Analítica") return "reportes";
-  return "operacion";
+  if (item.module === "admin") return "administracion";
+  if (item.module === "dashboard" || item.module === "profile") return "inicio";
+  if (item.module === "reports") return "reportes";
+  return item.module as NavSection;
 }
 
 const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "requiredPermissions" | "section">> = [
@@ -196,8 +202,12 @@ export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
   section: sectionForNavItem(item),
   requiredPermissions: [item.permission],
   featureFlag: `module.${item.module}`,
-  // Inicio, administración y gobierno son capacidades base, no módulos comerciales.
-  requiresCommercialModule: ["Inicio", "Administración", "Gobierno de plataforma"].includes(item.group)
+  // Las capacidades base se deciden por MÓDULO, no por el área en la que cae
+  // la pantalla. Al mirar el área, `/inventory/restaurant/settings` —que está
+  // en «Administración»— se libraba de la puerta del módulo, así que una
+  // empresa sin el inventario de restaurante contratado veía igualmente su
+  // sección con la configuración dentro.
+  requiresCommercialModule: (["dashboard", "profile", "admin"] as string[]).includes(item.module)
     ? false
     : item.requiresCommercialModule,
   available: !unavailableRouteHrefs.has(item.href),

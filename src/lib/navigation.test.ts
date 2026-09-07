@@ -341,29 +341,39 @@ describe("secciones de navegación", () => {
     }
   });
 
-  it("separa lo que hay que vigilar de lo que se consulta", () => {
-    const section = (href: string) => appNavigation.find((item) => item.href === href)?.section;
-    // Vigilar: existen porque algo puede estar mal y alguien debe actuar.
-    expect(section("/notifications")).toBe("supervision");
-    expect(section("/inventory/restaurant/expiry-alerts")).toBe("supervision");
-    expect(section("/inventory/restaurant/shrinkage")).toBe("supervision");
-    expect(section("/inventory/restaurant/audit-log")).toBe("supervision");
-    // Consultar: existen para responder una pregunta.
-    expect(section("/inventory/restaurant/recipe-margins")).toBe("reportes");
-    expect(section("/inventory/restaurant/unit-comparison")).toBe("reportes");
-    expect(section("/ats/analytics")).toBe("reportes");
+  it("cada módulo ocupa una sola sección", () => {
+    // Es la regla del menú: contratar un módulo añade su sección entera y no
+    // contratarlo la quita entera. Un módulo repartido entre secciones deja
+    // huecos por todo el menú en vez de desaparecer de un bloque.
+    const sectionsByModule = new Map<string, Set<string>>();
+    for (const item of appNavigation) {
+      if (item.module === "admin") continue; // sirve a empresa y a plataforma
+      const seen = sectionsByModule.get(item.module) ?? new Set<string>();
+      seen.add(item.section);
+      sectionsByModule.set(item.module, seen);
+    }
+    const scattered = [...sectionsByModule.entries()]
+      .filter(([, seen]) => seen.size > 1)
+      .map(([module, seen]) => `${module} está en ${[...seen].join(", ")}`);
+    expect(scattered).toEqual([]);
   });
 
-  it("las pantallas de análisis fuera del grupo «Analítica» acaban en reportes", () => {
+  it("la sección de un módulo se llama como el módulo", () => {
     const section = (href: string) => appNavigation.find((item) => item.href === href)?.section;
-    expect(section("/training/results")).toBe("reportes");
-    expect(section("/training/intelligence")).toBe("reportes");
-    // …pero el resto de Aprendizaje sigue siendo operación diaria.
-    expect(section("/training")).toBe("operacion");
-    expect(section("/training/evaluations")).toBe("operacion");
+    expect(section("/ats")).toBe("ats");
+    expect(section("/ats/analytics")).toBe("ats");
+    expect(section("/training")).toBe("training");
+    expect(section("/training/results")).toBe("training");
+    expect(section("/inventory/restaurant/receipts")).toBe("restaurant_inventory");
+    expect(section("/inventory/restaurant/recipe-margins")).toBe("restaurant_inventory");
+    expect(section("/inventory/restaurant/settings")).toBe("restaurant_inventory");
+    expect(section("/inventory/assets")).toBe("asset_inventory");
+    expect(section("/notifications")).toBe("notifications");
   });
 
   it("administración y gobierno de plataforma no se mezclan", () => {
+    // La única excepción a «una sección por módulo»: `admin` sirve a dos
+    // públicos y cada uno necesita su bloque.
     const section = (href: string) => appNavigation.find((item) => item.href === href)?.section;
     expect(section("/admin/users")).toBe("administracion");
     expect(section("/admin/branches")).toBe("administracion");
@@ -371,12 +381,10 @@ describe("secciones de navegación", () => {
     expect(section("/admin/plans")).toBe("plataforma");
   });
 
-  it("el grueso del producto cae en operación diaria", () => {
-    const operacion = appNavigation.filter((item) => item.section === "operacion");
-    expect(operacion.length).toBeGreaterThan(30);
-    expect(operacion.some((item) => item.href === "/ats")).toBe(true);
-    expect(operacion.some((item) => item.href === "/hiring")).toBe(true);
-    expect(operacion.some((item) => item.href === "/inventory/restaurant/receipts")).toBe(true);
+  it("toda sección declarada tiene al menos una pantalla", () => {
+    const used = new Set(appNavigation.map((item) => item.section));
+    const empty = navSections.map((section) => section.id).filter((id) => !used.has(id));
+    expect(empty).toEqual([]);
   });
 
   it("visibleSections respeta el orden canónico y omite las vacías", () => {
@@ -387,7 +395,7 @@ describe("secciones de navegación", () => {
       ["/admin/users", "/ats", "/dashboard"].includes(item.href),
     );
     // El orden sale de `navSections`, no del orden en que llegan los ítems.
-    expect(visibleSections(mezcla)).toEqual(["inicio", "operacion", "administracion"]);
+    expect(visibleSections(mezcla)).toEqual(["inicio", "ats", "administracion"]);
   });
 
   it("visibleSections ignora los ítems ocultos del menú", () => {
@@ -407,7 +415,7 @@ describe("secciones de navegación", () => {
   });
 
   it("sectionForPath resuelve la sección de una subruta", () => {
-    expect(sectionForPath(appNavigation, "/ats/vacancies/nueva-vacante")).toBe("operacion");
+    expect(sectionForPath(appNavigation, "/ats/vacancies/nueva-vacante")).toBe("ats");
     expect(sectionForPath(appNavigation, "/admin/users")).toBe("administracion");
   });
 

@@ -1979,7 +1979,7 @@
   "nav.section.inicio": "Inicio",
   "nav.section.operacion": "Operación diaria",
   "nav.section.supervision": "Supervisión",
-  "nav.section.reportes": "Reportes y análisis",
+  "nav.section.reportes": "Reportes",
   "nav.section.administracion": "Administración",
   "nav.section.plataforma": "Gobierno de plataforma",
   "hiring.blocker.docs.fix": "Vuelve al paso de documentos y aprueba los que falten.",
@@ -2031,4 +2031,11 @@
   "branches.deleteConsequenceLast": "Es la única sucursal de {{company}}: la empresa se queda sin ninguna sede operativa.",
   "branches.deleteConsequenceRemaining": "Quedan {{count}} sucursales en la empresa."
   ,"interviews.missingCredentials": "Falta configurar las credenciales de este proveedor en el servidor."
+  ,"nav.section.ats": "Reclutamiento"
+  ,"nav.section.onboarding": "Incorporación"
+  ,"nav.section.training": "Capacitación"
+  ,"nav.section.productivity": "Personas y productividad"
+  ,"nav.section.asset_inventory": "Inventario de activos"
+  ,"nav.section.restaurant_inventory": "Inventario de restaurante"
+  ,"nav.section.notifications": "Alertas"
 }

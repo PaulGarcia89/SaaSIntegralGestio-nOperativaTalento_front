@@ -1979,7 +1979,7 @@
   "nav.section.inicio": "Home",
   "nav.section.operacion": "Daily operations",
   "nav.section.supervision": "Oversight",
-  "nav.section.reportes": "Reports and analysis",
+  "nav.section.reportes": "Reports",
   "nav.section.administracion": "Administration",
   "nav.section.plataforma": "Platform governance",
   "hiring.blocker.docs.fix": "Go back to the documents step and approve the missing ones.",
@@ -2031,4 +2031,11 @@
   "branches.deleteConsequenceLast": "It is the only branch of {{company}}: the company is left with no operating site.",
   "branches.deleteConsequenceRemaining": "{{count}} branches remain in the company."
   ,"interviews.missingCredentials": "This provider's credentials are not configured on the server yet."
+  ,"nav.section.ats": "Recruiting"
+  ,"nav.section.onboarding": "Onboarding"
+  ,"nav.section.training": "Training"
+  ,"nav.section.productivity": "People and productivity"
+  ,"nav.section.asset_inventory": "Asset inventory"
+  ,"nav.section.restaurant_inventory": "Restaurant inventory"
+  ,"nav.section.notifications": "Alerts"
 }

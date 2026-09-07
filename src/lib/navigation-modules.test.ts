@@ -37,22 +37,27 @@ const BASIC: ModuleKey[] = ["dashboard", "profile", "ats"];
 describe("el menú se abre módulo a módulo", () => {
   it("una suscripción básica no trae las pantallas de los módulos que no paga", () => {
     const visible = menuFor(BASIC);
+    // Sin excluir las capacidades base por bandera: se comprueba por módulo.
+    // La exención se decidía por el ÁREA de la pantalla, así que
+    // `/inventory/restaurant/settings` —que cae en «Administración»— se
+    // libraba de la puerta y una empresa sin restaurante veía su sección.
+    const BASE: ModuleKey[] = ["dashboard", "profile", "admin"];
     const intruders = visible.filter(
-      (item) => !BASIC.includes(item.module) && item.requiresCommercialModule !== false,
+      (item) => !BASIC.includes(item.module) && !BASE.includes(item.module),
     );
     expect(intruders.map((item) => item.href)).toEqual([]);
   });
 
   it("contratar un módulo no arrastra ninguna pantalla de otro", () => {
-    for (const module of MODULE_KEYS) {
-      const withModule = menuFor([...BASIC, module]).map((item) => item.href);
+    for (const moduleKey of MODULE_KEYS) {
+      const withModule = menuFor([...BASIC, moduleKey]).map((item) => item.href);
       const without = menuFor(BASIC).map((item) => item.href);
       const added = withModule.filter((href) => !without.includes(href));
       const foreign = added
         .map((href) => appNavigation.find((item) => item.href === href)!)
-        .filter((item) => item.module !== module);
+        .filter((item) => item.module !== moduleKey);
       expect(
-        foreign.map((item) => `${module} arrastró ${item.href} (${item.module})`),
+        foreign.map((item) => `${moduleKey} arrastró ${item.href} (${item.module})`),
       ).toEqual([]);
     }
   });
@@ -61,9 +66,9 @@ describe("el menú se abre módulo a módulo", () => {
     // Un módulo que se paga y no añade nada al menú es un módulo que la
     // empresa no puede usar aunque lo tenga contratado.
     const mute: string[] = [];
-    for (const module of MODULE_KEYS) {
-      const added = menuFor([...BASIC, module]).filter((item) => item.module === module);
-      if (added.length === 0 && !BASIC.includes(module)) mute.push(module);
+    for (const moduleKey of MODULE_KEYS) {
+      const added = menuFor([...BASIC, moduleKey]).filter((item) => item.module === moduleKey);
+      if (added.length === 0 && !BASIC.includes(moduleKey)) mute.push(moduleKey);
     }
     expect(mute).toEqual([]);
   });

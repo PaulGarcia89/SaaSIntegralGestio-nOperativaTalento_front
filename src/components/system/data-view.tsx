@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState, SkeletonRows } from "@/components/system/feedback";
+import { useLocale } from "@/components/locale-provider";
 
 /* ==========================================================================
    VISTA DE DATOS
@@ -120,6 +121,7 @@ export function DataView<T>({
   onClearFilters,
   className,
 }: DataViewProps<T>) {
+  const { t } = useLocale();
   const [internalSort, setInternalSort] = useState<SortState>(null);
   const controlled = controlledSort !== undefined;
   const sort = controlled ? controlledSort : internalSort;
@@ -215,7 +217,7 @@ export function DataView<T>({
               })}
               {rowActions ? (
                 <th scope="col" className="px-4 py-3 text-right text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">
-                  <span className="sr-only">Acciones</span>
+                  <span className="sr-only">{t("sys.actions")}</span>
                 </th>
               ) : null}
             </tr>
@@ -355,7 +357,7 @@ export function DataView<T>({
 export function FilterBar({
   search,
   onSearchChange,
-  searchLabel = "Buscar",
+  searchLabel,
   activeCount = 0,
   onClear,
   children,
@@ -368,6 +370,7 @@ export function FilterBar({
   onClear?: () => void;
   children?: ReactNode;
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const searchId = useId();
   const panelId = useId();
@@ -378,7 +381,7 @@ export function FilterBar({
         {onSearchChange ? (
           <div className="relative min-w-0 flex-1">
             <label htmlFor={searchId} className="sr-only">
-              {searchLabel}
+              {searchLabel ?? t("actions.search")}
             </label>
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3"
@@ -424,7 +427,7 @@ export function FilterBar({
           {activeCount > 0 && onClear ? (
             <Button type="button" variant="ghost" onClick={onClear}>
               <X className="size-4" aria-hidden="true" />
-              Quitar filtros
+              {t("sys.removeFilters")}
             </Button>
           ) : null}
         </div>
@@ -455,6 +458,7 @@ export function Pagination({
   totalItems: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t } = useLocale();
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const start = totalItems === 0 ? 0 : page * pageSize + 1;
   const end = Math.min((page + 1) * pageSize, totalItems);
@@ -462,7 +466,7 @@ export function Pagination({
   if (totalItems <= pageSize) return null;
 
   return (
-    <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3 pt-2">
+    <nav aria-label={t("sys.pagination")} className="flex flex-wrap items-center justify-between gap-3 pt-2">
       <p className="font-mono text-xs text-ink-2 tabular-figures">
         {start}–{end} de {totalItems}
       </p>
@@ -473,7 +477,7 @@ export function Pagination({
           size="icon"
           disabled={page <= 0}
           onClick={() => onPageChange(page - 1)}
-          aria-label="Página anterior"
+          aria-label={t("sys.previousPage")}
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
         </Button>
@@ -486,7 +490,7 @@ export function Pagination({
           size="icon"
           disabled={page >= totalPages - 1}
           onClick={() => onPageChange(page + 1)}
-          aria-label="Página siguiente"
+          aria-label={t("sys.nextPage")}
         >
           <ChevronRight className="size-4" aria-hidden="true" />
         </Button>

@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import {
   CircleAlert,
@@ -14,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { OperationBlocker, OperationWarning } from "@/lib/operation-flow";
 import { sortBlockers } from "@/lib/operation-flow";
+import { useLocale } from "@/components/locale-provider";
 
 /* ==========================================================================
    ESTADOS
@@ -104,6 +107,7 @@ export function BlockerCard({
   /** Lleva el foco al campo que causa el bloqueo, si apunta a uno. */
   onFocusField?: (fieldId: string) => void;
 }) {
+  const { t } = useLocale();
   return (
     <li className="rounded-lg border border-status-danger/30 bg-status-danger/5 p-4">
       <p className="flex items-start gap-2 font-semibold text-ink-1">
@@ -111,15 +115,15 @@ export function BlockerCard({
         <span>{blocker.cause}</span>
       </p>
       <dl className="mt-2 grid gap-x-6 gap-y-1 pl-6 text-sm sm:grid-cols-[auto_1fr]">
-        <dt className="text-ink-2">Responsable</dt>
+        <dt className="text-ink-2">{t("sys.owner")}</dt>
         <dd className="text-ink-1">{blocker.owner}</dd>
-        <dt className="text-ink-2">Cómo se resuelve</dt>
+        <dt className="text-ink-2">{t("sys.howToResolve")}</dt>
         <dd className="text-ink-1">{blocker.resolution}</dd>
       </dl>
       {blocker.fieldId && onFocusField ? (
         <div className="mt-3 pl-6">
           <Button type="button" variant="secondary" size="sm" onClick={() => onFocusField(blocker.fieldId!)}>
-            Ir al campo
+            {t("sys.goToField")}
           </Button>
         </div>
       ) : null}
@@ -136,18 +140,19 @@ export function BlockerCard({
  */
 export function BlockerList({
   blockers,
-  title = "No se puede continuar todavía",
+  title,
   onFocusField,
 }: {
   blockers: OperationBlocker[];
   title?: string;
   onFocusField?: (fieldId: string) => void;
 }) {
+  const { t } = useLocale();
   if (blockers.length === 0) return null;
   return (
     <section role="alert" aria-labelledby="blockers-title" className="space-y-3">
       <h3 id="blockers-title" className="text-sm font-semibold text-ink-1">
-        {title}
+        {title ?? t("sys.cannotContinue")}
       </h3>
       <ul className="space-y-2">
         {sortBlockers(blockers).map((blocker) => (
@@ -165,12 +170,13 @@ export function BlockerList({
  * como un bloqueo, la gente aprende a ignorar los dos.
  */
 export function WarningList({ warnings }: { warnings: OperationWarning[] }) {
+  const { t } = useLocale();
   if (warnings.length === 0) return null;
   return (
     <section role="status" aria-labelledby="warnings-title" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-4">
       <h3 id="warnings-title" className="flex items-center gap-2 text-sm font-semibold text-ink-1">
         <TriangleAlert className="size-4 shrink-0 text-status-warning" aria-hidden="true" />
-        {warnings.length === 1 ? "Ten en cuenta" : `Ten en cuenta ${warnings.length} cosas`}
+        {warnings.length === 1 ? t("sys.noteOne") : t("sys.noteMany", { count: warnings.length })}
       </h3>
       <ul className="mt-2 space-y-1 pl-6 text-sm text-ink-2">
         {warnings.map((warning) => (
@@ -287,21 +293,22 @@ export function EmptyState({
   action?: ReactNode;
   onClearFilters?: () => void;
 }) {
+  const { t } = useLocale();
   const filtered = reason === "no-matches";
   return (
     <StateShell
       icon={<CircleDot className="size-7 text-ink-3" aria-hidden="true" />}
-      title={title ?? (filtered ? "Ningún resultado con estos filtros" : "Todavía no hay registros")}
+      title={title ?? (filtered ? t("sys.noMatchesTitle") : t("sys.noRecordsTitle"))}
       description={
         description ??
         (filtered
-          ? "Prueba a quitar algún filtro o a ampliar el periodo consultado."
-          : "Cuando exista información dentro de tu alcance, aparecerá aquí.")
+          ? t("sys.noMatchesDetail")
+          : t("sys.noRecordsDetail"))
       }
       action={
         filtered && onClearFilters ? (
           <Button type="button" variant="secondary" onClick={onClearFilters}>
-            Quitar los filtros
+            {t("sys.clearFilters")}
           </Button>
         ) : (
           action
@@ -318,7 +325,7 @@ export function EmptyState({
  * usuario y a quien da soporte sin nada con lo que trabajar.
  */
 export function ErrorState({
-  title = "No fue posible cargar la información",
+  title,
   detail,
   requestId,
   onRetry,
@@ -328,18 +335,19 @@ export function ErrorState({
   requestId?: string;
   onRetry?: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <StateShell
       tone="danger"
       icon={<CircleAlert className="size-7 text-status-danger" aria-hidden="true" />}
-      title={title}
+      title={title ?? t("states.loadError")}
       description={
         <>
-          {detail ?? "Conservamos tu contexto. Reintenta la consulta para continuar."}
+          {detail ?? t("states.loadErrorDetail")}
           {requestId ? (
             <>
               {" "}
-              <span className="font-mono text-2xs text-ink-3">Referencia de soporte: {requestId}</span>
+              <span className="font-mono text-2xs text-ink-3">{t("sys.supportReference", { id: requestId })}</span>
             </>
           ) : null}
         </>
@@ -348,7 +356,7 @@ export function ErrorState({
         onRetry ? (
           <Button type="button" variant="secondary" onClick={onRetry}>
             <RotateCw className="size-4" aria-hidden="true" />
-            Reintentar
+            {t("actions.retry")}
           </Button>
         ) : null
       }
@@ -375,6 +383,7 @@ export function BlockedState({
   resolution: string;
   action?: ReactNode;
 }) {
+  const { t } = useLocale();
   return (
     <StateShell
       tone="blocked"
@@ -384,7 +393,7 @@ export function BlockedState({
         <span className="block space-y-1 text-left sm:text-center">
           <span className="block">{cause}</span>
           <span className="block text-ink-2">
-            Responsable: <span className="text-ink-1">{owner}</span>
+            {t("sys.ownerIs")} <span className="text-ink-1">{owner}</span>
           </span>
           <span className="block text-ink-2">{resolution}</span>
         </span>
@@ -411,10 +420,12 @@ export function SkeletonBlock({ className }: { className?: string }) {
 }
 
 /** Silueta de una lista de filas, que es la forma más común del producto. */
-export function SkeletonRows({ rows = 6, label = "Cargando registros" }: { rows?: number; label?: string }) {
+export function SkeletonRows({ rows = 6, label }: { rows?: number; label?: string }) {
+  const { t } = useLocale();
+  const rotulo = label ?? t("sys.loadingRows");
   return (
     <div aria-busy="true" aria-live="polite" className="space-y-2">
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{rotulo}</span>
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} className="flex items-center gap-4 rounded-lg border border-line bg-surface-1 p-4">
           <SkeletonBlock className="size-10 shrink-0 rounded-full" />

@@ -1,9 +1,12 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Tone } from "@/components/system/feedback";
+import { useLocale } from "@/components/locale-provider";
 
 /* ==========================================================================
    CABECERA DE PÁGINA
@@ -55,15 +58,16 @@ export function PageHeader({
  */
 export function ActionBar({
   children,
-  label = "Acciones de la página",
+  label,
   className,
 }: {
   children: ReactNode;
   label?: string;
   className?: string;
 }) {
+  const { t } = useLocale();
   return (
-    <div role="toolbar" aria-label={label} className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div role="toolbar" aria-label={label ?? t("sys.pageActions")} className={cn("flex flex-wrap items-center gap-2", className)}>
       {children}
     </div>
   );
@@ -77,13 +81,14 @@ export function ActionBar({
  * espaciador en el flujo normal: sin él, el último elemento de la lista queda
  * bajo una barra `fixed` y es inalcanzable.
  */
-export function MobileActionBar({ children, label = "Acción principal" }: { children: ReactNode; label?: string }) {
+export function MobileActionBar({ children, label }: { children: ReactNode; label?: string }) {
+  const { t } = useLocale();
   return (
     <>
       <div aria-hidden="true" className="h-20 sm:hidden" />
       <div
         role="toolbar"
-        aria-label={label}
+        aria-label={label ?? t("sys.primaryAction")}
         className="fixed inset-x-0 bottom-0 z-[var(--z-action-bar)] border-t border-line bg-surface-1/95 p-3 backdrop-blur sm:hidden"
         style={{ paddingBottom: "calc(0.75rem + var(--mobile-nav-space, env(safe-area-inset-bottom)))" }}
       >

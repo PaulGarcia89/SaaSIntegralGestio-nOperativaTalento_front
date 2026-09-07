@@ -21,6 +21,7 @@ import {
   type OperationState,
   type OperationStepId,
 } from "@/lib/operation-flow";
+import { useLocale } from "@/components/locale-provider";
 
 /* ==========================================================================
    PATRÓN UNIVERSAL DE OPERACIONES
@@ -39,10 +40,11 @@ export function OperationStepper({
   state: OperationState;
   onStepChange?: (step: OperationStepId) => void;
 }) {
+  const { t } = useLocale();
   const current = stepIndex(state.step);
 
   return (
-    <nav aria-label="Progreso de la operación">
+    <nav aria-label={t("sys.operationProgress")}>
       <ol className="flex min-w-0 gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {OPERATION_STEPS.map((step, index) => {
           const done = state.completed.includes(step) && index < current;
@@ -113,6 +115,7 @@ export function OperationStepper({
    ========================================================================== */
 
 export function ImpactReview({ impact }: { impact: OperationImpact }) {
+  const { t } = useLocale();
   const adverse = adverseCount(impact);
 
   return (
@@ -133,23 +136,23 @@ export function ImpactReview({ impact }: { impact: OperationImpact }) {
               label={adverse === 1 ? "1 cambio desfavorable" : `${adverse} cambios desfavorables`}
             />
           ) : (
-            <StatusBadge tone="success" label="Sin cambios desfavorables" />
+            <StatusBadge tone="success" label={t("sys.noAdverseChanges")} />
           )}
         </div>
 
         {impact.lines.length > 0 ? (
           <table className="mt-4 w-full border-collapse text-sm">
-            <caption className="sr-only">Estado actual y resultado esperado de cada elemento afectado</caption>
+            <caption className="sr-only">{t("sys.impactCaption")}</caption>
             <thead>
               <tr className="border-b border-line">
                 <th scope="col" className="pb-2 text-left text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">
-                  Elemento
+                  {t("sys.item")}
                 </th>
                 <th scope="col" className="pb-2 text-right text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">
-                  Ahora
+                  {t("sys.now")}
                 </th>
                 <th scope="col" className="pb-2 text-right text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">
-                  Quedará
+                  {t("sys.after")}
                 </th>
               </tr>
             </thead>
@@ -203,7 +206,7 @@ export function ImpactReview({ impact }: { impact: OperationImpact }) {
       <BlockerList blockers={impact.blockers} />
 
       <p className="text-xs text-ink-3">
-        Quedará registrado a nombre de <span className="text-ink-2">{impact.responsible}</span>.
+        {t("sys.recordedUnder")} <span className="text-ink-2">{impact.responsible}</span>.
       </p>
     </div>
   );
@@ -234,6 +237,7 @@ export function ConfirmPanel({
   acknowledged?: boolean;
   onAcknowledgedChange?: (value: boolean) => void;
 }) {
+  const { t } = useLocale();
   const impact = state.impact;
   if (!impact) return null;
 
@@ -256,7 +260,7 @@ export function ConfirmPanel({
           ) : (
             <CircleAlert className="mt-0.5 size-5 shrink-0 text-ink-3" aria-hidden="true" />
           )}
-          {irreversible ? "Esta operación no se puede deshacer" : "Revisa antes de confirmar"}
+          {irreversible ? t("sys.irreversible") : t("sys.reviewBeforeConfirm")}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-2">{consequenceSentence(impact)}</p>
 
@@ -286,7 +290,7 @@ export function ConfirmPanel({
         {onBack ? (
           <Button type="button" variant="secondary" onClick={onBack} className="sm:w-auto">
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Volver a revisar
+            {t("sys.backToReview")}
           </Button>
         ) : null}
         <Button
@@ -295,7 +299,7 @@ export function ConfirmPanel({
           onClick={onConfirm}
           disabled={!ready}
           loading={state.submitting}
-          loadingLabel="Registrando…"
+          loadingLabel={t("sys.recording")}
           variant={irreversible ? "destructive" : "default"}
         >
           {confirmLabel(operationName, irreversible)}
@@ -317,13 +321,14 @@ export function OperationResultView({
   outcome,
   onRetry,
   onStartAnother,
-  startAnotherLabel = "Registrar otra",
+  startAnotherLabel,
 }: {
   outcome: OperationOutcome;
   onRetry?: () => void;
   onStartAnother?: () => void;
   startAnotherLabel?: string;
 }) {
+  const { t } = useLocale();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   // El foco viaja al resultado: sin esto, quien navega con teclado o lector se
@@ -365,7 +370,7 @@ export function OperationResultView({
 
       {outcome.status === "partial" && outcome.failures.length > 0 ? (
         <>
-          <h3 className="mt-4 text-sm font-semibold text-ink-1">Lo que no se pudo registrar</h3>
+          <h3 className="mt-4 text-sm font-semibold text-ink-1">{t("sys.notRecorded")}</h3>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-2">
             {outcome.failures.map((failure) => (
               <li key={failure}>{failure}</li>
@@ -390,7 +395,7 @@ export function OperationResultView({
         ) : null}
         {onStartAnother ? (
           <Button type="button" variant="secondary" onClick={onStartAnother}>
-            {startAnotherLabel}
+            {startAnotherLabel ?? t("sys.recordAnother")}
           </Button>
         ) : null}
       </div>

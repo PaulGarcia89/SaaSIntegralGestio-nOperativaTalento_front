@@ -311,6 +311,7 @@ texto de interfaz. Cada módulo tiene su diccionario, con pruebas:
 | Módulo | Archivo |
 |---|---|
 | Inventario de restaurante | `components/restaurant-inventory-ui.tsx` |
+| Inventario de activos | `lib/inventory-labels.ts` |
 | Capacitación | `lib/training-labels.ts` |
 
 Tres reglas, iguales en los dos:

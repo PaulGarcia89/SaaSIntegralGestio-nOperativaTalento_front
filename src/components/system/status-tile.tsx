@@ -41,6 +41,11 @@ export type StatusTileProps = {
   status?: { label: string; tone?: Tone };
   /** Adónde lleva la tarjeta. Sin él, la tarjeta informa pero no resuelve. */
   href?: string;
+  /**
+   * Acción en la propia pantalla (aplicar un filtro, abrir un panel), para
+   * cuando el destino no es otra ruta. Se ignora si hay `href`.
+   */
+  onAction?: () => void;
   actionLabel?: string;
   /** Periodo o alcance del dato, al pie. Obligatorio si hay `trend`. */
   scope?: string;
@@ -56,6 +61,7 @@ export function StatusTile({
   context,
   status,
   href,
+  onAction,
   actionLabel,
   scope,
   trend,
@@ -70,7 +76,7 @@ export function StatusTile({
     <article
       className={cn(
         "relative flex h-full min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface-1 p-4",
-        href && "transition hover:border-line-strong",
+        (href || onAction) && "transition hover:border-line-strong",
         "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus",
         className,
       )}
@@ -103,7 +109,7 @@ export function StatusTile({
         </div>
       ) : null}
 
-      {href || scope ? (
+      {href || onAction || scope ? (
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           {scope ? <p className="min-w-0 text-2xs text-ink-3">{scope}</p> : <span />}
           {href ? (
@@ -114,6 +120,15 @@ export function StatusTile({
               {actionLabel ?? t("common.open")}
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
+          ) : onAction ? (
+            <button
+              type="button"
+              onClick={onAction}
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-accent-ink after:absolute after:inset-0 hover:underline"
+            >
+              {actionLabel ?? t("common.open")}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </button>
           ) : null}
         </div>
       ) : null}

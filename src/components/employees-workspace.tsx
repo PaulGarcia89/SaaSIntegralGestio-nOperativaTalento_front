@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, ResponsiveDataView, Wizard } from "@/components/design-system";
 import { DataView, PageHeader, StatusBadge, type DataColumn } from "@/components/system";
 import { technicalLabel } from "@/lib/ui-labels";
+import { EmployeesModulePanel } from "@/components/employees/employees-module-panel";
 import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createDocuSealSubmission, createEmployee, deleteEmployee, fetchBranches, fetchDocuSealTemplates, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, uploadEmployeeDocument, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
@@ -270,6 +271,23 @@ export function EmployeesDirectoryPage() {
           ) : null
         }
       />
+
+      {/*
+        Panel del módulo.
+        La pantalla abría directamente en la tabla: para saber cuánta gente
+        hay activa había que filtrarla. Ahora abre con el estado del módulo y
+        el directorio queda como segundo nivel. Las tarjetas no navegan: dejan
+        aplicado el filtro del directorio que está justo debajo, que es lo que
+        el usuario iba a hacer a mano.
+      */}
+      <EmployeesModulePanel
+        onSelectStatus={(value) => {
+          setStatus(value);
+          resetFilters();
+        }}
+        onSelectBranch={updateBranchFilter}
+      />
+
       <Card level={2}>
         <CardContent className="space-y-4 p-4">
           <div className="min-w-0 flex justify-end sm:hidden">

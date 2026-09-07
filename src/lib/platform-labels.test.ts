@@ -16,6 +16,9 @@ import {
   tenantStatusChangeWarning,
   tenantStatusInfo,
   tenantStatusLabel,
+  defaultRenewalDate,
+  planCatalogCode,
+  planLimitBreaches,
 } from "@/lib/platform-labels";
 
 describe("cobertura del contrato", () => {
@@ -123,5 +126,69 @@ describe("shortId", () => {
   it("deja intacto lo que ya es corto", () => {
     expect(shortId("acme")).toBe("acme");
     expect(shortId(undefined)).toBe("—");
+  });
+});
+
+describe("correspondencia con el catálogo del backend", () => {
+  it("traduce cada plan al código del catálogo", () => {
+    expect(planCatalogCode("starter")).toBe("BASIC");
+    expect(planCatalogCode("growth")).toBe("PRO");
+    expect(planCatalogCode("enterprise")).toBe("ENTERPRISE");
+  });
+
+  it("un plan que no conocemos no inventa correspondencia", () => {
+    expect(planCatalogCode("mega")).toBeNull();
+    expect(planCatalogCode(undefined)).toBeNull();
+  });
+});
+
+describe("topes del plan frente al consumo real", () => {
+  it("avisa de lo que ya está por encima del tope", () => {
+    const breaches = planLimitBreaches({ maxUsers: 10, maxBranches: 2 }, { employeeCount: 25, branchCount: 5 });
+    expect(breaches).toHaveLength(2);
+    expect(breaches[0]).toEqual({ label: "Personas", current: 25, cap: 10 });
+  });
+
+  it("no avisa cuando el consumo cabe en el plan", () => {
+    expect(planLimitBreaches({ maxUsers: 50, maxBranches: 10 }, { employeeCount: 25, branchCount: 5 })).toEqual([]);
+  });
+
+  it("estar justo en el tope no es una infracción", () => {
+    expect(planLimitBreaches({ maxUsers: 25, maxBranches: 5 }, { employeeCount: 25, branchCount: 5 })).toEqual([]);
+  });
+
+  it("un tope nulo es «sin límite», no cero", () => {
+    // Confundir null con 0 haría que el plan empresarial avisara siempre.
+    expect(planLimitBreaches({ maxUsers: null, maxBranches: null }, { employeeCount: 900, branchCount: 40 })).toEqual([]);
+  });
+
+  it("sin catálogo cargado no se inventan avisos", () => {
+    expect(planLimitBreaches(null, { employeeCount: 900 })).toEqual([]);
+  });
+
+  it("una empresa sin cifras no dispara avisos", () => {
+    expect(planLimitBreaches({ maxUsers: 1, maxBranches: 1 }, {})).toEqual([]);
+  });
+});
+
+describe("fecha de renovación por defecto", () => {
+  const base = new Date("2026-01-31T00:00:00.000Z");
+
+  it("mensual suma un mes", () => {
+    expect(defaultRenewalDate("monthly", new Date("2026-03-15T00:00:00.000Z"))).toBe("2026-04-15");
+  });
+
+  it("anual suma un año", () => {
+    expect(defaultRenewalDate("annual", new Date("2026-03-15T00:00:00.000Z"))).toBe("2027-03-15");
+  });
+
+  it("nunca devuelve una fecha fija del pasado", () => {
+    // Era la cadena "2026-08-01" escrita a mano en dos sitios.
+    expect(defaultRenewalDate("monthly", base)).not.toBe("2026-08-01");
+    expect(defaultRenewalDate("monthly")).not.toBe("2026-08-01");
+  });
+
+  it("un ciclo desconocido se trata como mensual", () => {
+    expect(defaultRenewalDate("quincenal", new Date("2026-03-15T00:00:00.000Z"))).toBe("2026-04-15");
   });
 });

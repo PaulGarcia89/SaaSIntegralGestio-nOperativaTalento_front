@@ -190,3 +190,68 @@ export function shortId(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") return "—";
   return value.length <= 12 ? value : `${value.slice(0, 8)}…`;
 }
+
+/**
+ * El catálogo del backend nombra los planes con otros códigos que la
+ * suscripción (`BASIC` frente a `starter`). La correspondencia estaba escrita
+ * a mano dentro de un `find` de tres condiciones en la pantalla de
+ * suscripciones; aquí queda en un solo sitio y con prueba.
+ */
+const PLAN_CATALOG_CODE: Record<PlanTierCode, "BASIC" | "PRO" | "ENTERPRISE"> = {
+  starter: "BASIC",
+  growth: "PRO",
+  enterprise: "ENTERPRISE",
+};
+
+export function planCatalogCode(tier: unknown): "BASIC" | "PRO" | "ENTERPRISE" | null {
+  return typeof tier === "string" && tier in PLAN_CATALOG_CODE
+    ? PLAN_CATALOG_CODE[tier as PlanTierCode]
+    : null;
+}
+
+/** Topes de un plan. Un `null` significa «sin tope», no «cero». */
+export type PlanCaps = {
+  maxUsers: number | null;
+  maxBranches: number | null;
+};
+
+/** Lo que la empresa consume hoy. */
+export type TenantUsage = {
+  employeeCount?: number;
+  branchCount?: number;
+};
+
+export type LimitBreach = { label: string; current: number; cap: number };
+
+/**
+ * Qué topes del plan elegido ya están superados por lo que la empresa tiene
+ * hoy. Bajar de plan sin mirar esto deja a la empresa por encima de su propio
+ * límite, y el producto no lo dice en ninguna parte.
+ */
+export function planLimitBreaches(caps: PlanCaps | null | undefined, usage: TenantUsage): LimitBreach[] {
+  if (!caps) return [];
+  const breaches: LimitBreach[] = [];
+  const users = usage.employeeCount ?? 0;
+  const branches = usage.branchCount ?? 0;
+  if (typeof caps.maxUsers === "number" && users > caps.maxUsers) {
+    breaches.push({ label: "Personas", current: users, cap: caps.maxUsers });
+  }
+  if (typeof caps.maxBranches === "number" && branches > caps.maxBranches) {
+    breaches.push({ label: "Sucursales", current: branches, cap: caps.maxBranches });
+  }
+  return breaches;
+}
+
+/**
+ * Fecha de renovación por defecto: un mes o un año desde hoy, según el ciclo.
+ *
+ * Existía como la cadena fija "2026-08-01" escrita en dos sitios, así que
+ * toda suscripción nueva nacía con la misma fecha —correcta solo por
+ * casualidad y solo durante unos meses—.
+ */
+export function defaultRenewalDate(cycle: unknown, from: Date = new Date()): string {
+  const date = new Date(from.getTime());
+  if (cycle === "annual") date.setFullYear(date.getFullYear() + 1);
+  else date.setMonth(date.getMonth() + 1);
+  return date.toISOString().slice(0, 10);
+}

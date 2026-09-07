@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,24 @@ export type DataColumn<T> = {
   width?: string;
 };
 
+export type SortState = { key: string; direction: "asc" | "desc" } | null;
+
+/**
+ * Selección múltiple.
+ *
+ * Es opcional a propósito: la mayoría de las listas no la necesitan, y una
+ * columna de casillas que nadie usa roba el sitio de la columna de identidad
+ * en pantallas estrechas.
+ */
+export type DataSelection<T> = {
+  selectedIds: readonly string[];
+  onToggle: (row: T) => void;
+  /** Marca o desmarca todo lo visible. */
+  onToggleAll: () => void;
+  /** Etiqueta accesible por fila, p. ej. "Seleccionar a Ana Duarte". */
+  rowLabel: (row: T) => string;
+};
+
 export type DataViewProps<T> = {
   rows: T[];
   columns: DataColumn<T>[];
@@ -57,17 +75,32 @@ export type DataViewProps<T> = {
   rowActionLabel?: (row: T) => string;
   /** Se pinta al final de cada ficha móvil y en la última columna de la tabla. */
   rowActions?: (row: T) => ReactNode;
+  /**
+   * Orden CONTROLADO. Si se pasa, la vista deja de tener estado propio.
+   *
+   * Existe porque hay pantallas que guardan el orden en las preferencias del
+   * usuario: si la vista se lo guardase por dentro, esa preferencia se perdería
+   * en cada montaje.
+   */
+  sort?: SortState;
+  onSortChange?: (sort: SortState) => void;
+  selection?: DataSelection<T>;
   emptyReason?: "no-records" | "no-matches";
   emptyAction?: ReactNode;
   onClearFilters?: () => void;
   className?: string;
 };
 
-type SortState = { key: string; direction: "asc" | "desc" } | null;
-
 function compare(a: string | number, b: string | number) {
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b), "es", { numeric: true, sensitivity: "base" });
+}
+
+/** Siguiente estado al pulsar una cabecera: asc → desc → sin orden. */
+export function nextSort(current: SortState, key: string): SortState {
+  if (current?.key !== key) return { key, direction: "asc" };
+  if (current.direction === "asc") return { key, direction: "desc" };
+  return null;
 }
 
 export function DataView<T>({
@@ -79,16 +112,29 @@ export function DataView<T>({
   onRowAction,
   rowActionLabel,
   rowActions,
+  sort: controlledSort,
+  onSortChange,
+  selection,
   emptyReason = "no-records",
   emptyAction,
   onClearFilters,
   className,
 }: DataViewProps<T>) {
-  const [sort, setSort] = useState<SortState>(null);
+  const [internalSort, setInternalSort] = useState<SortState>(null);
+  const controlled = controlledSort !== undefined;
+  const sort = controlled ? controlledSort : internalSort;
   const captionId = useId();
 
+  function toggleSort(key: string) {
+    const next = nextSort(sort, key);
+    if (controlled) onSortChange?.(next);
+    else setInternalSort(next);
+  }
+
+  // Con orden controlado, quien llama ya entrega las filas ordenadas: ordenar
+  // aquí otra vez daría un resultado distinto del que esa pantalla guardó.
   const sorted = (() => {
-    if (!sort) return rows;
+    if (controlled || !sort) return rows;
     const column = columns.find((candidate) => candidate.key === sort.key);
     if (!column?.sortValue) return rows;
     const factor = sort.direction === "asc" ? 1 : -1;
@@ -105,13 +151,8 @@ export function DataView<T>({
   const primary = columns.filter((column) => column.priority === "primary");
   const secondary = columns.filter((column) => column.priority === "secondary");
 
-  function toggleSort(key: string) {
-    setSort((current) => {
-      if (current?.key !== key) return { key, direction: "asc" };
-      if (current.direction === "asc") return { key, direction: "desc" };
-      return null;
-    });
-  }
+  const allSelected =
+    Boolean(selection) && sorted.length > 0 && sorted.every((row) => selection!.selectedIds.includes(getKey(row)));
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -120,13 +161,29 @@ export function DataView<T>({
         <table className="w-full border-collapse text-sm">
           <caption id={captionId} className="sr-only">
             {caption}
-            {sort ? `. Ordenada por ${columns.find((c) => c.key === sort.key)?.header}, ${sort.direction === "asc" ? "ascendente" : "descendente"}` : ""}
+            {sort
+              ? `. Ordenada por ${columns.find((c) => c.key === sort.key)?.header}, ${sort.direction === "asc" ? "ascendente" : "descendente"}`
+              : ""}
           </caption>
           <thead>
             <tr className="border-b border-line bg-surface-2">
+              {selection ? (
+                <th scope="col" className="w-12 px-4 py-3">
+                  <label className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={selection.onToggleAll}
+                      className="size-4 rounded-xs border-line-control"
+                    />
+                    <span className="sr-only">Seleccionar todo lo visible</span>
+                  </label>
+                </th>
+              ) : null}
               {columns.map((column) => {
                 const sortable = Boolean(column.sortValue);
                 const active = sort?.key === column.key;
+                const Icon = !active ? ChevronsUpDown : sort!.direction === "asc" ? ChevronUp : ChevronDown;
                 return (
                   <th
                     key={column.key}
@@ -148,7 +205,7 @@ export function DataView<T>({
                         )}
                       >
                         {column.header}
-                        <ChevronsUpDown className="size-3" aria-hidden="true" />
+                        <Icon className="size-3" aria-hidden="true" />
                       </button>
                     ) : (
                       column.header
@@ -164,26 +221,47 @@ export function DataView<T>({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => (
-              <tr
-                key={getKey(row)}
-                className="border-b border-line last:border-0 transition-colors hover:bg-surface-2/60"
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className={cn(
-                      "px-4 align-middle text-ink-1",
-                      column.numeric && "text-right font-mono tabular-figures",
-                    )}
-                    style={{ height: "var(--row-h)" }}
-                  >
-                    {column.render(row)}
-                  </td>
-                ))}
-                {rowActions ? <td className="px-4 text-right">{rowActions(row)}</td> : null}
-              </tr>
-            ))}
+            {sorted.map((row) => {
+              const key = getKey(row);
+              const isSelected = Boolean(selection?.selectedIds.includes(key));
+              return (
+                <tr
+                  key={key}
+                  aria-selected={selection ? isSelected : undefined}
+                  className={cn(
+                    "border-b border-line last:border-0 transition-colors hover:bg-surface-2/60",
+                    isSelected && "bg-accent-fill/5",
+                  )}
+                >
+                  {selection ? (
+                    <td className="px-4">
+                      <label className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => selection.onToggle(row)}
+                          className="size-4 rounded-xs border-line-control"
+                        />
+                        <span className="sr-only">{selection.rowLabel(row)}</span>
+                      </label>
+                    </td>
+                  ) : null}
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={cn(
+                        "px-4 align-middle text-ink-1",
+                        column.numeric && "text-right font-mono tabular-figures",
+                      )}
+                      style={{ height: "var(--row-h)" }}
+                    >
+                      {column.render(row)}
+                    </td>
+                  ))}
+                  {rowActions ? <td className="px-4 text-right">{rowActions(row)}</td> : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -193,6 +271,8 @@ export function DataView<T>({
           columnas `detail` NO se pintan: para eso está la vista de detalle. */}
       <ul className="space-y-2 md:hidden" aria-label={caption}>
         {sorted.map((row) => {
+          const key = getKey(row);
+          const isSelected = Boolean(selection?.selectedIds.includes(key));
           const content = (
             <>
               <div className="flex min-w-0 items-start justify-between gap-3">
@@ -223,21 +303,39 @@ export function DataView<T>({
           );
 
           return (
-            <li key={getKey(row)}>
-              {onRowAction ? (
-                <button
-                  type="button"
-                  onClick={() => onRowAction(row)}
-                  aria-label={rowActionLabel?.(row)}
-                  className="block w-full rounded-lg border border-line bg-surface-1 p-4 text-left transition-colors active:bg-surface-2"
-                  style={{ minHeight: "var(--control-h-touch)" }}
-                >
-                  {content}
-                </button>
-              ) : (
-                <div className="rounded-lg border border-line bg-surface-1 p-4">{content}</div>
-              )}
-              {rowActions ? <div className="mt-2 flex flex-wrap gap-2 px-1">{rowActions(row)}</div> : null}
+            <li key={key}>
+              <div
+                className={cn(
+                  "rounded-lg border bg-surface-1",
+                  isSelected ? "border-accent-line/50 bg-accent-fill/5" : "border-line",
+                )}
+              >
+                {selection ? (
+                  <label className="flex items-center gap-3 border-b border-line px-4 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => selection.onToggle(row)}
+                      className="size-5 rounded-xs border-line-control"
+                    />
+                    <span className="text-sm text-ink-2">{selection.rowLabel(row)}</span>
+                  </label>
+                ) : null}
+                {onRowAction ? (
+                  <button
+                    type="button"
+                    onClick={() => onRowAction(row)}
+                    aria-label={rowActionLabel?.(row)}
+                    className="block w-full p-4 text-left transition-colors active:bg-surface-2"
+                    style={{ minHeight: "var(--control-h-touch)" }}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className="p-4">{content}</div>
+                )}
+                {rowActions ? <div className="flex flex-wrap gap-2 px-4 pb-4">{rowActions(row)}</div> : null}
+              </div>
             </li>
           );
         })}

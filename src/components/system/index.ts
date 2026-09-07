@@ -53,9 +53,12 @@ export {
   DataView,
   FilterBar,
   Pagination,
-  type DataColumn,
-  type DataViewProps,
+  nextSort,
   type ColumnPriority,
+  type DataColumn,
+  type DataSelection,
+  type DataViewProps,
+  type SortState,
 } from "@/components/system/data-view";
 
 export {

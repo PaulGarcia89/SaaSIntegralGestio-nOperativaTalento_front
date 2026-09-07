@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { InlineFeedback, MobileFilterSheet, PageHeader, ResponsiveDataView, Wizard } from "@/components/design-system";
+import { InlineFeedback, MobileFilterSheet, ResponsiveDataView, Wizard } from "@/components/design-system";
+import { DataView, PageHeader, StatusBadge, type DataColumn } from "@/components/system";
+import { technicalLabel } from "@/lib/ui-labels";
 import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createDocuSealSubmission, createEmployee, deleteEmployee, fetchBranches, fetchDocuSealTemplates, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, uploadEmployeeDocument, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
@@ -60,7 +62,6 @@ export function EmployeesDirectoryPage() {
   const meta = employees.data?.meta;
   const canCreate = can("employees.create");
   const totalItems = meta?.total ?? data.length;
-  const totalPages = meta?.totalPages ?? 1;
   const selectionCount = selectedIds.length;
   const detailQuery = useQuery({
     queryKey: ["employee-detail", detailEmployee?.id],
@@ -197,10 +198,6 @@ export function EmployeesDirectoryPage() {
     resetFilters();
   };
 
-  const updateStatus = (value: EmployeeStatusFilter) => {
-    setStatus(value);
-    resetFilters();
-  };
 
   const updateBranchFilter = (value: string) => {
     setBranchFilter(value);
@@ -230,51 +227,45 @@ export function EmployeesDirectoryPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[2rem] border border-border-default bg-gradient-to-br from-surface-section via-card to-primary/5 p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl space-y-3">
-            <div>
-              <p className="text-sm font-medium text-brand">Personas</p>
-              <h2 className="text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Directorio de empleados</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary sm:text-base">
-                Gestión rápida para equipos pequeños o muy grandes. Busca, filtra, navega por páginas y entra al expediente sin cargar información innecesaria.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{currentTenant.name}</Badge>
-              <Badge variant="secondary">{currentBranch?.name ?? "Sucursal activa"}</Badge>
-              <Badge variant="outline">{totalItems} expedientes</Badge>
-              <Badge variant="outline">{totalPages} páginas</Badge>
-              {selectionCount ? <Badge variant="outline">{selectionCount} seleccionados</Badge> : null}
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3 lg:w-[420px]">
-            <MiniStat label="Total" value={String(totalItems)} />
-            <MiniStat label="Página" value={`${page} / ${Math.max(totalPages, 1)}`} />
-            <MiniStat label="Tamaño" value={`${pageSize} filas`} />
-          </div>
-        </div>
-      </section>
+      {/*
+        Una sola cabecera.
+        Antes había TRES bloques apilados antes de ver un dato: una sección con
+        degradado y esquinas de 2rem que repetía empresa, sucursal, total y
+        páginas en cinco distintivos; una fila de tres mosaicos con «Total»,
+        «Página» y «Tamaño»; y encima un `PageHeader` con su propio titular
+        «Explorar expedientes». El total y la página son procedencia del dato,
+        no métricas: viven en el subtítulo y en la paginación.
+      */}
       <PageHeader
         eyebrow="Personas"
-        title="Explorar expedientes"
-        description="Usa los filtros para reducir resultados y entra al detalle solo cuando lo necesites."
+        title="Empleados"
+        description="Busca, filtra y entra al expediente sin cargar información innecesaria."
+        meta={
+          <>
+            <span>{currentTenant.name}</span>
+            <span>{currentBranch?.name ?? "Sucursal activa"}</span>
+            <span className="font-mono tabular-figures">{totalItems} expedientes</span>
+            {selectionCount ? (
+              <span className="font-mono tabular-figures text-accent-ink">{selectionCount} seleccionados</span>
+            ) : null}
+          </>
+        }
         actions={
           canCreate ? (
-            <div className="flex flex-wrap gap-2">
+            <>
               <Button asChild type="button" variant="secondary">
                 <Link href="/employees/import">
-                  <FileSpreadsheet className="size-4" />
+                  <FileSpreadsheet className="size-4" aria-hidden="true" />
                   Carga masiva
                 </Link>
               </Button>
               <Button asChild type="button">
                 <Link href="/employees/new">
-                  <UserPlus className="size-4" />
+                  <UserPlus className="size-4" aria-hidden="true" />
                   Registrar empleado
                 </Link>
               </Button>
-            </div>
+            </>
           ) : null
         }
       />
@@ -311,24 +302,12 @@ export function EmployeesDirectoryPage() {
               </span>
               <Input placeholder="Nombre o correo" value={search} onChange={(event) => updateSearch(event.target.value)} />
             </label>
-            <label className="space-y-2">
-              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                <Filter className="size-4" />
-                Estado
-              </span>
-              <Select value={status} onValueChange={(value) => updateStatus(value as EmployeeStatusFilter)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="ACTIVE">Activos</SelectItem>
-                  <SelectItem value="INACTIVE">Inactivos</SelectItem>
-                  <SelectItem value="TERMINATED">Finalizados</SelectItem>
-                  <SelectItem value="DELETED">Eliminados</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
+            {/*
+              El desplegable de «Estado» se retiró: los chips de arriba hacen
+              exactamente lo mismo y además muestran cuántos hay en cada
+              estado. Dos controles idénticos para el mismo filtro son ruido, no
+              una opción.
+            */}
             <label className="space-y-2">
               <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 <LayoutList className="size-4" />
@@ -467,36 +446,18 @@ export function EmployeesDirectoryPage() {
         </div>
       </MobileFilterSheet>
       {viewMode === "table" ? (
-        <Card level={2}>
-          <CardContent className="p-0">
-            <div className="overflow-hidden rounded-2xl border border-border-default bg-card shadow-sm">
-              <div className="grid grid-cols-[52px_minmax(0,1.3fr)_180px_180px_120px_1fr_130px_180px] gap-4 border-b border-border-default bg-surface-section px-4 py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                <button type="button" className="flex items-center justify-center" onClick={toggleSelectAll} aria-label="Seleccionar todas">
-                  {sortedData.length && sortedData.every((employee) => selectedIds.includes(employee.id)) ? "☑" : "☐"}
-                </button>
-                <SortHeader label="Empleado" active={sortField === "name"} direction={sortDirection} onClick={() => { toggleSort("name"); setSelectedIds([]); }} />
-                <SortHeader label="Correo" active={sortField === "email"} direction={sortDirection} onClick={() => { toggleSort("email"); setSelectedIds([]); }} />
-                <SortHeader label="Sucursal" active={sortField === "assignments"} direction={sortDirection} onClick={() => { toggleSort("assignments"); setSelectedIds([]); }} />
-                <SortHeader label="Docs" active={sortField === "documents"} direction={sortDirection} onClick={() => { toggleSort("documents"); setSelectedIds([]); }} />
-                <SortHeader label="Asignaciones" active={sortField === "assignments"} direction={sortDirection} onClick={() => { toggleSort("assignments"); setSelectedIds([]); }} />
-                <SortHeader label="Estado" active={sortField === "status"} direction={sortDirection} onClick={() => { toggleSort("status"); setSelectedIds([]); }} />
-                <span>Acciones</span>
-              </div>
-              <div>
-                {sortedData.map((employee, index) => (
-                  <EmployeeRow
-                    key={employee.id}
-                    employee={employee}
-                    compact={index >= 10}
-                    selected={selectedIds.includes(employee.id)}
-                    onToggleSelect={() => toggleSelection(employee.id)}
-                    onEdit={() => router.push(`/employees/${employee.id}/edit`)}
-                  />
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <EmployeeDirectoryTable
+          rows={sortedData}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={(field) => { toggleSort(field); setSelectedIds([]); }}
+          selectedIds={selectedIds}
+          onToggleSelect={(employee) => toggleSelection(employee.id)}
+          onToggleAll={toggleSelectAll}
+          onEdit={(employee) => router.push(`/employees/${employee.id}/edit`)}
+          hasFilters={Boolean(search) || status !== "all" || Boolean(branchFilter)}
+          onClearFilters={() => { setStatus("all"); setBranchFilter(""); setSearch(""); setSelectedIds([]); setPage(1); }}
+        />
       ) : (
         <ResponsiveDataView
           data={sortedData}
@@ -841,14 +802,6 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-border-default bg-surface-elevated p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-text-primary">{value}</p>
-    </div>
-  );
-}
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
@@ -1110,50 +1063,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
   );
 }
 
-function EmployeeRow({ employee, compact = false, selected = false, onToggleSelect, onEdit }: { employee: EmployeeDirectoryItem; compact?: boolean; selected?: boolean; onToggleSelect?: () => void; onEdit?: () => void }) {
-  const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
-  const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
-  const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
-  const documentSummary = (employee as EmployeeDirectoryWithDocuments).documentSummary;
 
-  return (
-    <div className={cn("grid grid-cols-1 gap-3 border-b border-border-default px-4 py-4 last:border-b-0 md:grid-cols-[52px_minmax(0,1.3fr)_180px_180px_120px_1fr_130px] md:items-center", selected && "bg-primary/5", compact && "opacity-95")}>
-      <button type="button" className="flex items-center justify-center rounded-full border border-border-default bg-surface-section p-2 text-xs font-semibold" onClick={onToggleSelect} aria-label={`Seleccionar ${employee.name}`}>
-        {selected ? "☑" : "☐"}
-      </button>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <UsersRound className="size-4 shrink-0 text-brand" />
-          <Link href={`/employees/${employee.id}`} className="truncate font-semibold hover:text-brand hover:underline">{employee.name}</Link>
-        </div>
-        <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
-      </div>
-      <div className="flex items-center gap-2 text-sm text-text-secondary md:min-w-0">
-        <MapPin className="size-4 shrink-0" />
-        <span className="truncate">{primary?.branch?.name ?? "Sin nombre"}</span>
-      </div>
-      <div className="flex items-center gap-2 text-sm text-text-secondary md:min-w-0">
-        <BriefcaseBusiness className="size-4 shrink-0" />
-        <span className="truncate">{primary?.role ?? "Sin asignación"}</span>
-      </div>
-      <div className="text-sm text-text-secondary">{documentSummary ? <span className="font-medium text-text-primary">{documentSummary.totalDocuments}</span> : "0"} docs</div>
-      <div className="text-sm text-text-secondary">{activeAssignments.length} asignación{activeAssignments.length === 1 ? "" : "es"}</div>
-      <div className="flex items-center justify-between gap-3 md:justify-end">
-        <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
-        <div className="hidden items-center gap-1 md:flex">{onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}>Editar</Button> : null}</div>
-      </div>
-    </div>
-  );
-}
-
-function SortHeader({ label, active, direction, onClick }: { label: string; active: boolean; direction: "asc" | "desc"; onClick: () => void }) {
-  return (
-    <button type="button" className="flex items-center gap-1 text-left transition hover:text-text-primary" onClick={onClick}>
-      <span>{label}</span>
-      {active ? direction === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" /> : <ArrowUpDown className="size-3.5 opacity-60" />}
-    </button>
-  );
-}
 
 function ImportMetric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "danger" }) {
   return (
@@ -1351,4 +1261,142 @@ function downloadEmployeeTemplate() {
   anchor.download = "plantilla-empleados.csv";
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Tabla del directorio.
+ *
+ * Sustituye a una rejilla CSS con `grid-cols-[52px_minmax(0,1.3fr)_180px_180px_120px_1fr_130px_180px]`,
+ * es decir, un ancho mínimo de unos 940px, que además era la vista POR DEFECTO:
+ * el directorio de empleados era inusable en un teléfono nada más abrirlo.
+ *
+ * `DataView` produce una `<table>` real en escritorio y fichas por debajo de
+ * `md`, con la misma declaración de columnas. El orden sigue siendo CONTROLADO
+ * desde fuera porque esta pantalla lo guarda en las preferencias del usuario:
+ * si la vista se lo guardase por dentro, la preferencia se perdería en cada
+ * montaje.
+ */
+function EmployeeDirectoryTable({
+  rows,
+  sortField,
+  sortDirection,
+  onSort,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
+  onEdit,
+  hasFilters,
+  onClearFilters,
+}: {
+  rows: EmployeeDirectoryItem[];
+  sortField: "name" | "email" | "status" | "documents" | "assignments";
+  sortDirection: "asc" | "desc";
+  onSort: (field: "name" | "email" | "status" | "documents" | "assignments") => void;
+  selectedIds: string[];
+  onToggleSelect: (employee: EmployeeDirectoryItem) => void;
+  onToggleAll: () => void;
+  onEdit: (employee: EmployeeDirectoryItem) => void;
+  hasFilters: boolean;
+  onClearFilters: () => void;
+}) {
+  const columns: DataColumn<EmployeeDirectoryItem>[] = [
+    {
+      key: "name",
+      header: "Empleado",
+      priority: "identity",
+      sortValue: (employee) => employee.name,
+      render: (employee) => (
+        <span className="block min-w-0">
+          <Link href={`/employees/${employee.id}`} className="block truncate font-medium text-ink-1 hover:underline">
+            {employee.name}
+          </Link>
+          <span className="block truncate text-xs text-ink-3">{employee.email}</span>
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Estado",
+      priority: "primary",
+      sortValue: (employee) => employee.status,
+      render: (employee) => (
+        <StatusBadge
+          size="sm"
+          label={employee.status === "ACTIVE" ? "Activo" : technicalLabel(employee.status)}
+          tone={
+            employee.status === "ACTIVE"
+              ? "success"
+              : employee.status === "TERMINATED" || employee.status === "DELETED"
+                ? "neutral"
+                : "warning"
+          }
+        />
+      ),
+    },
+    {
+      key: "assignments",
+      header: "Sucursal",
+      priority: "secondary",
+      sortValue: (employee) => primaryAssignmentOf(employee)?.branch?.name ?? "",
+      render: (employee) => (
+        <span className="truncate">{primaryAssignmentOf(employee)?.branch?.name ?? "Sin sucursal"}</span>
+      ),
+    },
+    {
+      key: "role",
+      header: "Cargo",
+      priority: "secondary",
+      render: (employee) => (
+        <span className="truncate">{primaryAssignmentOf(employee)?.role ?? "Sin asignación"}</span>
+      ),
+    },
+    {
+      key: "documents",
+      header: "Docs",
+      priority: "secondary",
+      numeric: true,
+      sortValue: (employee) => (employee as EmployeeDirectoryWithDocuments).documentSummary?.totalDocuments ?? 0,
+      render: (employee) => (employee as EmployeeDirectoryWithDocuments).documentSummary?.totalDocuments ?? 0,
+    },
+    {
+      key: "email",
+      header: "Correo",
+      priority: "detail",
+      sortValue: (employee) => employee.email,
+      render: (employee) => <span className="truncate text-ink-2">{employee.email}</span>,
+    },
+  ];
+
+  return (
+    <DataView
+      rows={rows}
+      columns={columns}
+      getKey={(employee) => employee.id}
+      caption="Directorio de empleados"
+      sort={{ key: sortField, direction: sortDirection }}
+      onSortChange={(next) => {
+        // `null` significa "sin orden"; esta pantalla siempre tiene uno, así
+        // que se vuelve al orden por defecto en vez de dejar la lista suelta.
+        onSort((next?.key ?? "name") as typeof sortField);
+      }}
+      selection={{
+        selectedIds,
+        onToggle: onToggleSelect,
+        onToggleAll,
+        rowLabel: (employee) => `Seleccionar a ${employee.name}`,
+      }}
+      emptyReason={hasFilters ? "no-matches" : "no-records"}
+      onClearFilters={hasFilters ? onClearFilters : undefined}
+      rowActions={(employee) => (
+        <span className="flex gap-1.5">
+          <Button type="button" size="sm" variant="secondary" onClick={() => onEdit(employee)}>
+            Editar
+          </Button>
+          <Button type="button" size="sm" variant="ghost" asChild>
+            <Link href={`/employees/${employee.id}`}>Ver expediente</Link>
+          </Button>
+        </span>
+      )}
+    />
+  );
 }

@@ -19,8 +19,6 @@ import {
   Upload,
   UserRoundCheck,
   ArrowRight,
-  ShieldCheck,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,8 +73,26 @@ import {
   validateOnboardingDocumentFile,
 } from "@/lib/onboarding-document-security";
 import { useAppStore } from "@/store/app-store";
-import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { InlineFeedback } from "@/components/design-system";
+import {
+  ActionBar,
+  BlockerList,
+  EmptyState,
+  ErrorState,
+  FilterBar,
+  InlineNote,
+  Metric,
+  MetricRow,
+  PageHeader,
+  SkeletonRows,
+  StatusBadge,
+} from "@/components/system";
+import {
+  blockerOwner,
+  onboardingBlockers,
+  onboardingHeadline,
+  onboardingProgress,
+} from "@/lib/onboarding-operation";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -442,136 +458,183 @@ export default function OnboardingDocumentsPage() {
         description="Coordina responsables, vencimientos, dependencias y evidencias desde la contratación hasta un primer día listo."
         actions={
           can("onboarding.manage") ? (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="secondary"><Link href="/onboarding/operations">Automatización</Link></Button>
-              <Button asChild variant="secondary"><Link href="/onboarding/analytics">Analítica</Link></Button>
-              <Button asChild variant="secondary"><Link href="/onboarding/compliance">Cumplimiento</Link></Button>
-              <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Biblioteca de plantillas</Button>
-              <Button asChild variant="secondary"><Link href="/onboarding/compliance">Documentos y políticas</Link></Button>
-              <Button variant="secondary" onClick={() => { setRevisionSourceId(null); setTemplateOpen(true); }}>
-                <Plus className="size-4" />
+            <>
+              {/*
+                Antes había SEIS botones secundarios seguidos, y dos de ellos
+                —«Cumplimiento» y «Documentos y políticas»— llevaban a la misma
+                ruta con nombres distintos. Queda una acción principal y los
+                destinos, sin repetir ninguno.
+              */}
+              <Button asChild variant="ghost"><Link href="/onboarding/operations">Automatización</Link></Button>
+              <Button asChild variant="ghost"><Link href="/onboarding/analytics">Analítica</Link></Button>
+              <Button asChild variant="ghost"><Link href="/onboarding/compliance">Cumplimiento</Link></Button>
+              <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Plantillas</Button>
+              <Button onClick={() => { setRevisionSourceId(null); setTemplateOpen(true); }}>
+                <Plus className="size-4" aria-hidden="true" />
                 Nueva plantilla
               </Button>
-            </div>
+            </>
           ) : undefined
         }
       />
 
-      <Card level={2}>
-        <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_240px]">
-          <div>
-            <Label htmlFor="onboarding-search">Buscar incorporación</Label>
-            <Input id="onboarding-search" value={search} placeholder="Empleado, correo o puesto" onChange={(event) => { setSearch(event.target.value); setFlowPage(1); }} />
-          </div>
-          <div>
-            <Label>Estado</Label>
-            <Select value={flowStatus || "ALL"} onValueChange={(value) => { setFlowStatus(value === "ALL" ? "" : value); setFlowPage(1); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todos</SelectItem>
-                <SelectItem value="PENDING">Pendiente</SelectItem>
-                <SelectItem value="IN_PROGRESS">En incorporación</SelectItem>
-                <SelectItem value="BLOCKED">Bloqueado</SelectItem>
-                <SelectItem value="COMPLETED">Completado</SelectItem>
-                <SelectItem value="CANCELLED">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar
+        search={search}
+        onSearchChange={(value) => { setSearch(value); setFlowPage(1); }}
+        searchLabel="Empleado, correo o puesto"
+        activeCount={(search ? 1 : 0) + (flowStatus ? 1 : 0)}
+        onClear={() => { setSearch(""); setFlowStatus(""); setFlowPage(1); }}
+      >
+        <label className="min-w-0 flex-1 space-y-1.5 sm:max-w-56">
+          <span className="block text-xs font-medium text-ink-2">Estado</span>
+          <Select value={flowStatus || "ALL"} onValueChange={(value) => { setFlowStatus(value === "ALL" ? "" : value); setFlowPage(1); }}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos</SelectItem>
+              <SelectItem value="PENDING">Pendiente</SelectItem>
+              <SelectItem value="IN_PROGRESS">En incorporación</SelectItem>
+              <SelectItem value="BLOCKED">Bloqueado</SelectItem>
+              <SelectItem value="COMPLETED">Completado</SelectItem>
+              <SelectItem value="CANCELLED">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+      </FilterBar>
 
-      {flows.isLoading ? <AsyncState state="loading" title="Cargando incorporaciones" /> : null}
+      {flows.isLoading ? <SkeletonRows rows={4} label="Cargando incorporaciones" /> : null}
       {flows.isError ? (
-        <AsyncState
-          state="error"
+        <ErrorState
           title="No pudimos cargar las incorporaciones"
-          description={getApiErrorMessage(flows.error, "Conservamos tu contexto. Vuelve a intentarlo.")}
+          detail={getApiErrorMessage(flows.error, "Conservamos tu contexto. Vuelve a intentarlo.")}
           onRetry={() => void flows.refetch()}
         />
       ) : null}
       {flows.isSuccess && !flows.data.items.length ? (
-        <InlineFeedback tone="info" title="Todavía no hay incorporaciones">
-          Al contratar formalmente a un candidato se creará aquí su expediente y recorrido de ingreso.
-        </InlineFeedback>
+        <EmptyState
+          reason={search || flowStatus ? "no-matches" : "no-records"}
+          title={search || flowStatus ? undefined : "Todavía no hay incorporaciones"}
+          description={
+            search || flowStatus
+              ? undefined
+              : "Al contratar formalmente a un candidato se creará aquí su expediente y recorrido de ingreso."
+          }
+          onClearFilters={search || flowStatus ? () => { setSearch(""); setFlowStatus(""); setFlowPage(1); } : undefined}
+        />
       ) : null}
 
       {selected ? (
-        <Card level={1}>
-          <CardContent className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.9fr)]">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">Incorporación documental</Badge>
-                <Badge>{selected.progressPercent}% listo</Badge>
-                <Badge variant={selected.status === "COMPLETED" ? "success" : selected.alerts.length ? "destructive" : "default"}>
-                  {selected.status === "COMPLETED"
-                    ? "Expediente cerrado"
-                    : selected.alerts.length
-                      ? "Bloqueado por documentación"
-                      : "En validación"}
-                </Badge>
-              </div>
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  {selected.employee.name}
-                </h2>
-                <p className="mt-1 text-sm text-text-secondary">
-                  {selected.employee.jobTitle || "Puesto por confirmar"} · {selected.branch.name}
-                </p>
-              </div>
-              <p className="max-w-3xl text-sm text-text-secondary">
-                Este expediente convierte la contratación en operación real: valida la identidad, concentra evidencias,
-                distribuye responsables y deja listo el paso hacia firma, inventario, capacitación y acceso operativo.
+        <section aria-labelledby="expediente-actual" className="space-y-5 rounded-xl border border-line bg-surface-1 p-5 shadow-e1 sm:p-6">
+          {/*
+            Este bloque sustituye a una tarjeta que dedicaba dos párrafos a
+            explicar qué es la incorporación en general —«convierte la
+            contratación en operación real», «checklist aplicado y evidencias
+            listas»— y resumía el estado con un distintivo que decía «Bloqueado
+            por documentación» ante CUALQUIER alerta, incluidas las que solo
+            eran avisos y las que no tenían que ver con documentación.
+
+            Ahora el espacio lo ocupa el estado real de ESTE expediente: cuánto
+            lleva, qué lo detiene, quién lo resuelve y cómo. La lógica está en
+            `lib/onboarding-operation.ts`, que está probada.
+          */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h2 id="expediente-actual" className="text-xl font-semibold text-ink-1">
+                {selected.employee.name}
+              </h2>
+              <p className="text-sm text-ink-2">
+                {selected.employee.jobTitle || "Puesto por confirmar"} · {selected.branch.name}
               </p>
-              <div className="flex flex-wrap gap-3">
-                <Button asChild>
-                  <Link href="/ats/candidates">
-                    <ArrowRight className="size-4" />
-                    Volver a ATS
-                  </Link>
-                </Button>
-                <Button asChild variant="secondary">
-                  <Link href={`/onboarding/signatures?flowId=${encodeURIComponent(selected.id)}&action=create`}>
-                    <FileSignature className="size-4" />
-                    Ir a firmas
-                  </Link>
-                </Button>
-                <Button asChild variant="secondary">
-                  <Link href={`/inventory?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}`}>Inventario</Link>
-                </Button>
-                <Button asChild variant="secondary">
-                  <Link href={`/training/paths?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}&templateId=${encodeURIComponent(selected.template?.id ?? "")}`}>Capacitación</Link>
-                </Button>
-              </div>
             </div>
-            <div className="grid gap-3 rounded-2xl bg-surface-section p-4">
-              <div className="flex items-start gap-3">
-                <Sparkles className="mt-0.5 size-5 text-brand" />
-                <div>
-                  <p className="font-medium">Flujo de handoff</p>
-                  <p className="text-sm text-text-secondary">
-                    Contratación formalizada, checklist aplicado y evidencias listas para revisión.
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <StatCard label="Tareas" value={`${selected.tasks.length}`} hint={`${selected.tasks.filter((task) => task.status === "COMPLETED").length} completadas`} />
-                <StatCard label="Documentos" value={`${selected.documents.length}`} hint={`${selected.documents.filter((document) => document.status === "APPROVED").length} aprobados`} />
-                <StatCard label="Alertas" value={`${selected.alerts.length}`} hint={selected.alerts.length ? "Requiere atención" : "Sin bloqueos"} />
-              </div>
-              <div className="rounded-xl border border-border-default bg-card p-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <ShieldCheck className="size-4 text-brand" />
-                  Siguiente decisión operativa
-                </div>
-                <p className="mt-2 text-sm text-text-secondary">
-                  {selected.nextAction
-                    ? `Priorizar "${selected.nextAction.title}" para liberar el expediente hacia la siguiente etapa.`
-                    : "No hay una siguiente tarea definida; revisa bloqueos y dependencias."}
+            <StatusBadge label={onboardingHeadline(selected).label} tone={onboardingHeadline(selected).tone} />
+          </div>
+
+          <MetricRow>
+            <Metric
+              label="Avance"
+              value={`${selected.progressPercent}%`}
+              detail={`${onboardingProgress(selected).completed} de ${onboardingProgress(selected).total} tareas`}
+            />
+            <Metric
+              label="Tareas pendientes"
+              value={String(onboardingProgress(selected).pending)}
+              tone={onboardingProgress(selected).pending > 0 ? "warning" : "success"}
+            />
+            <Metric
+              label="Vencidas"
+              value={String(onboardingProgress(selected).overdue)}
+              tone={onboardingProgress(selected).overdue > 0 ? "danger" : undefined}
+            />
+            <Metric
+              label="Documentos"
+              value={String(selected.documents.length)}
+              detail={`${selected.documents.filter((document) => document.status === "APPROVED").length} aprobados`}
+            />
+          </MetricRow>
+
+          {/* La siguiente tarea, en singular y con su responsable. */}
+          {selected.nextAction ? (
+            <div className="relative overflow-hidden rounded-lg border border-accent-line/40 bg-surface-2 p-4">
+              <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-accent-fill" />
+              <div className="pl-3">
+                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-ink">Lo siguiente</p>
+                <p className="mt-0.5 font-medium text-ink-1">{selected.nextAction.title}</p>
+                <p className="text-sm text-ink-2">
+                  Responsable: {blockerOwner(selected.nextAction)}
+                  {selected.nextAction.dueDate
+                    ? ` · Vence el ${new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(selected.nextAction.dueDate))}`
+                    : ""}
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          ) : null}
+
+          {/* Bloqueos y avisos, con causa, responsable y salida. Separados a
+              propósito: pintarlos igual enseña a ignorar los dos. */}
+          <BlockerList blockers={onboardingBlockers(selected).blocking} />
+          {onboardingBlockers(selected).warnings.length > 0 ? (
+            <InlineNote
+              tone="warning"
+              title={
+                onboardingBlockers(selected).warnings.length === 1
+                  ? "Un aviso que no impide continuar"
+                  : `${onboardingBlockers(selected).warnings.length} avisos que no impiden continuar`
+              }
+            >
+              <ul className="space-y-1">
+                {onboardingBlockers(selected).warnings.map((warning) => (
+                  <li key={warning.code}>
+                    {warning.cause} <span className="text-ink-3">· {warning.resolution}</span>
+                  </li>
+                ))}
+              </ul>
+            </InlineNote>
+          ) : null}
+
+          <ActionBar label="Continuar la incorporación en otro módulo">
+            <Button asChild variant="secondary">
+              <Link href={`/onboarding/signatures?flowId=${encodeURIComponent(selected.id)}&action=create`}>
+                <FileSignature className="size-4" aria-hidden="true" />
+                Firmas
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/inventory?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}`}>
+                Inventario
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/training/paths?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}&templateId=${encodeURIComponent(selected.template?.id ?? "")}`}>
+                Capacitación
+              </Link>
+            </Button>
+            <Button asChild variant="ghost">
+              <Link href="/ats/candidates">
+                Volver a Personas
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+            </Button>
+          </ActionBar>
+        </section>
       ) : null}
 
       {selected ? (
@@ -1511,9 +1574,9 @@ function FlowSummary({ flow }: { flow: EmployeeOnboardingFlowDto }) {
         </div>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-3">
-        <Metric icon={UserRoundCheck} label="Avance" value={`${flow.progressPercent}%`} />
-        <Metric icon={CalendarClock} label="Inicio" value={new Date(flow.startedAt).toLocaleDateString()} />
-        <Metric icon={FileCheck2} label="Expediente" value={`${flow.documents.length} documentos`} />
+        <IconMetric icon={UserRoundCheck} label="Avance" value={`${flow.progressPercent}%`} />
+        <IconMetric icon={CalendarClock} label="Inicio" value={new Date(flow.startedAt).toLocaleDateString()} />
+        <IconMetric icon={FileCheck2} label="Expediente" value={`${flow.documents.length} documentos`} />
         {flow.nextAction ? (
           <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:col-span-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-brand">Siguiente acción</p>
@@ -1641,15 +1704,6 @@ function TaskRow({
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-xl border border-border-default bg-card p-4">
-      <p className="text-xs text-text-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs text-text-secondary">{hint}</p>
-    </div>
-  );
-}
 
 function Timeline({ flow }: { flow: EmployeeOnboardingFlowDto }) {
   return (
@@ -1798,7 +1852,7 @@ function Progress({ value }: { value: number }) {
   );
 }
 
-function Metric({
+function IconMetric({
   icon: Icon,
   label,
   value,

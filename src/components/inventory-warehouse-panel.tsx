@@ -2,82 +2,803 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ClipboardCheck, Download, MapPin, PackagePlus, Settings2, SlidersHorizontal } from "lucide-react";
-import { adjustInventoryStock, countInventoryStock, createInventoryLocation, downloadInventoryMovements, fetchInventoryContext, fetchInventoryLocations, fetchInventoryWarehouse, updateInventoryStockPolicy } from "@/lib/backend";
+import { Download, MapPin, Minus, Plus } from "lucide-react";
+import {
+  adjustInventoryStock,
+  countInventoryStock,
+  createInventoryLocation,
+  downloadInventoryMovements,
+  fetchInventoryContext,
+  fetchInventoryLocations,
+  fetchInventoryWarehouse,
+  getApiErrorMessage,
+  updateInventoryStockPolicy,
+} from "@/lib/backend";
 import type { InventoryWarehouseStockDto } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
-import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
+import {
+  ConfirmPanel,
+  DataView,
+  ErrorState,
+  ImpactReview,
+  InlineNote,
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  Pagination,
+  StatusBadge,
+  type DataColumn,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatQuantity } from "@/lib/inventory-labels";
+import { initialOperationState, type OperationImpact, type OperationState } from "@/lib/operation-flow";
 
-type DialogKind = "location" | "adjustment" | "count" | "policy" | null;
+type DialogKind = "location" | "add" | "remove" | "count" | "policy" | null;
 
+const PAGE_SIZE = 12;
+
+/**
+ * Almacén y existencias no serializadas.
+ *
+ * Esta pantalla estaba construida pero NO LA IMPORTABA NADIE: la ruta
+ * `/inventory/warehouse` hacía `redirect("/inventory")`, así que pulsar
+ * «Almacén y stock» en el menú dejaba a la persona en el selector de módulo.
+ * Al recuperarla se corrigen los defectos que arrastraba:
+ *
+ * · El ajuste pedía la cantidad CON SIGNO en un solo campo («Ej.: 5 o -2»).
+ *   Un menos olvidado sumaba en vez de restar, y el movimiento es inmutable.
+ *   Peor todavía: el campo declaraba `inputMode="numeric"`, que en los
+ *   teclados de móvil no ofrece el signo menos, así que desde un teléfono
+ *   directamente no se podía restar. Ahora son dos acciones distintas,
+ *   «Añadir» y «Retirar», y la cantidad siempre es positiva.
+ * · Ni el ajuste ni el conteo mostraban el resultado antes de confirmar,
+ *   teniendo el dato delante: un conteo que declara 3 donde el sistema espera
+ *   300 se aceptaba sin un solo aviso.
+ * · La política permitía guardar un mínimo por encima del punto de reposición
+ *   —que nunca dispararía el aviso— sin decir nada.
+ * · «Exportar movimientos» estaba pintado como acción PRIMARIA siendo la menos
+ *   importante, y se disparaba con `void`: sin indicación de progreso y sin
+ *   manejo de error, así que la persona pulsaba y no pasaba nada visible.
+ * · «Bajo mínimo» y «Reponer» compartían el mismo tono: dos urgencias
+ *   distintas con el mismo aspecto.
+ * · El error del formulario era una frase fija que ocultaba la respuesta del
+ *   servidor, y la paginación estaba hecha a mano.
+ *
+ * El contrato del backend no cambia: `adjustInventoryStock` sigue recibiendo
+ * una cantidad con signo; lo que cambia es quién le pone el signo.
+ */
 export function InventoryWarehousePanel() {
   const { can, currentBranch } = useAppStore();
   const queryClient = useQueryClient();
+
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [selected, setSelected] = useState<InventoryWarehouseStockDto | null>(null);
+
   const canManage = can("asset_inventory.manage");
+
   const context = useQuery({ queryKey: ["inventory-context"], queryFn: fetchInventoryContext });
-  const warehouse = useQuery({ queryKey: ["inventory-warehouse", currentBranch?.id, search, page], queryFn: () => fetchInventoryWarehouse({ branchId: currentBranch?.id, search: search || undefined, page, pageSize: 12 }) });
-  const locations = useQuery({ queryKey: ["inventory-locations", currentBranch?.id], queryFn: () => fetchInventoryLocations(currentBranch?.id) });
-  const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["inventory-warehouse"] }), queryClient.invalidateQueries({ queryKey: ["inventory-locations"] }), queryClient.invalidateQueries({ queryKey: ["inventory-catalog"] })]); };
-  const needsAttention = warehouse.data?.items.filter((item) => item.needsReorder || item.belowMinimum).length ?? 0;
+  const warehouse = useQuery({
+    queryKey: ["inventory-warehouse", currentBranch?.id, search, page],
+    queryFn: () =>
+      fetchInventoryWarehouse({
+        branchId: currentBranch?.id,
+        search: search || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      }),
+  });
+  const locations = useQuery({
+    queryKey: ["inventory-locations", currentBranch?.id],
+    queryFn: () => fetchInventoryLocations(currentBranch?.id),
+  });
 
-  return <div className="space-y-6">
-    <PageHeader eyebrow="Inventario" title="Almacén y stock" description="Controla existencias no serializadas, ubicaciones, conteos y ajustes con trazabilidad por sucursal." actions={canManage ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setDialog("location")}><MapPin className="size-4" />Nueva ubicación</Button><Button onClick={() => void downloadInventoryMovements(currentBranch?.id)}><Download className="size-4" />Exportar movimientos</Button></div> : undefined} />
-    <section className="grid gap-3 sm:grid-cols-3" aria-label="Resumen de stock">
-      <Metric icon={PackagePlus} label="Referencias en almacén" value={warehouse.data?.total ?? 0} />
-      <Metric icon={AlertTriangle} label="Requieren reposición" value={needsAttention} tone={needsAttention ? "warning" : "normal"} />
-      <Metric icon={MapPin} label="Ubicaciones activas" value={locations.data?.length ?? 0} />
-    </section>
-    {needsAttention ? <InlineFeedback tone="warning" title="Reposición requerida">Hay {needsAttention} referencia{needsAttention === 1 ? "" : "s"} por debajo del mínimo o del punto de reposición. Registra la recepción o un ajuste para mantener la trazabilidad.</InlineFeedback> : null}
-    <Card level={2}><CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_220px]"><div><Label htmlFor="warehouse-search">Buscar referencia</Label><Input id="warehouse-search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="SKU o nombre del artículo" /></div><div><Label>Sucursal activa</Label><div className="mt-2 rounded-lg border border-border-default bg-surface-section px-3 py-2 text-sm">{currentBranch?.name || "Selecciona una sucursal"}</div></div></CardContent></Card>
-    {warehouse.isLoading ? <AsyncState state="loading" title="Cargando existencias" /> : null}
-    {warehouse.isError ? <AsyncState state="error" title="No pudimos cargar el almacén" onRetry={() => void warehouse.refetch()} /> : null}
-    {warehouse.isSuccess && !warehouse.data.items.length ? <InlineFeedback tone="info" title="Sin stock registrado">Aún no hay existencias no serializadas para los filtros actuales. Los activos serializados se administran desde Inventario.</InlineFeedback> : null}
-    {warehouse.data?.items.length ? <section className="grid gap-3 lg:grid-cols-2" aria-label="Existencias por artículo">{warehouse.data.items.map((stock) => <StockCard key={stock.id} stock={stock} canManage={canManage} onAdjust={() => { setSelected(stock); setDialog("adjustment"); }} onCount={() => { setSelected(stock); setDialog("count"); }} onPolicy={() => { setSelected(stock); setDialog("policy"); }} />)}</section> : null}
-    {warehouse.data && warehouse.data.totalPages > 1 ? <nav className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-section p-3" aria-label="Paginación de inventario"><p className="text-sm text-text-secondary">Página {warehouse.data.page} de {warehouse.data.totalPages} · {warehouse.data.total} referencias</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Anterior</Button><Button size="sm" variant="secondary" disabled={page >= warehouse.data.totalPages} onClick={() => setPage((value) => value + 1)}>Siguiente</Button></div></nav> : null}
-    <WarehouseDialog kind={dialog} stock={selected} branchId={currentBranch?.id || ""} branches={context.data?.branches ?? []} locations={locations.data ?? []} onClose={() => { setDialog(null); setSelected(null); }} onSuccess={async () => { await refresh(); setDialog(null); setSelected(null); }} />
-  </div>;
+  const exportMovements = useMutation({
+    mutationFn: () => downloadInventoryMovements(currentBranch?.id),
+  });
+
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["inventory-warehouse"] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-locations"] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-catalog"] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory-analytics"] }),
+    ]);
+  };
+
+  const belowMinimum = warehouse.data?.items.filter((item) => item.belowMinimum).length ?? 0;
+  const needsReorder = warehouse.data?.items.filter((item) => item.needsReorder && !item.belowMinimum).length ?? 0;
+
+  const open = (stock: InventoryWarehouseStockDto, kind: DialogKind) => {
+    setSelected(stock);
+    setDialog(kind);
+  };
+
+  const columns: Array<DataColumn<InventoryWarehouseStockDto>> = [
+    {
+      key: "item",
+      header: "Referencia",
+      priority: "identity",
+      render: (stock) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium text-ink-1">{stock.item.name}</p>
+          <p className="truncate font-mono text-2xs text-ink-3">
+            {stock.item.sku} · {stock.branch.name}
+          </p>
+        </div>
+      ),
+      sortValue: (stock) => stock.item.name,
+    },
+    {
+      key: "state",
+      header: "Situación",
+      priority: "primary",
+      render: (stock) =>
+        stock.belowMinimum ? (
+          <StatusBadge size="sm" tone="danger" label="Bajo mínimo" />
+        ) : stock.needsReorder ? (
+          <StatusBadge size="sm" tone="warning" label="Toca reponer" />
+        ) : (
+          <StatusBadge size="sm" tone="success" label="Estable" />
+        ),
+      sortValue: (stock) => (stock.belowMinimum ? 0 : stock.needsReorder ? 1 : 2),
+    },
+    {
+      key: "available",
+      header: "Disponible",
+      priority: "primary",
+      numeric: true,
+      render: (stock) => (
+        <span className="font-mono tabular-figures">
+          {formatQuantity(stock.qtyLocal)} {stock.item.unitOfMeasure}
+        </span>
+      ),
+      sortValue: (stock) => stock.qtyLocal,
+    },
+    {
+      key: "min",
+      header: "Mínimo",
+      priority: "secondary",
+      numeric: true,
+      render: (stock) => formatQuantity(stock.minQty),
+      sortValue: (stock) => stock.minQty,
+    },
+    {
+      key: "reorder",
+      header: "Reponer en",
+      priority: "detail",
+      numeric: true,
+      render: (stock) => formatQuantity(stock.reorderPoint),
+      sortValue: (stock) => stock.reorderPoint,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Inventario"
+        title="Almacén y stock"
+        description="Existencias no serializadas, ubicaciones, conteos y ajustes, con trazabilidad por sucursal."
+        meta={<span>{currentBranch?.name ?? "Sin sucursal"}</span>}
+        actions={
+          canManage ? (
+            <Button variant="secondary" onClick={() => setDialog("location")}>
+              <MapPin className="size-4" aria-hidden="true" />
+              Nueva ubicación
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {belowMinimum > 0 || needsReorder > 0 ? (
+        <InlineNote
+          tone={belowMinimum > 0 ? "danger" : "warning"}
+          title={
+            belowMinimum > 0
+              ? `${belowMinimum} ${belowMinimum === 1 ? "referencia está" : "referencias están"} por debajo del mínimo`
+              : `${needsReorder} ${needsReorder === 1 ? "referencia ha llegado" : "referencias han llegado"} al punto de reposición`
+          }
+        >
+          Registra la recepción de una compra o un ajuste para que la existencia vuelva a cuadrar con lo que hay en
+          la estantería.
+        </InlineNote>
+      ) : null}
+
+      <MetricRow>
+        <Metric label="Referencias en almacén" value={String(warehouse.data?.total ?? 0)} />
+        <Metric
+          label="Bajo mínimo"
+          value={String(belowMinimum)}
+          tone={belowMinimum > 0 ? "danger" : undefined}
+        />
+        <Metric
+          label="Toca reponer"
+          value={String(needsReorder)}
+          tone={needsReorder > 0 ? "warning" : undefined}
+        />
+        <Metric label="Ubicaciones activas" value={String(locations.data?.length ?? 0)} />
+      </MetricRow>
+
+      <PageSection title="Buscar" boxed>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div>
+            <Label htmlFor="warehouse-search">Referencia</Label>
+            <Input
+              id="warehouse-search"
+              value={search}
+              placeholder="SKU o nombre del artículo"
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          {/* Exportar es una acción secundaria y ahora informa de su progreso
+              y de sus fallos: antes se disparaba con `void` y no pasaba nada
+              visible ni al empezar ni al fallar. */}
+          <Button
+            variant="secondary"
+            loading={exportMovements.isPending}
+            loadingLabel="Preparando…"
+            onClick={() => exportMovements.mutate()}
+          >
+            <Download className="size-4" aria-hidden="true" />
+            Exportar movimientos
+          </Button>
+        </div>
+        {exportMovements.isError ? (
+          <div className="mt-3">
+            <InlineNote tone="danger" title="No se pudo exportar">
+              {getApiErrorMessage(exportMovements.error, "El servidor rechazó la descarga.")}
+            </InlineNote>
+          </div>
+        ) : null}
+      </PageSection>
+
+      {warehouse.isError ? (
+        <ErrorState
+          title="No fue posible cargar el almacén"
+          detail={getApiErrorMessage(warehouse.error, "Reintenta la consulta para continuar.")}
+          onRetry={() => void warehouse.refetch()}
+        />
+      ) : (
+        <>
+          <DataView
+            rows={warehouse.data?.items ?? []}
+            loading={warehouse.isLoading}
+            columns={columns}
+            getKey={(stock) => stock.id}
+            caption="Existencias por artículo"
+            emptyReason={search ? "no-matches" : "no-records"}
+            onClearFilters={search ? () => setSearch("") : undefined}
+            rowActions={
+              canManage
+                ? (stock) => (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => open(stock, "add")}>
+                        <Plus className="size-4" aria-hidden="true" />
+                        Añadir
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => open(stock, "remove")}>
+                        <Minus className="size-4" aria-hidden="true" />
+                        Retirar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => open(stock, "count")}>
+                        Conteo
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => open(stock, "policy")}>
+                        Alertas
+                      </Button>
+                    </div>
+                  )
+                : undefined
+            }
+          />
+
+          {warehouse.data && warehouse.data.total > PAGE_SIZE ? (
+            <Pagination
+              page={page - 1}
+              totalItems={warehouse.data.total}
+              pageSize={warehouse.data.pageSize}
+              onPageChange={(nextPage) => setPage(nextPage + 1)}
+            />
+          ) : null}
+        </>
+      )}
+
+      <WarehouseDialog
+        kind={dialog}
+        stock={selected}
+        branchId={currentBranch?.id || ""}
+        branches={context.data?.branches ?? []}
+        locations={locations.data ?? []}
+        onClose={() => {
+          setDialog(null);
+          setSelected(null);
+        }}
+        onSuccess={async () => {
+          await refresh();
+          setDialog(null);
+          setSelected(null);
+        }}
+      />
+    </div>
+  );
 }
 
-function StockCard({ stock, canManage, onAdjust, onCount, onPolicy }: { stock: InventoryWarehouseStockDto; canManage: boolean; onAdjust: () => void; onCount: () => void; onPolicy: () => void }) {
-  const status = stock.belowMinimum ? "Bajo mínimo" : stock.needsReorder ? "Reponer" : "Estable";
-  return <Card level={2}><CardContent className="space-y-4 p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{stock.item.name}</p><p className="text-sm text-text-secondary">{stock.item.sku} · {stock.branch.name}</p></div><Badge variant={stock.needsReorder || stock.belowMinimum ? "warning" : "secondary"}>{status}</Badge></div><div className="grid grid-cols-3 gap-2 rounded-xl bg-surface-section p-3 text-center"><MetricValue label="Disponible" value={`${stock.qtyLocal} ${stock.item.unitOfMeasure}`} /><MetricValue label="Mínimo" value={String(stock.minQty)} /><MetricValue label="Reponer en" value={String(stock.reorderPoint)} /></div>{canManage ? <div className="flex flex-wrap gap-2"><Button size="sm" onClick={onAdjust}><SlidersHorizontal className="size-4" />Ajustar</Button><Button size="sm" variant="secondary" onClick={onCount}><ClipboardCheck className="size-4" />Conteo</Button><Button size="sm" variant="secondary" onClick={onPolicy}><Settings2 className="size-4" />Alertas</Button></div> : null}</CardContent></Card>;
-}
-
-function WarehouseDialog({ kind, stock, branchId, branches, locations, onClose, onSuccess }: { kind: DialogKind; stock: InventoryWarehouseStockDto | null; branchId: string; branches: Array<{ id: string; name: string }>; locations: Array<{ id: string; name: string; code: string }>; onClose: () => void; onSuccess: () => Promise<void> }) {
+function WarehouseDialog({
+  kind,
+  stock,
+  branchId,
+  branches,
+  locations,
+  onClose,
+  onSuccess,
+}: {
+  kind: DialogKind;
+  stock: InventoryWarehouseStockDto | null;
+  branchId: string;
+  branches: Array<{ id: string; name: string }>;
+  locations: Array<{ id: string; name: string; code: string }>;
+  onClose: () => void;
+  onSuccess: () => Promise<void>;
+}) {
+  const { currentUser } = useAppStore();
   const [values, setValues] = useState<Record<string, string>>({});
-  const mutation = useMutation({ mutationFn: async () => {
-    if (kind === "location") return createInventoryLocation({ branchId: values.branchId || branchId, code: values.code, name: values.name, type: values.type || undefined });
-    if (!stock) throw new Error("Selecciona una referencia de stock");
-    if (kind === "adjustment") return adjustInventoryStock({ itemId: stock.itemId, branchId: stock.branchId, quantity: Number(values.quantity), locationId: values.locationId || undefined, reason: values.reason });
-    if (kind === "count") return countInventoryStock({ itemId: stock.itemId, branchId: stock.branchId, countedQty: Number(values.countedQty), notes: values.notes || undefined });
-    return updateInventoryStockPolicy({ itemId: stock.itemId, branchId: stock.branchId, minQty: Number(values.minQty), reorderPoint: Number(values.reorderPoint), maxQty: values.maxQty ? Number(values.maxQty) : undefined });
-  }, onSuccess });
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (kind === "location") {
+        return createInventoryLocation({
+          branchId: values.branchId || branchId,
+          code: values.code,
+          name: values.name,
+          type: values.type || undefined,
+        });
+      }
+      if (!stock) throw new Error("Selecciona una referencia de stock");
+
+      // El signo lo pone la acción elegida, no la persona escribiéndolo en el
+      // campo: un menos olvidado sumaba donde había que restar.
+      if (kind === "add" || kind === "remove") {
+        const magnitude = Math.abs(Number(values.quantity));
+        return adjustInventoryStock({
+          itemId: stock.itemId,
+          branchId: stock.branchId,
+          quantity: kind === "add" ? magnitude : -magnitude,
+          locationId: values.locationId || undefined,
+          reason: values.reason,
+        });
+      }
+      if (kind === "count") {
+        return countInventoryStock({
+          itemId: stock.itemId,
+          branchId: stock.branchId,
+          countedQty: Number(values.countedQty),
+          notes: values.notes || undefined,
+        });
+      }
+      return updateInventoryStockPolicy({
+        itemId: stock.itemId,
+        branchId: stock.branchId,
+        minQty: Number(values.minQty ?? stock.minQty),
+        reorderPoint: Number(values.reorderPoint ?? stock.reorderPoint),
+        maxQty: values.maxQty ? Number(values.maxQty) : undefined,
+      });
+    },
+    onSuccess,
+  });
+
   const set = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
-  const title = kind === "location" ? "Nueva ubicación" : kind === "adjustment" ? "Ajustar existencias" : kind === "count" ? "Registrar conteo cíclico" : "Configurar alertas de reposición";
-  return <Dialog open={Boolean(kind)} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{kind === "location" ? "Crea una ubicación interna para mejorar la trazabilidad del almacén." : "Esta operación genera un movimiento inmutable y queda disponible para conciliación y auditoría."}</DialogDescription></DialogHeader><div className="space-y-4">
-    {kind === "location" ? <><Choice label="Sucursal" value={values.branchId || branchId} onChange={(value) => set("branchId", value)} options={branches.map((branch) => ({ value: branch.id, label: branch.name }))} /><Field label="Código" value={values.code} onChange={(value) => set("code", value)} placeholder="ALM-01" /><Field label="Nombre" value={values.name} onChange={(value) => set("name", value)} placeholder="Almacén principal" /><Field label="Tipo" value={values.type} onChange={(value) => set("type", value)} placeholder="Almacén, sala, estante..." /></> : null}
-    {kind === "adjustment" && stock ? <><ReadOnly label="Referencia" value={`${stock.item.name} · disponible: ${stock.qtyLocal}`} /><Field label="Cantidad a sumar o restar" value={values.quantity} onChange={(value) => set("quantity", value)} placeholder="Ej.: 5 o -2" inputMode="numeric" /><Choice label="Ubicación (opcional)" value={values.locationId} onChange={(value) => set("locationId", value)} options={[{ value: "NONE", label: "Sin ubicación específica" }, ...locations.map((location) => ({ value: location.id, label: `${location.code} · ${location.name}` }))]} /><Field label="Motivo" value={values.reason} onChange={(value) => set("reason", value)} placeholder="Recepción de proveedor, corrección..." /></> : null}
-    {kind === "count" && stock ? <><ReadOnly label="Referencia" value={`${stock.item.name} · esperado: ${stock.qtyLocal}`} /><Field label="Cantidad contada" value={values.countedQty} onChange={(value) => set("countedQty", value)} placeholder="0" inputMode="numeric" /><Field label="Observaciones" value={values.notes} onChange={(value) => set("notes", value)} placeholder="Opcional" /></> : null}
-    {kind === "policy" && stock ? <><ReadOnly label="Referencia" value={stock.item.name} /><Field label="Stock mínimo" value={values.minQty || String(stock.minQty)} onChange={(value) => set("minQty", value)} inputMode="numeric" /><Field label="Punto de reposición" value={values.reorderPoint || String(stock.reorderPoint)} onChange={(value) => set("reorderPoint", value)} inputMode="numeric" /><Field label="Stock máximo" value={values.maxQty || (stock.maxQty ? String(stock.maxQty) : "")} onChange={(value) => set("maxQty", value)} placeholder="Opcional" inputMode="numeric" /></> : null}
-    {mutation.isError ? <p role="alert" className="text-sm text-status-danger">No fue posible guardar. Revisa los campos obligatorios e inténtalo de nuevo.</p> : null}
-    <Button className="w-full" disabled={mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? "Guardando…" : "Confirmar operación"}</Button>
-  </div></DialogContent></Dialog>;
+
+  const title =
+    kind === "location"
+      ? "Nueva ubicación"
+      : kind === "add"
+        ? "Añadir existencias"
+        : kind === "remove"
+          ? "Retirar existencias"
+          : kind === "count"
+            ? "Registrar un conteo"
+            : "Alertas de reposición";
+
+  const impact = kind && stock ? buildImpact(kind, stock, values, currentUser.fullName) : undefined;
+
+  const operationState: OperationState = {
+    ...initialOperationState(),
+    step: "confirm",
+    completed: ["select", "record", "review"],
+    impact,
+    submitting: mutation.isPending,
+  };
+
+  const unit = stock?.item.unitOfMeasure ?? "";
+
+  return (
+    <Dialog
+      open={Boolean(kind)}
+      onOpenChange={(open) => {
+        if (!open) {
+          setValues({});
+          setAcknowledged(false);
+          mutation.reset();
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {kind === "location"
+              ? "Una ubicación interna para saber en qué estante está cada cosa."
+              : "El movimiento queda registrado de forma inmutable y disponible para conciliación y auditoría."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {kind === "location" ? (
+            <>
+              <Choice
+                id="location-branch"
+                label="Sucursal"
+                value={values.branchId || branchId}
+                onChange={(value) => set("branchId", value)}
+                options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+              />
+              <Field id="location-code" label="Código" value={values.code} placeholder="ALM-01" onChange={(v) => set("code", v)} />
+              <Field id="location-name" label="Nombre" value={values.name} placeholder="Almacén principal" onChange={(v) => set("name", v)} />
+              <Field id="location-type" label="Tipo" value={values.type} placeholder="Almacén, sala, estante…" onChange={(v) => set("type", v)} />
+            </>
+          ) : null}
+
+          {(kind === "add" || kind === "remove") && stock ? (
+            <>
+              <Field
+                id="adjust-quantity"
+                label={kind === "add" ? `Cuánto entra (${unit})` : `Cuánto sale (${unit})`}
+                type="number"
+                min="0"
+                value={values.quantity}
+                onChange={(v) => set("quantity", v)}
+              />
+              <Choice
+                id="adjust-location"
+                label="Ubicación (opcional)"
+                value={values.locationId}
+                onChange={(value) => set("locationId", value)}
+                options={[
+                  { value: "NONE", label: "Sin ubicación concreta" },
+                  ...locations.map((location) => ({
+                    value: location.id,
+                    label: `${location.code} · ${location.name}`,
+                  })),
+                ]}
+              />
+              <Field
+                id="adjust-reason"
+                label="Motivo"
+                value={values.reason}
+                placeholder={kind === "add" ? "Recepción de proveedor, corrección…" : "Rotura, consumo interno, corrección…"}
+                onChange={(v) => set("reason", v)}
+              />
+            </>
+          ) : null}
+
+          {kind === "count" && stock ? (
+            <>
+              <Field
+                id="count-quantity"
+                label={`Cuánto has contado (${unit})`}
+                type="number"
+                min="0"
+                value={values.countedQty}
+                onChange={(v) => set("countedQty", v)}
+              />
+              <Field
+                id="count-notes"
+                label="Observaciones"
+                value={values.notes}
+                placeholder="Opcional"
+                onChange={(v) => set("notes", v)}
+              />
+            </>
+          ) : null}
+
+          {kind === "policy" && stock ? (
+            <>
+              <Field
+                id="policy-min"
+                label="Stock mínimo"
+                type="number"
+                min="0"
+                value={values.minQty ?? String(stock.minQty)}
+                onChange={(v) => set("minQty", v)}
+              />
+              <Field
+                id="policy-reorder"
+                label="Punto de reposición"
+                type="number"
+                min="0"
+                value={values.reorderPoint ?? String(stock.reorderPoint)}
+                onChange={(v) => set("reorderPoint", v)}
+              />
+              <Field
+                id="policy-max"
+                label="Stock máximo"
+                type="number"
+                min="0"
+                value={values.maxQty ?? (stock.maxQty ? String(stock.maxQty) : "")}
+                placeholder="Opcional"
+                onChange={(v) => set("maxQty", v)}
+              />
+            </>
+          ) : null}
+
+          {mutation.isError ? (
+            <InlineNote tone="danger" title="No se pudo guardar">
+              {getApiErrorMessage(mutation.error, "El servidor rechazó la operación.")}
+            </InlineNote>
+          ) : null}
+
+          {impact ? (
+            <>
+              <ImpactReview impact={impact} />
+              <ConfirmPanel
+                state={operationState}
+                operationName={title}
+                onConfirm={() => mutation.mutate()}
+                acknowledged={acknowledged}
+                onAcknowledgedChange={setAcknowledged}
+              />
+            </>
+          ) : (
+            <Button
+              className="w-full"
+              disabled={!values.code?.trim() || !values.name?.trim()}
+              loading={mutation.isPending}
+              loadingLabel="Guardando…"
+              onClick={() => mutation.mutate()}
+            >
+              Crear la ubicación
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
-function Field({ label, value = "", onChange, placeholder, inputMode }: { label: string; value?: string; onChange: (value: string) => void; placeholder?: string; inputMode?: "numeric" | "text" }) { const id = label.toLowerCase().replaceAll(" ", "-"); return <div><Label htmlFor={id}>{label}</Label><Input id={id} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} inputMode={inputMode} /></div>; }
-function Choice({ label, value = "", onChange, options }: { label: string; value?: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) { return <div><Label>{label}</Label><Select value={value} onValueChange={(value) => onChange(value === "NONE" ? "" : value)}><SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>; }
-function ReadOnly({ label, value }: { label: string; value: string }) { return <div><p className="text-sm font-medium">{label}</p><p className="mt-1 rounded-lg bg-surface-section p-3 text-sm text-text-secondary">{value}</p></div>; }
-function Metric({ icon: Icon, label, value, tone = "normal" }: { icon: typeof PackagePlus; label: string; value: number; tone?: "normal" | "warning" }) { return <Card level={2}><CardContent className="flex items-center gap-4 p-4"><Icon className={`size-5 ${tone === "warning" ? "text-status-warning" : "text-brand"}`} /><div><p className="text-sm text-text-secondary">{label}</p><p className="text-2xl font-semibold">{value}</p></div></CardContent></Card>; }
-function MetricValue({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-text-secondary">{label}</p><p className="mt-1 text-sm font-semibold">{value}</p></div>; }
+/**
+ * El resultado de la operación, con los datos que la pantalla ya tenía.
+ *
+ * Ninguna de las tres operaciones de stock lo mostraba, teniendo `qtyLocal`
+ * delante.
+ */
+function buildImpact(
+  kind: Exclude<DialogKind, null>,
+  stock: InventoryWarehouseStockDto,
+  values: Record<string, string>,
+  responsible: string,
+): OperationImpact | undefined {
+  if (kind === "location") return undefined;
+
+  const unit = stock.item.unitOfMeasure;
+  const blockers: OperationImpact["blockers"] = [];
+  const warnings: OperationImpact["warnings"] = [];
+  const lines: OperationImpact["lines"] = [];
+
+  if (kind === "add" || kind === "remove") {
+    const magnitude = Math.abs(Number(values.quantity));
+    const valid = Number.isFinite(magnitude) && magnitude > 0;
+    const after = kind === "add" ? stock.qtyLocal + magnitude : stock.qtyLocal - magnitude;
+
+    lines.push({
+      label: stock.item.name,
+      before: `${formatQuantity(stock.qtyLocal)} ${unit}`,
+      after: valid ? `${formatQuantity(after)} ${unit}` : "—",
+      adverse: kind === "remove",
+    });
+
+    if (!valid) {
+      blockers.push({
+        code: "NO_QUANTITY",
+        cause: "No has indicado cuánto.",
+        owner: "Quien registra el movimiento",
+        resolution: "Escribe una cantidad mayor que cero.",
+        fieldId: "adjust-quantity",
+      });
+    } else if (after < 0) {
+      // Dejar la existencia en negativo haría que el inventario mintiera
+      // sobre lo que hay en la estantería.
+      blockers.push({
+        code: "NEGATIVE_STOCK",
+        cause: `Solo hay ${formatQuantity(stock.qtyLocal)} ${unit} y estás retirando ${formatQuantity(magnitude)}.`,
+        owner: "Encargado del almacén",
+        resolution: "Registra primero la entrada que falta, o retira como mucho lo que hay.",
+        fieldId: "adjust-quantity",
+      });
+    } else if (valid && after < stock.minQty) {
+      warnings.push({
+        code: "BELOW_MINIMUM",
+        message: `Quedará por debajo del mínimo (${formatQuantity(stock.minQty)} ${unit}).`,
+      });
+    }
+
+    if (!values.reason?.trim()) {
+      blockers.push({
+        code: "NO_REASON",
+        cause: "No has escrito el motivo del ajuste.",
+        owner: "Quien registra el movimiento",
+        resolution: "Explica por qué cambia la existencia: es lo que quedará en la auditoría.",
+        fieldId: "adjust-reason",
+      });
+    }
+  }
+
+  if (kind === "count") {
+    const counted = Number(values.countedQty);
+    const valid = Number.isFinite(counted) && counted >= 0 && values.countedQty?.trim() !== "";
+    const difference = valid ? counted - stock.qtyLocal : 0;
+
+    lines.push({
+      label: stock.item.name,
+      before: `${formatQuantity(stock.qtyLocal)} ${unit} según el sistema`,
+      after: valid ? `${formatQuantity(counted)} ${unit} contados` : "—",
+      adverse: difference < 0,
+    });
+
+    if (!valid) {
+      blockers.push({
+        code: "NO_COUNT",
+        cause: "No has indicado la cantidad contada.",
+        owner: "Quien hace el conteo",
+        resolution: "Escribe cuántas unidades hay realmente.",
+        fieldId: "count-quantity",
+      });
+    } else if (difference !== 0) {
+      lines.push({
+        label: "Diferencia",
+        before: "0",
+        after: `${difference > 0 ? "+" : "−"}${formatQuantity(Math.abs(difference))} ${unit}`,
+        adverse: difference < 0,
+      });
+      // Un conteo muy alejado de lo esperado suele ser un dedazo, no un
+      // descuadre real: se avisa antes de aplicarlo, no después.
+      const ratio = stock.qtyLocal > 0 ? Math.abs(difference) / stock.qtyLocal : 1;
+      if (ratio >= 0.5) {
+        warnings.push({
+          code: "LARGE_GAP",
+          message: `La diferencia es de un ${Math.round(ratio * 100)} % sobre lo esperado. Comprueba que no falte un dígito.`,
+        });
+      }
+    }
+  }
+
+  if (kind === "policy") {
+    const min = Number(values.minQty ?? stock.minQty);
+    const reorder = Number(values.reorderPoint ?? stock.reorderPoint);
+
+    lines.push({
+      label: "Stock mínimo",
+      before: `${formatQuantity(stock.minQty)} ${unit}`,
+      after: Number.isFinite(min) ? `${formatQuantity(min)} ${unit}` : "—",
+    });
+    lines.push({
+      label: "Punto de reposición",
+      before: `${formatQuantity(stock.reorderPoint)} ${unit}`,
+      after: Number.isFinite(reorder) ? `${formatQuantity(reorder)} ${unit}` : "—",
+    });
+
+    if (Number.isFinite(min) && Number.isFinite(reorder) && min > reorder) {
+      // Con el mínimo por encima del punto de reposición, el aviso de
+      // «toca reponer» nunca llegaría a tiempo.
+      blockers.push({
+        code: "MIN_ABOVE_REORDER",
+        cause: `El mínimo (${formatQuantity(min)}) es mayor que el punto de reposición (${formatQuantity(reorder)}).`,
+        owner: "Encargado del almacén",
+        resolution:
+          "El punto de reposición debe estar por encima del mínimo: es el aviso que llega antes de quedarse corto.",
+        fieldId: "policy-reorder",
+      });
+    }
+
+    if (Number.isFinite(min) && stock.qtyLocal < min) {
+      warnings.push({
+        code: "ALREADY_BELOW",
+        message: `Con este mínimo, la referencia pasa a estar bajo mínimo desde ya (hay ${formatQuantity(stock.qtyLocal)} ${unit}).`,
+      });
+    }
+  }
+
+  return {
+    headline:
+      kind === "policy"
+        ? `Cambiar las alertas de ${stock.item.name}`
+        : kind === "count"
+          ? `Cuadrar ${stock.item.name} con el conteo físico`
+          : `${kind === "add" ? "Añadir a" : "Retirar de"} ${stock.item.name}`,
+    affectedCount: 1,
+    affectedLabel: "referencia",
+    lines,
+    warnings,
+    blockers,
+    responsible,
+    // La política solo cambia umbrales de aviso; los movimientos de stock son
+    // inmutables y corregirlos exige otro movimiento.
+    irreversible: kind !== "policy",
+  };
+}
+
+function Field({
+  id,
+  label,
+  value = "",
+  onChange,
+  placeholder,
+  type = "text",
+  min,
+}: {
+  id: string;
+  label: string;
+  value?: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  min?: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        min={min}
+        step={type === "number" ? "0.01" : undefined}
+        inputMode={type === "number" ? "decimal" : undefined}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function Choice({
+  id,
+  label,
+  value = "",
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value?: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={value} onValueChange={(next) => onChange(next === "NONE" ? "" : next)}>
+        <SelectTrigger id={id}>
+          <SelectValue placeholder="Seleccionar" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}

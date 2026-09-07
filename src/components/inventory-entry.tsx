@@ -3,30 +3,101 @@
 import Link from "next/link";
 import { ArrowRight, Boxes, ChefHat, type LucideIcon } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { BlockedState, PageHeader, SkeletonRows } from "@/components/system";
 
+/**
+ * Selector entre los dos inventarios de la empresa.
+ *
+ * Qué cambió
+ * ----------
+ * · Mientras arrancaba la sesión se devolvía un `<div>Cargando inventario...</div>`
+ *   que borraba el encabezado: la persona perdía el título y el contexto.
+ * · Los dos bloqueos —sin empresa, sin módulos— eran avisos sin salida: decían
+ *   que no se puede seguir, pero no a quién pedirlo ni qué hacer. Ahora usan
+ *   `BlockedState`, que nombra al responsable.
+ * · Cuando solo había un módulo activo se añadía un aviso —«el otro inventario
+ *   no está habilitado»— que no lleva a ninguna decisión. Fuera.
+ * · Solo el botón era clicable, no la tarjeta entera.
+ */
 export function InventoryEntry() {
   const { hasModule, isBootstrapping, accessContextVerified, currentTenant } = useAppStore();
   const assetEnabled = hasModule("asset_inventory");
   const restaurantEnabled = hasModule("restaurant_inventory");
   const enabledCount = Number(assetEnabled) + Number(restaurantEnabled);
 
-  if (isBootstrapping || !accessContextVerified) return <div className="p-6">Cargando inventario...</div>;
-  if (!currentTenant.id) return <InlineFeedback tone="warning" title="Sin empresa seleccionada">Selecciona una empresa para ver los módulos disponibles.</InlineFeedback>;
-  if (enabledCount === 0) return <InlineFeedback tone="info" title="Inventario no disponible">Esta empresa no tiene módulos de inventario activos.</InlineFeedback>;
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Operaciones"
+        title="Inventario"
+        description="Elige con qué inventario vas a trabajar."
+      />
 
-  return <div className="space-y-6">
-    <PageHeader eyebrow="Operaciones" title="Inventario" description="Elige el módulo de inventario disponible para esta empresa." />
-    <div className={`grid gap-4 ${enabledCount > 1 ? "md:grid-cols-2" : "max-w-3xl"}`}>
-      {assetEnabled ? <EntryCard icon={Boxes} title="Inventario de activos" description="Administra equipos, mobiliario, herramientas, asignaciones y mantenimiento." href="/inventory/assets" /> : null}
-      {restaurantEnabled ? <EntryCard icon={ChefHat} title="Inventario de restaurante" description="Administra ingredientes, entradas, recetas, consumo, producción y desperdicios." href="/inventory/restaurant" /> : null}
+      {isBootstrapping || !accessContextVerified ? (
+        <SkeletonRows rows={2} label="Cargando los módulos de inventario" />
+      ) : !currentTenant.id ? (
+        <BlockedState
+          title="Falta elegir la empresa"
+          cause="Los módulos de inventario dependen de la empresa activa, y ahora mismo no hay ninguna seleccionada."
+          owner="Tú, desde el selector de empresa"
+          resolution="Elige una empresa en el selector de la barra superior."
+        />
+      ) : enabledCount === 0 ? (
+        <BlockedState
+          title="Esta empresa no tiene inventario activo"
+          cause="Ni el inventario de activos ni el de restaurante están habilitados para esta empresa."
+          owner="Quien administra la empresa"
+          resolution="Se habilitan desde Administración › Módulos."
+        />
+      ) : (
+        <div className={`grid gap-4 ${enabledCount > 1 ? "md:grid-cols-2" : "max-w-3xl"}`}>
+          {assetEnabled ? (
+            <EntryCard
+              icon={Boxes}
+              title="Inventario de activos"
+              description="Equipos, mobiliario y herramientas: custodia, entregas, devoluciones y mantenimiento."
+              href="/inventory/assets"
+            />
+          ) : null}
+          {restaurantEnabled ? (
+            <EntryCard
+              icon={ChefHat}
+              title="Inventario de restaurante"
+              description="Ingredientes y recetas: entradas, consumo, producción, mermas y conteos."
+              href="/inventory/restaurant"
+            />
+          ) : null}
+        </div>
+      )}
     </div>
-    {enabledCount === 1 ? <InlineFeedback tone="info" title="Un módulo de inventario activo">El otro inventario no está habilitado para la empresa actual.</InlineFeedback> : null}
-  </div>;
+  );
 }
 
-function EntryCard({ icon: Icon, title, description, href }: { icon: LucideIcon; title: string; description: string; href: string }) {
-  return <Card level={2}><CardContent className="space-y-4 p-6"><Icon className="size-8 text-brand" /><div><h2 className="text-xl font-semibold">{title}</h2><p className="mt-2 text-sm text-text-secondary">{description}</p></div><Button asChild><Link href={href}>Abrir módulo <ArrowRight className="size-4" /></Link></Button></CardContent></Card>;
+function EntryCard({
+  icon: Icon,
+  title,
+  description,
+  href,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col gap-4 rounded-lg border border-line bg-surface-1 p-6 transition-colors hover:border-line-strong"
+    >
+      <Icon className="size-8 text-ink-3" aria-hidden="true" />
+      <div>
+        <h2 className="text-lg font-semibold text-ink-1">{title}</h2>
+        <p className="mt-2 text-sm text-ink-2">{description}</p>
+      </div>
+      <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-ink-1">
+        Abrir
+        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </span>
+    </Link>
+  );
 }

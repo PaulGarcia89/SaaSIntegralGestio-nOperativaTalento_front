@@ -14,9 +14,12 @@ import {
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { ModuleRouteGuard } from "@/components/module-route-guard";
-import { AsyncState } from "@/components/async-state";
 import { InlineFeedback } from "@/components/design-system";
-import { PageHeader } from "@/components/system";
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonRows,
+} from "@/components/system";
 import { Badge } from "@/components/ui/badge";
 import { RowTable } from "@/components/row-table";
 import { confirmAction } from "@/components/confirm-action";
@@ -191,8 +194,8 @@ function RestaurantInventorySettings() {
 }
 
 function QueryState({ loading, error, retry, children }: { loading: boolean; error: unknown; retry: () => void; children: ReactNode }) {
-  if (loading) return <AsyncState state="loading" />;
-  if (error) return <AsyncState state="error" onRetry={retry} description={getApiErrorMessage(error, "No fue posible consultar el inventario de restaurante.")} />;
+  if (loading) return <SkeletonRows rows={5} label={"Cargando información"} />;
+  if (error) return <ErrorState title={"No fue posible cargar la información"} detail={getApiErrorMessage(error, "No fue posible consultar el inventario de restaurante.")} onRetry={() => { void (retry)(); }} />;
   return <>{children}</>;
 }
 

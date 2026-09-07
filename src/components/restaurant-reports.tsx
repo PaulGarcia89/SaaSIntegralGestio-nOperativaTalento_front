@@ -5,10 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Download, RefreshCw } from "lucide-react";
 import { downloadRestaurantReport, fetchRestaurantRecipeCost, fetchRestaurantRecipes, fetchRestaurantReport, getApiErrorMessage } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
-import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
-import { DataView } from "@/components/system";
+import {
+  DataView,
+  ErrorState,
+  SkeletonRows,
+} from "@/components/system";
 import { RowTable } from "@/components/row-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,7 +47,7 @@ function RecipeCostScreen() { const [recipeId, setRecipeId] = useState(""); cons
 
 export function AuditScreen() { return <ReportsScreen initialReport="audit" />; }
 
-function ReportQueryState({ query, children }: { query: { isLoading: boolean; isFetching: boolean; error: unknown; refetch: () => unknown }; children: ReactNode }) { if (query.isLoading) return <AsyncState state="loading" />; if (query.error) return <AsyncState state="error" onRetry={() => void query.refetch()} description={getApiErrorMessage(query.error, "No fue posible cargar el reporte.")} />; return <>{query.isFetching ? <InlineFeedback tone="info" title="Actualizando">Consultando los datos más recientes.</InlineFeedback> : null}{children}</>; }
+function ReportQueryState({ query, children }: { query: { isLoading: boolean; isFetching: boolean; error: unknown; refetch: () => unknown }; children: ReactNode }) { if (query.isLoading) return <SkeletonRows rows={5} label={"Cargando información"} />; if (query.error) return <ErrorState title={"No fue posible cargar la información"} detail={getApiErrorMessage(query.error, "No fue posible cargar el reporte.")} onRetry={() => { void (() => void query.refetch())(); }} />; return <>{query.isFetching ? <InlineFeedback tone="info" title="Actualizando">Consultando los datos más recientes.</InlineFeedback> : null}{children}</>; }
 function FilterField({ id, label, value, onChange, type = "text" }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string }) { return <div><Label htmlFor={id}>{label}</Label><Input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} /></div>; }
 function Metric({ label, value }: { label: string; value: ReactNode }) { return <Card level={2}><CardContent className="p-4"><p className="text-xs text-text-secondary">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></CardContent></Card>; }
 function ReportTableSimple({ headers, rows }: { headers: string[]; rows: ReactNode[][] }) {

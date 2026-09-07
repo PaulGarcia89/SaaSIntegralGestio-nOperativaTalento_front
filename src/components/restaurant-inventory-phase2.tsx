@@ -5,11 +5,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Send, Trash2, Truck } from "lucide-react";
 import { cancelRestaurantTransfer, createRestaurantAdjustment, createRestaurantTransfer, fetchRestaurantIngredients, fetchRestaurantPhase2Dashboard, fetchRestaurantTransfers, fetchRestaurantWarehouses, getApiErrorMessage, receiveRestaurantTransfer, sendRestaurantTransfer, submitRestaurantStockCount } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
-import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { RowTable } from "@/components/row-table";
 import { confirmAction } from "@/components/confirm-action";
+import {
+  ErrorState,
+  SkeletonRows,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,7 +34,7 @@ export function RestaurantPhase2View({ section }: { section: string }) {
   return <Phase2Dashboard branchId={currentBranch.id} />;
 }
 
-function QueryState({ loading, error, retry, children }: { loading: boolean; error: unknown; retry: () => void; children: ReactNode }) { if (loading) return <AsyncState state="loading" />; if (error) return <AsyncState state="error" onRetry={retry} description={getApiErrorMessage(error, "No fue posible consultar esta sección.")} />; return <>{children}</>; }
+function QueryState({ loading, error, retry, children }: { loading: boolean; error: unknown; retry: () => void; children: ReactNode }) { if (loading) return <SkeletonRows rows={5} label={"Cargando información"} />; if (error) return <ErrorState title={"No fue posible cargar la información"} detail={getApiErrorMessage(error, "No fue posible consultar esta sección.")} onRetry={() => { void (retry)(); }} />; return <>{children}</>; }
 function transferNextAction(value: unknown) { const labels: Record<string, string> = { confirm_operation: "Revisar y confirmar", send_transfer: "Lista para enviar", receive_transfer: "Pendiente de recepción", cancel_transfer: "Puede cancelarse", resolve_stock_shortage: "Resolver el bloqueo de inventario" }; return labels[String(value)] ?? String(value ?? ""); }
 function SecureTransfersScreen({ branchId }: { branchId: string }) {
   const qc = useQueryClient(); const catalog = Catalog({ branchId }); const [source, setSource] = useState(""); const [destination, setDestination] = useState(""); const [lines, setLines] = useState<Line[]>([{ ingredientId: "", quantity: "", lotId: "" }]); const [reviewing, setReviewing] = useState(false); const [created, setCreated] = useState(false);

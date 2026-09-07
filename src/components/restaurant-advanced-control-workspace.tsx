@@ -6,10 +6,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { acknowledgeRestaurantExpiryAlert, createRestaurantCountSchedule, fetchRestaurantAuditLog, fetchRestaurantCountSchedules, fetchRestaurantExpiryAlerts, fetchRestaurantShrinkageAlerts, fetchRestaurantVariance, getApiErrorMessage } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
-import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { RowTable } from "@/components/row-table";
+import {
+  ErrorState,
+  SkeletonRows,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +35,7 @@ function ShrinkageView() { const { currentBranch } = useAppStore(); const { ware
 
 function AuditView() { const { currentBranch } = useAppStore(); const { warehouseId } = useRestaurantInventoryContext(); const query = useQuery({ queryKey: ["restaurant-audit-log", currentBranch?.id, warehouseId], queryFn: () => fetchRestaurantAuditLog({ branchId: currentBranch?.id, warehouseId }) }); return <Card level={1}><CardContent className="space-y-4 p-5"><div><h2 className="font-semibold">Auditoría inmutable</h2><p className="text-sm text-text-secondary">Registro de cambios de inventario que no puede editarse desde el cliente.</p></div><DataState query={query}>{<Table headers={["Fecha", "Actor", "Acción", "Entidad", "Motivo", "Integridad"]}>{(query.data ?? []).map((item) => <tr key={item.id}><td>{item.createdAt}</td><td>{item.actorName ?? "-"}</td><td>{item.action}</td><td>{item.entityType} · {item.entityId}</td><td>{item.reason ?? "-"}</td><td><Badge variant={item.immutable ? "default" : "destructive"}>{item.immutable ? "Inmutable" : "Revisar"}</Badge></td></tr>)}</Table>}</DataState></CardContent></Card>; }
 
-function DataState({ query, children }: { query: { isLoading: boolean; error: unknown; refetch: () => unknown }; children: React.ReactNode }) { if (query.isLoading) return <AsyncState state="loading" />; if (query.error) return <AsyncState state="error" onRetry={() => void query.refetch()} description={getApiErrorMessage(query.error, "El contrato de control avanzado aún no está disponible.")} />; return <>{children}</>; }
+function DataState({ query, children }: { query: { isLoading: boolean; error: unknown; refetch: () => unknown }; children: React.ReactNode }) { if (query.isLoading) return <SkeletonRows rows={5} label={"Cargando información"} />; if (query.error) return <ErrorState title={"No fue posible cargar la información"} detail={getApiErrorMessage(query.error, "El contrato de control avanzado aún no está disponible.")} onRetry={() => { void (() => void query.refetch())(); }} />; return <>{children}</>; }
 /**
  * Puente al puente: el ayudante local conserva su firma para no tocar ninguna
  * de las llamadas, y delega en `RowTable`, que en el teléfono descompone cada

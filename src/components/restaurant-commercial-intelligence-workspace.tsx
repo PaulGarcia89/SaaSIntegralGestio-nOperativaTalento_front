@@ -16,10 +16,13 @@ import {
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
-import { AsyncState } from "@/components/async-state";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { RowTable } from "@/components/row-table";
+import {
+  ErrorState,
+  SkeletonRows,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,7 +44,7 @@ export function RestaurantCommercialIntelligenceWorkspace({ initialView = "forec
 }
 
 function CommercialCard({ title, description, children }: { title: string; description: string; children: ReactNode }) { return <Card level={1}><CardContent className="space-y-4 p-5"><div><h2 className="font-semibold">{title}</h2><p className="text-sm text-text-secondary">{description}</p></div>{children}</CardContent></Card>; }
-function QueryState({ query, children }: { query: { isLoading: boolean; error: unknown; refetch: () => unknown }; children: ReactNode }) { if (query.isLoading) return <AsyncState state="loading" />; if (query.error) return <AsyncState state="error" onRetry={() => void query.refetch()} description={getApiErrorMessage(query.error, "El contrato de inteligencia comercial aún no está disponible.")} />; return <>{children}</>; }
+function QueryState({ query, children }: { query: { isLoading: boolean; error: unknown; refetch: () => unknown }; children: ReactNode }) { if (query.isLoading) return <SkeletonRows rows={5} label={"Cargando información"} />; if (query.error) return <ErrorState title={"No fue posible cargar la información"} detail={getApiErrorMessage(query.error, "El contrato de inteligencia comercial aún no está disponible.")} onRetry={() => { void (() => void query.refetch())(); }} />; return <>{children}</>; }
 /**
  * Puente al puente: el ayudante local conserva su firma para no tocar ninguna
  * de las llamadas, y delega en `RowTable`, que en el teléfono descompone cada

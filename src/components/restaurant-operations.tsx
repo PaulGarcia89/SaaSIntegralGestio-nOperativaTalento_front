@@ -13,15 +13,16 @@ import {
 } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { validateOperationDraft } from "@/lib/restaurant-inventory";
-import { AsyncState } from "@/components/async-state";
 import {
   ConfirmPanel,
+  ErrorState,
   ImpactReview,
   InlineNote,
   OperationResultView,
   OperationStepper,
   PageHeader,
   PageSection,
+  SkeletonRows,
 } from "@/components/system";
 import { InlineFeedback } from "@/components/design-system";
 import { restaurantOperationImpact } from "@/lib/restaurant-operation";
@@ -51,9 +52,9 @@ export function RestaurantOperations({ section, warehouseId, warehouseName }: { 
   const units = useQuery({ queryKey: ["restaurant-ops-units"], queryFn: () => fetchRestaurantUnits({ status: "ACTIVE", pageSize: 200 }) });
   const recipes = useQuery({ queryKey: ["restaurant-ops-recipes"], queryFn: () => fetchRestaurantRecipes() });
   if (!currentBranch) return <InlineFeedback tone="warning" title="Sucursal requerida">Selecciona una sucursal para operar el inventario de restaurante.</InlineFeedback>;
-  if (ingredients.isLoading || units.isLoading || recipes.isLoading) return <AsyncState state="loading" />;
+  if (ingredients.isLoading || units.isLoading || recipes.isLoading) return <SkeletonRows rows={5} label={"Cargando información"} />;
   const catalogError = ingredients.error ?? units.error ?? recipes.error;
-  if (catalogError) return <AsyncState state="error" onRetry={() => { void ingredients.refetch(); void units.refetch(); void recipes.refetch(); }} description={getApiErrorMessage(catalogError, "No fue posible cargar los catálogos.")} />;
+  if (catalogError) return <ErrorState title="No fue posible cargar los catálogos" detail={getApiErrorMessage(catalogError, "Reintenta la consulta para continuar.")} onRetry={() => { void ingredients.refetch(); void units.refetch(); void recipes.refetch(); }} />;
   const ingredientOptions = (ingredients.data?.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; return { id: item.id, label: `${item.sku} · ${item.name}`, unitId: String(record.inventoryUnitId ?? ""), purchaseUnitId: String(record.purchaseUnitId ?? "") }; });
   const unitOptions = (units.data?.data ?? []).map((item) => ({ id: item.id, label: `${item.name} (${item.abbreviation ?? ""})` }));
   const recipeOptions = (recipes.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; return { id: String(record.id), label: `${String(record.code ?? "")} · ${String(record.name ?? "")}` }; });

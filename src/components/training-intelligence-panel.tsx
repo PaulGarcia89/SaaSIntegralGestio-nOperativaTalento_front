@@ -1,54 +1,351 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BrainCircuit, BriefcaseBusiness, ChartNoAxesCombined, Plus, Target, UsersRound } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
-import { PageHeader } from "@/components/design-system";
-import { Badge } from "@/components/ui/badge";
+import {
+  EmptyState,
+  ErrorState,
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+  StatusBadge,
+} from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { captureTrainingIntelligence, fetchTrainingIntelligence, getApiErrorMessage } from "@/lib/backend";
+import {
+  captureTrainingIntelligence,
+  fetchTrainingCompetencies,
+  fetchTrainingIntelligence,
+  fetchUsers,
+  getApiErrorMessage,
+} from "@/lib/backend";
 import type { TrainingIntelligenceRecordType } from "@/lib/contracts";
+import { formatDateTime } from "@/lib/training-labels";
+
+/**
+ * Inteligencia de aprendizaje.
+ *
+ * Qué cambió
+ * ----------
+ * · La tarjeta de brechas mostraba «Competencia 8f3a-…» y «Colaborador
+ *   2b71-…»: el identificador de base de datos ocupaba el sitio del nombre.
+ *   El endpoint de inteligencia sólo devuelve identificadores, así que ahora
+ *   se resuelven contra los catálogos de competencias y de personas que el
+ *   frontend ya consulta. Si un identificador no se puede resolver, se dice
+ *   —«Competencia no identificada»— en vez de volcar el UUID.
+ * · La previsión titulaba cada tarjeta con `cohortKey`, la clave técnica de
+ *   la cohorte, sin explicar qué es.
+ * · Se cortaba la lista de previsiones a ocho en silencio; ahora se dice
+ *   cuántas hay en total.
+ * · Cargar reemplazaba la pantalla entera —título incluido— por un aro
+ *   girando.
+ * · La brecha se pintaba con un distintivo rojo sin palabra que lo explicara.
+ *
+ * El contrato del backend no cambia: los mismos endpoints, los mismos campos.
+ */
 
 const templates: Record<TrainingIntelligenceRecordType, Record<string, unknown>> = {
   ROLE_PROFILE: { jobTitle: "", competencyId: "", targetLevel: "WORKING", weight: 1, isRequired: true },
   ASSESSMENT: { userId: "", competencyId: "", score: 0, targetScore: 70, source: "MANUAL" },
   CAREER_PLAN: { userId: "", title: "", targetRole: "", targetDate: "" },
   FEEDBACK_360: { courseId: "", subjectUserId: "", rating: 5, npsScore: 10, kind: "COURSE", comment: "" },
-  ROI: { courseId: "", periodStart: "2026-01-01", periodEnd: "2026-03-31", participantCount: 0, costAmount: 0, benefitAmount: 0, currency: "USD" },
-  FORECAST: { courseId: "", cohortKey: "2026-Q1", assigned: 0, completed: 0, projectedCompletionRate: 0, projectedOverdue: 0 },
+  ROI: {
+    courseId: "",
+    periodStart: "2026-01-01",
+    periodEnd: "2026-03-31",
+    participantCount: 0,
+    costAmount: 0,
+    benefitAmount: 0,
+    currency: "USD",
+  },
+  FORECAST: {
+    courseId: "",
+    cohortKey: "2026-Q1",
+    assigned: 0,
+    completed: 0,
+    projectedCompletionRate: 0,
+    projectedOverdue: 0,
+  },
 };
 
-const labels: Record<TrainingIntelligenceRecordType, string> = { ROLE_PROFILE: "Perfil de competencia", ASSESSMENT: "Evaluación de brecha", CAREER_PLAN: "Plan de carrera", FEEDBACK_360: "Feedback 360 / NPS", ROI: "Medición de ROI", FORECAST: "Previsión de cumplimiento" };
+const labels: Record<TrainingIntelligenceRecordType, string> = {
+  ROLE_PROFILE: "Perfil de competencia",
+  ASSESSMENT: "Evaluación de brecha",
+  CAREER_PLAN: "Plan de carrera",
+  FEEDBACK_360: "Feedback 360 / NPS",
+  ROI: "Medición de ROI",
+  FORECAST: "Previsión de cumplimiento",
+};
+
+const FORECAST_LIMIT = 8;
 
 export function TrainingIntelligencePanel() {
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TrainingIntelligenceRecordType>("ROLE_PROFILE");
   const [values, setValues] = useState<Record<string, unknown>>(templates.ROLE_PROFILE);
+
   const intelligence = useQuery({ queryKey: ["training-intelligence"], queryFn: fetchTrainingIntelligence });
-  const capture = useMutation({ mutationFn: () => captureTrainingIntelligence(type, values), onSuccess: async () => { await client.invalidateQueries({ queryKey: ["training-intelligence"] }); setOpen(false); toast.success("Registro de inteligencia guardado"); }, onError: (error) => toast.error(getApiErrorMessage(error, "Revisa los campos requeridos.")) });
-  const chooseType = (value: TrainingIntelligenceRecordType) => { setType(value); setValues(templates[value]); };
-  if (intelligence.isLoading) return <AsyncState state="loading" title="Cargando inteligencia de aprendizaje" />;
-  if (intelligence.isError) return <AsyncState state="error" title="No fue posible cargar la inteligencia" description={getApiErrorMessage(intelligence.error, "Reintenta para continuar.")} onRetry={() => intelligence.refetch()} />;
-  const data = intelligence.data!;
-  return <div className="space-y-6"><PageHeader eyebrow="Aprendizaje" title="Inteligencia de aprendizaje" description="Conecta competencias, carrera, feedback, retorno y previsiones sin mezclar datos entre empresas." actions={<Button onClick={() => setOpen(true)}><Plus />Registrar señal</Button>} />
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric icon={Target} label="Perfiles" value={data.competencyProfiles} /><Metric icon={BrainCircuit} label="Evaluaciones" value={data.assessments} /><Metric icon={BriefcaseBusiness} label="Planes activos" value={data.careerPlans.active} /><Metric icon={UsersRound} label="Feedback" value={data.feedback.responses} /><Metric icon={ChartNoAxesCombined} label="ROI" value={data.roi.roiPercent === null ? "-" : `${data.roi.roiPercent}%`} /></section>
-    <section className="grid gap-4 xl:grid-cols-2"><Card><CardHeader><CardTitle>Brechas prioritarias</CardTitle></CardHeader><CardContent className="space-y-2">{data.gaps.length ? data.gaps.map((gap) => <div key={`${gap.userId}-${gap.competencyId}`} className="flex items-center justify-between gap-3 rounded-xl border p-3"><div><p className="font-medium">Competencia {gap.competencyId}</p><p className="text-xs text-muted-foreground">Colaborador {gap.userId}</p></div><Badge variant="destructive">-{gap.gap} puntos</Badge></div>) : <p className="text-sm text-muted-foreground">Aún no hay brechas calculadas.</p>}</CardContent></Card><Card><CardHeader><CardTitle>Previsión y benchmark interno</CardTitle></CardHeader><CardContent className="space-y-2">{data.forecasts.length ? data.forecasts.slice(0, 8).map((forecast) => <div key={forecast.id} className="rounded-xl border p-3"><div className="flex justify-between gap-3"><strong>{forecast.cohortKey}</strong><Badge variant="secondary">{forecast.projectedCompletionRate}% proyectado</Badge></div><p className="mt-1 text-xs text-muted-foreground">{forecast.completed}/{forecast.assigned} completados · {forecast.projectedOverdue} en riesgo</p></div>) : <p className="text-sm text-muted-foreground">Registra una previsión para iniciar el seguimiento.</p>}</CardContent></Card></section>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Registrar señal</DialogTitle><DialogDescription>Selecciona el tipo y completa los datos. Los IDs se obtienen de usuarios, cursos y competencias existentes.</DialogDescription></DialogHeader><div className="space-y-4"><Select value={type} onValueChange={(value) => chooseType(value as TrainingIntelligenceRecordType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(labels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><StructuredIntelligenceFields values={values} onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))} /><Button className="w-full" disabled={capture.isPending} onClick={() => capture.mutate()}>{capture.isPending ? "Guardando..." : "Guardar registro"}</Button></div></DialogContent></Dialog>
-  </div>;
+
+  // Los catálogos existen para poner nombre a los identificadores que devuelve
+  // el resumen. Son secundarios: si fallan, la pantalla sigue funcionando y
+  // sólo se pierde el nombre, no la cifra.
+  const competencies = useQuery({ queryKey: ["training-competencies"], queryFn: fetchTrainingCompetencies });
+  const people = useQuery({ queryKey: ["users"], queryFn: fetchUsers });
+
+  const capture = useMutation({
+    mutationFn: () => captureTrainingIntelligence(type, values),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["training-intelligence"] });
+      setOpen(false);
+      toast.success("Registro de inteligencia guardado");
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "Revisa los campos requeridos.")),
+  });
+
+  const chooseType = (value: TrainingIntelligenceRecordType) => {
+    setType(value);
+    setValues(templates[value]);
+  };
+
+  const competencyName = (id: string) => {
+    const match = competencies.data?.find((item) => item.id === id);
+    if (!match) return "Competencia no identificada";
+    return match.code ? `${match.name} (${match.code})` : match.name;
+  };
+
+  const personName = (id: string) => {
+    const match = people.data?.find((item) => item.id === id);
+    if (!match) return "Persona no identificada";
+    return match.fullName || match.email;
+  };
+
+  const data = intelligence.data;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Aprendizaje"
+        title="Inteligencia de aprendizaje"
+        description="Competencias, carrera, feedback, retorno y previsiones, sin mezclar datos entre empresas."
+        actions={
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="size-4" aria-hidden="true" />
+            Registrar señal
+          </Button>
+        }
+      />
+
+      {intelligence.isLoading ? (
+        <SkeletonRows rows={5} label="Cargando la inteligencia de aprendizaje" />
+      ) : intelligence.isError || !data ? (
+        <ErrorState
+          title="No fue posible cargar la inteligencia de aprendizaje"
+          detail={getApiErrorMessage(intelligence.error, "Reintenta la consulta para continuar.")}
+          onRetry={() => void intelligence.refetch()}
+        />
+      ) : (
+        <>
+          <MetricRow>
+            <Metric label="Perfiles de competencia" value={String(data.competencyProfiles)} />
+            <Metric label="Evaluaciones" value={String(data.assessments)} />
+            <Metric label="Planes de carrera activos" value={String(data.careerPlans.active)} detail={`de ${data.careerPlans.total} en total`} />
+            <Metric label="Respuestas de feedback" value={String(data.feedback.responses)} />
+            <Metric
+              label="Retorno de la inversión"
+              value={data.roi.roiPercent === null ? "—" : `${data.roi.roiPercent} %`}
+              detail={data.roi.measurements === 0 ? "sin mediciones todavía" : `sobre ${data.roi.measurements} mediciones`}
+              tone={data.roi.roiPercent !== null && data.roi.roiPercent < 0 ? "danger" : undefined}
+            />
+          </MetricRow>
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <PageSection
+              title="Brechas prioritarias"
+              description="Distancia entre el nivel evaluado y el nivel esperado."
+              boxed
+            >
+              {data.gaps.length ? (
+                <ul className="divide-y divide-line">
+                  {data.gaps.map((gap) => (
+                    <li
+                      key={`${gap.userId}-${gap.competencyId}`}
+                      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-ink-1">{competencyName(gap.competencyId)}</p>
+                        <p className="truncate text-2xs text-ink-3">{personName(gap.userId)}</p>
+                      </div>
+                      <StatusBadge
+                        size="sm"
+                        tone={gap.gap >= 30 ? "danger" : "warning"}
+                        label={`Faltan ${gap.gap} puntos`}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState
+                  reason="no-records"
+                  title="Aún no hay brechas calculadas"
+                  description="Registra evaluaciones de competencia para que aparezcan aquí."
+                />
+              )}
+            </PageSection>
+
+            <PageSection
+              title="Previsión de cumplimiento"
+              description={
+                data.forecasts.length > FORECAST_LIMIT
+                  ? `Las ${FORECAST_LIMIT} cohortes más recientes, de ${data.forecasts.length} registradas.`
+                  : "Cada cohorte con su proyección de finalización."
+              }
+              boxed
+            >
+              {data.forecasts.length ? (
+                <ul className="divide-y divide-line">
+                  {data.forecasts.slice(0, FORECAST_LIMIT).map((forecast) => (
+                    <li key={forecast.id} className="py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                        <p className="min-w-0 truncate font-medium text-ink-1">Cohorte {forecast.cohortKey}</p>
+                        <StatusBadge
+                          size="sm"
+                          tone={forecast.projectedCompletionRate >= 80 ? "success" : "warning"}
+                          label={`${forecast.projectedCompletionRate} % proyectado`}
+                        />
+                      </div>
+                      <p className="mt-1 font-mono text-2xs text-ink-3 tabular-figures">
+                        {forecast.completed} de {forecast.assigned} completados ·{" "}
+                        {forecast.projectedOverdue} en riesgo de vencer · calculada el{" "}
+                        {formatDateTime(forecast.generatedAt)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState
+                  reason="no-records"
+                  title="Todavía no hay previsiones"
+                  description="Registra una previsión para empezar el seguimiento de la cohorte."
+                  action={
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        chooseType("FORECAST");
+                        setOpen(true);
+                      }}
+                    >
+                      Registrar una previsión
+                    </Button>
+                  }
+                />
+              )}
+            </PageSection>
+          </div>
+        </>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Registrar señal</DialogTitle>
+            <DialogDescription>
+              Elige el tipo y completa los datos. Los identificadores se toman de las personas, los cursos y las
+              competencias que ya existen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={type} onValueChange={(value) => chooseType(value as TrainingIntelligenceRecordType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(labels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <StructuredIntelligenceFields
+              values={values}
+              onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))}
+            />
+            <Button
+              className="w-full"
+              loading={capture.isPending}
+              loadingLabel="Guardando…"
+              onClick={() => capture.mutate()}
+            >
+              Guardar registro
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
-function StructuredIntelligenceFields({ values, onChange }: { values: Record<string, unknown>; onChange: (key: string, value: unknown) => void }) {
-  return <div className="grid gap-3 sm:grid-cols-2">{Object.entries(values).map(([key, value]) => { const isBoolean = typeof value === "boolean"; const isNumber = typeof value === "number"; return <label key={key} className={isBoolean ? "flex min-h-11 items-center gap-3 rounded-xl border p-3 text-sm" : "space-y-2 text-sm font-medium"}>{isBoolean ? <input type="checkbox" checked={value} onChange={(event) => onChange(key, event.target.checked)} /> : null}{isBoolean ? <span>{intelligenceFieldLabel(key)}</span> : <><span>{intelligenceFieldLabel(key)}</span><input className="h-10 w-full rounded-xl border border-border-default bg-background px-3" type={isNumber ? "number" : key.toLowerCase().includes("date") ? "date" : "text"} value={String(value ?? "")} onChange={(event) => onChange(key, isNumber ? Number(event.target.value) : event.target.value)} /></>}</label>; })}</div>;
+function StructuredIntelligenceFields({
+  values,
+  onChange,
+}: {
+  values: Record<string, unknown>;
+  onChange: (key: string, value: unknown) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {Object.entries(values).map(([key, value]) => {
+        const isBoolean = typeof value === "boolean";
+        const isNumber = typeof value === "number";
+        const id = `intelligence-${key}`;
+
+        if (isBoolean) {
+          return (
+            <label
+              key={key}
+              htmlFor={id}
+              className="flex items-center gap-3 rounded-md border border-line px-3 text-sm text-ink-1"
+              style={{ minHeight: "var(--control-h-touch)" }}
+            >
+              <input
+                id={id}
+                type="checkbox"
+                className="size-4 accent-[hsl(var(--accent-fill))]"
+                checked={value}
+                onChange={(event) => onChange(key, event.target.checked)}
+              />
+              <span>{intelligenceFieldLabel(key)}</span>
+            </label>
+          );
+        }
+
+        return (
+          <div key={key} className="space-y-1">
+            <label htmlFor={id} className="text-sm font-medium text-ink-1">
+              {intelligenceFieldLabel(key)}
+            </label>
+            <input
+              id={id}
+              className="w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3 text-base text-ink-1 sm:text-sm"
+              style={{ minHeight: "var(--control-h-touch)" }}
+              type={isNumber ? "number" : key.toLowerCase().includes("date") ? "date" : "text"}
+              inputMode={isNumber ? "decimal" : undefined}
+              value={String(value ?? "")}
+              onChange={(event) => onChange(key, isNumber ? Number(event.target.value) : event.target.value)}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function intelligenceFieldLabel(key: string) {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase());
 }
-
-function Metric({ icon: Icon, label, value }: { icon: typeof Target; label: string; value: string | number }) { return <Card><CardContent className="p-5"><Icon className="size-5 text-brand" /><p className="mt-3 text-sm text-muted-foreground">{label}</p><p className="text-3xl font-semibold">{value}</p></CardContent></Card>; }

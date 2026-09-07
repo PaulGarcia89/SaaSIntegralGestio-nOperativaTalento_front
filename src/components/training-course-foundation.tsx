@@ -4,7 +4,7 @@ import { Info, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
+import { ErrorState, SkeletonRows } from "@/components/system";
 import { InlineFeedback } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,9 +79,20 @@ export function TrainingCourseFoundation({
   });
   const users = useQuery({ queryKey: ["training-foundation-users"], queryFn: fetchUsers });
 
-  if (design.isLoading || competencies.isLoading) return <AsyncState state="loading" title="Cargando diseño pedagógico" />;
+  // Antes esto reemplazaba el paso entero del asistente —el estepper incluido—
+  // por un aro girando, y quien lo miraba perdía de vista en qué punto estaba.
+  if (design.isLoading || competencies.isLoading) return <SkeletonRows rows={5} label="Cargando el diseño pedagógico" />;
   if (design.isError || competencies.isError) {
-    return <AsyncState state="error" title="No fue posible cargar el diseño pedagógico" onRetry={() => { void design.refetch(); void competencies.refetch(); }} />;
+    return (
+      <ErrorState
+        title="No fue posible cargar el diseño pedagógico"
+        detail={getApiErrorMessage(design.error ?? competencies.error, "Reintenta la consulta para continuar.")}
+        onRetry={() => {
+          void design.refetch();
+          void competencies.refetch();
+        }}
+      />
+    );
   }
   if (!design.data || !competencies.data) return null;
 

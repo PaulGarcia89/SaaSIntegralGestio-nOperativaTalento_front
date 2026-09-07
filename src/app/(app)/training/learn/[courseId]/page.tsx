@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
+import { ErrorState, PageHeader, SkeletonRows } from "@/components/system";
 import { CourseContent, type VideoProgressEvent } from "@/components/training-learning-hub";
 import { Button } from "@/components/ui/button";
 import { fetchLearnerTrainingCourse, getApiErrorMessage, heartbeatTrainingVideo, recordTrainingVideoEvent, startTrainingVideo, updateTrainingLessonProgress } from "@/lib/backend";
@@ -38,8 +38,35 @@ export default function TrainingCourseLearnPage() {
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible sincronizar tu avance.")),
   });
 
-  return <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-    <Button asChild variant="ghost" className="-ml-3"><Link href="/training"><ArrowLeft className="size-4" />Volver a mis capacitaciones</Link></Button>
-    {query.isLoading ? <AsyncState state="loading" title="Cargando capacitación" /> : query.isError ? <AsyncState state="error" onRetry={() => query.refetch()} /> : query.data ? <><header><p className="text-sm font-medium text-brand">Capacitación</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{query.data.title}</h1><p className="mt-2 max-w-3xl text-text-secondary">{query.data.summary}</p></header><CourseContent course={query.data} onVideoProgress={(event) => progress.mutateAsync(event)} /></> : null}
-  </main>;
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <Button asChild variant="ghost" className="-ml-3">
+        <Link href="/training">
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Volver a mis capacitaciones
+        </Link>
+      </Button>
+
+      {/* El título del curso vive en el PageHeader del sistema: antes era un
+          <h1> escrito a mano que además desaparecía durante la carga, así que
+          al recargar la página el aprendiz perdía de vista qué estaba haciendo. */}
+      <PageHeader
+        eyebrow="Capacitación"
+        title={query.data?.title ?? "Cargando la capacitación"}
+        description={query.data?.summary ?? undefined}
+      />
+
+      {query.isLoading ? (
+        <SkeletonRows rows={5} label="Cargando el contenido de la capacitación" />
+      ) : query.isError ? (
+        <ErrorState
+          title="No fue posible cargar la capacitación"
+          detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+          onRetry={() => void query.refetch()}
+        />
+      ) : query.data ? (
+        <CourseContent course={query.data} onVideoProgress={(event) => progress.mutateAsync(event)} />
+      ) : null}
+    </main>
+  );
 }

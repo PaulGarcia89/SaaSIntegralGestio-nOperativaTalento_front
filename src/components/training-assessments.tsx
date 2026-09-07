@@ -6,8 +6,16 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
-import { PageHeader, Pagination } from "@/components/design-system";
+import {
+  EmptyState,
+  ErrorState,
+  InlineNote,
+  PageHeader,
+  Pagination,
+  SkeletonRows,
+  StatusBadge,
+} from "@/components/system";
+import { questionDifficultyLabel } from "@/lib/training-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,11 +84,13 @@ function AssessmentBuilder() {
   const [createOpen, setCreateOpen] = useState(Boolean(courseId));
   const [questionQuiz, setQuestionQuiz] = useState<TrainingQuizDto | null>(null);
   const [configureQuiz, setConfigureQuiz] = useState<TrainingQuizDto | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string; attempts: number } | null>(null);
   const [bankQuiz, setBankQuiz] = useState<TrainingQuizDto | null>(null);
   const query = useQuery({ queryKey: ["training-assessments"], queryFn: fetchTrainingAssessments });
   const remove = useMutation({
     mutationFn: deleteTrainingAssessment,
     onSuccess: () => {
+      setPendingDelete(null);
       toast.success("Evaluación eliminada");
       queryClient.invalidateQueries({ queryKey: ["training-assessments"] });
     },
@@ -113,9 +123,9 @@ function AssessmentBuilder() {
         description="Diseña instrumentos de evaluación, configura intentos y controla el criterio de aprobación."
         actions={<Button onClick={() => setCreateOpen(true)}><Plus />Nueva evaluación</Button>}
       />
-      {query.isLoading ? <AsyncState state="loading" title="Cargando evaluaciones" /> : null}
+      {query.isLoading ? <SkeletonRows rows={4} label="Cargando las evaluaciones" /> : null}
       {query.isError ? (
-        <AsyncState state="error" title="No fue posible cargar las evaluaciones" onRetry={() => query.refetch()} />
+        <ErrorState title="No fue posible cargar las evaluaciones" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} />
       ) : null}
       {query.data ? <AssessmentBuilderSummary assessments={query.data.items} /> : null}
       {query.data?.items.length ? (
@@ -134,13 +144,13 @@ function AssessmentBuilder() {
                   <Badge variant="secondary">{quiz.questions.length} preguntas</Badge>
                   <Badge variant="secondary">{quiz.maxAttempts ?? "∞"} intentos</Badge>
                   <Badge variant="secondary">{quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} min` : "Sin límite"}</Badge>
-                  <Badge variant={quiz.readiness?.ready ? "success" : "destructive"}>{quiz.readiness?.ready ? "Lista" : "Incompleta"}</Badge>
+                  <StatusBadge size="sm" tone={quiz.readiness?.ready ? "success" : "warning"} label={quiz.readiness?.ready ? "Lista para usarse" : "Incompleta"} />
                 </div>
-                {!quiz.readiness?.ready && quiz.readiness?.errors.length ? <p className="rounded-xl bg-status-warning-soft p-3 text-sm text-status-warning">{quiz.readiness.errors.join(" · ")}</p> : null}
+                {!quiz.readiness?.ready && quiz.readiness?.errors.length ? <InlineNote tone="warning" title="Falta algo para poder usarla">{quiz.readiness.errors.join(" · ")}</InlineNote> : null}
                 <div className="space-y-2">
                   {quiz.questions.map((question, index) => (
                     <div key={question.id} className="flex items-center gap-2 rounded-xl border border-border-default p-3">
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{index + 1}. {question.prompt}</p><p className="text-xs text-text-secondary">{question.points} pts · {question.difficulty ?? "MEDIUM"}{question.category ? ` · ${question.category}` : ""}</p></div>
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{index + 1}. {question.prompt}</p><p className="text-xs text-text-secondary">{question.points} pts · dificultad {questionDifficultyLabel(question.difficulty ?? "MEDIUM").toLocaleLowerCase("es")}{question.category ? ` · ${question.category}` : ""}</p></div>
                       <Button size="icon" variant="ghost" aria-label="Subir pregunta" disabled={index === 0 || reorder.isPending} onClick={() => moveQuestion(quiz, index, -1)}><ArrowUp className="size-4" /></Button>
                       <Button size="icon" variant="ghost" aria-label="Bajar pregunta" disabled={index === quiz.questions.length - 1 || reorder.isPending} onClick={() => moveQuestion(quiz, index, 1)}><ArrowDown className="size-4" /></Button>
                       <Button size="icon" variant="ghost" aria-label="Eliminar pregunta" disabled={removeQuestion.isPending} onClick={() => removeQuestion.mutate(question.id)}><Trash2 className="size-4 text-status-danger" /></Button>
@@ -153,19 +163,52 @@ function AssessmentBuilder() {
                   </Button>
                   <Button variant="secondary" onClick={() => setBankQuiz(quiz)}><Library />Banco</Button>
                   <Button variant="secondary" onClick={() => setConfigureQuiz(quiz)}><Settings2 />Reglas</Button>
-                  <Button variant="destructive" size="icon" aria-label={`Eliminar ${quiz.title}`} onClick={() => { if (window.confirm(`¿Eliminar la evaluación “${quiz.title}”? Solo se puede eliminar si no tiene intentos.`)) remove.mutate(quiz.id); }}>
-                    <Trash2 />
+                  <Button variant="destructive" size="icon" aria-label={`Eliminar ${quiz.title}`} onClick={() => setPendingDelete({ id: quiz.id, title: quiz.title, attempts: quiz._count?.attempts ?? 0 })}>
+                    <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-      ) : query.isSuccess ? <EmptyCard title="Aún no hay evaluaciones" description="Crea la primera evaluación y vincúlala con un curso." /> : null}
+      ) : query.isSuccess ? <EmptyState reason="no-records" title="Aún no hay evaluaciones" description="Una evaluación mide lo aprendido y decide si alguien aprueba el curso." action={<Button onClick={() => setCreateOpen(true)}>Crear la primera evaluación</Button>} /> : null}
       <CreateAssessmentDialog open={createOpen} onOpenChange={setCreateOpen} initialCourseId={courseId} />
       <ConfigureAssessmentDialog quiz={configureQuiz} onClose={() => setConfigureQuiz(null)} />
       <CreateQuestionDialog quiz={questionQuiz} onClose={() => setQuestionQuiz(null)} />
       <QuestionBankDialog quiz={bankQuiz} onClose={() => setBankQuiz(null)} />
+
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar la evaluación «{pendingDelete?.title}»?</DialogTitle>
+            <DialogDescription>
+              Se borran también sus preguntas y sus reglas. No se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingDelete && pendingDelete.attempts > 0 ? (
+            <InlineNote tone="blocked" title="El servidor no permitirá borrarla">
+              Ya tiene {pendingDelete.attempts} {pendingDelete.attempts === 1 ? "intento registrado" : "intentos registrados"}, y borrarla dejaría esos resultados sin la evaluación que los explica. Retírala del curso en su lugar.
+            </InlineNote>
+          ) : null}
+          {remove.error ? (
+            <InlineNote tone="danger" title="No se pudo eliminar">
+              {getApiErrorMessage(remove.error, "El servidor rechazó la eliminación.")}
+            </InlineNote>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setPendingDelete(null)}>Conservarla</Button>
+            <Button
+              variant="destructive"
+              disabled={Boolean(pendingDelete && pendingDelete.attempts > 0)}
+              loading={remove.isPending}
+              loadingLabel="Eliminando…"
+              onClick={() => pendingDelete && remove.mutate(pendingDelete.id)}
+            >
+              Eliminar la evaluación
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -440,7 +483,7 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto [&>button:last-child]:sticky [&>button:last-child]:bottom-0 [&>button:last-child]:z-10 [&>button:last-child]:bg-card [&>button:last-child]:py-3">
         <DialogHeader><DialogTitle>Banco de preguntas</DialogTitle><DialogDescription>Selecciona preguntas validadas para copiarlas a {quiz?.title}.</DialogDescription></DialogHeader>
-        {query.isLoading ? <AsyncState state="loading" /> : null}
+        {query.isLoading ? <SkeletonRows rows={4} label="Cargando el banco de preguntas" /> : null}
         {query.data?.items.length ? <div className="space-y-2">
           {query.data.items.map((item) => (
             <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-default p-3">
@@ -450,10 +493,10 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
                 checked={selected.includes(item.id)}
                 onChange={(event) => setSelected(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
               />
-              <span className="min-w-0"><span className="block font-medium">{item.prompt}</span><span className="text-xs text-text-secondary">{item.category || "Sin categoría"} · {item.difficulty} · {item.points} pts</span></span>
+              <span className="min-w-0"><span className="block font-medium">{item.prompt}</span><span className="text-xs text-text-secondary">{item.category || "Sin categoría"} · dificultad {questionDifficultyLabel(item.difficulty).toLocaleLowerCase("es")} · {item.points} pts</span></span>
             </label>
           ))}
-        </div> : query.isSuccess ? <EmptyCard title="Banco vacío" description="Marca “Guardar también en el banco” al crear una pregunta." /> : null}
+        </div> : query.isSuccess ? <EmptyState reason="no-records" title="El banco de preguntas está vacío" description="Al crear una pregunta, marca «Guardar también en el banco» para poder reutilizarla en otras evaluaciones." /> : null}
         <Button disabled={!selected.length || mutation.isPending} onClick={() => mutation.mutate()}>Importar {selected.length || ""} preguntas</Button>
       </DialogContent>
     </Dialog>
@@ -493,9 +536,9 @@ function LearnerAssessments() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Aprendizaje" title="Mis evaluaciones" description="Completa tus evaluaciones pendientes y consulta claramente el resultado de cada intento." />
-      {query.isLoading ? <AsyncState state="loading" title="Cargando evaluaciones" /> : null}
+      {query.isLoading ? <SkeletonRows rows={4} label="Cargando tus evaluaciones" /> : null}
       {query.data?.length ? <LearnerAssessmentSummary quizzes={query.data} /> : null}
-      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; return <Card key={quiz.id}><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">Último resultado: <strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">Retroalimentación: {quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : "Comenzar evaluación"}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyCard title="No tienes evaluaciones pendientes" /> : null}
+      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; return <Card key={quiz.id}><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">Último resultado: <strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">Retroalimentación: {quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : "Comenzar evaluación"}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyState reason="no-records" title="No tienes evaluaciones pendientes" description="Cuando un curso asignado incluya una evaluación, aparecerá aquí." /> : null}
       <AssessmentPlayer key={attempt?.id ?? "no-attempt"} attempt={attempt} onClose={() => setAttempt(null)} onSubmitted={() => queryClient.invalidateQueries({ queryKey: ["learner-assessments"] })} />
     </div>
   );
@@ -695,7 +738,7 @@ export function TrainingResults() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Aprendizaje" title="Resultados" description="Supervisa intentos, calificaciones y revisiones pendientes." />
-      {query.isLoading ? <AsyncState state="loading" title="Cargando resultados" /> : null}
+      {query.isLoading ? <SkeletonRows rows={5} label="Cargando los resultados" /> : null}
       {query.data ? <ResultsSummary items={query.data.items} total={query.data.total} /> : null}
       {query.data?.items.length ? (
         <div className="grid gap-3">
@@ -716,8 +759,8 @@ export function TrainingResults() {
             </Card>
           ))}
         </div>
-      ) : query.isSuccess ? <EmptyCard title="Aún no hay intentos" /> : null}
-      {query.data ? <Pagination page={query.data.page - 1} totalPages={Math.max(1, Math.ceil(query.data.total / query.data.pageSize))} totalItems={query.data.total} pageSize={query.data.pageSize} onPageChange={(nextPage) => setPage(nextPage + 1)} /> : null}
+      ) : query.isSuccess ? <EmptyState reason="no-records" title="Aún no hay intentos" description="Los resultados aparecerán aquí en cuanto alguien rinda una evaluación." /> : null}
+      {query.data ? <Pagination page={query.data.page - 1} totalItems={query.data.total} pageSize={query.data.pageSize} onPageChange={(nextPage) => setPage(nextPage + 1)} /> : null}
     </div>
   );
 }
@@ -771,7 +814,7 @@ export function TrainingCertificates() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Aprendizaje" title="Certificados" description="Consulta credenciales verificables, evidencia, vigencia y cadena de renovación." />
-      {query.isLoading ? <AsyncState state="loading" title="Cargando certificados" /> : null}
+      {query.isLoading ? <SkeletonRows rows={4} label="Cargando los certificados" /> : null}
       {query.data ? <CertificateSummary certificates={query.data.items} admin={admin} /> : null}
       {query.data?.items.length ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -804,7 +847,7 @@ export function TrainingCertificates() {
             );
           })}
         </div>
-      ) : query.isSuccess ? <EmptyCard title="Aún no hay certificados" /> : null}
+      ) : query.isSuccess ? <EmptyState reason="no-records" title="Aún no hay certificados" description="Al aprobar un curso que los emite, el certificado aparecerá aquí." /> : null}
     </div>
   );
 }
@@ -834,6 +877,3 @@ function CertificateMetric({ label, value, tone = "normal" }: { label: string; v
   return <Card level={2}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "warning" ? "text-status-warning" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p></CardContent></Card>;
 }
 
-function EmptyCard({ title, description }: { title: string; description?: string }) {
-  return <Card className="border-dashed"><CardContent className="py-12 text-center"><h2 className="text-lg font-semibold">{title}</h2>{description ? <p className="mt-2 text-sm text-muted-foreground">{description}</p> : null}</CardContent></Card>;
-}

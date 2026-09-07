@@ -3,20 +3,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  Activity,
-  BarChart3,
-  CheckCircle2,
   Download,
   Lightbulb,
   Settings2,
-  Target,
-  Users,
   X,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { AsyncState } from "@/components/async-state";
-import { PageHeader } from "@/components/design-system";
+import {
+  DataView,
+  EmptyState,
+  ErrorState,
+  InlineNote,
+  Metric,
+  MetricRow,
+  PageHeader,
+  PageSection,
+  SkeletonRows,
+  StatusBadge,
+  type DataColumn,
+} from "@/components/system";
+import {
+  formatDateTime,
+  progressStatusTone,
+  severityLabel,
+  severityTone,
+} from "@/lib/training-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,8 +151,8 @@ export function TrainingAnalyticsDashboard() {
         onClear={() => { setCourseId(""); setBranchId(""); setFrom(""); setTo(""); }}
       />
 
-      {analytics.isLoading ? <AsyncState state="loading" title="Calculando indicadores" /> : null}
-      {analytics.isError ? <AsyncState state="error" title="No fue posible calcular la analítica" description={getApiErrorMessage(analytics.error, "Reintenta la consulta.")} onRetry={() => analytics.refetch()} /> : null}
+      {analytics.isLoading ? <SkeletonRows rows={6} label="Calculando los indicadores" /> : null}
+      {analytics.isError ? <ErrorState title="No fue posible calcular la analítica" detail={getApiErrorMessage(analytics.error, "Reintenta la consulta para continuar.")} onRetry={() => void analytics.refetch()} /> : null}
       {analytics.data ? (
         <>
           <MetricGrid data={analytics.data} />
@@ -186,17 +198,48 @@ function AnalyticsScopeSummary({
 }
 
 function MetricGrid({ data }: { data: TrainingAnalyticsDto }) {
-  const metrics = [
-    { label: "Participantes", value: data.summary.uniqueLearners, icon: Users },
-    { label: "Finalización", value: `${data.summary.completionRate}%`, icon: CheckCircle2 },
-    { label: "Aprobación", value: `${data.summary.passRate}%`, icon: BarChart3 },
-    { label: "Vencidos", value: data.summary.overdue, icon: AlertTriangle },
-  ];
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <Card key={metric.label}><CardContent className="py-5"><metric.icon className="size-5 text-brand" /><p className="mt-4 text-sm text-muted-foreground">{metric.label}</p><strong className="text-3xl">{metric.value}</strong></CardContent></Card>)}</div>;
+  return (
+    <MetricRow>
+      <Metric label="Participantes" value={String(data.summary.uniqueLearners)} />
+      <Metric label="Finalización" value={`${data.summary.completionRate} %`} />
+      <Metric label="Aprobación" value={`${data.summary.passRate} %`} />
+      <Metric
+        label="Vencidos"
+        value={String(data.summary.overdue)}
+        tone={data.summary.overdue > 0 ? "danger" : undefined}
+      />
+    </MetricRow>
+  );
 }
 
 function CoursePerformance({ data }: { data: TrainingAnalyticsDto }) {
-  return <Card><CardHeader><CardTitle>Rendimiento por curso</CardTitle></CardHeader><CardContent>{data.byCourse.length ? <><div className="grid gap-3 md:hidden">{data.byCourse.map((course) => <article key={course.courseId} className="rounded-xl border p-3"><p className="font-semibold">{course.title}</p><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-muted-foreground">Asignados</dt><dd>{course.assigned}</dd></div><div><dt className="text-muted-foreground">Completados</dt><dd>{course.completed}</dd></div><div><dt className="text-muted-foreground">Progreso</dt><dd>{course.averageProgress}%</dd></div><div><dt className="text-muted-foreground">Aprobación</dt><dd>{course.passRate}%</dd></div><div><dt className="text-muted-foreground">Vencidos</dt><dd>{course.overdue}</dd></div></dl></article>)}</div><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[720px] text-sm"><thead><tr className="border-b text-left text-muted-foreground"><th className="p-3">Curso</th><th>Asignados</th><th>Completados</th><th>Progreso</th><th>Aprobación</th><th>Vencidos</th></tr></thead><tbody>{data.byCourse.map((course) => <tr key={course.courseId} className="border-b last:border-0"><td className="p-3 font-medium">{course.title}</td><td>{course.assigned}</td><td>{course.completed}</td><td>{course.averageProgress}%</td><td>{course.passRate}%</td><td>{course.overdue}</td></tr>)}</tbody></table></div></> : <p className="py-8 text-center text-muted-foreground">No hay datos para el periodo seleccionado.</p>}</CardContent></Card>;
+  const columns: Array<DataColumn<TrainingAnalyticsDto["byCourse"][number]>> = [
+    { key: "title", header: "Curso", priority: "identity", render: (row) => row.title, sortValue: (row) => row.title },
+    { key: "assigned", header: "Asignados", priority: "secondary", numeric: true, render: (row) => row.assigned, sortValue: (row) => row.assigned },
+    { key: "completed", header: "Completados", priority: "primary", numeric: true, render: (row) => row.completed, sortValue: (row) => row.completed },
+    { key: "progress", header: "Progreso medio", priority: "secondary", numeric: true, render: (row) => `${row.averageProgress} %`, sortValue: (row) => row.averageProgress },
+    { key: "pass", header: "Aprobación", priority: "secondary", numeric: true, render: (row) => `${row.passRate} %`, sortValue: (row) => row.passRate },
+    {
+      key: "overdue",
+      header: "Vencidos",
+      priority: "primary",
+      numeric: true,
+      // El vencimiento es lo que obliga a actuar: se destaca cuando lo hay.
+      render: (row) => (row.overdue > 0 ? <span className="font-medium text-status-danger">{row.overdue}</span> : row.overdue),
+      sortValue: (row) => row.overdue,
+    },
+  ];
+
+  return (
+    <PageSection title="Rendimiento por curso" description="Ordena por cualquier columna para encontrar dónde se atasca la formación.">
+      <DataView
+        rows={data.byCourse}
+        columns={columns}
+        getKey={(row) => row.courseId}
+        caption="Rendimiento por curso"
+      />
+    </PageSection>
+  );
 }
 
 function EffectivenessPanel({
@@ -217,9 +260,9 @@ function EffectivenessPanel({
     queryKey: ["training-improvements", filters.courseId],
     queryFn: () => fetchTrainingImprovements({ courseId: filters.courseId }),
   });
-  if (effectiveness.isLoading) return <AsyncState state="loading" title="Midiendo efectividad" />;
+  if (effectiveness.isLoading) return <SkeletonRows rows={5} label="Midiendo la efectividad" />;
   if (effectiveness.isError) {
-    return <AsyncState state="error" title="No fue posible medir la efectividad" description={getApiErrorMessage(effectiveness.error, "Reintenta la consulta.")} onRetry={() => effectiveness.refetch()} />;
+    return <ErrorState title="No fue posible medir la efectividad" detail={getApiErrorMessage(effectiveness.error, "Reintenta la consulta para continuar.")} onRetry={() => void effectiveness.refetch()} />;
   }
   if (!effectiveness.data) return null;
   const data = effectiveness.data;
@@ -236,12 +279,16 @@ function EffectivenessPanel({
           <Badge variant="secondary">{data.summary.openSignals} señales</Badge>
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <EffectivenessMetric icon={Activity} label="Salud promedio" value={`${data.summary.averageHealthScore}/100`} />
-        <EffectivenessMetric icon={Target} label="Cursos medidos" value={data.summary.courses} />
-        <EffectivenessMetric icon={AlertTriangle} label="Señales abiertas" value={data.summary.openSignals} />
-        <EffectivenessMetric icon={Lightbulb} label="Mejoras registradas" value={improvements.data?.items.length ?? 0} />
-      </div>
+      <MetricRow>
+        <Metric label="Salud promedio" value={`${data.summary.averageHealthScore}`} detail="sobre 100" />
+        <Metric label="Cursos medidos" value={String(data.summary.courses)} />
+        <Metric
+          label="Señales abiertas"
+          value={String(data.summary.openSignals)}
+          tone={data.summary.openSignals > 0 ? "warning" : undefined}
+        />
+        <Metric label="Mejoras registradas" value={String(improvements.data?.items.length ?? 0)} />
+      </MetricRow>
       <div className="grid gap-4">
         {data.courses.map((course) => (
           <CourseEffectivenessCard
@@ -268,17 +315,6 @@ function EffectivenessPanel({
   );
 }
 
-function EffectivenessMetric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Activity;
-  label: string;
-  value: string | number;
-}) {
-  return <Card><CardContent className="py-5"><Icon className="size-5 text-brand" /><p className="mt-3 text-sm text-muted-foreground">{label}</p><strong className="text-3xl">{value}</strong></CardContent></Card>;
-}
 
 function CourseEffectivenessCard({
   course,
@@ -287,13 +323,13 @@ function CourseEffectivenessCard({
   course: TrainingEffectivenessDto["courses"][number];
   onCreate: (signal: TrainingEffectivenessSignalDto) => void;
 }) {
-  const healthTone = course.healthScore >= 80 ? "text-emerald-600" : course.healthScore >= 60 ? "text-amber-600" : "text-red-600";
+  const healthTone = course.healthScore >= 80 ? "text-status-success" : course.healthScore >= 60 ? "text-status-warning" : "text-status-danger";
   return (
     <Card>
       <CardHeader className="border-b bg-muted/25">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div><CardTitle>{course.title}</CardTitle><p className="mt-1 text-sm text-muted-foreground">Versión {course.version} · confianza {course.confidence === "HIGH" ? "alta" : course.confidence === "MEDIUM" ? "media" : "baja"}</p></div>
-          <div className="text-right"><p className={`text-4xl font-bold ${healthTone}`}>{course.healthScore}</p><p className="text-xs text-muted-foreground">índice de salud</p></div>
+          <div className="text-right"><p className={`font-mono text-4xl font-semibold tabular-figures ${healthTone}`}>{course.healthScore}</p><p className="text-xs text-muted-foreground">índice de salud sobre 100</p></div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5 py-5">
@@ -311,14 +347,14 @@ function CourseEffectivenessCard({
           <div className="space-y-2">
             <h3 className="text-sm font-semibold">Señales que requieren atención</h3>
             {course.signals.map((signal) => (
-              <div key={signal.code} className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 md:flex-row md:items-center">
-                <AlertTriangle className={signal.severity === "CRITICAL" ? "size-5 shrink-0 text-red-600" : "size-5 shrink-0 text-amber-600"} />
-                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong>{signal.title}</strong><Badge variant={signal.severity === "CRITICAL" ? "destructive" : "secondary"}>{signal.severity}</Badge></div><p className="text-sm text-muted-foreground">{signal.detail} {signal.recommendation}</p></div>
+              <div key={signal.code} className={`flex flex-col gap-3 rounded-md border p-4 md:flex-row md:items-center ${signal.severity === "CRITICAL" ? "border-status-danger/40 bg-status-danger/5" : "border-status-warning/40 bg-status-warning/5"}`}>
+                <AlertTriangle className={signal.severity === "CRITICAL" ? "size-5 shrink-0 text-status-danger" : "size-5 shrink-0 text-status-warning"} aria-hidden="true" />
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong>{signal.title}</strong><StatusBadge size="sm" tone={severityTone(signal.severity)} label={`Severidad ${severityLabel(signal.severity).toLocaleLowerCase("es")}`} /></div><p className="text-sm text-muted-foreground">{signal.detail} {signal.recommendation}</p></div>
                 <Button size="sm" variant="secondary" onClick={() => onCreate(signal)}><Lightbulb className="size-4" />Crear mejora</Button>
               </div>
             ))}
           </div>
-        ) : <p className="rounded-xl bg-emerald-500/10 p-4 text-sm text-emerald-700">No se detectaron señales con evidencia suficiente para este periodo.</p>}
+        ) : <InlineNote tone="success" title="Sin señales de alerta">No se detectaron señales con evidencia suficiente en este periodo.</InlineNote>}
         {course.lessonJourney.length ? (
           <div>
             <h3 className="mb-3 text-sm font-semibold">Recorrido por lección</h3>
@@ -326,8 +362,17 @@ function CourseEffectivenessCard({
               {course.lessonJourney.map((lesson) => (
                 <div key={lesson.lessonId} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[minmax(180px,1fr)_minmax(180px,2fr)_90px] md:items-center">
                   <span className="truncate text-sm font-medium">{lesson.title}</span>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${lesson.completionRate}%` }} /></div>
-                  <span className={lesson.dropOffRate >= 20 ? "text-sm font-semibold text-red-600" : "text-sm text-muted-foreground"}>{lesson.completionRate}% · -{lesson.dropOffRate}%</span>
+                  <div
+                    className="h-2 overflow-hidden rounded-full bg-surface-3"
+                    role="progressbar"
+                    aria-valuenow={lesson.completionRate}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Finalización de ${lesson.title}`}
+                  >
+                    <div className="h-full rounded-full bg-accent-fill" style={{ width: `${lesson.completionRate}%` }} />
+                  </div>
+                  <span className={lesson.dropOffRate >= 20 ? "font-mono text-sm font-semibold tabular-figures text-status-danger" : "font-mono text-sm tabular-figures text-muted-foreground"}>{lesson.completionRate} % · abandono {lesson.dropOffRate} %</span>
                 </div>
               ))}
             </div>
@@ -380,13 +425,13 @@ function ImprovementBacklog({
         <div className="flex items-center justify-between gap-3"><div><CardTitle>Pendientes de mejora</CardTitle><p className="text-sm text-muted-foreground">Convierte evidencia en acciones con responsable y criterio de cierre.</p></div><Button size="sm" onClick={onCreate}><Lightbulb className="size-4" />Nueva mejora</Button></div>
       </CardHeader>
       <CardContent>
-        {loading ? <AsyncState state="loading" /> : items.length ? (
+        {loading ? <SkeletonRows rows={4} label="Cargando las iniciativas de mejora" /> : items.length ? (
           <div className="space-y-3">
             {items.map((item) => {
               const nextAction = next[item.status];
               return (
                 <div key={item.id} className="grid gap-3 rounded-xl border p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-center">
-                  <div><div className="flex flex-wrap items-center gap-2"><strong>{item.title}</strong><Badge variant={item.priority === "CRITICAL" ? "destructive" : "secondary"}>{item.priority}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{item.course.title} · {item.owner ? `${item.owner.firstName} ${item.owner.lastName}` : "Sin responsable"}{item.dueAt ? ` · vence ${new Date(item.dueAt).toLocaleDateString("es")}` : ""}</p></div>
+                  <div><div className="flex flex-wrap items-center gap-2"><strong>{item.title}</strong><StatusBadge size="sm" tone={severityTone(item.priority)} label={`Prioridad ${severityLabel(item.priority).toLocaleLowerCase("es")}`} /></div><p className="mt-1 text-sm text-muted-foreground">{item.course.title} · {item.owner ? `${item.owner.firstName} ${item.owner.lastName}` : "Sin responsable"}{item.dueAt ? ` · vence ${new Date(item.dueAt).toLocaleDateString("es")}` : ""}</p></div>
                   <Badge variant={item.status === "COMPLETED" ? "success" : "secondary"}>{improvementStatusLabels[item.status]}</Badge>
                   <div className="flex gap-2">
                     {nextAction ? <Button size="sm" variant="secondary" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: item.id, status: nextAction.status })}>{nextAction.label}</Button> : null}
@@ -397,7 +442,7 @@ function ImprovementBacklog({
               );
             })}
           </div>
-        ) : <p className="py-8 text-center text-sm text-muted-foreground">No hay iniciativas registradas para este filtro.</p>}
+        ) : <EmptyState reason="no-matches" title="No hay iniciativas con estos filtros" description="Cambia el curso, la sucursal o el periodo, o crea una mejora a partir de una señal." />}
       </CardContent>
       <CompleteImprovementDialog key={completing?.id ?? "none"} improvement={completing} open={Boolean(completing)} onOpenChange={(open) => !open && setCompleting(null)} onComplete={(outcomeNotes) => completing && mutation.mutate({ id: completing.id, status: "COMPLETED", outcomeNotes })} pending={mutation.isPending} />
     </Card>
@@ -474,11 +519,65 @@ function CompleteImprovementDialog({
   pending: boolean;
 }) {
   const [notes, setNotes] = useState("");
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Cerrar mejora</DialogTitle><DialogDescription>{improvement?.title}. Documenta el resultado para conservar evidencia verificable.</DialogDescription></DialogHeader><div><Label htmlFor="outcome-notes">Resultado observado</Label><textarea id="outcome-notes" className="min-h-28 w-full rounded-xl border bg-background p-3 text-base sm:text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Describe qué cambió y cómo se verificó…" /></div><Button disabled={notes.trim().length < 10 || pending} onClick={() => onComplete(notes)}>{pending ? "Cerrando…" : "Confirmar cierre"}</Button></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Cerrar mejora</DialogTitle><DialogDescription>{improvement?.title}. Documenta el resultado para conservar evidencia verificable.</DialogDescription></DialogHeader><div><Label htmlFor="outcome-notes">Resultado observado</Label><textarea id="outcome-notes" className="min-h-28 w-full rounded-xl border bg-background p-3 text-base sm:text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Describe qué cambió y cómo se verificó…" /></div><Button disabled={notes.trim().length < 10} loading={pending} loadingLabel="Cerrando…" onClick={() => onComplete(notes)}>{"Confirmar cierre"}</Button></DialogContent></Dialog>;
 }
 
+const COMPLIANCE_LIMIT = 100;
+
 function ComplianceMatrix({ data }: { data: TrainingAnalyticsDto }) {
-  return <Card><CardHeader><CardTitle>Matriz de cumplimiento</CardTitle></CardHeader><CardContent><div className="grid gap-3">{data.compliance.slice(0, 100).map((row) => <div key={row.assignmentId} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[1.2fr_1fr_160px_100px] md:items-center"><div><strong>{row.learnerName}</strong><p className="text-xs text-muted-foreground">{row.email} · {row.branch}</p></div><div><p className="font-medium">{row.courseTitle}</p><p className="text-xs text-muted-foreground">{row.dueAt ? `Vence ${new Date(row.dueAt).toLocaleDateString("es")}` : "Sin vencimiento"}</p></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary" style={{ width: `${row.progressPercent}%` }} /></div><Badge variant={row.status === "COMPLETED" ? "success" : row.status === "OVERDUE" ? "destructive" : "secondary"}>{statusLabels[row.status]}</Badge></div>)}</div></CardContent></Card>;
+  const shown = data.compliance.slice(0, COMPLIANCE_LIMIT);
+  const truncated = data.compliance.length > COMPLIANCE_LIMIT;
+
+  const columns: Array<DataColumn<TrainingAnalyticsDto["compliance"][number]>> = [
+    {
+      key: "learner",
+      header: "Persona",
+      priority: "identity",
+      render: (row) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium text-ink-1">{row.learnerName}</p>
+          <p className="truncate text-2xs text-ink-3">{row.email} · {row.branch}</p>
+        </div>
+      ),
+      sortValue: (row) => row.learnerName,
+    },
+    { key: "course", header: "Curso", priority: "secondary", render: (row) => row.courseTitle, sortValue: (row) => row.courseTitle },
+    {
+      key: "due",
+      header: "Vencimiento",
+      priority: "secondary",
+      render: (row) => (row.dueAt ? formatDateTime(row.dueAt) : "Sin vencimiento"),
+      sortValue: (row) => row.dueAt ?? "",
+    },
+    {
+      key: "progress",
+      header: "Avance",
+      priority: "primary",
+      numeric: true,
+      render: (row) => <span className="font-mono tabular-figures">{row.progressPercent} %</span>,
+      sortValue: (row) => row.progressPercent,
+    },
+    {
+      key: "status",
+      header: "Estado",
+      priority: "primary",
+      render: (row) => <StatusBadge size="sm" tone={progressStatusTone(row.status)} label={statusLabels[row.status]} />,
+      sortValue: (row) => row.status,
+    },
+  ];
+
+  return (
+    <PageSection
+      title="Matriz de cumplimiento"
+      description={
+        truncated
+          ? `Las primeras ${COMPLIANCE_LIMIT} asignaciones, de ${data.compliance.length}. Afina los filtros o exporta el CSV para verlas todas.`
+          : "Cada asignación con su avance y su fecha límite."
+      }
+    >
+      <DataView rows={shown} columns={columns} getKey={(row) => row.assignmentId} caption="Matriz de cumplimiento" />
+    </PageSection>
+  );
 }
 
 function CompliancePolicyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {

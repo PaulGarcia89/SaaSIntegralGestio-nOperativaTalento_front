@@ -58,6 +58,15 @@ def limpiar(f):
 
 def esp(t): return bool(ACENTOS.search(t) or PALABRAS.search(t))
 
+# Archivos cuyo español NO llega a pantalla en el idioma de la persona:
+#  · `mock-data`/`mock-backend`: datos de demostración; solo se cargan con
+#    NEXT_PUBLIC_ENABLE_MOCK_BACKEND fuera de producción.
+#  · `navigation.ts`: las etiquetas son la CLAVE (`nav.<etiqueta>`) y el
+#    respaldo; su traducción vive en el diccionario y la cubre
+#    `navigation-i18n.test.ts`.
+FUERA_DE_PANTALLA = ("lib/mock-data.ts", "lib/mock-backend.ts", "lib/navigation.ts")
+
+
 def contar(f):
     n = 0
     for m in re.finditer(r'>([^<>{}\n]{2,})<', f):
@@ -76,7 +85,7 @@ for raiz, dirs, fs in os.walk("src"):
         p = os.path.join(raiz, f)
         crudo = unicodedata.normalize("NFC", io.open(p, encoding="utf-8").read())
         fuentes[p] = crudo
-        propio[p] = contar(limpiar(crudo))
+        propio[p] = 0 if p.replace(os.sep, "/").endswith(FUERA_DE_PANTALLA) else contar(limpiar(crudo))
 
 def resolver(spec):
     if not spec.startswith("@/"): return None

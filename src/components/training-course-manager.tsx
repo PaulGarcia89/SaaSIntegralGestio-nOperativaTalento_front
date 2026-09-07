@@ -439,7 +439,7 @@ function CategoryFormDialog({
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title="Nueva categoría" description="Agrupa cursos y crea subcategorías para facilitar su descubrimiento.">
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (name.trim()) create.mutate(); }}>
-        <FormErrorSummary serverError={create.error} />
+        <FormErrorSummary subject="el curso" serverError={create.error} />
         <FormField id="category-name" label="Nombre" required>
           {(field) => <Input {...field} value={name} onChange={(event) => setName(event.target.value)} />}
         </FormField>
@@ -643,7 +643,7 @@ export function TrainingCourseCreatePage() {
       <CardHeader><CardTitle>Información inicial</CardTitle></CardHeader>
       <CardContent>
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); if (!errors.length) create.mutate(); }}>
-          <FormErrorSummary errors={errors} serverError={create.error} />
+          <FormErrorSummary subject="el curso" errors={errors} serverError={create.error} />
           <FormField id="course-title" label="Título del curso" description="Usa un nombre claro para que las personas lo encuentren fácilmente." required>
             {(field) => <Input {...field} autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ej. Seguridad básica en el trabajo" />}
           </FormField>
@@ -769,7 +769,7 @@ function CourseMetadataForm({
 
   return (
     <form className="space-y-4" onSubmit={submit}>
-      <FormErrorSummary errors={errors} serverError={save.error} />
+      <FormErrorSummary subject="el curso" errors={errors} serverError={save.error} />
       <FormField id="course-title" label="Título" required>
         {(field) => <Input {...field} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />}
       </FormField>
@@ -1080,7 +1080,7 @@ function CertificationWizardStep({ course, onChanged, onContinue }: { course: Tr
       <CardHeader><CardTitle>Certificación, vigencia y renovación</CardTitle></CardHeader>
       <CardContent>
         <form key={policy.version} className="space-y-5" onSubmit={submit}>
-          <FormErrorSummary serverError={save.error} />
+          <FormErrorSummary subject="el curso" serverError={save.error} />
           {!query.data.readiness.ready && policy.isEnabled ? <InlineFeedback tone="warning" title="Configuración incompleta">{query.data.readiness.errors.join(" · ")}</InlineFeedback> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex items-center gap-3 rounded-xl border border-border-default p-4"><input type="checkbox" name="isEnabled" defaultChecked={policy.isEnabled} /><span><strong>Emitir certificado</strong><span className="block text-sm text-text-secondary">Habilita una credencial verificable para este curso.</span></span></label>
@@ -1632,7 +1632,7 @@ function BlockFormDialog({ lessonId, block, open, onOpenChange, onSaved }: { les
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title={block ? "Editar contenido" : "Añadir contenido"} description="Configura el recurso, la actividad o la evaluación con criterios claros para el participante.">
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (value.trim()) save.mutate(); }}>
-        <FormErrorSummary serverError={save.error} />
+        <FormErrorSummary subject="el curso" serverError={save.error} />
         <FormField id="block-type" label="Tipo">{(field) => <Select value={type} onValueChange={(next) => { setType(next as TrainingContentBlockType); setValue(""); }}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent>{Object.entries(blockLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>}</FormField>
         <FormField id="block-title" label="Título">{(field) => <Input {...field} value={title} onChange={(event) => setTitle(event.target.value)} />}</FormField>
         <FormField id="block-value" label={valueLabel} required>{(field) => resource || type === "QUIZ" ? <Input {...field} type={resource ? "url" : "text"} value={value} onChange={(event) => setValue(event.target.value)} /> : <textarea {...field} className="min-h-32 w-full rounded-2xl border border-border-default bg-surface-elevated p-4" value={value} onChange={(event) => setValue(event.target.value)} />}</FormField>

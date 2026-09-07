@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { ErrorState } from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
+/**
+ * Fallo no controlado en cualquier punto de la aplicación.
+ *
+ * El icono estaba dentro de un degradado `from-amber-100 to-rose-100` con su
+ * variante oscura escrita a mano: dos colores crudos que no pertenecen a la
+ * paleta y que no existen en ninguna otra pantalla del producto. Es además la
+ * pantalla que aparece justo cuando algo ha fallado, o sea el peor momento
+ * para que el producto deje de parecerse a sí mismo.
+ */
 export default function Error({
   error,
   reset,
@@ -17,34 +25,18 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-6">
-      <Card className="w-full max-w-lg border-border/70 bg-card/85 shadow-lg">
-        <CardContent className="flex flex-col items-center gap-6 px-6 py-12 text-center">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 dark:from-amber-900/30 dark:to-rose-900/30">
-            <AlertTriangle className="size-8 text-destructive" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Algo salió mal</h1>
-            <p className="text-sm leading-7 text-muted-foreground">
-              Ocurrió un error inesperado al cargar esta vista. Puedes intentar recargar o volver al panel.
-            </p>
-            {error.digest ? (
-              <p className="mt-2 rounded-xl bg-secondary/60 px-3 py-2 font-mono text-xs text-muted-foreground">
-                {error.digest}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex gap-3">
-            <Button onClick={reset}>
-              <RefreshCw className="size-4" />
-              Reintentar
-            </Button>
-            <Button asChild variant="secondary">
-              <a href="/dashboard">Volver al panel</a>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-4 px-4 py-6">
+      <ErrorState
+        title="Algo salió mal"
+        detail="Ocurrió un error inesperado al cargar esta vista. Puedes reintentar o volver al panel."
+        requestId={error.digest}
+        onRetry={reset}
+      />
+      <div className="flex justify-center">
+        <Button asChild variant="secondary">
+          <a href="/dashboard">Volver al panel</a>
+        </Button>
+      </div>
     </main>
   );
 }

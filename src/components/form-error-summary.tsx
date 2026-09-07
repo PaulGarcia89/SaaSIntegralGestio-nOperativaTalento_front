@@ -1,15 +1,32 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { ApiError } from "@/lib/backend";
+import { InlineNote } from "@/components/system";
 
 export type FormSummaryError = { fieldId: string; label: string; message: string };
 
-function getServerFormTitle(error: unknown, context: "form" | "authentication") {
+/**
+ * Resumen de errores de un formulario.
+ *
+ * Tenía un defecto que se leía en pantalla: los títulos decían «vacante»
+ * siempre. Este componente lo usan cuatro formularios —vacantes, alta de
+ * empresa, inicio de sesión y creación de cursos—, así que al registrar una
+ * empresa y fallar el servidor aparecía «El servidor no pudo guardar la
+ * vacante», y al no tener permiso, «No tienes permiso para guardar esta
+ * vacante». Ahora el asunto del formulario es una prop y por defecto es
+ * neutro.
+ *
+ * El aviso de éxito estaba pintado con `border-emerald-300 bg-emerald-50
+ * text-emerald-950`: un recuadro verde claro fijo, que en tema oscuro
+ * aparecía como un bloque luminoso en medio de una pantalla oscura. Ahora usa
+ * el aviso del sistema, que responde al tema.
+ */
+
+function getServerFormTitle(error: unknown, context: "form" | "authentication", subject: string) {
   if (context === "authentication") return "No pudimos iniciar sesión";
-  if (error instanceof ApiError && error.status >= 500) return "El servidor no pudo guardar la vacante";
-  if (error instanceof ApiError && error.status === 403) return "No tienes permiso para guardar esta vacante";
+  if (error instanceof ApiError && error.status >= 500) return `El servidor no pudo guardar ${subject}`;
+  if (error instanceof ApiError && error.status === 403) return `No tienes permiso para guardar ${subject}`;
   return "Revisa el formulario";
 }
 
@@ -32,14 +49,56 @@ export function getServerFormMessage(error: unknown, context: "form" | "authenti
   return error.message || fallback;
 }
 
-export function FormErrorSummary({ errors, serverError, success, context = "form" }: { errors?: FormSummaryError[]; serverError?: unknown; success?: string; context?: "form" | "authentication" }) {
+export function FormErrorSummary({
+  errors,
+  serverError,
+  success,
+  context = "form",
+  subject = "los cambios",
+}: {
+  errors?: FormSummaryError[];
+  serverError?: unknown;
+  success?: string;
+  context?: "form" | "authentication";
+  /** Qué se está guardando, en minúscula y con artículo: "la vacante", "el curso". */
+  subject?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const hasError = Boolean(errors?.length || serverError);
-  useEffect(() => { if (hasError) ref.current?.focus(); }, [hasError]);
-  if (success) return <div className="flex gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950" role="status"><CheckCircle2 className="size-5 shrink-0" />{success}</div>;
+  useEffect(() => {
+    if (hasError) ref.current?.focus();
+  }, [hasError]);
+
+  if (success) {
+    return <InlineNote tone="success" title={success} />;
+  }
   if (!hasError) return null;
-  return <div ref={ref} tabIndex={-1} className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 outline-none focus-visible:ring-2 focus-visible:ring-destructive" role="alert" aria-labelledby="form-errors-title">
-    <div className="flex gap-3"><AlertCircle className="size-5 shrink-0 text-destructive" /><div><h2 id="form-errors-title" className="font-semibold">{serverError ? getServerFormTitle(serverError, context) : "Revisa el formulario"}</h2>{serverError ? <p className="mt-1 text-sm text-muted-foreground">{getServerFormMessage(serverError, context)}</p> : null}</div></div>
-    {errors?.length ? <ul className="mt-3 list-disc space-y-1 pl-8 text-sm">{errors.map((error) => <li key={error.fieldId}><a href={`#${error.fieldId}`} onClick={() => document.getElementById(error.fieldId)?.focus()} className="underline underline-offset-2">{error.label}: {error.message}</a></li>)}</ul> : null}
-  </div>;
+
+  return (
+    <div ref={ref} tabIndex={-1} className="outline-none">
+      <InlineNote
+        tone="danger"
+        title={serverError ? getServerFormTitle(serverError, context, subject) : "Revisa el formulario"}
+      >
+        {serverError ? <p>{getServerFormMessage(serverError, context)}</p> : null}
+        {errors?.length ? (
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {errors.map((error) => (
+              <li key={error.fieldId}>
+                {/* El enlace lleva el foco al campo: sin esto, en un formulario
+                    largo hay que buscar a mano cuál falló. */}
+                <a
+                  href={`#${error.fieldId}`}
+                  onClick={() => document.getElementById(error.fieldId)?.focus()}
+                  className="underline underline-offset-2"
+                >
+                  {error.label}: {error.message}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </InlineNote>
+    </div>
+  );
 }

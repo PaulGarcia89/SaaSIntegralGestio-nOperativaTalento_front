@@ -892,7 +892,7 @@ export default function OnboardingDocumentsPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Rechazar documento</DialogTitle><DialogDescription>{reviewDocument?.originalName}. La observación quedará visible y auditada.</DialogDescription></DialogHeader>
           <div className="space-y-4">
-            <div><Label htmlFor="document-rejection-reason">Motivo y observaciones</Label><textarea id="document-rejection-reason" rows={5} maxLength={1000} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-sm" /></div>
+            <div><Label htmlFor="document-rejection-reason">Motivo y observaciones</Label><textarea id="document-rejection-reason" rows={5} maxLength={1000} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-base sm:text-sm" /></div>
             <Button variant="destructive" className="w-full" disabled={!reviewReason.trim() || review.isPending} onClick={() => reviewDocument && review.mutate({ id: reviewDocument.id, status: "REJECTED", reason: reviewReason.trim() })}>Confirmar rechazo</Button>
           </div>
         </DialogContent>
@@ -1203,7 +1203,7 @@ export default function OnboardingDocumentsPage() {
                 value={blockingObservations}
                 placeholder="Describe qué falta, quién debe intervenir y cualquier dato útil para resolver el bloqueo."
                 onChange={(event) => setBlockingObservations(event.target.value)}
-                className="w-full rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 text-sm outline-none transition focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30"
+                className="w-full rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 text-base sm:text-sm outline-none transition focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30"
               />
               <p className="text-xs text-text-secondary">
                 Esta observación quedará visible en el checklist y registrada en el timeline.
@@ -1389,7 +1389,7 @@ function TemplateTaskEditor({
             rows={2}
             value={task.description ?? ""}
             onChange={(event) => onChange({ description: event.target.value })}
-            className="w-full rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 text-sm outline-none transition focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30"
+            className="w-full rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 text-base sm:text-sm outline-none transition focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30"
           />
         </div>
 
@@ -1540,7 +1540,7 @@ function RuntimeTaskDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div><Label htmlFor="runtime-task-title">Título</Label><Input id="runtime-task-title" value={task.title} onChange={(event) => update({ title: event.target.value })} /></div>
-          <div><Label htmlFor="runtime-task-description">Descripción</Label><textarea id="runtime-task-description" rows={3} value={task.description ?? ""} onChange={(event) => update({ description: event.target.value })} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-sm" /></div>
+          <div><Label htmlFor="runtime-task-description">Descripción</Label><textarea id="runtime-task-description" rows={3} value={task.description ?? ""} onChange={(event) => update({ description: event.target.value })} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-base sm:text-sm" /></div>
           <div><Label>Tipo</Label><Select value={task.taskType} onValueChange={(value) => update({ taskType: value as OnboardingTemplateTaskConfigDto["taskType"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{taskTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
           <div><Label>Responsable</Label><Select value={task.ownerType ?? "SYSTEM"} onValueChange={(value) => update({ ownerType: value as OnboardingOwnerType, ownerId: undefined })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ownerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
           {task.ownerType === "USER" ? <div><Label>Persona</Label><Select value={task.ownerId ?? ""} onValueChange={(ownerId) => update({ ownerId })}><SelectTrigger><SelectValue placeholder="Selecciona una persona" /></SelectTrigger><SelectContent>{assignableUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.name} · {user.email}</SelectItem>)}</SelectContent></Select></div> : null}

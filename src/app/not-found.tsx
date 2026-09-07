@@ -1,27 +1,27 @@
 import Link from "next/link";
-import { FileQuestion } from "lucide-react";
+import { EmptyState } from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 
+/**
+ * Ruta inexistente.
+ *
+ * El icono estaba dentro de un degradado `from-cyan-100 to-blue-100`: cian y
+ * azul, dos colores que no aparecen en ninguna otra parte del producto y que
+ * no son los de la marca elegida.
+ */
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-6">
-      <Card className="w-full max-w-lg border-border/70 bg-card/85">
-        <CardContent className="flex flex-col items-center gap-6 px-6 py-12 text-center">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-900/30 dark:to-blue-900/30">
-            <FileQuestion className="size-8 text-brand" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Página no encontrada</h1>
-            <p className="text-sm leading-7 text-muted-foreground">
-              La ruta que intentas acceder no existe o fue movida. Verifica la URL o regresa al panel principal.
-            </p>
-          </div>
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-4 px-4 py-6">
+      <EmptyState
+        reason="no-records"
+        title="Página no encontrada"
+        description="La dirección que abriste no existe o se movió. Comprueba el enlace o vuelve al panel."
+        action={
           <Button asChild>
             <Link href="/dashboard">Volver al panel</Link>
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     </main>
   );
 }

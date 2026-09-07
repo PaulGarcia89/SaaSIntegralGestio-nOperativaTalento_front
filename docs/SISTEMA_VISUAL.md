@@ -294,10 +294,38 @@ editarlas una por una, y la migración al vocabulario nuevo puede ser gradual.
 | `components/ui.tsx` → `DataTable` | `DataView` |
 | `design-system.tsx` → `InlineFeedback` | `InlineNote` |
 | `design-system.tsx` → `Wizard` | `OperationStepper` |
+| `design-system.tsx` → `ResponsiveDataView` | `DataView` |
+| `design-system.tsx` → `Pagination` (con `totalPages`) | `Pagination` (deriva las páginas del total) |
+| `components/async-state.tsx` → `AsyncState state="loading"` | `SkeletonRows` / `SkeletonBlock` |
+| `components/async-state.tsx` → `AsyncState state="error"` | `ErrorState` |
 | `simple/simple-ui.tsx` → `PhaseChip` | `StatusBadge` |
 
 Los módulos anteriores siguen existiendo y funcionando; lo que cambia es a
 dónde apuntan las pantallas nuevas.
+
+### Vocabulario: nunca volcar un enumerado del backend
+
+Un estado del servidor —`PUBLISHED`, `HEALTHY`, `DELIVERED`, `BEGINNER`— no es
+texto de interfaz. Cada módulo tiene su diccionario, con pruebas:
+
+| Módulo | Archivo |
+|---|---|
+| Inventario de restaurante | `components/restaurant-inventory-ui.tsx` |
+| Capacitación | `lib/training-labels.ts` |
+
+Tres reglas, iguales en los dos:
+
+1. El **rótulo** sale del diccionario; si el código no está, se humaniza
+   (`ESTADO_NUEVO` → «Estado nuevo»), nunca se pinta en mayúsculas ni se deja
+   vacío.
+2. El **tono** lo decide el significado, no la marca del tenant. «Aprobado»
+   pintado con el color corporativo se lee como un problema en una empresa de
+   marca roja.
+3. Un estado **desconocido** es neutro, jamás rojo: un despliegue del backend
+   no puede convertirse en una alarma falsa para toda la operación.
+
+El tono siempre viaja acompañado de la palabra (`StatusBadge` lleva icono y
+texto): el color solo no informa a quien no lo distingue.
 
 ---
 

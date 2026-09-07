@@ -255,3 +255,41 @@ export function defaultRenewalDate(cycle: unknown, from: Date = new Date()): str
   else date.setMonth(date.getMonth() + 1);
   return date.toISOString().slice(0, 10);
 }
+
+/**
+ * Nombre legible de una clave de datos técnica: `eicarDetected` →
+ * «Eicar detected», `bucket_name` → «Bucket name».
+ *
+ * La consola de plataforma volcaba las claves de la evidencia tal cual, en
+ * camelCase, como si fueran rótulos. Humanizarlas no las traduce, pero al
+ * menos deja de parecer un `console.log`.
+ */
+export function humanizeFieldKey(key: string): string {
+  const spaced = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .toLocaleLowerCase("es");
+  if (!spaced) return "Sin nombre";
+  return spaced.charAt(0).toLocaleUpperCase("es") + spaced.slice(1);
+}
+
+/** Tamaños en bytes. Un `1536` crudo no dice nada; «1,5 KB» sí. */
+export function formatBytes(value: unknown): string {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number) || number < 0) return "—";
+  if (number < 1024) return `${Math.round(number)} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  const index = Math.min(Math.floor(Math.log(number) / Math.log(1024)) - 1, units.length - 1);
+  const scaled = number / 1024 ** (index + 1);
+  return `${new Intl.NumberFormat("es", { maximumFractionDigits: index > 0 ? 2 : 1 }).format(scaled)} ${units[index]}`;
+}
+
+/** Duraciones en milisegundos, con la unidad que se lee mejor. */
+export function formatMillis(value: unknown): string {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number) || number < 0) return "—";
+  if (number < 1_000) return `${Math.round(number)} ms`;
+  if (number < 60_000) return `${new Intl.NumberFormat("es", { maximumFractionDigits: 2 }).format(number / 1_000)} s`;
+  return `${new Intl.NumberFormat("es", { maximumFractionDigits: 1 }).format(number / 60_000)} min`;
+}

@@ -11,9 +11,12 @@ import { MetricCard, SectionCard } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormSelect } from "@/components/ui/form-select";
+import { BlockedState } from "@/components/system";
+import { formatBytes, formatDateTime, formatMillis, humanizeFieldKey } from "@/lib/platform-labels";
 import {
   ApiError,
   fetchAtsStorageOperations,
+  getApiErrorMessage,
   fetchProductionIntegrationCertification,
   fetchQueueMonitoring,
   runProductionIntegrationCertification,
@@ -35,28 +38,22 @@ const refreshOptions = [
 
 function formatDate(value: string | null) {
   if (!value) return "Sin actividad";
-  return new Intl.DateTimeFormat("es", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
-function formatDuration(value: number) {
-  if (value < 1_000) return `${Math.round(value)} ms`;
-  return `${(value / 1_000).toFixed(2)} s`;
-}
+const formatDuration = formatMillis;
 
-function formatBytes(value: number) {
-  if (value < 1024) return `${value} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)) - 1, units.length - 1);
-  return `${(value / 1024 ** (index + 1)).toFixed(index > 0 ? 2 : 1)} ${units[index]}`;
-}
-
-function evidenceValue(value: unknown) {
+function evidenceValue(value: unknown): string {
   if (value === null || value === undefined) return "No informado";
   if (typeof value === "boolean") return value ? "Sí" : "No";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return value.length === 0 ? "Ninguno" : value.map(evidenceValue).join(", ");
+  // Un objeto anidado se resume en vez de volcarse como JSON: `{"a":1,"b":2}`
+  // en medio de una ficha no es información, es ruido.
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return "Sin datos";
+    return entries.map(([key, nested]) => `${humanizeFieldKey(key)}: ${evidenceValue(nested)}`).join(" · ");
+  }
   return String(value);
 }
 
@@ -123,10 +120,11 @@ export default function QueueManagementPage() {
 
   if (currentRole !== "admin_saas") {
     return (
-      <StateCard
-        tone="restricted"
-        title="Consola exclusiva de superadministración"
-        description="La supervisión global del bus y las colas requiere alcance de superadministrador."
+      <BlockedState
+        title="Sin acceso a la consola de plataforma"
+        cause="La supervisión del bus y las colas abarca la actividad de todas las empresas a la vez."
+        owner="Quien administra la plataforma"
+        resolution="Si necesitas consultarla, pide acceso de administración de plataforma."
       />
     );
   }
@@ -141,9 +139,9 @@ export default function QueueManagementPage() {
       status === 401
         ? "La sesión expiró. Inicia sesión nuevamente."
         : status === 403
-          ? "Tu sesión no tiene el permiso platform.integrations.manage."
+          ? "Tu sesión no tiene permiso para supervisar las integraciones de la plataforma."
           : status === 404
-            ? "El backend actual no expone uno o más endpoints de observabilidad."
+            ? "Esta instalación del servidor todavía no publica la supervisión del bus. Hay que actualizarla."
             : status === 429
               ? "Se alcanzó el límite de consultas. Espera antes de reintentar."
               : "El servicio de observabilidad no está disponible. Conservamos tus filtros para reintentar.";
@@ -170,12 +168,12 @@ export default function QueueManagementPage() {
       <PageHeader
         eyebrow="Gobierno de plataforma"
         title="Bus de eventos y colas"
-        description="Supervisa procesamiento, reintentos, latencia y eventos enviados a dead letter en toda la plataforma."
+        description="Procesamiento, reintentos, latencia y eventos descartados de toda la plataforma. Vista de solo lectura: desde aquí no se reintenta ni se borra nada."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:w-auto lg:flex-wrap lg:items-center">
             <FormSelect
               aria-label="Filtrar por empresa"
-              className="min-w-52"
+              className="min-w-0 lg:min-w-52"
               value={tenantId}
               onValueChange={setTenantId}
               options={[
@@ -185,14 +183,14 @@ export default function QueueManagementPage() {
             />
             <FormSelect
               aria-label="Seleccionar periodo"
-              className="min-w-44"
+              className="min-w-0 lg:min-w-44"
               value={periodHours}
               onValueChange={setPeriodHours}
               options={periodOptions}
             />
             <FormSelect
               aria-label="Configurar actualización automática"
-              className="min-w-48"
+              className="min-w-0 lg:min-w-48"
               value={refreshSeconds}
               onValueChange={setRefreshSeconds}
               options={refreshOptions}
@@ -286,7 +284,7 @@ export default function QueueManagementPage() {
                     <dl className="mt-4 space-y-2 text-xs">
                       {Object.entries(check.evidence).map(([key, value]) => (
                         <div key={key} className="flex items-start justify-between gap-4 border-t border-border/50 pt-2">
-                          <dt className="text-muted-foreground">{key}</dt>
+                          <dt className="text-muted-foreground">{humanizeFieldKey(key)}</dt>
                           <dd className="max-w-[65%] break-words text-right font-medium">{evidenceValue(value)}</dd>
                         </div>
                       ))}
@@ -300,7 +298,10 @@ export default function QueueManagementPage() {
 
           {certificationMutation.isError ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              La certificación no pudo completarse. Revisa conectividad, credenciales y logs del backend.
+              {getApiErrorMessage(
+                certificationMutation.error,
+                "La certificación no pudo completarse. Revisa conectividad y credenciales.",
+              )}
             </p>
           ) : null}
         </div>
@@ -368,13 +369,16 @@ export default function QueueManagementPage() {
           )}
 
           {storageMaintenanceMutation.isSuccess ? (
-            <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
+            <p className="rounded-lg border border-status-success/30 bg-status-success/10 px-3 py-2 text-sm text-ink-1">
               Mantenimiento completado: {storageMaintenanceMutation.data.expiredResumes ?? 0} CV y {storageMaintenanceMutation.data.expiredImages ?? 0} imágenes vencidas.
             </p>
           ) : null}
           {storageMaintenanceMutation.isError ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              No fue posible completar el mantenimiento. Revisa la conexión y los permisos del bucket.
+              {getApiErrorMessage(
+                storageMaintenanceMutation.error,
+                "No fue posible completar el mantenimiento. Revisa la conexión y los permisos del almacenamiento.",
+              )}
             </p>
           ) : null}
         </div>
@@ -383,7 +387,7 @@ export default function QueueManagementPage() {
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <MetricCard label="Eventos procesados" value={String(overview.summary.processedEvents)} detail={`${overview.summary.totalEvents} eventos recibidos`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
         <MetricCard label="Pendientes" value={String(overview.summary.pendingEvents)} detail={`${overview.summary.retryingJobs} en reintento`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
-        <MetricCard label="Fallidos" value={String(overview.summary.failedJobs)} detail={`${deadLetter.openCount} en dead letter`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
+        <MetricCard label="Fallidos" value={String(overview.summary.failedJobs)} detail={`${deadLetter.openCount} descartados sin resolver`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
         <MetricCard label="Latencia p95" value={formatDuration(overview.performance.p95ProcessingMs)} detail={`Promedio ${formatDuration(overview.performance.averageProcessingMs)}`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
       </div>
 
@@ -405,7 +409,7 @@ export default function QueueManagementPage() {
         )}
       </SectionCard>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2 [&>*]:min-w-0">
         <SectionCard title="Rendimiento por dominio" subtitle="Eventos">
           {throughput.domains.length === 0 ? (
             <StateCard tone="empty" title="Sin eventos por dominio" description="Amplía el periodo para consultar actividad histórica." />
@@ -433,7 +437,7 @@ export default function QueueManagementPage() {
               columns={[
                 { key: "tenant", header: "Empresa", render: (tenant) => tenant.tenantName },
                 { key: "failed", header: "Fallidos", sortable: true, render: (tenant) => tenant.failed, sortValue: (tenant) => tenant.failed },
-                { key: "dead", header: "Dead letter", sortable: true, render: (tenant) => tenant.deadLetter, sortValue: (tenant) => tenant.deadLetter },
+                { key: "dead", header: "Descartados", sortable: true, render: (tenant) => tenant.deadLetter, sortValue: (tenant) => tenant.deadLetter },
                 { key: "last", header: "Último error", render: (tenant) => formatDate(tenant.lastErrorAt) },
               ]}
             />
@@ -441,9 +445,16 @@ export default function QueueManagementPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Dead letter" subtitle={`${deadLetter.openCount} abiertos`}>
+      <SectionCard
+        title="Eventos descartados"
+        subtitle={`${deadLetter.openCount} sin resolver · cola «dead letter»`}
+      >
         {deadLetter.events.length === 0 ? (
-          <StateCard tone="empty" title="Sin eventos en dead letter" description="No hay eventos pendientes de revisión." />
+          <StateCard
+            tone="empty"
+            title="Ningún evento fue descartado"
+            description="Todo lo que entró a la cola acabó procesándose o sigue en reintento."
+          />
         ) : (
           <DomainTable
             exportable
@@ -465,15 +476,27 @@ export default function QueueManagementPage() {
         </p>
       </SectionCard>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <SectionCard title="Eventos y trazabilidad" subtitle="Endpoint pendiente">
-          <StateCard tone="empty" title="Función no disponible" description="Falta GET /api/admin/event-bus/events y su detalle para consultar payload sanitizado, intentos y correlation ID." />
+      <div className="grid min-w-0 gap-6 xl:grid-cols-3 [&>*]:min-w-0">
+        <SectionCard title="Eventos y trazabilidad" subtitle="Todavía no disponible">
+          <StateCard
+            tone="empty"
+            title="No se puede seguir un evento concreto"
+            description="Para ver el contenido de un evento, sus intentos y su identificador de correlación hace falta una versión del servidor que todavía no está desplegada."
+          />
         </SectionCard>
-        <SectionCard title="Consumidores" subtitle="Endpoint pendiente">
-          <StateCard tone="empty" title="Función no disponible" description="Falta GET /api/admin/event-bus/consumers para mostrar instancias, concurrencia, throughput y heartbeat." />
+        <SectionCard title="Consumidores" subtitle="Todavía no disponible">
+          <StateCard
+            tone="empty"
+            title="No se pueden ver los procesos que consumen la cola"
+            description="Cuántas instancias hay, cuánto procesan y cuándo dieron señal de vida requiere una versión del servidor que todavía no está desplegada."
+          />
         </SectionCard>
-        <SectionCard title="Auditoría operativa" subtitle="Endpoint pendiente">
-          <StateCard tone="empty" title="Función no disponible" description="Falta GET /api/admin/event-bus/audit. No se simulan acciones ni registros de auditoría." />
+        <SectionCard title="Auditoría operativa" subtitle="Todavía no disponible">
+          <StateCard
+            tone="empty"
+            title="No hay auditoría de las acciones sobre la cola"
+            description="Requiere una versión del servidor que todavía no está desplegada. No se muestra nada inventado mientras tanto."
+          />
         </SectionCard>
       </div>
     </div>

@@ -19,6 +19,9 @@ import {
   defaultRenewalDate,
   planCatalogCode,
   planLimitBreaches,
+  formatBytes,
+  formatMillis,
+  humanizeFieldKey,
 } from "@/lib/platform-labels";
 
 describe("cobertura del contrato", () => {
@@ -190,5 +193,46 @@ describe("fecha de renovación por defecto", () => {
 
   it("un ciclo desconocido se trata como mensual", () => {
     expect(defaultRenewalDate("quincenal", new Date("2026-03-15T00:00:00.000Z"))).toBe("2026-04-15");
+  });
+});
+
+describe("claves técnicas legibles", () => {
+  it("separa camelCase", () => {
+    expect(humanizeFieldKey("eicarDetected")).toBe("Eicar detected");
+    expect(humanizeFieldKey("bucketName")).toBe("Bucket name");
+  });
+
+  it("trata los guiones y los guiones bajos igual", () => {
+    expect(humanizeFieldKey("bucket_name")).toBe("Bucket name");
+    expect(humanizeFieldKey("bucket-name")).toBe("Bucket name");
+  });
+
+  it("no devuelve cadena vacía", () => {
+    expect(humanizeFieldKey("  ")).toBe("Sin nombre");
+  });
+});
+
+describe("tamaños", () => {
+  it("usa la unidad que se lee mejor", () => {
+    expect(formatBytes(512)).toBe("512 B");
+    expect(formatBytes(1536)).toContain("KB");
+    expect(formatBytes(5 * 1024 ** 3)).toContain("GB");
+  });
+
+  it("un valor inválido no imprime NaN", () => {
+    expect(formatBytes(undefined)).toBe("—");
+    expect(formatBytes(-5)).toBe("—");
+  });
+});
+
+describe("duraciones", () => {
+  it("milisegundos, segundos y minutos según convenga", () => {
+    expect(formatMillis(320)).toBe("320 ms");
+    expect(formatMillis(2500)).toContain("s");
+    expect(formatMillis(180000)).toContain("min");
+  });
+
+  it("un valor inválido no imprime NaN", () => {
+    expect(formatMillis("hola")).toBe("—");
   });
 });

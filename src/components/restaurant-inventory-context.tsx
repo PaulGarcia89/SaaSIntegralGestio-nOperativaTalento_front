@@ -5,6 +5,7 @@ import { Rows3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchRestaurantWarehouses, getApiErrorMessage } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
+import { confirmAction } from "@/components/confirm-action";
 import { InlineFeedback } from "@/components/design-system";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,16 +85,43 @@ export function useRestaurantInventoryContext() {
 export function RestaurantInventoryContextBar() {
   const { currentBranch, tenantBranches, setCurrentBranchId } = useAppStore();
   const { warehouseId, warehouses, setWarehouseId, hasPendingChanges, setHasPendingChanges, warehouseName, compactMode, toggleCompactMode, isLoading, error } = useRestaurantInventoryContext();
-  const confirmContextChange = () => !hasPendingChanges || window.confirm("Hay cambios sin guardar en este flujo. ¿Cambiar de ubicación y descartarlos?");
+  /**
+   * Cambiar de sucursal o de almacén descarta lo que se esté registrando.
+   *
+   * Era el último `window.confirm` del producto, y encima el peor sitio para
+   * uno: la barra de contexto vive en TODAS las pantallas del módulo, así que
+   * cualquiera que tocase el selector con un consumo a medias veía una caja
+   * gris del sistema operativo preguntando por «esta ubicación». Ahora dice
+   * qué se pierde y el botón nombra la acción.
+   */
+  const guard = (perform: () => void) => {
+    if (!hasPendingChanges) {
+      perform();
+      return;
+    }
+    void confirmAction({
+      title: "Tienes cambios sin guardar",
+      description: "Estás en mitad de un registro que todavía no se ha confirmado.",
+      consequence: "Si cambias de contexto ahora, lo que llevas escrito se descarta y hay que empezarlo de nuevo.",
+      confirmLabel: "Descartar y cambiar",
+      cancelLabel: "Seguir donde estoy",
+    }).then((ok) => {
+      if (ok) perform();
+    });
+  };
   const changeBranch = (id: string) => {
-    if (id === currentBranch?.id || !confirmContextChange()) return;
-    setHasPendingChanges(false);
-    void setCurrentBranchId(id);
+    if (id === currentBranch?.id) return;
+    guard(() => {
+      setHasPendingChanges(false);
+      void setCurrentBranchId(id);
+    });
   };
   const changeWarehouse = (id: string) => {
-    if (id === warehouseId || !confirmContextChange()) return;
-    setHasPendingChanges(false);
-    setWarehouseId(id);
+    if (id === warehouseId) return;
+    guard(() => {
+      setHasPendingChanges(false);
+      setWarehouseId(id);
+    });
   };
   const location = (warehouse: Warehouse) => warehouse.location ?? warehouse.address ?? ([warehouse.city, warehouse.state].filter(Boolean).join(", ") || "Ubicación no registrada");
   return <div className="sticky top-2 z-20 space-y-3">

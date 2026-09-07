@@ -7,6 +7,7 @@ import { AppStoreProvider } from "@/store/app-store";
 import { DemoModeBanner } from "@/components/integration-state";
 import { UnsavedChangesProvider } from "@/hooks/use-unsaved-changes";
 import { LocaleProvider } from "@/components/locale-provider";
+import { ConfirmActionHost } from "@/components/confirm-action";
 import { AppearanceProvider, useAppearance } from "@/components/appearance";
 
 /**
@@ -61,6 +62,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <UnsavedChangesProvider>
               <DemoModeBanner />
               {children}
+              <ConfirmActionHost />
             </UnsavedChangesProvider>
             <AppToaster />
           </AppStoreProvider>

@@ -33,6 +33,9 @@
    ========================================================================== */
 
 @theme inline {
+  /* Heredado: varias pantallas dependen de este interletraje. */
+  --tracking-tight: -0.021em;
+
   /* ---- Tipografía ------------------------------------------------------- */
   --font-sans: var(--font-body);
   --font-display: var(--font-display-family);
@@ -497,95 +500,114 @@
    BASE
    ========================================================================== */
 
-*,
-*::before,
-*::after {
-  border-color: hsl(var(--line-1));
+/* Las reglas de elemento van DENTRO de `@layer base`.
+
+   Sin capa ganaban a todas las utilidades de Tailwind, que viven en
+   `@layer utilities`: una regla sin capa gana a cualquier capa sea cual sea
+   su especificidad. Así, `h1..h6 { color }` anulaba todo `text-*` sobre un
+   titular —el titular del hero de la portada salía casi negro sobre fondo
+   oscuro— y `* { border-color }` pintaba del mismo gris los bordes ámbar de
+   acción y los rojos de peligro. Dentro de `base` el valor sigue siendo el
+   predeterminado y la utilidad puede cambiarlo, que es lo que se esperaba. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: hsl(var(--line-1));
+  }
+
+  html {
+    scroll-behavior: smooth;
+    background: hsl(var(--canvas));
+    /* Evita que iOS agrande el texto al girar el teléfono. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100svh;
+    min-width: 320px;
+    overflow-x: hidden;
+    color: hsl(var(--ink-1));
+    font-family: var(--font-body), sans-serif;
+    font-size: var(--type-base);
+    line-height: var(--type-base-lh);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: start;
+    /* Profundidad sutil: una sola luz fría arriba a la izquierda y un velo cálido
+       casi imperceptible. Sin `background-attachment: fixed`, que en Safari de
+       iOS repinta en cada desplazamiento. */
+    background-color: hsl(var(--canvas));
+    background-image:
+      radial-gradient(80rem 40rem at 12% -10%, hsl(var(--accent-fill) / 0.05), transparent 60%),
+      linear-gradient(180deg, hsl(var(--surface-2) / 0.7) 0%, transparent 24rem);
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(80rem 42rem at 12% -12%, hsl(var(--accent-fill) / 0.07), transparent 62%),
+      linear-gradient(180deg, hsl(var(--surface-2) / 0.55) 0%, transparent 28rem);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display-family), sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.021em;
+    /* `anywhere` no solo parte la palabra donde sea: pone a cero el ancho
+       mínimo de contenido, así que un contenedor flex o grid puede aplastar el
+       elemento hasta dejarlo en nada y el texto acaba apilado una letra por
+       línea. `break-word` parte lo que de verdad no cabe y respeta el mínimo. */
+    overflow-wrap: break-word;
+    text-wrap: balance;
+    /* Sin `color`. Un titular hereda la tinta de su contenedor, que es lo que
+       hace que el mismo componente funcione sobre superficie clara y sobre
+       superficie oscura. Fijarlo aquí rompía la herencia: el titular del
+       bloque final de la portada —dentro de una sección `text-surface-dark-ink`
+       sobre degradado oscuro— salía con la tinta clara, 1.5:1. El valor
+       predeterminado ya lo pone `body`. */
+  }
+
+  /* Los titulares grandes cierran más el interletraje: es lo que separa una
+     tipografía "puesta" de una compuesta. */
+  h1 { letter-spacing: -0.03em; }
+
+  p, li, dd, dt, label, figcaption {
+    /* Ver la nota de los titulares: `anywhere` era la causa de que el nombre de
+       la empresa saliera apilado letra a letra en la cabecera del teléfono. */
+    overflow-wrap: break-word;
+    text-align: start;
+    text-wrap: pretty;
+  }
+
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  code, pre, .tabular, [data-numeric] {
+    font-family: var(--font-mono-family), monospace;
+  }
+
+  /* Cifras de ancho fijo: sin esto, una métrica que pasa de 199 a 200 salta. */
+  .tabular-figures,
+  table td,
+  table th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: hsl(var(--accent-fill) / 0.28);
+    color: hsl(var(--ink-1));
+  }
 }
 
-html {
-  scroll-behavior: smooth;
-  background: hsl(var(--canvas));
-  /* Evita que iOS agrande el texto al girar el teléfono. */
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  min-height: 100svh;
-  min-width: 320px;
-  overflow-x: hidden;
-  color: hsl(var(--ink-1));
-  font-family: var(--font-body), sans-serif;
-  font-size: var(--type-base);
-  line-height: var(--type-base-lh);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: start;
-  /* Profundidad sutil: una sola luz fría arriba a la izquierda y un velo cálido
-     casi imperceptible. Sin `background-attachment: fixed`, que en Safari de
-     iOS repinta en cada desplazamiento. */
-  background-color: hsl(var(--canvas));
-  background-image:
-    radial-gradient(80rem 40rem at 12% -10%, hsl(var(--accent-fill) / 0.05), transparent 60%),
-    linear-gradient(180deg, hsl(var(--surface-2) / 0.7) 0%, transparent 24rem);
-}
-
-.dark body {
-  background-image:
-    radial-gradient(80rem 42rem at 12% -12%, hsl(var(--accent-fill) / 0.07), transparent 62%),
-    linear-gradient(180deg, hsl(var(--surface-2) / 0.55) 0%, transparent 28rem);
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display-family), sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.021em;
-  /* `anywhere` no solo parte la palabra donde sea: pone a cero el ancho
-     mínimo de contenido, así que un contenedor flex o grid puede aplastar el
-     elemento hasta dejarlo en nada y el texto acaba apilado una letra por
-     línea. `break-word` parte lo que de verdad no cabe y respeta el mínimo. */
-  overflow-wrap: break-word;
-  text-wrap: balance;
-  color: hsl(var(--ink-1));
-}
-
-/* Los titulares grandes cierran más el interletraje: es lo que separa una
-   tipografía "puesta" de una compuesta. */
-h1 { letter-spacing: -0.03em; }
-
-p, li, dd, dt, label, figcaption {
-  /* Ver la nota de los titulares: `anywhere` era la causa de que el nombre de
-     la empresa saliera apilado letra a letra en la cabecera del teléfono. */
-  overflow-wrap: break-word;
-  text-align: start;
-  text-wrap: pretty;
-}
-
-/* Safari de iOS hace zoom sobre la página al enfocar un control nativo con
-   tipografía menor de 16px, y el usuario no tiene forma evidente de deshacerlo. */
+/* FUERA de la capa a propósito: esta es una barrera, no un valor
+   predeterminado. Safari de iOS hace zoom sobre la página al enfocar un
+   control con tipografía menor de 16px, y el usuario no tiene forma evidente
+   de deshacerlo. Dentro de `base`, un `text-sm` sobre el campo ganaría y el
+   zoom volvería. */
 input, select, textarea {
   font-size: max(16px, 1em);
   font-family: inherit;
-}
-
-button, a {
-  -webkit-tap-highlight-color: transparent;
-}
-
-code, pre, .tabular, [data-numeric] {
-  font-family: var(--font-mono-family), monospace;
-}
-
-/* Cifras de ancho fijo: sin esto, una métrica que pasa de 199 a 200 salta. */
-.tabular-figures,
-table td,
-table th {
-  font-variant-numeric: tabular-nums;
-}
-
-::selection {
-  background: hsl(var(--accent-fill) / 0.28);
-  color: hsl(var(--ink-1));
 }
 
 /* ============================================================================
@@ -658,16 +680,18 @@ table th {
   to   { background-position: -200% 0; }
 }
 
-.skeleton {
-  background-color: hsl(var(--surface-2));
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    hsl(var(--surface-3) / 0.9) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-sweep 1.4s ease-in-out infinite;
+@layer components {
+  .skeleton {
+    background-color: hsl(var(--surface-2));
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--surface-3) / 0.9) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -681,8 +705,10 @@ table th {
    ARMAZÓN
    ========================================================================== */
 
-.operational-shell {
-  background: transparent;
+@layer components {
+  .operational-shell {
+    background: transparent;
+  }
 }
 
 @media (max-width: 639px) {
@@ -702,7 +728,6 @@ table th {
   min-width: max-content;
 }
 
-/* Heredado: varias pantallas dependen de esta clase para el interletraje. */
-.tracking-tight {
-  letter-spacing: -0.021em;
-}
+/* El interletraje del sistema para `tracking-tight` se define en `@theme`,
+   no reescribiendo la clase: así hay UNA definición y las utilidades siguen
+   pudiendo ganarla donde haga falta. */

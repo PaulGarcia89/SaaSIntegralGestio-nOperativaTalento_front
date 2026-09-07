@@ -64,35 +64,35 @@ export default function LoginPage() {
       <div className="mb-4 flex justify-end"><LanguageSelector /></div>
       <Card className="w-full max-w-6xl overflow-hidden border-border/70 bg-card/85">
         <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="space-y-8 bg-[radial-gradient(circle_at_top_left,rgba(14,165,183,0.22),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.97),rgba(20,33,61,0.95))] p-8 text-white md:p-10">
-            <Badge className="w-fit rounded-full bg-white/10 text-white hover:bg-white/10">
+          <div className="space-y-8 bg-[radial-gradient(circle_at_top_left,hsl(38_94%_52%_/_0.22),transparent_30%),linear-gradient(180deg,hsl(213_40%_10%_/_0.97),hsl(213_34%_15%_/_0.95))] p-8 text-landing-ink md:p-10">
+            <Badge className="w-fit rounded-full bg-landing-ink/10 text-landing-ink hover:bg-landing-ink/10">
               Iniciar sesión
             </Badge>
             <div className="space-y-4">
               <h1 className="max-w-xl text-4xl font-semibold tracking-tight md:text-5xl">
                 Todo tu trabajo, en el contexto correcto desde el primer momento.
               </h1>
-              <p className="max-w-2xl text-base leading-8 text-white/72">
+              <p className="max-w-2xl text-base leading-8 text-landing-ink/72">
                 Accede de forma segura a las personas, tareas y operaciones que te corresponden.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {[
                 {
-                  icon: <Building2 className="size-5 text-cyan-200" />,
+                  icon: <Building2 className="size-5 text-accent-fill" />,
                   title: "Tu empresa y sucursal correctas",
                   copy: "Al entrar verás claramente el espacio de trabajo en el que estás operando.",
                 },
                 {
-                  icon: <ShieldCheck className="size-5 text-cyan-200" />,
+                  icon: <ShieldCheck className="size-5 text-accent-fill" />,
                   title: "Una experiencia adaptada a ti",
                   copy: "La navegación muestra únicamente las tareas y herramientas que puedes utilizar.",
                 },
               ].map((item) => (
-                <div key={item.title} className="rounded-3xl border border-white/10 bg-white/6 p-5">
+                <div key={item.title} className="rounded-3xl border border-landing-ink/10 bg-surface-1/6 p-5">
                   <div className="mb-3">{item.icon}</div>
                   <h2 className="font-semibold">{item.title}</h2>
-                  <p className="mt-2 text-sm leading-7 text-white/68">{item.copy}</p>
+                  <p className="mt-2 text-sm leading-7 text-landing-ink/68">{item.copy}</p>
                 </div>
               ))}
             </div>

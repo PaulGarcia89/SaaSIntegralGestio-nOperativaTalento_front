@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <main className="overflow-x-hidden"><section className="bg-[radial-gradient(circle_at_75%_0%,rgba(34,211,238,.2),transparent_28%),linear-gradient(145deg,#071b33,#0a3252_58%,#075e75)] text-white"><div className="mx-auto w-full max-w-[1280px] px-4 sm:px-6"><LandingHeader /><HeroSection /></div></section><div className="mx-auto w-full max-w-[1280px] px-4 sm:px-6"><ModulesSection /><EmployeeLifecycle /><MultiBranchSection /><FlexibleModulesAndRoles /><HowItWorks /><CandidateSection /><div className="py-12 sm:py-16"><FinalCTA /></div><LandingFooter /></div></main>;
+  return <main className="overflow-x-hidden"><section className="bg-[radial-gradient(circle_at_75%_0%,hsl(38_94%_52%_/_.2),transparent_28%),linear-gradient(145deg,hsl(213_40%_10%),hsl(213_34%_15%)_58%,hsl(206_30%_21%))] text-landing-ink"><div className="mx-auto w-full max-w-[1280px] px-4 sm:px-6"><LandingHeader /><HeroSection /></div></section><div className="mx-auto w-full max-w-[1280px] px-4 sm:px-6"><ModulesSection /><EmployeeLifecycle /><MultiBranchSection /><FlexibleModulesAndRoles /><HowItWorks /><CandidateSection /><div className="py-12 sm:py-16"><FinalCTA /></div><LandingFooter /></div></main>;
 }

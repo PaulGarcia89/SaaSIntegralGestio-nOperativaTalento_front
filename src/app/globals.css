@@ -77,6 +77,12 @@
   --color-on-accent-fill: hsl(var(--on-accent-fill));
   --color-focus: hsl(var(--focus));
 
+  /* ---- Color: portada pública ------------------------------------------- */
+  --color-landing-deep: hsl(var(--landing-deep));
+  --color-landing-mid: hsl(var(--landing-mid));
+  --color-landing-far: hsl(var(--landing-far));
+  --color-landing-ink: hsl(var(--landing-ink));
+
   /* ---- Color: nombres heredados (reasignados) --------------------------- */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -295,6 +301,17 @@
   --accent-fill: 38 94% 52%;
   --on-accent-fill: 30 45% 10%;
   --focus: 28 92% 36%;
+
+  /* La portada pública es una pieza de marca, no una pantalla de trabajo: se
+     mantiene oscura en los dos temas. Estaba pintada en cian y pizarra
+     (#071b33 → #075e75, cyan-400), una paleta que no aparecía en ningún otro
+     sitio del producto, así que la página que ve un cliente y el producto que
+     compra no parecían de la misma empresa. Estos tonos son el mismo grafito
+     del resto de la interfaz; el acento sigue siendo el ámbar. */
+  --landing-deep: 213 40% 10%;
+  --landing-mid: 213 34% 15%;
+  --landing-far: 206 30% 21%;
+  --landing-ink: 210 22% 96%;
 
   --status-info: 205 80% 30%;
   --status-success: 158 80% 23%;

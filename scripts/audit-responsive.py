@@ -99,6 +99,10 @@ for path in collect():
             continue
         if has_min_w0.search(window):
             continue
+        # Lo que está oculto hasta `md`/`lg` no existe a 320px: marcarlo
+        # enseñaba a ignorar al auditor, que es como se pierde una herramienta.
+        if re.search(r'"[^"]*\bhidden\b[^"]*\b(?:sm|md|lg|xl):(?:block|flex|grid|table)', window):
+            continue
         findings.append((path, number, "sin-min-w-0", "tabla o scroll horizontal dentro de flex/grid sin min-w-0"))
 
 by_kind = {}

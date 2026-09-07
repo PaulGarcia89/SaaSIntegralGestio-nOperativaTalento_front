@@ -24,14 +24,9 @@ export function Input({ className, type, ...props }: React.ComponentProps<"input
     <input
       type={type}
       className={cn(
-        "flex w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3 py-2",
-        "min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)]",
-        "text-base text-ink-1 sm:text-sm",
-        "placeholder:text-ink-3",
-        "outline-none transition-colors duration-[var(--dur-fast)]",
-        "hover:border-ink-3",
-        "disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-disabled",
-        "aria-invalid:border-status-danger aria-invalid:bg-status-danger/5",
+        // Forma, borde, relleno, altura y tipografía salen de `.field`, que es
+        // la ÚNICA definición del aspecto de un control en la aplicación.
+        "field",
         "data-[success=true]:border-status-success",
         className,
       )}

@@ -26,11 +26,9 @@ export function Textarea({ className, rows = 4, ...props }: React.ComponentProps
     <textarea
       rows={rows}
       className={cn(
-        "flex w-full rounded-md border border-line-control bg-surface-elevated px-3 py-2 text-base text-text-primary outline-none transition sm:text-sm",
-        "hover:border-border-strong",
-        "focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30",
-        "disabled:cursor-not-allowed disabled:opacity-60",
-        "aria-[invalid=true]:border-status-danger aria-[invalid=true]:ring-status-danger/30",
+        // Mismo origen que `Input`: `.field` ya trae la variante de área de
+        // texto —bloque, altura mínima y redimensionado vertical—.
+        "field",
         className,
       )}
       {...props}

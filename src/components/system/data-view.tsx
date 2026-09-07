@@ -176,7 +176,7 @@ export function DataView<T>({
                       type="checkbox"
                       checked={allSelected}
                       onChange={selection.onToggleAll}
-                      className="size-4 rounded-xs border-line-control"
+                      className="field size-4"
                     />
                     <span className="sr-only">Seleccionar todo lo visible</span>
                   </label>

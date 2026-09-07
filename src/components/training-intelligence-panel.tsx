@@ -332,7 +332,7 @@ function StructuredIntelligenceFields({
             </label>
             <input
               id={id}
-              className="w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3 text-base text-ink-1 sm:text-sm"
+              className="field"
               style={{ minHeight: "var(--control-h-touch)" }}
               type={isNumber ? "number" : key.toLowerCase().includes("date") ? "date" : "text"}
               inputMode={isNumber ? "decimal" : undefined}

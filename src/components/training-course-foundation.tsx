@@ -336,7 +336,7 @@ function Field({ label, hint, value, onChange, disabled, type = "text" }: { labe
 }
 
 function TextArea({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {
-  return <label className="space-y-2 text-sm font-medium">{label}<textarea className="min-h-24 w-full rounded-2xl border border-border-default bg-surface-elevated p-3 disabled:opacity-60" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="space-y-2 text-sm font-medium">{label}<textarea className="field min-h-24" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function LevelChoice({ value, onChange, disabled }: { value: TrainingCompetencyLevel; onChange: (value: TrainingCompetencyLevel) => void; disabled: boolean }) {

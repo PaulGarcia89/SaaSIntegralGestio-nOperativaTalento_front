@@ -8,7 +8,9 @@ export function Label({
 }: React.ComponentProps<typeof LabelPrimitive.Root>) {
   return (
     <LabelPrimitive.Root
-      className={cn("text-sm font-medium text-foreground", className)}
+      // Tinta SECUNDARIA, no la del titular: doce rótulos con la tinta
+      // principal compiten con el contenido del formulario.
+      className={cn("text-sm font-medium text-ink-2", className)}
       {...props}
     />
   );

@@ -72,7 +72,9 @@ export function SelectTrigger({
       className={cn(
         // El MISMO radio que `Input`: un desplegable no puede tener otra forma que
         // el campo que tiene al lado.
-        "flex h-11 w-full items-center justify-between rounded-md border border-input bg-background px-4 text-base outline-none focus:ring-2 focus:ring-ring/40 sm:text-sm",
+        // `.field` da forma, borde y relleno; aquí solo se añade lo propio de
+        // un disparador: separar el valor del icono.
+        "field justify-between",
         className,
       )}
       {...props}

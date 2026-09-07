@@ -715,6 +715,79 @@ input, select, textarea {
    ========================================================================== */
 
 @layer components {
+  /* ==========================================================================
+     CAMPO
+     ==========================================================================
+     UNA definición del aspecto de un control de formulario.
+
+     Antes había 41 combinaciones distintas de clases en los controles nativos
+     repartidos por la aplicación —`rounded-2xl` aquí, `rounded-xl` allá,
+     `bg-surface-elevated` en uno y `bg-background` en el de al lado—, además
+     de los primitivos de React. En una misma pantalla convivían cuatro
+     aspectos para el mismo tipo de control, y eso es lo que se lee como
+     «recargado» aunque cada pieza por separado parezca razonable.
+
+     Vive en `@layer components` para que una utilidad pueda seguir ajustando
+     lo que corresponde a la pantalla —`w-full`, `min-h-28`, `mt-1`— sin tener
+     que pelear con especificidad.
+
+     El foco NO se define aquí: lo pone la regla global de `:focus-visible`,
+     que es la misma para todo control de la aplicación.
+     ========================================================================== */
+  .field {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    border-radius: var(--r-md);
+    border: 1px solid hsl(var(--line-control));
+    background-color: hsl(var(--surface-1));
+    padding-inline: 0.75rem;
+    padding-block: 0.5rem;
+    min-height: var(--control-h-touch);
+    /* 16px en móvil: por debajo, Safari de iOS hace zoom al enfocar. */
+    font-size: max(16px, 1rem);
+    line-height: 1.4;
+    color: hsl(var(--ink-1));
+    outline: none;
+    transition: border-color var(--dur-fast);
+  }
+
+  @media (min-width: 640px) {
+    .field {
+      min-height: var(--control-h-base);
+      font-size: 0.875rem;
+    }
+  }
+
+  .field::placeholder {
+    color: hsl(var(--ink-3));
+  }
+
+  .field:hover:not(:disabled) {
+    border-color: hsl(var(--ink-3));
+  }
+
+  .field:disabled {
+    cursor: not-allowed;
+    background-color: hsl(var(--surface-2));
+    color: hsl(var(--ink-disabled));
+  }
+
+  .field[aria-invalid="true"] {
+    border-color: hsl(var(--status-danger));
+    background-color: hsl(var(--status-danger) / 0.05);
+  }
+
+  /* Un área de texto crece hacia abajo y su contenido empieza arriba, no
+     centrado como en un campo de una línea. */
+  textarea.field {
+    display: block;
+    align-items: unset;
+    min-height: 5rem;
+    resize: vertical;
+  }
+
   .operational-shell {
     background: transparent;
   }

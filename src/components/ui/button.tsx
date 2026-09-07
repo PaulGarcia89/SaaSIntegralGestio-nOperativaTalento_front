@@ -28,7 +28,14 @@ const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium",
     "transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)]",
-    "disabled:pointer-events-none disabled:opacity-55",
+    /*
+     * Deshabilitado: superficie apagada, NO el relleno de la variante a media
+     * opacidad. El relleno oscuro al 55% sobre blanco da un gris medio sólido
+     * que se lee como un botón disponible; con superficie y tinta apagadas se
+     * lee lo que es. La regla 1.4.3 exime del contraste a los controles
+     * inactivos, así que aquí lo que importa es que se distinga del activo.
+     */
+    "disabled:pointer-events-none disabled:border disabled:border-line disabled:bg-surface-2 disabled:text-ink-disabled disabled:shadow-none",
     "aria-invalid:border-status-danger",
     "data-[loading=true]:cursor-wait",
   ].join(" "),

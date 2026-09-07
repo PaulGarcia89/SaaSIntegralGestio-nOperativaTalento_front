@@ -26,7 +26,7 @@ export function Textarea({ className, rows = 4, ...props }: React.ComponentProps
     <textarea
       rows={rows}
       className={cn(
-        "flex w-full rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 text-base text-text-primary outline-none transition sm:text-sm",
+        "flex w-full rounded-md border border-line-control bg-surface-elevated px-3 py-2 text-base text-text-primary outline-none transition sm:text-sm",
         "hover:border-border-strong",
         "focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30",
         "disabled:cursor-not-allowed disabled:opacity-60",

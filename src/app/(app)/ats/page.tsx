@@ -19,7 +19,6 @@ import { useLocale } from "@/components/locale-provider";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { seriesColorClass } from "@/components/chart";
 
 /**
  * "Hoy" — la única bandeja de trabajo del módulo.
@@ -74,13 +73,22 @@ function PhaseRail({
   phases: Array<{ id: RecruitmentPhaseId; total: number | undefined; loading: boolean }>;
   locale: "es" | "en";
 }) {
+  /*
+   * Todas las barras comparten color a propósito.
+   *
+   * Aquí hay UNA medida —cuántas personas— repartida entre cuatro categorías,
+   * no cuatro series distintas. Darle a cada fase un color de la paleta
+   * categórica sugiere que el color significa algo cuando no significa nada:
+   * lo que informa es la longitud. Además metía el morado de `--series-4` en la
+   * interfaz, y esta dirección no usa morado.
+   */
   const known = phases.filter((phase) => typeof phase.total === "number");
   const max = Math.max(1, ...known.map((phase) => phase.total ?? 0));
   const sum = known.reduce((total, phase) => total + (phase.total ?? 0), 0);
 
   return (
     <ul className="space-y-1">
-      {phases.map((phase, index) => {
+      {phases.map((phase) => {
         const total = phase.total;
         const share = typeof total === "number" && sum > 0 ? Math.round((total / sum) * 100) : null;
         return (
@@ -105,7 +113,7 @@ function PhaseRail({
                 className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 xs:block lg:w-40"
               >
                 <span
-                  className={cn("block h-full rounded-full bg-current", seriesColorClass(index))}
+                  className="block h-full rounded-full bg-accent-fill"
                   style={{ width: `${typeof total === "number" ? Math.round((total / max) * 100) : 0}%` }}
                 />
               </span>

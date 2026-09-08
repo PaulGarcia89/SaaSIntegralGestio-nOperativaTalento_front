@@ -1,3 +1,4 @@
+import { restaurantSections } from "./restaurant-navigation";
 import type { ModuleKey, PermissionKey, RoleKey, SubscriptionAccessState } from "@/lib/contracts";
 
 export type NavGroup = "Inicio" | "Personas" | "Productividad" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Inventario de activos" | "Inventario de restaurante" | "Analítica" | "Administración" | "Gobierno de plataforma";
@@ -169,6 +170,11 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/inventory/assets/audit", label: "Auditoría de inventario", group: "Analítica", module: "asset_inventory", permission: "asset_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "reports", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/deliveries", label: "Entregas", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
   { href: "/inventory/returns", label: "Devoluciones", group: "Operaciones", module: "asset_inventory", permission: "asset_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
+  { href: "/inventory/restaurant/stock", label: "Existencias", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
+  { href: "/inventory/restaurant/categories", label: "Categorías", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
+  { href: "/inventory/restaurant/units", label: "Unidades y conversiones", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
+  { href: "/inventory/restaurant/suppliers", label: "Proveedores", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
+  { href: "/inventory/restaurant/warehouses", label: "Almacenes", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
   { href: "/inventory/restaurant/dashboard", label: "Dashboard", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "dashboard", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
   { href: "/inventory/restaurant", label: "Restaurante", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.view", audience: "shared", subscriptionStates: live, branchRequired: true, showInNavigation: false, icon: "inventory", roles: ["admin_saas", "admin_empresa", "supervisor", "encargado_inventario"] },
   { href: "/inventory/restaurant/ingredients", label: "Ingredientes", group: "Operaciones", module: "restaurant_inventory", permission: "restaurant_inventory.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "inventory", roles: ["admin_saas", "admin_empresa", "encargado_inventario"] },
@@ -293,6 +299,14 @@ export function visibleSections(items: readonly NavItem[]): NavSection[] {
 /** Ítems de una sección, agrupados por área y conservando el orden original. */
 export function itemsBySection(items: readonly NavItem[], section: NavSection) {
   const visible = items.filter((item) => item.section === section && item.showInNavigation !== false);
+  if (section === "restaurant_inventory") {
+    // Input is already filtered by route access. Never select an inaccessible landing page.
+    const entries = restaurantSections.flatMap(area => {
+      const target = area.items.map(page => visible.find(item => item.href === page.href)).find(Boolean);
+      return target ? [{ ...target, label: area.label, group: "Inventario de restaurante" as NavGroup }] : [];
+    });
+    return entries.length ? [{ group: "Inventario de restaurante" as NavGroup, items: entries }] : [];
+  }
   const groups: Array<{ group: NavGroup; items: NavItem[] }> = [];
   for (const item of visible) {
     const existing = groups.find((candidate) => candidate.group === item.group);

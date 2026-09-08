@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ClipboardList, Eye, Plus } from "lucide-react";
@@ -41,19 +41,10 @@ import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-c
 import { RestaurantPurchasingWorkspace } from "@/components/restaurant-purchasing-workspace";
 import { RestaurantAdvancedControlWorkspace } from "@/components/restaurant-advanced-control-workspace";
 import { RestaurantCommercialIntelligenceWorkspace } from "@/components/restaurant-commercial-intelligence-workspace";
-import type { PermissionKey } from "@/lib/contracts";
 
-type InventoryItem = { key: string; label: string; href: string; permission: PermissionKey };
-type InventoryTask = { key: string; label: string; description: string; items: InventoryItem[] };
-const taskGroups: InventoryTask[] = [
-  { key: "overview", label: "Inicio", description: "Tareas y pendientes", items: [{ key: "dashboard", label: "Dashboard", href: "/inventory/restaurant/dashboard", permission: "restaurant_inventory.view" }] },
-  { key: "daily", label: "Operación diaria", description: "Registros frecuentes", items: [
-    { key: "receipts", label: "Recibir productos", href: "/inventory/restaurant/receipts", permission: "restaurant_inventory.manage" }, { key: "production", label: "Registrar producción", href: "/inventory/restaurant/production", permission: "restaurant_inventory.manage" }, { key: "consumption", label: "Registrar salida", href: "/inventory/restaurant/consumption", permission: "restaurant_inventory.manage" }, { key: "waste", label: "Registrar merma", href: "/inventory/restaurant/waste", permission: "restaurant_inventory.manage" }, { key: "stock-counts", label: "Realizar conteo", href: "/inventory/restaurant/stock-counts", permission: "restaurant_inventory.manage" }, { key: "transfers", label: "Transferir productos", href: "/inventory/restaurant/transfers", permission: "restaurant_inventory.manage" },
-  ] },
-  { key: "control", label: "Control", description: "Existencias y alertas", items: [{ key: "stock", label: "Existencias", href: "/inventory/restaurant/stock", permission: "restaurant_inventory.view" }, { key: "lots", label: "Lotes y vencimientos", href: "/inventory/restaurant/lots", permission: "restaurant_inventory.view" }, { key: "expiry-alerts", label: "Alertas de vencimiento", href: "/inventory/restaurant/expiry-alerts", permission: "restaurant_inventory.expiry_alerts.view" }, { key: "count-schedules", label: "Conteos programados", href: "/inventory/restaurant/count-schedules", permission: "restaurant_inventory.counts.schedule" }, { key: "variance", label: "Teórico vs real", href: "/inventory/restaurant/variance", permission: "restaurant_inventory.variance.view" }, { key: "shrinkage", label: "Shrinkage", href: "/inventory/restaurant/shrinkage", permission: "restaurant_inventory.shrinkage.view" }, { key: "adjustments", label: "Ajustes", href: "/inventory/restaurant/adjustments", permission: "restaurant_inventory.manage" }, { key: "movements", label: "Movimientos", href: "/inventory/restaurant/movements", permission: "restaurant_inventory.view" }, { key: "audit-log", label: "Auditoría inmutable", href: "/inventory/restaurant/audit-log", permission: "restaurant_inventory.audit.read" }] },
-  { key: "configuration", label: "Configuración", description: "Productos y reglas", items: [{ key: "ingredients", label: "Productos", href: "/inventory/restaurant/ingredients", permission: "restaurant_inventory.view" }, { key: "recipes", label: "Recetas", href: "/inventory/restaurant/recipes", permission: "restaurant_inventory.view" }, { key: "categories", label: "Categorías", href: "/inventory/restaurant/categories", permission: "restaurant_inventory.view" }, { key: "units", label: "Unidades y conversiones", href: "/inventory/restaurant/units", permission: "restaurant_inventory.view" }, { key: "suppliers", label: "Proveedores", href: "/inventory/restaurant/suppliers", permission: "restaurant_inventory.view" }, { key: "warehouses", label: "Almacenes", href: "/inventory/restaurant/warehouses", permission: "restaurant_inventory.view" }, { key: "settings", label: "Reglas del módulo", href: "/inventory/restaurant/settings", permission: "restaurant_inventory.manage" }] },
-  { key: "reports", label: "Reportes y auditoría", description: "Costos y trazabilidad", items: [{ key: "reports", label: "Reportes", href: "/inventory/restaurant/reports", permission: "restaurant_inventory.view" }, { key: "analytics", label: "Análisis", href: "/inventory/restaurant/analytics", permission: "restaurant_inventory.view" }, { key: "costs", label: "Costos y rentabilidad", href: "/inventory/restaurant/costs", permission: "restaurant_inventory.view" }, { key: "purchase-orders", label: "Órdenes de compra", href: "/inventory/restaurant/purchase-orders", permission: "restaurant_inventory.manage" }, { key: "price-history", label: "Precios por proveedor", href: "/inventory/restaurant/price-history", permission: "restaurant_inventory.view" }, { key: "purchase-suggestions", label: "Sugerencias de compra", href: "/inventory/restaurant/purchase-suggestions", permission: "restaurant_inventory.view" }, { key: "invoices", label: "Facturas OCR", href: "/inventory/restaurant/invoices", permission: "restaurant_inventory.manage" }, { key: "sales-import", label: "Importar ventas", href: "/inventory/restaurant/sales-import", permission: "restaurant_inventory.manage" }, { key: "forecast", label: "Pronóstico de demanda", href: "/inventory/restaurant/forecast", permission: "restaurant_inventory.commercial.view" }, { key: "branch-costs", label: "Costos por sucursal", href: "/inventory/restaurant/branch-costs", permission: "restaurant_inventory.commercial.view" }, { key: "recipe-margins", label: "Margen por receta", href: "/inventory/restaurant/recipe-margins", permission: "restaurant_inventory.commercial.view" }, { key: "unit-comparison", label: "Comparativo multiunidad", href: "/inventory/restaurant/unit-comparison", permission: "restaurant_inventory.commercial.view" }, { key: "commissary", label: "Comisariato", href: "/inventory/restaurant/commissary", permission: "restaurant_inventory.commissary.manage" }, { key: "purchase-budget", label: "Presupuesto de compras", href: "/inventory/restaurant/purchase-budget", permission: "restaurant_inventory.budgets.manage" }, { key: "audit", label: "Auditoría", href: "/inventory/restaurant/audit", permission: "restaurant_inventory.manage" }] },
-];
+import { restaurantSections as taskGroups } from "@/lib/restaurant-navigation";
+import { getRoutePolicy, isRoleAllowed } from "@/lib/navigation";
+import { useLocale } from "@/components/locale-provider";
 
 export function RestaurantInventoryShell() {
   return <ModuleRouteGuard module="restaurant_inventory" permission="restaurant_inventory.view"><RestaurantInventoryContextProvider><RestaurantInventoryInner /></RestaurantInventoryContextProvider></ModuleRouteGuard>;
@@ -61,13 +52,17 @@ export function RestaurantInventoryShell() {
 
 function RestaurantInventoryInner() {
   const pathname = usePathname();
+  const router = useRouter();
   const section = pathname.includes("/recipes") ? "recipes" : taskGroups.flatMap((task) => task.items).find((item) => item.key !== "dashboard" && pathname.endsWith(`/${item.key}`))?.key ?? "dashboard";
-  const { currentBranch, can } = useAppStore();
+  const { currentBranch, currentUser, can } = useAppStore();
+  const { t } = useLocale();
+  const label = (value: string) => { const key = `nav.${value}`; const translated = t(key); return translated === key ? value : translated; };
   const { warehouseId, warehouseName, compactMode } = useRestaurantInventoryContext();
-  const visibleTasks = taskGroups.map((task) => ({ ...task, items: task.items.filter((item) => can(item.permission)) })).filter((task) => task.items.length);
-  const activeTask = visibleTasks.find((task) => task.items.some((item) => item.key === section))?.key ?? "overview";
+  const visibleTasks = taskGroups.map((task) => ({ ...task, items: task.items.filter((item) => { const policy = getRoutePolicy(item.href); return policy && isRoleAllowed(policy.roles, currentUser.role, policy.strictRoles) && policy.requiredPermissions.every(can); }) })).filter((task) => task.items.length);
+  const activeTask = visibleTasks.find((task) => task.items.some((item) => item.key === section))?.key ?? "summary";
   const task = visibleTasks.find((item) => item.key === activeTask) ?? visibleTasks[0];
   const currentItem = task?.items.find((item) => item.key === section);
+  if (!currentItem) return <InlineFeedback tone="warning" title={t("restaurant.accessDenied")} />;
   return <div className={compactMode ? "space-y-4 text-sm" : "space-y-6"} data-compact={compactMode ? "true" : "false"}>
     {/*
       Una sola capa de navegación dentro de la página.
@@ -85,9 +80,9 @@ function RestaurantInventoryInner() {
       El filtro por permiso (`can(item.permission)`) se conserva intacto.
     */}
     <PageHeader
-      eyebrow={task?.label ?? "Inventario de restaurante"}
-      title={currentItem?.label ?? "Inventario de restaurante"}
-      description={task?.description}
+      eyebrow={label(task?.label ?? "Inventario de restaurante")}
+      title={label(currentItem?.label ?? "Inventario de restaurante")}
+
       meta={
         <>
           <span>{currentBranch?.name ?? "Sin sucursal"}</span>
@@ -97,27 +92,21 @@ function RestaurantInventoryInner() {
     />
 
     {task && task.items.length > 1 ? (
-      <nav aria-label={`Pantallas de ${task.label}`}>
-        <ul className="min-w-0 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {task.items.map((item) => {
-            const active = section === item.key;
-            return (
-              <li key={item.key} className="shrink-0">
-                <Link
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex items-center whitespace-nowrap rounded-md border px-3 text-sm transition-colors ${
-                    active
-                      ? "border-accent-line/50 bg-accent-fill/10 font-medium text-ink-1"
-                      : "border-line bg-surface-1 text-ink-2 hover:border-line-strong hover:text-ink-1"
-                  }`}
-                  style={{ minHeight: "var(--control-h-base)" }}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
+      <nav aria-label={label(task.label)} className="min-w-0">
+        <label className="block text-sm md:hidden" htmlFor="restaurant-section-view">
+          {label("Ir a")}
+          <select id="restaurant-section-view" className="field mt-1 w-full" value={currentItem?.href ?? ""}
+            onChange={event => router.push(event.target.value)}>
+            {task.items.map(item => <option key={item.key} value={item.href}>{label(item.label)}</option>)}
+          </select>
+        </label>
+        <ul className="hidden flex-wrap gap-2 md:flex">
+          {task.items.map(item => <li key={item.key}>
+            <Link href={item.href} aria-current={section === item.key ? "page" : undefined}
+              className={`flex min-h-11 items-center rounded-md border px-3 text-sm ${section === item.key ? "border-accent-line/50 bg-accent-fill/10 font-medium text-ink-1" : "border-line bg-surface-1 text-ink-2 hover:border-line-strong"}`}>
+              {label(item.label)}
+            </Link>
+          </li>)}
         </ul>
       </nav>
     ) : null}
@@ -139,21 +128,21 @@ function RestaurantInventoryInner() {
     */}
     {section === "dashboard" ? <RestaurantModulePanel /> : null}
     {section === "ingredients" ? <RestaurantInventoryCatalog kind="ingredients" /> : null}
-    {section === "purchase-orders" ? <RestaurantPurchasingWorkspace initialView="orders" /> : null}
-    {section === "price-history" ? <RestaurantPurchasingWorkspace initialView="prices" /> : null}
-    {section === "purchase-suggestions" ? <RestaurantPurchasingWorkspace initialView="suggestions" /> : null}
-    {section === "invoices" ? <RestaurantPurchasingWorkspace initialView="invoices" /> : null}
-    {section === "expiry-alerts" ? <RestaurantAdvancedControlWorkspace initialView="fefo" /> : null}
-    {section === "count-schedules" ? <RestaurantAdvancedControlWorkspace initialView="counts" /> : null}
-    {section === "variance" ? <RestaurantAdvancedControlWorkspace initialView="variance" /> : null}
-    {section === "shrinkage" ? <RestaurantAdvancedControlWorkspace initialView="shrinkage" /> : null}
-    {section === "audit-log" ? <RestaurantAdvancedControlWorkspace initialView="audit" /> : null}
-    {section === "forecast" ? <RestaurantCommercialIntelligenceWorkspace initialView="forecast" /> : null}
-    {section === "branch-costs" ? <RestaurantCommercialIntelligenceWorkspace initialView="branches" /> : null}
-    {section === "recipe-margins" ? <RestaurantCommercialIntelligenceWorkspace initialView="margins" /> : null}
-    {section === "unit-comparison" ? <RestaurantCommercialIntelligenceWorkspace initialView="comparison" /> : null}
-    {section === "commissary" ? <RestaurantCommercialIntelligenceWorkspace initialView="commissary" /> : null}
-    {section === "purchase-budget" ? <RestaurantCommercialIntelligenceWorkspace initialView="budget" /> : null}
+    {section === "purchase-orders" ? <RestaurantPurchasingWorkspace hideNavigation key={section} initialView="orders" /> : null}
+    {section === "price-history" ? <RestaurantPurchasingWorkspace hideNavigation key={section} initialView="prices" /> : null}
+    {section === "purchase-suggestions" ? <RestaurantPurchasingWorkspace hideNavigation key={section} initialView="suggestions" /> : null}
+    {section === "invoices" ? <RestaurantPurchasingWorkspace hideNavigation key={section} initialView="invoices" /> : null}
+    {section === "expiry-alerts" ? <RestaurantAdvancedControlWorkspace hideNavigation key={section} initialView="fefo" /> : null}
+    {section === "count-schedules" ? <RestaurantAdvancedControlWorkspace hideNavigation key={section} initialView="counts" /> : null}
+    {section === "variance" ? <RestaurantAdvancedControlWorkspace hideNavigation key={section} initialView="variance" /> : null}
+    {section === "shrinkage" ? <RestaurantAdvancedControlWorkspace hideNavigation key={section} initialView="shrinkage" /> : null}
+    {section === "audit-log" ? <RestaurantAdvancedControlWorkspace hideNavigation key={section} initialView="audit" /> : null}
+    {section === "forecast" ? <RestaurantCommercialIntelligenceWorkspace hideNavigation key={section} initialView="forecast" /> : null}
+    {section === "branch-costs" ? <RestaurantCommercialIntelligenceWorkspace hideNavigation key={section} initialView="branches" /> : null}
+    {section === "recipe-margins" ? <RestaurantCommercialIntelligenceWorkspace hideNavigation key={section} initialView="margins" /> : null}
+    {section === "unit-comparison" ? <RestaurantCommercialIntelligenceWorkspace hideNavigation key={section} initialView="comparison" /> : null}
+    {section === "commissary" ? <RestaurantCommercialIntelligenceWorkspace hideNavigation key={section} initialView="commissary" /> : null}
+    {section === "purchase-budget" ? <RestaurantCommercialIntelligenceWorkspace hideNavigation key={section} initialView="budget" /> : null}
     {section === "receipts" ? <RestaurantReceiptsScreen /> : null}
     {section === "recipes" ? <RestaurantRecipesWorkspace /> : null}
     {section === "consumption" ? <RestaurantOperations section="consumption" warehouseId={warehouseId} warehouseName={warehouseName} /> : null}
@@ -170,7 +159,14 @@ function RestaurantInventoryInner() {
 }
 
 function RestaurantInventorySettings() {
-  return <div className="space-y-5"><PageHeader eyebrow="Administración" title="Configuración del inventario" description="Consulta las reglas operativas que deben mantenerse alineadas con el backend." /><div className="grid gap-4 md:grid-cols-2"><Card level={2}><CardContent className="space-y-3 p-5"><h2 className="font-semibold">Contexto y seguridad</h2><p className="text-sm text-text-secondary">Cada operación debe validar tenant, sucursal y almacén en el servidor. El frontend envía el contexto activo en las cabeceras de la solicitud.</p><Badge variant="secondary">Validación server-side requerida</Badge></CardContent></Card><Card level={2}><CardContent className="space-y-3 p-5"><h2 className="font-semibold">Confirmaciones seguras</h2><p className="text-sm text-text-secondary">Las mutaciones críticas envían una clave de idempotencia para evitar doble aplicación ante reintentos.</p><Badge variant="secondary">Contrato Idempotency-Key</Badge></CardContent></Card></div><InlineFeedback tone="info" title="Configuración administrada por plataforma">Las reglas de permisos, aprobación y retención de auditoría se administran en el backend y no deben depender sólo de la visibilidad del menú.</InlineFeedback></div>;
+  const { t } = useLocale();
+  const pages = taskGroups.find(group => group.key === "settings")!.items.filter(item => item.key !== "settings");
+  return <div className="grid gap-4 md:grid-cols-3">{pages.map(page =>
+    <Link key={page.key} href={page.href} className="rounded-xl border border-line bg-surface-1 p-5 text-ink-1 transition hover:border-accent-line">
+      <h2 className="font-semibold">{t(`nav.${page.label}`)}</h2>
+      <p className="mt-2 text-sm text-ink-2">{t(`restaurant.settings.${page.key}`)}</p>
+    </Link>
+  )}</div>;
 }
 
 function QueryState({ loading, error, retry, children }: { loading: boolean; error: unknown; retry: () => void; children: ReactNode }) {

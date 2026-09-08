@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 
 type View = "forecast" | "branches" | "margins" | "comparison" | "commissary" | "budget";
 
-export function RestaurantCommercialIntelligenceWorkspace({ initialView = "forecast" }: { initialView?: View }) {
+export function RestaurantCommercialIntelligenceWorkspace({ initialView = "forecast", hideNavigation = false }: { initialView?: View; hideNavigation?: boolean }) {
   const [view, setView] = useState<View>(initialView);
   const tabs: Array<{ id: View; label: string; icon: typeof TrendingUp }> = [
     { id: "forecast", label: "Pronóstico", icon: TrendingUp },
@@ -40,7 +40,7 @@ export function RestaurantCommercialIntelligenceWorkspace({ initialView = "forec
     { id: "commissary", label: "Comisariato", icon: Factory },
     { id: "budget", label: "Presupuesto de compras", icon: Calculator },
   ];
-  return <div className="space-y-5"><PageHeader eyebrow="Inteligencia comercial" title="Decisiones comerciales de inventario" description="Pronostica demanda, controla costos, compara unidades y protege el presupuesto de compras." /><nav className="flex flex-wrap gap-2" aria-label="Inteligencia comercial">{tabs.map(({ id, label, icon: Icon }) => <Button key={id} variant={view === id ? "default" : "secondary"} onClick={() => setView(id)}><Icon className="size-4" />{label}</Button>)}</nav>{view === "forecast" ? <ForecastView /> : null}{view === "branches" ? <BranchCostsView /> : null}{view === "margins" ? <RecipeMarginsView /> : null}{view === "comparison" ? <UnitComparisonView /> : null}{view === "commissary" ? <CommissaryView /> : null}{view === "budget" ? <BudgetView /> : null}</div>;
+  return <div className="space-y-5">{!hideNavigation ? <><PageHeader eyebrow="Inteligencia comercial" title="Decisiones comerciales de inventario" description="Pronostica demanda, controla costos, compara unidades y protege el presupuesto de compras." /><nav className="flex flex-wrap gap-2" aria-label="Inteligencia comercial">{tabs.map(({ id, label, icon: Icon }) => <Button key={id} variant={view === id ? "default" : "secondary"} onClick={() => setView(id)}><Icon className="size-4" />{label}</Button>)}</nav></> : null}{view === "forecast" ? <ForecastView /> : null}{view === "branches" ? <BranchCostsView /> : null}{view === "margins" ? <RecipeMarginsView /> : null}{view === "comparison" ? <UnitComparisonView /> : null}{view === "commissary" ? <CommissaryView /> : null}{view === "budget" ? <BudgetView /> : null}</div>;
 }
 
 function CommercialCard({ title, description, children }: { title: string; description: string; children: ReactNode }) { return <Card level={1}><CardContent className="space-y-4 p-5"><div><h2 className="font-semibold">{title}</h2><p className="text-sm text-text-secondary">{description}</p></div>{children}</CardContent></Card>; }

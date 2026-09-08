@@ -2149,7 +2149,6 @@
   "hiring.panel.cancelled": "Esta contratación fue cancelada",
   "hiring.panel.cancelledBody": "No hay nada pendiente por hacer. Puedes consultar lo que ocurrió en el historial.",
   "hiring.panel.reasonOnFile": "Motivo registrado",
-  "hiring.panel.backStep": "Volver al paso anterior",
   "hiring.panel.agreedSalary": "Sueldo acordado",
   "hiring.panel.notInOffer": "No especificado en la oferta",
   "hiring.error.notAccepted": "Todavía no se puede cerrar la contratación: falta que la persona acepte la oferta.",
@@ -3051,16 +3050,51 @@
   "branches.deleteConsequencePeople": "Quien tenga esta sucursal como sede deja de poder seleccionarla y necesitará que se le asigne otra.",
   "branches.deleteConsequenceHistory": "Lo ya registrado en esta sucursal (contrataciones, movimientos, documentos) se conserva con su firma.",
   "branches.deleteConsequenceLast": "Es la única sucursal de {{company}}: la empresa se queda sin ninguna sede operativa.",
-  "branches.deleteConsequenceRemaining": "Quedan {{count}} sucursales en la empresa."
-  ,"interviews.missingCredentials": "Falta configurar las credenciales de este proveedor en el servidor."
-  ,"nav.section.ats": "Reclutamiento"
-  ,"nav.section.onboarding": "Incorporación"
-  ,"nav.section.training": "Capacitación"
-  ,"nav.section.productivity": "Productividad"
-  ,"nav.section.asset_inventory": "Inventario de activos"
-  ,"nav.section.restaurant_inventory": "Inventario de restaurante"
-  ,"nav.section.notifications": "Alertas"
-  ,"jobs.noVacancies": "Todavía no hay vacantes publicadas"
-  ,"jobs.noVacanciesHelp": "Cuando esta empresa publique una oferta aparecerá aquí. Vuelve en unos días."
-  ,"jobs.requestCodeResolution": "Pide el código de invitación a quien te contactó desde esta empresa."
+  "branches.deleteConsequenceRemaining": "Quedan {{count}} sucursales en la empresa.",
+  "interviews.missingCredentials": "Falta configurar las credenciales de este proveedor en el servidor.",
+  "nav.section.ats": "Reclutamiento",
+  "nav.section.onboarding": "Incorporación",
+  "nav.section.training": "Capacitación",
+  "nav.section.productivity": "Productividad",
+  "nav.section.asset_inventory": "Inventario de activos",
+  "nav.section.restaurant_inventory": "Inventario de restaurante",
+  "nav.section.notifications": "Alertas",
+  "jobs.noVacancies": "Todavía no hay vacantes publicadas",
+  "jobs.noVacanciesHelp": "Cuando esta empresa publique una oferta aparecerá aquí. Vuelve en unos días.",
+  "jobs.requestCodeResolution": "Pide el código de invitación a quien te contactó desde esta empresa.",
+  "nav.Resumen": "Resumen",
+  "nav.Existencias": "Existencias",
+  "nav.Lotes y vencimientos": "Lotes y vencimientos",
+  "nav.Historial de movimientos": "Historial de movimientos",
+  "nav.Recibir productos": "Recibir productos",
+  "nav.Qué comprar": "Qué comprar",
+  "nav.Cargar factura": "Cargar factura",
+  "nav.Proveedores": "Proveedores",
+  "nav.Planificar demanda": "Planificar demanda",
+  "nav.Registrar producción": "Registrar producción",
+  "nav.Cocina central": "Cocina central",
+  "nav.Registrar consumo": "Registrar consumo",
+  "nav.Registrar desperdicio": "Registrar desperdicio",
+  "nav.Pérdidas por revisar": "Pérdidas por revisar",
+  "nav.Realizar conteo": "Realizar conteo",
+  "nav.Programar conteos": "Programar conteos",
+  "nav.Costos de recetas": "Costos de recetas",
+  "nav.Rentabilidad de recetas": "Rentabilidad de recetas",
+  "nav.Consumo esperado y registrado": "Consumo esperado y registrado",
+  "nav.Comparar sucursales": "Comparar sucursales",
+  "nav.Historial de auditoría": "Historial de auditoría",
+  "nav.Reporte de auditoría": "Reporte de auditoría",
+  "nav.Categorías": "Categorías",
+  "nav.Unidades y conversiones": "Unidades y conversiones",
+  "nav.Almacenes": "Almacenes",
+  "nav.Ir a": "Ir a",
+  "nav.Compras y recepción": "Compras y recepción",
+  "nav.Recetas y producción": "Recetas y producción",
+  "nav.Salidas y pérdidas": "Salidas y pérdidas",
+  "nav.Conteos y ajustes": "Conteos y ajustes",
+  "nav.Reportes y costos": "Reportes y costos",
+  "restaurant.settings.categories": "Organiza los ingredientes por tipo.",
+  "restaurant.settings.units": "Administra las unidades de compra y sus conversiones.",
+  "restaurant.settings.warehouses": "Administra las ubicaciones donde guardas los productos.",
+  "restaurant.accessDenied": "No tienes acceso a esta vista."
 }

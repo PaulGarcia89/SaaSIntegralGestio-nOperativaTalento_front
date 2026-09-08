@@ -1,5 +1,7 @@
 "use client";
 
+import { restaurantSectionForPath } from "@/lib/restaurant-navigation";
+
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
@@ -334,7 +336,7 @@ function SidebarContent({
               const groups = itemsBySection(items as NavItem[], sectionId);
               const open = openSection === sectionId;
               const containsActive = groups.some((group) =>
-                group.items.some((item) => item.href === activeHref),
+                group.items.some((item) => (item.href === activeHref || (sectionId === "restaurant_inventory" && restaurantSectionForPath(item.href)?.key === restaurantSectionForPath(pathname)?.key))),
               );
               const panelId = `nav-section-${sectionId}`;
 
@@ -393,7 +395,7 @@ function SidebarContent({
                                   href={item.href}
                                   label={localizedNavLabel(item.label, t)}
                                   icon={navigationIcons[item.icon]}
-                                  active={item.href === activeHref}
+                                  active={(item.href === activeHref || (sectionId === "restaurant_inventory" && restaurantSectionForPath(item.href)?.key === restaurantSectionForPath(pathname)?.key))}
                                   onNavigate={onNavigate}
                                 />
                               </li>

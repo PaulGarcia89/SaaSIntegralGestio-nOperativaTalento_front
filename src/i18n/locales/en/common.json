@@ -2058,7 +2058,7 @@
   "hiring.header.startsOn": "Starts on",
   "hiring.blocker.listAria": "What is missing to continue",
   "hiring.blocker.why": "Why?",
-  "hiring.panel.backStep": "Back to previous step",
+  "hiring.panel.backStep": "Back to the previous step",
   "hiring.panel.askDocAfter": "{{name}} will see it in their pending list and can upload it.",
   "hiring.panel.toReviewCount": "{{n}} document(s) await your review: approve them or request a fix.",
   "hiring.panel.docsProgress": "{{approved}} of {{total}} required documents approved",
@@ -2149,7 +2149,6 @@
   "hiring.panel.cancelled": "This hire was cancelled",
   "hiring.panel.cancelledBody": "There's nothing left to do. You can see what happened in the history.",
   "hiring.panel.reasonOnFile": "Reason on file",
-  "hiring.panel.backStep": "Back to the previous step",
   "hiring.panel.agreedSalary": "Agreed pay",
   "hiring.panel.notInOffer": "Not specified in the offer",
   "hiring.error.notAccepted": "The hire can't be closed yet: the person still has to accept the offer.",
@@ -3051,16 +3050,51 @@
   "branches.deleteConsequencePeople": "Anyone based at this branch can no longer select it and will need another one assigned.",
   "branches.deleteConsequenceHistory": "What was already recorded at this branch (hires, movements, documents) is kept with its signature.",
   "branches.deleteConsequenceLast": "It is the only branch of {{company}}: the company is left with no operating site.",
-  "branches.deleteConsequenceRemaining": "{{count}} branches remain in the company."
-  ,"interviews.missingCredentials": "This provider's credentials are not configured on the server yet."
-  ,"nav.section.ats": "Recruiting"
-  ,"nav.section.onboarding": "Onboarding"
-  ,"nav.section.training": "Training"
-  ,"nav.section.productivity": "Productivity"
-  ,"nav.section.asset_inventory": "Asset inventory"
-  ,"nav.section.restaurant_inventory": "Restaurant inventory"
-  ,"nav.section.notifications": "Alerts"
-  ,"jobs.noVacancies": "No openings published yet"
-  ,"jobs.noVacanciesHelp": "When this company posts a role it will show up here. Check back in a few days."
-  ,"jobs.requestCodeResolution": "Ask for the invitation code from whoever contacted you at this company."
+  "branches.deleteConsequenceRemaining": "{{count}} branches remain in the company.",
+  "interviews.missingCredentials": "This provider's credentials are not configured on the server yet.",
+  "nav.section.ats": "Recruiting",
+  "nav.section.onboarding": "Onboarding",
+  "nav.section.training": "Training",
+  "nav.section.productivity": "Productivity",
+  "nav.section.asset_inventory": "Asset inventory",
+  "nav.section.restaurant_inventory": "Restaurant inventory",
+  "nav.section.notifications": "Alerts",
+  "jobs.noVacancies": "No openings published yet",
+  "jobs.noVacanciesHelp": "When this company posts a role it will show up here. Check back in a few days.",
+  "jobs.requestCodeResolution": "Ask for the invitation code from whoever contacted you at this company.",
+  "nav.Resumen": "Summary",
+  "nav.Existencias": "Stock levels",
+  "nav.Lotes y vencimientos": "Lots and expiry",
+  "nav.Historial de movimientos": "Movement history",
+  "nav.Recibir productos": "Receive products",
+  "nav.Qué comprar": "What to buy",
+  "nav.Cargar factura": "Upload invoice",
+  "nav.Proveedores": "Suppliers",
+  "nav.Planificar demanda": "Plan demand",
+  "nav.Registrar producción": "Record production",
+  "nav.Cocina central": "Central kitchen",
+  "nav.Registrar consumo": "Record usage",
+  "nav.Registrar desperdicio": "Record waste",
+  "nav.Pérdidas por revisar": "Losses to review",
+  "nav.Realizar conteo": "Count inventory",
+  "nav.Programar conteos": "Schedule counts",
+  "nav.Costos de recetas": "Recipe costs",
+  "nav.Rentabilidad de recetas": "Recipe profitability",
+  "nav.Consumo esperado y registrado": "Expected and recorded usage",
+  "nav.Comparar sucursales": "Compare branches",
+  "nav.Historial de auditoría": "Audit history",
+  "nav.Reporte de auditoría": "Audit report",
+  "nav.Categorías": "Categories",
+  "nav.Unidades y conversiones": "Units and conversions",
+  "nav.Almacenes": "Warehouses",
+  "nav.Ir a": "Go to",
+  "nav.Compras y recepción": "Purchasing and receiving",
+  "nav.Recetas y producción": "Recipes and production",
+  "nav.Salidas y pérdidas": "Usage and losses",
+  "nav.Conteos y ajustes": "Counts and adjustments",
+  "nav.Reportes y costos": "Reports and costs",
+  "restaurant.settings.categories": "Organize ingredients by type.",
+  "restaurant.settings.units": "Manage purchasing units and conversions.",
+  "restaurant.settings.warehouses": "Manage product storage locations.",
+  "restaurant.accessDenied": "You do not have access to this view."
 }

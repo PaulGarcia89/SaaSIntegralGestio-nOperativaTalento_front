@@ -228,7 +228,6 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
                   <Summary label="Tamaño" value={formatFileSize(selectedDocument.sizeBytes)} />
                   <Summary label="Vigencia" value={selectedDocument.expiresAt ? formatDate(selectedDocument.expiresAt) : "Sin vencimiento"} />
                 </div>
-                <InlineFeedback tone="info" title="Acceso permitido">Puedes abrir, reemplazar y actualizar la vigencia de este archivo.</InlineFeedback>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="secondary" onClick={() => void openDocumentFile(employeeId, selectedDocument, setDocumentError)}><Download className="size-4" />Ver archivo</Button>
                 </div>
@@ -339,7 +338,7 @@ function Overview({ employee, documents, snapshot }: { employee: Awaited<ReturnT
   return (
     <div className="space-y-5">
       <Card level={2}><CardContent className="p-5"><SectionTitle icon={<UserRound className="size-4" />} title="Ficha" /><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label="Correo" value={employee.email} /><Datum label="Cargo" value={employee.jobTitle ?? primary?.role ?? "Sin definir"} /><Datum label="Sucursal principal" value={primary?.branch.name ?? "Sin asignar"} /><Datum label="Estado" value={statusLabel(employee.status)} /><Datum label="Origen" value={source === "CANDIDATE_CONVERSION" ? "Conversión de candidato" : "Directorio"} /><Datum label="Documentos en el expediente" value={String(documents)} /></dl></CardContent></Card>
-      {snapshot ? <InlineFeedback tone="info" title="Cumplimiento del expediente">{snapshot.requirements.length} requisitos activos y {snapshot.alerts?.length ?? 0} alertas de cumplimiento.</InlineFeedback> : null}
+      {snapshot?.alerts?.length ? <InlineFeedback tone="warning" title={`${snapshot.alerts.length} ${snapshot.alerts.length === 1 ? "alerta de cumplimiento" : "alertas de cumplimiento"}`}>{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}
     </div>
   );
 }
@@ -520,7 +519,6 @@ function Compliance({
               </div>
             )) : <p className="text-sm text-text-secondary">No hay requisitos configurados en este expediente.</p>}
           </div>
-          <InlineFeedback tone="info" title="Dónde se completan los documentos">Desde aquí se sube el archivo asociado a cada requisito. Si el backend lo mantiene pendiente, el archivo queda guardado en el expediente para su revisión.</InlineFeedback>
         </CardContent>
       </Card>
       {snapshot.alerts?.length ? <InlineFeedback tone="warning" title="Alertas del expediente">{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}

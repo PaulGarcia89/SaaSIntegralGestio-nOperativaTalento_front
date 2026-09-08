@@ -694,7 +694,7 @@ export function TrainingCourseCreatePage() {
             ) : null}
             <VisualCourseHint />
           </div>
-          <InlineFeedback tone="info" title="El resto se configura después">Dificultad, duración, idioma, etiquetas, portada y visibilidad no son necesarios para crear el borrador.</InlineFeedback>
+          <p className="text-sm text-ink-2">Dificultad, duración, idioma, etiquetas, portada y visibilidad se configuran después, en el editor.</p>
           <div className="flex flex-col-reverse gap-3 border-t border-border-default pt-5 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={() => router.push("/training/content")}>Cancelar</Button><Button type="submit" disabled={create.isPending || Boolean(errors.length)}>{create.isPending ? "Creando…" : "Crear y diseñar curso"}</Button></div>
         </form>
       </CardContent>

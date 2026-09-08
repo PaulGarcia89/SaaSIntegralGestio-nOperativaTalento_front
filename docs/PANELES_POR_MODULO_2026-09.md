@@ -291,6 +291,18 @@ asistentes no lineales) y `freeNavigation`. Verificado con specimen a 390 y
 1440 px (tarjeta de firma, tarjeta de entrevista, carga de empleados): sin
 desbordes, controles ≥ 44 px.
 
+Cuarta pasada (misma fecha):
+
+| Módulo · pantalla | Antes | Ahora |
+|---|---|---|
+| Inventario de restaurante · nueva receta / nueva versión | Cinco «secciones» en una sola página larga; el costo, la política de inventario y el botón al final de todo | **Cuatro pasos con el `Stepper`** (qué es · rendimiento · componentes · revisar): cada paso valida solo lo suyo y «Continuar» dice qué falta en vez de apagarse; descripción y procedimiento plegados como opcionales; el precio solo en platos; resumen y política de faltantes en el último paso; costo del servidor tras guardar |
+| Inventario de restaurante · lista de recetas | «Consultar» abría el editor prefijado como «Crear receta»; la ficha de costo (`/cost`) no tenía ningún enlace | «Consultar» abre la ficha de costo (o el editor si no hay permiso comercial); la ficha gana «Nueva versión» |
+| Personas · expediente (documentos, cumplimiento) | Avisos «Acceso permitido», «Cumplimiento del expediente: N requisitos», «Dónde se completan los documentos» | Solo una alerta cuando hay alertas de cumplimiento; el resto se quitó |
+| Reclutamiento · CRM de talento (duplicados) | Caja explicando cómo se calcula el puntaje | Una línea con la cifra y la regla (nadie se fusiona sin confirmación); el cálculo en «¿Cómo se calcula?» |
+| Aprendizaje · nuevo curso | Aviso en caja «El resto se configura después» | Una línea de texto bajo el formulario |
+
+Verificado con specimen del paso «Componentes» a 390 y 1440 px.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

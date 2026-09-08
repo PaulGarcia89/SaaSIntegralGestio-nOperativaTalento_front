@@ -303,6 +303,34 @@ Cuarta pasada (misma fecha):
 
 Verificado con specimen del paso «Componentes» a 390 y 1440 px.
 
+## 2.septies Portada nueva (2026-09-08)
+
+Rediseño completo de `/` con las piezas del propio sistema, sin fotografías
+de archivo ni logotipos de clientes inventados:
+
+| Sección | Qué enseña | Movimiento |
+|---|---|---|
+| Hero | Titular con verbo que cambia (Contrata · Incorpora · Capacita · Gestiona), dos acciones y **el panel real de Reclutamiento** maquetado con los tokens de la aplicación; tres tarjetas flotantes (candidata confirmada, aviso de existencias, firma completada) | Entrada escalonada, flotación lenta, perspectiva suave en escritorio que se aplana al posar el puntero, dos luces de fondo que derivan en 30 s |
+| Cinta de módulos | Los ocho módulos con icono | Marquesina lenta (46 s), se detiene al posar el puntero o al enfocar |
+| Producto (`#producto`) | Pestañas por módulo con una maqueta de cada pantalla (pipeline, expediente de incorporación, reproductor, personas, existencias, productividad) y tres capacidades | Rotación automática cada 7 s con barra de tiempo; se detiene al elegir; flechas del teclado; en móvil las pestañas son fichas desplazables |
+| Flujo (`#soluciones`) | Ocho etapas numeradas sobre una línea | La línea se dibuja al entrar en pantalla; tarjetas escalonadas |
+| Multiempresa | Esquema empresa → tres sucursales con su alcance | Conectores que se dibujan |
+| Módulos a medida (`#planes`) | Interruptores reales por módulo con recuento en vivo | Sin animación más allá del cambio de estado |
+| Roles | Seis roles con una línea de qué ve cada uno | Escalonado |
+| Cómo funciona (`#como-funciona`), portal de candidatos, cierre y pie | Contenido anterior con la retícula y el ámbar de la marca | Escalonado |
+
+Archivos: `landing-hero.tsx`, `landing-showcase.tsx`, `landing-mocks.tsx`,
+`landing-motion.tsx` (Reveal, RevealGroup, RotatingWord, Float sobre
+framer-motion, ya presente en el proyecto), `landing-sections.tsx`,
+`page.tsx`; en `globals.css`, `.landing-grid`, `.landing-glow`,
+`.landing-marquee`, `.landing-tilt`. Todo el texto pasa por `t()`
+(`landing.hero.*`, `landing.mock.*`, `landing.strip.*`, `landing.flow.*`,
+`landing.branches.*`, `landing.plans.*`, `landing.roles.*Hint`) y la prueba
+de la portada sigue vigilando que no haya literales. `prefers-reduced-motion`
+apaga todo el movimiento (los componentes usan `useReducedMotion` y el CSS
+global corta las animaciones). Verificado a 390, 768 y 1440 px sin
+desbordes y con todos los enlaces y botones ≥ 44 px.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

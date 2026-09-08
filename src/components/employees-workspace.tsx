@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, CircleAlert, Download, FilePenLine, FileSpreadsheet, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncState } from "@/components/async-state";
 import { FormField } from "@/components/ui/form-field";
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, ResponsiveDataView, Wizard } from "@/components/design-system";
-import { DataView, PageHeader, StatusBadge, type DataColumn } from "@/components/system";
+import { DataView, InlineNote, PageHeader, ProgressMeter, StatusBadge, Stepper, type DataColumn } from "@/components/system";
 import { technicalLabel } from "@/lib/ui-labels";
 import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createDocuSealSubmission, createEmployee, deleteEmployee, fetchBranches, fetchDocuSealTemplates, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, uploadEmployeeDocument, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
@@ -741,25 +741,6 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function GuideStep({ number, title, description, icon, accent }: { number: string; title: string; description: string; icon: React.ReactNode; accent: "primary" | "info" | "success" }) {
-  return (
-    <li className="min-w-0 rounded-2xl border border-border-default bg-card p-4">
-      <div className="flex items-start gap-3">
-        <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
-          accent === "primary" ? "bg-primary/10 text-brand" : accent === "info" ? "bg-info/10 text-info" : "bg-status-success/10 text-status-success"
-        }`}>
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-brand">Paso {number}</p>
-          <p className="mt-1 font-medium">{title}</p>
-          <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
-        </div>
-      </div>
-    </li>
-  );
-}
-
 type EmployeeDirectoryWithDocuments = EmployeeDirectoryItem & {
   documentSummary?: { totalDocuments: number };
 };
@@ -787,13 +768,35 @@ export function EmployeeImportPage() {
     setFileName(file.name);
     setRows(await parseEmployeeFile(file, branches.data ?? []));
   };
+  const reset = () => { setRows([]); setFileName(""); };
+
+  /*
+   * El paso se deduce del estado, no se elige: sin archivo → Preparar; con
+   * archivo y errores → Validar; con todas las filas bien → Confirmar. Antes
+   * la pantalla explicaba los tres pasos en tres tarjetas decorativas y
+   * además enseñaba tres iconos sueltos, dos avisos y tres métricas; ahora el
+   * paso a paso de arriba es el mismo que en el resto del producto y solo se
+   * ve lo que toca en el paso actual.
+   */
+  const current = !fileName ? 0 : invalidRows.length ? 1 : 2;
+  const fileInput = (
+    <input
+      className="sr-only"
+      type="file"
+      accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values"
+      onChange={(event) => {
+        void handleFile(event.target.files?.[0]);
+        event.currentTarget.value = "";
+      }}
+    />
+  );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageHeader
         eyebrow="Personas"
         title="Cargar empleados"
-        description="Carga hasta 500 empleados desde un archivo CSV o Excel. Primero revisa los errores y luego confirma la creación."
+        description="Hasta 500 personas desde un archivo CSV o Excel. Primero se revisan los errores y después se confirma la carga."
         actions={
           <Button asChild type="button" variant="secondary">
             <Link href="/employees">
@@ -803,99 +806,55 @@ export function EmployeeImportPage() {
           </Button>
         }
       />
-      <Card level={2}>
-        <CardContent className="space-y-4 p-6">
-          <div className="overflow-hidden rounded-2xl border border-dashed border-primary/40 bg-gradient-to-br from-primary/10 via-surface-section to-info/10 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-medium">Documento de empleados</p>
-                <p className="mt-1 text-sm text-text-secondary">Formato recomendado: XLSX, CSV o TSV con columnas nombre, correo, sucursal, cargo y estado opcional.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
+      <section className="rounded-lg border border-line bg-surface-1 p-5 shadow-e1 sm:p-6">
+        <Stepper
+          label="Pasos de la carga"
+          steps={[{ label: "Preparar", icon: FileSpreadsheet }, { label: "Validar", icon: ShieldCheck }, { label: "Confirmar", icon: CheckCircle2 }]}
+          current={current}
+        />
+        <div className="mt-6 space-y-5 border-t border-line pt-6">
+          {branches.isLoading ? <AsyncState state="loading" title="Cargando sucursales" /> : null}
+
+          {current === 0 ? (
+            <div className="rounded-lg border-2 border-dashed border-line-strong bg-surface-2 p-6 text-center">
+              <Upload className="mx-auto size-8 text-ink-3" aria-hidden="true" />
+              <h2 className="mt-3 text-lg font-semibold text-ink-1">Sube el archivo con las personas</h2>
+              <p className="mx-auto mt-1 max-w-prose text-sm text-ink-2">XLSX, CSV o TSV con las columnas nombre, correo, sucursal y cargo. El estado es opcional.</p>
+              <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+                <label className="inline-flex min-h-[var(--control-h-touch)] cursor-pointer items-center justify-center gap-2 rounded-md bg-action px-5 text-base font-medium text-on-action shadow-e1 hover:opacity-90 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
+                  <Upload className="size-4" aria-hidden="true" />
+                  Subir archivo
+                  {fileInput}
+                </label>
                 <Button type="button" variant="secondary" onClick={downloadEmployeeTemplate}>
                   <Download className="size-4" />
-                  Plantilla
+                  Descargar plantilla
                 </Button>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-text-on-accent">
-                  <Upload className="size-4" />
-                  Subir archivo
-                  <input
-                    className="sr-only"
-                    type="file"
-                    accept=".xlsx,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values"
-                    onChange={(event) => {
-                      void handleFile(event.target.files?.[0]);
-                      event.currentTarget.value = "";
-                    }}
-                  />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-ink-1"><FileSpreadsheet className="mr-1.5 inline size-4 align-[-2px] text-ink-3" aria-hidden="true" />{fileName}</p>
+                  <p className="text-sm text-ink-2">{rows.length} filas leídas</p>
+                </div>
+                <label className="inline-flex min-h-[var(--control-h-base)] shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-line bg-surface-1 px-4 text-sm font-medium text-ink-1 hover:bg-surface-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
+                  <Upload className="size-4" aria-hidden="true" />
+                  Subir otro archivo
+                  {fileInput}
                 </label>
               </div>
-            </div>
-            <p className="mt-3 text-xs text-text-secondary">Si tu archivo viene desde Excel, puedes subirlo directamente en .xlsx o exportarlo como CSV/TSV.</p>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-2xl bg-surface-elevated p-3">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-brand">
-                  <FileSpreadsheet className="size-4" />
-                </div>
-              </div>
-              <div className="rounded-2xl bg-surface-elevated p-3">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-info/10 text-info">
-                  <UsersRound className="size-4" />
-                </div>
-              </div>
-              <div className="rounded-2xl bg-surface-elevated p-3">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-status-success/10 text-status-success">
-                  <Upload className="size-4" />
-                </div>
-              </div>
-            </div>
-            {fileName ? (
-              <div className="mt-4 rounded-2xl border border-border-default bg-card p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-text-primary">Archivo listo para validar</p>
-                    <p className="mt-1 truncate text-xs text-text-secondary">{fileName}</p>
-                  </div>
-                  <Badge variant={invalidRows.length ? "secondary" : "success"}>{invalidRows.length ? "Revisar" : "Listo"}</Badge>
-                </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-elevated">
-                  <div
-                    className={cn("h-full rounded-full transition-all", invalidRows.length ? "bg-status-warning" : "bg-status-success")}
-                    style={{ width: rows.length ? `${Math.max(35, Math.min(100, (validRows.length / rows.length) * 100))}%` : "0%" }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-text-secondary">
-                  {rows.length ? `${validRows.length} de ${rows.length} filas listas para cargar` : "Todavía no hay filas cargadas"}
-                </p>
-              </div>
-            ) : null}
-            <ol className="mt-4 grid gap-3 sm:grid-cols-3">
-              <GuideStep number="1" title="Preparar" description="Descarga la plantilla y organiza nombre, correo, sucursal y cargo." icon={<FileSpreadsheet className="size-4" />} accent="primary" />
-              <GuideStep number="2" title="Validar" description="Sube el archivo y revisa errores antes de confirmar la carga." icon={<ShieldCheck className="size-4" />} accent="info" />
-              <GuideStep number="3" title="Confirmar" description="Ejecuta la carga cuando todas las filas estén listas." icon={<CheckCircle2 className="size-4" />} accent="success" />
-            </ol>
-          </div>
-          {branches.isLoading ? <AsyncState state="loading" title="Cargando sucursales" /> : null}
-          {fileName ? <p className="text-sm text-text-secondary">Archivo seleccionado: <strong className="text-text-primary">{fileName}</strong></p> : null}
-          {rows.length ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <ImportMetric label="Filas leídas" value={rows.length} />
-                <ImportMetric label="Listas para cargar" value={validRows.length} tone="success" />
-                <ImportMetric label="Con errores" value={invalidRows.length} tone={invalidRows.length ? "danger" : "default"} />
-              </div>
+              <ProgressMeter label="Filas listas para cargar" value={validRows.length} max={rows.length || 1} detail={`${validRows.length} de ${rows.length} filas`} />
               {invalidRows.length ? (
-                <InlineFeedback tone="danger" title="Corrige el archivo antes de cargar">
-                  Cada fila debe tener nombre, correo válido, sucursal existente y cargo. También se bloquean correos repetidos.
-                </InlineFeedback>
+                <InlineNote tone="danger" title={`${invalidRows.length} ${invalidRows.length === 1 ? "fila tiene errores" : "filas tienen errores"}`}>
+                  Corrige esas filas en el archivo y vuelve a subirlo. Cada fila necesita nombre, correo válido, sucursal existente y cargo; los correos repetidos también se bloquean.
+                </InlineNote>
               ) : (
-                <InlineFeedback tone="success" title="Archivo listo">
-                  Todas las filas son válidas. La carga se ejecutará en una sola operación.
-                </InlineFeedback>
+                <InlineNote tone="success" title="Todas las filas son válidas">
+                  Al confirmar se crearán las {validRows.length} personas en una sola operación.
+                </InlineNote>
               )}
-              {/* La previsualización de la carga masiva tenía 680px de ancho
-                  mínimo: justo la pantalla donde alguien revisa fila a fila si
-                  el archivo está bien antes de crear decenas de personas. */}
               <div className="max-h-96 overflow-y-auto">
                 <RowTable
                   caption="Previsualización de las filas del archivo"
@@ -912,28 +871,26 @@ export function EmployeeImportPage() {
                       <td className="px-4 py-3 align-top">{row.primaryRole || "—"}</td>
                       <td className="px-4 py-3 align-top">
                         {row.errors.length ? (
-                          <span className="text-status-danger">{row.errors.join(" · ")}</span>
+                          <span className="inline-flex items-start gap-1.5 text-status-danger"><CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{row.errors.join(" · ")}</span>
                         ) : (
-                          <span className="text-status-success">Lista</span>
+                          <span className="inline-flex items-center gap-1.5 text-status-success"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />Lista</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </RowTable>
               </div>
-              {rows.length > 20 ? <p className="text-xs text-text-secondary">Se muestran las primeras 20 filas de {rows.length}.</p> : null}
+              {rows.length > 20 ? <p className="text-xs text-ink-3">Se muestran las primeras 20 filas de {rows.length}.</p> : null}
+              <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+                <Button type="button" variant="secondary" onClick={reset}>Cancelar</Button>
+                <Button type="button" disabled={!validRows.length || invalidRows.length > 0 || importEmployees.isPending} onClick={() => importEmployees.mutate()}>
+                  {importEmployees.isPending ? "Cargando..." : `Cargar ${validRows.length || ""} empleados`}
+                </Button>
+              </div>
             </>
-          ) : null}
-          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <Button asChild type="button" variant="secondary">
-              <Link href="/employees">Cancelar</Link>
-            </Button>
-            <Button type="button" disabled={!validRows.length || invalidRows.length > 0 || importEmployees.isPending} onClick={() => importEmployees.mutate()}>
-              {importEmployees.isPending ? "Cargando..." : `Cargar ${validRows.length || ""} empleados`}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -994,15 +951,6 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
 }
 
 
-
-function ImportMetric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "danger" }) {
-  return (
-    <div className="rounded-xl border border-border-default p-3">
-      <p className="text-xs text-text-secondary">{label}</p>
-      <p className={tone === "success" ? "text-xl font-semibold text-status-success" : tone === "danger" ? "text-xl font-semibold text-status-danger" : "text-xl font-semibold"}>{value}</p>
-    </div>
-  );
-}
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (

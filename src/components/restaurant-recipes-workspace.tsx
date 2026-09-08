@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Edit3, Filter, Plus, Save, Archive, CheckCircle2, Printer, GitCompareArrows, BookOpen } from "lucide-react";
+import { ArrowLeft, ChefHat, ChevronRight, Edit3, Filter, Plus, Save, Archive, CheckCircle2, Printer, GitCompareArrows, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { activateRestaurantRecipe, archiveRestaurantRecipe, createRestaurantRecipe, fetchRestaurantCategories, fetchRestaurantIngredients, fetchRestaurantRecipeCost, fetchRestaurantRecipes, fetchRestaurantUnits, getApiErrorMessage } from "@/lib/backend";
@@ -12,6 +13,8 @@ import { RowTable } from "@/components/row-table";
 import {
   ErrorState,
   SkeletonRows,
+  StatusBadge,
+  type Tone,
 } from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,12 +62,47 @@ function RecipeList({ recipes, showCosts, onNew, onOpen }: { recipes: RecipeRow[
     const cost = Number(row.calculatedCost ?? 0);
     return haystack.includes(search.toLowerCase()) && (status === "ALL" || String(row.status) === status) && (recipeType === "ALL" || String(row.recipeType ?? (row.outputIngredientId ? "PREPARATION" : "MENU_ITEM")) === recipeType) && (!onlyWarnings || cost === 0);
   });
-  return <div className="space-y-5"><PageHeader eyebrow="Producción" title="Recetas y preparaciones" description="Administra platos, preparaciones y rendimientos con costos calculados por el backend." actions={<Button onClick={onNew} disabled={!canManage}><Plus className="size-4" />Nueva receta</Button>} />{action.error ? <InlineFeedback tone="danger" title="No se pudo actualizar la receta">{getApiErrorMessage(action.error, "Revisa el estado de la receta.")}</InlineFeedback> : null}<Card level={1}><CardContent className="space-y-4 p-5"><div className="flex items-center gap-2 text-sm font-semibold"><Filter className="size-4 text-brand" />Filtros operativos</div><div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]"><div><Label htmlFor="recipe-search">Buscar</Label><Input id="recipe-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Código o nombre" /></div><div><Label htmlFor="recipe-status">Estado</Label><select id="recipe-status" className="field" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">Todos</option><option value="DRAFT">Borrador</option><option value="ACTIVE">Activa</option><option value="ARCHIVED">Archivada</option></select></div><div><Label htmlFor="recipe-type">Tipo</Label><select id="recipe-type" className="field" value={recipeType} onChange={(event) => setRecipeType(event.target.value)}><option value="ALL">Todos</option><option value="MENU_ITEM">Platos</option><option value="PREPARATION">Preparaciones</option><option value="YIELD">Rendimientos</option></select></div><label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={onlyWarnings} onChange={(event) => setOnlyWarnings(event.target.checked)} />Sin costo</label></div></CardContent></Card><div className="grid gap-4 xl:grid-cols-2">{visible.map((row) => <SecureRecipeCard key={String(row.id)} row={row} canManage={canManage} showCosts={showCosts} onOpen={onOpen} onAction={(type) => action.mutate({ id: String(row.id), type })} />)}</div>{!visible.length ? <InlineFeedback tone="info" title="Sin resultados">No hay recetas con los filtros seleccionados.</InlineFeedback> : null}</div>;
+  return <div className="space-y-5"><PageHeader eyebrow="Producción" title="Recetas y preparaciones" description="Administra platos, preparaciones y rendimientos con costos calculados por el backend." actions={<Button onClick={onNew} disabled={!canManage}><Plus className="size-4" />Nueva receta</Button>} />{action.error ? <InlineFeedback tone="danger" title="No se pudo actualizar la receta">{getApiErrorMessage(action.error, "Revisa el estado de la receta.")}</InlineFeedback> : null}<Card level={1}><CardContent className="space-y-4 p-5"><div className="flex items-center gap-2 text-sm font-semibold"><Filter className="size-4 text-brand" />Filtros operativos</div><div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]"><div><Label htmlFor="recipe-search">Buscar</Label><Input id="recipe-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Código o nombre" /></div><div><Label htmlFor="recipe-status">Estado</Label><select id="recipe-status" className="field" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">Todos</option><option value="DRAFT">Borrador</option><option value="ACTIVE">Activa</option><option value="ARCHIVED">Archivada</option></select></div><div><Label htmlFor="recipe-type">Tipo</Label><select id="recipe-type" className="field" value={recipeType} onChange={(event) => setRecipeType(event.target.value)}><option value="ALL">Todos</option><option value="MENU_ITEM">Platos</option><option value="PREPARATION">Preparaciones</option><option value="YIELD">Rendimientos</option></select></div><label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={onlyWarnings} onChange={(event) => setOnlyWarnings(event.target.checked)} />Sin costo</label></div></CardContent></Card><ul aria-label="Recetas" className="grid gap-4 xl:grid-cols-2 [&>li]:min-w-0">{visible.map((row) => <SecureRecipeCard key={String(row.id)} row={row} canManage={canManage} showCosts={showCosts} onOpen={onOpen} onAction={(type) => action.mutate({ id: String(row.id), type })} />)}</ul>{!visible.length ? <InlineFeedback tone="info" title="Sin resultados">No hay recetas con los filtros seleccionados.</InlineFeedback> : null}</div>;
 }
 
+const RECIPE_STATUS: Record<string, { label: string; tone: Tone }> = {
+  DRAFT: { label: "Borrador", tone: "neutral" },
+  ACTIVE: { label: "Activa", tone: "success" },
+  ARCHIVED: { label: "Archivada", tone: "blocked" },
+};
+
+/**
+ * Tarjeta de receta en la lista: nombre, tipo, estado en palabras y —si se
+ * puede ver— dos cifras que sí orientan: costo por porción y precio. El
+ * costo del lote está en la ficha. Un botón principal («Consultar») y el
+ * resto secundarios; «Activar» solo aparece en borradores.
+ */
 function SecureRecipeCard({ row, canManage, showCosts, onOpen, onAction }: { row: RecipeRow; canManage: boolean; showCosts: boolean; onOpen: (id: string) => void; onAction: (type: "activate" | "archive") => void }) {
   const status = String(row.status ?? "DRAFT"); const price = row.sellingPrice == null ? null : Number(row.sellingPrice);
-  return <Card level={2}><CardContent className="space-y-4 p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">{String(row.code ?? "Sin código")}</p><h2 className="mt-1 text-xl font-semibold">{String(row.name ?? "Sin nombre")}</h2><p className="mt-1 text-sm text-text-secondary">{row.outputIngredientId ? "Preparación / rendimiento" : "Plato vendido"} · versión {String(row.version ?? 1)}</p></div><Badge variant={status === "ACTIVE" ? "default" : status === "ARCHIVED" ? "secondary" : "outline"}>{status}</Badge></div>{showCosts ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-5"><Metric label="Costo lote" value={`$${Number(row.calculatedCost ?? 0).toFixed(2)}`} /><Metric label="Porción" value={`$${(Number(row.calculatedCost ?? 0) / Math.max(1, Number(row.yieldQuantity ?? 1))).toFixed(2)}`} /><Metric label="Precio venta" value={price == null ? "-" : `$${price.toFixed(2)}`} /></div> : <InlineFeedback tone="info" title="Información comercial restringida">Tu perfil no tiene permiso para consultar costos.</InlineFeedback>}<div className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" onClick={() => onOpen(String(row.id))}><ChevronRight className="size-4" />Consultar</Button>{canManage ? <Button size="sm" variant="ghost" onClick={() => onOpen(String(row.id) + "/edit")}><Edit3 className="size-4" />Nueva versión</Button> : null}{status === "DRAFT" && canManage ? <Button size="sm" onClick={() => onAction("activate")}><CheckCircle2 className="size-4" />Activar</Button> : null}{status !== "ARCHIVED" && canManage ? <Button size="sm" variant="ghost" onClick={() => onAction("archive")}><Archive className="size-4" />Archivar</Button> : null}</div></CardContent></Card>;
+  const badge = RECIPE_STATUS[status] ?? { label: status, tone: "neutral" as Tone };
+  const portionCost = Number(row.calculatedCost ?? 0) / Math.max(1, Number(row.yieldQuantity ?? 1));
+  const foodCost = price && price > 0 ? (portionCost / price) * 100 : null;
+  return <li className="flex flex-col gap-4 rounded-lg border border-line bg-surface-1 p-4 sm:p-5">
+    <div className="flex items-start gap-3">
+      <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-fill/15 text-accent-ink"><ChefHat className="size-5" /></span>
+      <div className="min-w-0 flex-1">
+        <h2 className="line-clamp-2 break-words text-base font-semibold leading-snug text-ink-1">{String(row.name ?? "Sin nombre")}</h2>
+        <p className="mt-0.5 truncate text-sm text-ink-2">{row.outputIngredientId ? "Preparación / rendimiento" : "Plato vendido"} · {String(row.code ?? "Sin código")} · v{String(row.version ?? 1)}</p>
+      </div>
+      <StatusBadge tone={badge.tone} label={badge.label} className="shrink-0" />
+    </div>
+    {showCosts ? <dl className="grid grid-cols-3 gap-3 [&>div]:min-w-0">
+      <div><dt className="text-xs text-ink-3">Costo por porción</dt><dd className="font-mono text-base font-semibold tabular-nums text-ink-1">${portionCost.toFixed(2)}</dd></div>
+      <div><dt className="text-xs text-ink-3">Precio venta</dt><dd className="font-mono text-base font-semibold tabular-nums text-ink-1">{price == null ? "—" : `$${price.toFixed(2)}`}</dd></div>
+      <div><dt className="text-xs text-ink-3">Food cost</dt><dd className={cn("font-mono text-base font-semibold tabular-nums", foodCost == null ? "text-ink-1" : foodCost > 35 ? "text-status-warning" : "text-status-success")}>{foodCost == null ? "—" : `${foodCost.toFixed(1)}%`}</dd></div>
+    </dl> : <p className="text-sm text-ink-3">Costos visibles solo con permiso comercial.</p>}
+    <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+      <Button variant="secondary" onClick={() => onOpen(String(row.id))}><ChevronRight className="size-4" />Consultar</Button>
+      {status === "DRAFT" && canManage ? <Button onClick={() => onAction("activate")}><CheckCircle2 className="size-4" />Activar</Button> : null}
+      {canManage ? <Button variant="ghost" onClick={() => onOpen(String(row.id) + "/edit")}><Edit3 className="size-4" />Nueva versión</Button> : null}
+      {status !== "ARCHIVED" && canManage ? <Button variant="ghost" onClick={() => onAction("archive")}><Archive className="size-4" />Archivar</Button> : null}
+    </div>
+  </li>;
 }
 
 function SecureRecipeCost({ recipeId, showCosts, onBack, onCookbook }: { recipeId: string; showCosts: boolean; onBack: () => void; onCookbook: () => void }) {

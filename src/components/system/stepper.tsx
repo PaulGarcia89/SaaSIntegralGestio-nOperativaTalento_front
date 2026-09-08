@@ -18,17 +18,27 @@ export type StepperStep = { label: string; icon?: LucideIcon };
  *
  * `current` es un índice desde 0. Con `onSelect`, los pasos ya recorridos se
  * pueden pulsar para volver; los posteriores no son botones.
+ *
+ * Para asistentes que no son lineales (el editor de cursos, donde cada etapa
+ * se completa por su cuenta), `completed` dice qué pasos están hechos y
+ * `freeNavigation` deja pulsar cualquiera.
  */
 export function Stepper({
   steps,
   current,
   onSelect,
+  completed,
+  freeNavigation = false,
   label = "Pasos",
   className,
 }: {
   steps: StepperStep[];
   current: number;
   onSelect?: (index: number) => void;
+  /** Hecho por paso; si falta, hecho = anterior al actual. */
+  completed?: boolean[];
+  /** Permite pulsar pasos posteriores y no solo los ya recorridos. */
+  freeNavigation?: boolean;
   label?: string;
   className?: string;
 }) {
@@ -36,11 +46,11 @@ export function Stepper({
     <nav aria-label={label} className={className}>
       <ol className="flex items-start">
         {steps.map((step, index) => {
-          const done = index < current;
           const active = index === current;
+          const done = !active && (completed ? Boolean(completed[index]) : index < current);
           const last = index === steps.length - 1;
           const Icon = step.icon;
-          const clickable = Boolean(onSelect) && done;
+          const clickable = Boolean(onSelect) && !active && (freeNavigation || done);
           const circle = (
             <span
               aria-hidden="true"
@@ -74,7 +84,7 @@ export function Stepper({
                   type="button"
                   onClick={() => onSelect?.(index)}
                   className="flex min-h-[var(--control-h-touch)] flex-col items-center rounded-md px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                  aria-label={`Volver al paso ${index + 1}: ${step.label}`}
+                  aria-label={`${done ? "Volver al" : "Ir al"} paso ${index + 1}: ${step.label}`}
                 >
                   {circle}
                   {text}

@@ -275,6 +275,22 @@ Componente nuevo del sistema: `Stepper` (`components/system/stepper.tsx`).
 Sin cambios de backend. Verificado con specimen del expediente de
 incorporación a 390 y 1440 px.
 
+Tercera pasada (misma fecha):
+
+| Módulo · pantalla | Antes | Ahora |
+|---|---|---|
+| Incorporación · `/onboarding/signatures` | Tres métricas (una decía «Proveedor activo: Interno»), un aviso que explicaba qué es un checksum, tarjetas con el estado en inglés (`PARTIALLY_SIGNED`) y un badge por firmante | Dos tarjetas de estado (esperando firma / completados) que filtran la lista; filtro Pendientes · Completados · Todos; cada paquete con **barra «1 de 2 firmas»**, «Lo siguiente» (enviar / esperando a X), firmantes con icono y palabra, vencimiento en ámbar si pasó, **un botón** (Enviar o Recordar) y plantilla/proveedor/último evento en «Más». Estados traducidos (`signatures.*` es/en) |
+| Reclutamiento · `/ats/interviews` | Calendarios (tres proveedores) y el centro de coordinación ocupaban la primera pantalla y media; la agenda empezaba muy abajo; cada entrevista con dos badges técnicos, seis datos en rejilla, badges de panel «Nombre · Rol · Estado» y cuatro botones | Orden: **mis invitaciones sin responder → agenda → (plegado) calendarios → (plegado) centro de coordinación**. Filtros en un desplegable con punto cuando hay alguno activo y «Quitar filtros». Tarjeta: persona candidata y vacante, fecha completa con horas, estado en palabras, panel con icono por respuesta, «Abrir videollamada» como botón principal; zona horaria, etapa, calendario, recursos e .ics en «Más». Nada se quitó |
+| Aprendizaje · editor de curso | Cabecera «Borrador y publicación» + barra «Avance editorial 43 %» + frase de ánimo + barra lateral con siete tarjetas + «Paso 3 de 7» encima del contenido: la etapa se decía tres veces | Estado del curso, **`Stepper` de siete pasos con iconos** (hecho por etapa, navegación libre) y una frase solo si falta algo para publicar. La «guía rápida» de tres tarjetas de la lista de cursos se quitó |
+| Personas · `/employees/import` | Zona de subida con degradado, tres iconos decorativos, tres tarjetas «Paso 1/2/3» de texto, «Archivo seleccionado» dos veces, tres métricas y dos avisos | **El paso se deduce del estado** (sin archivo → Preparar; con errores → Validar; todo bien → Confirmar) y se pinta con el `Stepper`; solo se ve lo del paso actual: subida grande con la plantilla al lado, o archivo + «filas listas» + tabla con icono por fila + Cargar |
+| Administración · sucursales | Tres cifras antes de la lista | Solo la lista (las cifras están en `/admin/dashboard`) |
+| Inventario de restaurante · recetas | Tarjeta con código en mayúsculas, estado en inglés, cinco cifras y cuatro botones iguales | Tarjeta con icono, tipo · código · versión, estado en palabras, tres cifras que orientan (costo por porción, precio, **food cost** en verde/ámbar) y Consultar como acción principal |
+
+`Stepper` gana dos opciones compatibles: `completed` (hecho por paso, para
+asistentes no lineales) y `freeNavigation`. Verificado con specimen a 390 y
+1440 px (tarjeta de firma, tarjeta de entrevista, carga de empleados): sin
+desbordes, controles ≥ 44 px.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

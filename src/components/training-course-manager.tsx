@@ -9,7 +9,9 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  CircleDashed,
   CirclePause,
   Copy,
   Eye,
@@ -25,6 +27,7 @@ import {
   Rocket,
   Target,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -36,8 +39,11 @@ import {
   ErrorState,
   Pagination,
   SkeletonRows,
+  StatusBadge,
+  Stepper,
   type DataColumn,
 } from "@/components/system";
+import { cn } from "@/lib/utils";
 import { courseDifficultyLabel } from "@/lib/training-labels";
 import { ConfirmDeleteDialog, FormDialog } from "@/components/admin-crud";
 import {
@@ -250,11 +256,9 @@ export function TrainingCourseManager() {
         }
       />
 
-      <section className="grid gap-3 md:grid-cols-3" aria-label="Guía rápida para crear cursos">
-        <Card level={2}><CardContent className="space-y-2 p-4"><p className="text-sm font-semibold">1. Parte de un curso existente</p><p className="text-sm text-text-secondary">Usa “Duplicar” en cualquier curso para reutilizar su estructura, lecciones y bloques sin publicar cambios.</p></CardContent></Card>
-        <Card level={2}><CardContent className="space-y-2 p-4"><p className="text-sm font-semibold">2. Diseña por bloques</p><p className="text-sm text-text-secondary">El editor organiza texto, video, archivos, enlaces, cuestionarios y actividades en una secuencia vertical.</p></CardContent></Card>
-        <Card level={2}><CardContent className="space-y-2 p-4"><p className="text-sm font-semibold">3. Guarda y publica con control</p><p className="text-sm text-text-secondary">Cada curso inicia como borrador y el asistente valida diseño, evaluación y vista previa antes de publicarlo.</p></CardContent></Card>
-      </section>
+      {/* La «guía rápida» de tres tarjetas (duplicar, bloques, publicar) se
+          quitó: era texto explicativo sobre la lista, y la lista es lo que la
+          persona viene a usar. Lo que enseñaba lo enseña el propio asistente. */}
 
       <Card level={2}>
         <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(240px,1fr)_repeat(3,minmax(150px,220px))]">
@@ -869,30 +873,44 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
         description="Asistente editorial con guardado por etapa y requisitos de publicación."
         actions={<Button type="button" variant="secondary" onClick={() => router.push("/training/content")}><ArrowLeft className="size-4" />Volver a cursos</Button>}
       />
-      <section className="overflow-hidden rounded-3xl border border-border-default bg-card shadow-sm">
-        <header className="border-b border-border-default p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-text-secondary">Borrador y publicación</p>{query.data ? <CourseStatusBadge status={query.data.status} /> : null}</div><p className="mt-1 text-sm text-text-secondary">Completa cada etapa a tu ritmo; los campos avanzados son opcionales.</p></div>
+      {/*
+        Antes: una cabecera con «Borrador y publicación», una barra «Avance
+        editorial 43 %», una frase de ánimo, una barra lateral con siete
+        tarjetas (título, descripción y «Recomendado») y, encima del
+        contenido, «Paso 3 de 7» otra vez. La etapa se decía tres veces.
+        Ahora: el estado del curso, el paso a paso gráfico compartido con el
+        resto del producto y, si falta algo para publicar, una sola frase.
+      */}
+      <section className="overflow-hidden rounded-lg border border-line bg-surface-1 shadow-e1">
+        <header className="space-y-4 border-b border-line p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {query.data ? <CourseStatusBadge status={query.data.status} /> : null}
             {wizard ? (
-              <div className="min-w-48">
-                <div className="mb-2 flex justify-between text-xs font-medium"><span>Avance editorial</span><span>{wizard.progressPercent}%</span></div>
-                <div className="h-2 overflow-hidden rounded-full bg-surface-section" role="progressbar" aria-label="Avance editorial del curso" aria-valuemin={0} aria-valuemax={100} aria-valuenow={wizard.progressPercent}><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${wizard.progressPercent}%` }} /></div>
-                <p className={`mt-2 text-xs ${wizard.requiredReady ? "text-status-success" : "text-status-warning"}`}>{wizard.requiredReady ? "Etapas obligatorias completas" : "Completa Información, Fundamento y Estructura para publicar"}</p>
-              </div>
+              <p className={cn("flex items-center gap-2 text-sm", wizard.requiredReady ? "text-status-success" : "text-ink-2")}>
+                {wizard.requiredReady ? <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" /> : <CircleDashed className="size-4 shrink-0" aria-hidden="true" />}
+                {wizard.requiredReady ? "Listo para publicar" : "Para publicar: Información, Fundamento y Estructura"}
+              </p>
             ) : null}
           </div>
+          {wizard ? (
+            <Stepper
+              label="Etapas del curso"
+              steps={TRAINING_COURSE_WIZARD_STEPS.map((item) => ({ label: item.label, icon: WIZARD_STEP_ICONS[item.id] }))}
+              current={currentIndex}
+              completed={TRAINING_COURSE_WIZARD_STEPS.map((item) => Boolean(wizard.completed[item.id]))}
+              freeNavigation
+              onSelect={(index) => selectStep(TRAINING_COURSE_WIZARD_STEPS[index].id)}
+            />
+          ) : null}
         </header>
-        <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
-          {query.data && wizard ? <WizardSidebar step={step} wizard={wizard} onSelect={selectStep} /> : null}
-          <div className="min-w-0 p-5 sm:p-6">
+        <div className="min-w-0 p-5 sm:p-6">
           {query.isLoading ? <SkeletonRows rows={4} label="Cargando el curso" /> : null}
           {query.isError || design.isError ? <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error ?? design.error, "Reintenta la consulta para continuar.")} onRetry={() => { void query.refetch(); void design.refetch(); }} /> : null}
           {query.data && design.data && wizard ? (
             <div className="space-y-6">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">Paso {currentIndex + 1} de {TRAINING_COURSE_WIZARD_STEPS.length}</p>
-                <h2 className="mt-1 text-2xl font-semibold">{currentStep.label}</h2>
-                <p className="text-sm text-text-secondary">{currentStep.description}</p>
+                <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xl font-semibold text-ink-1">{currentStep.label}{!currentStep.required ? <StatusBadge tone="neutral" label="Opcional, recomendado" /> : null}</h2>
+                <p className="mt-1 text-sm text-ink-2">{currentStep.description}</p>
               </div>
               {step === "GENERAL" ? (
                 <Card level={2}><CardContent className="p-5"><CourseMetadataForm
@@ -948,7 +966,6 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
               />
             </div>
           ) : null}
-          </div>
         </div>
       </section>
       <ScheduleDialog
@@ -964,49 +981,15 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
 
 type CourseWizardState = ReturnType<typeof getTrainingCourseWizardState>;
 
-function WizardSidebar({
-  step,
-  wizard,
-  onSelect,
-}: {
-  step: TrainingCourseWizardStep;
-  wizard: CourseWizardState;
-  onSelect: (step: TrainingCourseWizardStep) => void;
-}) {
-  const icons: Record<TrainingCourseWizardStep, ReactNode> = {
-    GENERAL: <FileText className="size-4" />,
-    FOUNDATION: <Target className="size-4" />,
-    STRUCTURE: <BookOpen className="size-4" />,
-    ASSESSMENT: <ClipboardCheck className="size-4" />,
-    CERTIFICATION: <Award className="size-4" />,
-    PREVIEW: <Eye className="size-4" />,
-    PUBLISH: <Rocket className="size-4" />,
-  };
-  return (
-    <aside className="sticky top-0 z-10 max-h-[22rem] overflow-y-auto border-b border-border-default bg-surface-section p-4 lg:static lg:max-h-none lg:border-b-0 lg:border-r">
-      <nav aria-label="Etapas del curso" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-        {TRAINING_COURSE_WIZARD_STEPS.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onSelect(item.id)}
-            aria-current={step === item.id ? "step" : undefined}
-            className={`flex min-h-14 items-start gap-3 rounded-xl border p-3 text-left transition-colors ${step === item.id ? "border-primary bg-surface-elevated shadow-sm" : "border-transparent hover:border-border-default hover:bg-surface-elevated"}`}
-          >
-            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${wizard.completed[item.id] ? "bg-status-success/15 text-status-success" : "bg-surface-elevated text-text-secondary"}`}>
-              {wizard.completed[item.id] ? <CheckCircle2 className="size-4" /> : icons[item.id]}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold">{index + 1}. {item.label}</span>
-              <span className="block text-xs text-text-secondary">{item.description}</span>
-              {!item.required ? <span className="mt-1 block text-[11px] text-text-secondary">Recomendado</span> : null}
-            </span>
-          </button>
-        ))}
-      </nav>
-    </aside>
-  );
-}
+const WIZARD_STEP_ICONS: Record<TrainingCourseWizardStep, LucideIcon> = {
+  GENERAL: FileText,
+  FOUNDATION: Target,
+  STRUCTURE: BookOpen,
+  ASSESSMENT: ClipboardCheck,
+  CERTIFICATION: Award,
+  PREVIEW: Eye,
+  PUBLISH: Rocket,
+};
 
 function AssessmentWizardStep({ course, onContinue }: { course: TrainingCourseDto; onContinue: () => void }) {
   return (
@@ -1353,9 +1336,9 @@ function WizardFooter({ step, onPrevious, onNext }: { step: TrainingCourseWizard
   const first = step === TRAINING_COURSE_WIZARD_STEPS[0].id;
   const last = step === TRAINING_COURSE_WIZARD_STEPS[TRAINING_COURSE_WIZARD_STEPS.length - 1].id;
   return (
-    <div className="flex justify-between border-t border-border-default pt-4">
-      <Button type="button" variant="ghost" disabled={first} onClick={onPrevious}>Anterior</Button>
-      <Button type="button" variant="ghost" disabled={last} onClick={onNext}>Siguiente</Button>
+    <div className="flex justify-between border-t border-line pt-4">
+      <Button type="button" variant="ghost" disabled={first} onClick={onPrevious}><ChevronLeft className="size-4" />Anterior</Button>
+      <Button type="button" variant="ghost" disabled={last} onClick={onNext}>Siguiente<ChevronRight className="size-4" /></Button>
     </div>
   );
 }

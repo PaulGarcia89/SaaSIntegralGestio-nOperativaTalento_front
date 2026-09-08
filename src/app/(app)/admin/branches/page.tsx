@@ -23,8 +23,6 @@ import {
   EmptyState,
   ErrorState,
   InlineNote,
-  Metric,
-  MetricRow,
   PageHeader,
   PageSection,
   SkeletonRows,
@@ -190,8 +188,6 @@ export default function BranchesPage() {
     return tenantsQuery.data?.find((tenant) => tenant.id === tenantId)?.name ?? t("branches.unknownCompany");
   }
 
-  const branches = branchesQuery.data ?? [];
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -218,19 +214,8 @@ export default function BranchesPage() {
         />
       ) : (
         <>
-          <MetricRow>
-            <Metric label={t("branches.title")} value={String(branches.length)} />
-            {hasGlobalGovernance ? (
-              <Metric
-                label={t("branches.companiesWithBranches")}
-                value={String(new Set(branches.map((branch) => branch.tenantId)).size)}
-              />
-            ) : null}
-            <Metric
-              label={t("branches.citiesCovered")}
-              value={String(new Set(branches.map((branch) => branch.city.trim().toLocaleLowerCase("es"))).size)}
-            />
-          </MetricRow>
+          {/* Las tres cifras (sucursales, empresas, ciudades) viven en el panel
+              del módulo; aquí lo que se administra es la lista. */}
 
           {open ? (
             <PageSection

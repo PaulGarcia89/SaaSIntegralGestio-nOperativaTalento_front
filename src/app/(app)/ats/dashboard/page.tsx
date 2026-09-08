@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowRight, BriefcaseBusiness, CircleCheck, CircleSlash, Inbox, MessagesSquare, Plus } from "lucide-react";
 import { MobileActionBar, TaskCard } from "@/components/simple/simple-ui";
+import { HiringEmbeddedPanel } from "@/components/hiring-contract-workspace";
 import {
   ActiveContext,
   ErrorState,
@@ -525,6 +526,25 @@ export default function TodayPage() {
           </>
         )}
       </ChartCard>
+
+      {/* ---- Contratación ------------------------------------------------
+          Última fase del mismo módulo. Tenía su propio «Dashboard de
+          contratación» en el menú, es decir, dos dashboards para Reclutamiento.
+          Ahora es una sección de este: cifras, siguiente paso, reparto por
+          etapa y las que requieren atención. La lista completa sigue en
+          `/hiring`. */}
+      <PageSection
+        title={t("hiring.dashboard.title")}
+        description={t("hiring.dashboard.description")}
+        id="contrataciones"
+        actions={
+          <Button asChild variant="secondary">
+            <Link href="/hiring">{t("hiring.dashboard.openList")}</Link>
+          </Button>
+        }
+      >
+        <HiringEmbeddedPanel />
+      </PageSection>
 
       <MobileActionBar>
         <Button asChild size="lg" className="w-full">

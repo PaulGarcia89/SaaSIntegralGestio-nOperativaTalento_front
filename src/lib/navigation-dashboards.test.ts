@@ -14,7 +14,7 @@ import { appNavigation, navSections } from "@/lib/navigation";
 const SIN_DASHBOARD_PROPIO = new Set(["inicio", "reportes", "plataforma"]);
 
 /** Rutas cortas que se conservan por compatibilidad pero redirigen al dashboard. */
-const ALIAS_REDIRIGIDOS = ["/ats", "/people", "/productivity", "/inventory/restaurant", "/onboarding"];
+const ALIAS_REDIRIGIDOS = ["/ats", "/people", "/productivity", "/inventory/restaurant", "/onboarding", "/hiring/dashboard"];
 
 describe("cada módulo empieza por su dashboard", () => {
   for (const section of navSections) {
@@ -26,6 +26,9 @@ describe("cada módulo empieza por su dashboard", () => {
       expect(visibles[0].label.startsWith("Dashboard"), `${section.id}: primer ítem = «${visibles[0].label}»`).toBe(true);
       expect(visibles[0].href.endsWith("/dashboard"), `${section.id}: primer href = ${visibles[0].href}`).toBe(true);
       expect(visibles[0].icon).toBe("dashboard");
+      // Un solo dashboard por módulo: si ya existe, no se duplica.
+      const dashboards = visibles.filter((item) => item.label.startsWith("Dashboard") || item.href.endsWith("/dashboard"));
+      expect(dashboards.map((item) => item.href), `${section.id}: dashboards duplicados`).toHaveLength(1);
     });
   }
 
@@ -46,7 +49,7 @@ describe("cada módulo empieza por su dashboard", () => {
     const dashboards = appNavigation.filter(
       (item) => item.href.endsWith("/dashboard") && item.href !== "/dashboard" && item.showInNavigation !== false,
     );
-    expect(dashboards.length).toBeGreaterThanOrEqual(9);
+    expect(dashboards.length).toBe(8);
     for (const dashboard of dashboards) {
       const hermanos = appNavigation.filter(
         (item) => item.section === dashboard.section && item.group === dashboard.group && item.href !== dashboard.href,

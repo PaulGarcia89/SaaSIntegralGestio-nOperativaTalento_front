@@ -94,13 +94,19 @@ const TODOS = "ALL";
  * completa con vistas, filtros y buscador. Antes eran una sola pantalla y el
  * panel se repetía cada vez que alguien venía a buscar una contratación.
  */
-type HiringViewMode = "dashboard" | "list";
+/**
+ * `embedded`: el mismo panel sin cabecera propia, para vivir DENTRO del
+ * dashboard de Reclutamiento (`/ats/dashboard`). Un módulo tiene un solo
+ * dashboard; contratación es una fase de reclutamiento, no un módulo aparte.
+ */
+type HiringViewMode = "dashboard" | "list" | "embedded";
 
 const MAX_ATENCION = 4;
 
 function HiringModuleDashboard({ mode }: { mode: HiringViewMode }) {
   const { locale, t } = useLocale();
-  const esDashboard = mode === "dashboard";
+  const esDashboard = mode === "dashboard" || mode === "embedded";
+  const embebido = mode === "embedded";
   const { can, tenantBranches } = useAppStore();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<HiringListView>(HIRING_GUIDED_QUEUE_ENABLED ? "ATTENTION" : "ALL");
@@ -206,14 +212,17 @@ function HiringModuleDashboard({ mode }: { mode: HiringViewMode }) {
   if (!allowed) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow={t("hiring.list.eyebrow")} title={esDashboard ? t("hiring.dashboard.title") : t("hiring.list.title")} />
+        {embebido ? null : (
+          <PageHeader eyebrow={t("hiring.list.eyebrow")} title={esDashboard ? t("hiring.dashboard.title") : t("hiring.list.title")} />
+        )}
         <EmptyState reason="no-records" title={t("hiring.panel.noAccessTitle")} description={t("hiring.panel.noAccessHelp")} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-4">
+    <div className={embebido ? "space-y-6" : "space-y-6 pb-4"}>
+      {embebido ? null : (
       <PageHeader
         eyebrow={t("hiring.list.eyebrow")}
         title={esDashboard ? t("hiring.dashboard.title") : t("hiring.list.title")}
@@ -230,8 +239,9 @@ function HiringModuleDashboard({ mode }: { mode: HiringViewMode }) {
           )
         }
       />
+      )}
 
-      <ActiveContext />
+      {embebido ? null : <ActiveContext />}
 
       {!esDashboard ? null : (
       <>
@@ -510,6 +520,11 @@ export function HiringContractListPage() {
 
 export function HiringDashboardPage() {
   return <HiringModuleDashboard mode="dashboard" />;
+}
+
+/** Panel de contratación para incrustar en el dashboard de Reclutamiento. */
+export function HiringEmbeddedPanel() {
+  return <HiringModuleDashboard mode="embedded" />;
 }
 
 /* =============================== Detalle ================================ */

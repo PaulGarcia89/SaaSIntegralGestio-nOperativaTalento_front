@@ -168,7 +168,7 @@ se llama «Dashboard» en todos los módulos por igual.
 | Módulo | Dashboard | Ruta corta anterior | Qué queda en la operación |
 |---|---|---|---|
 | Reclutamiento | `/ats/dashboard` | `/ats` → redirige | Vacantes, pipeline, candidatos, entrevistas… sin cambios |
-| Contratación | `/hiring/dashboard` | — | `/hiring` conserva la lista con vistas, filtros y buscador (ya sin el panel repetido) |
+| Contratación | sección «Contratación» dentro de `/ats/dashboard` (un módulo, un dashboard) | `/hiring/dashboard` → redirige a `/ats/dashboard#contrataciones` | `/hiring` conserva la lista con vistas, filtros y buscador (ya sin el panel repetido) |
 | Personas | `/people/dashboard` | `/people` → redirige | `/employees` directorio |
 | Incorporación | `/onboarding/dashboard` (**nuevo**) | `/onboarding` → redirige aquí (antes iba a Incorporaciones) | Incorporaciones, Documentos y firmas, analítica, cumplimiento |
 | Aprendizaje | `/training/dashboard` | — | `/training` conserva las pestañas (prioridades, mis cursos, asignaciones, lanzamientos, supervisión) sin el panel encima |
@@ -191,6 +191,10 @@ Paneles nuevos y sus datos reales:
   `GET /branches`, `GET /users` del tenant, `GET /subscriptions` y
   `GET /audit/logs?pageSize=6`, cada uno solo si el rol tiene el permiso
   correspondiente; sin permiso la tarjeta lo dice en vez de quedar vacía.
+
+Regla añadida (2026-09-08): **un solo dashboard por módulo y siempre el primer
+ítem del menú**. `navigation-dashboards.test.ts` comprueba, sobre el menú real,
+que cada sección empieza por «Dashboard» y que no hay dos en la misma sección.
 
 Invariantes conservadas:
 

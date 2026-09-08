@@ -340,7 +340,9 @@ function SidebarContent({
                     aria-expanded={open}
                     aria-controls={panelId}
                     className={cn(
-                      "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-semibold transition-colors",
+                      // Misma altura mínima que los enlaces: el título de sección es
+                      // el control que se pulsa para abrirla, y en móvil medía 32px.
+                      "flex min-h-[var(--control-h-base)] w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-semibold transition-colors",
                       containsActive
                         ? "text-sidebar-primary"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",

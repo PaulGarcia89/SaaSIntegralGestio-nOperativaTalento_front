@@ -40,7 +40,6 @@ import {
   type DataColumn,
 } from "@/components/system";
 import { progressStatusTone } from "@/lib/training-labels";
-import { AdminTrainingPanel, LearnerTrainingPanel } from "@/components/training/training-module-panel";
 import {
   ConfirmPanel,
   ImpactReview,
@@ -140,21 +139,18 @@ export function TrainingLearningHub() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Aprendizaje"
-        title="Centro de aprendizaje"
-        description="Continúa tus cursos y consulta claramente qué formación requiere tu atención."
+        title="Cursos"
+        description="Continúa tus cursos, asigna formación y supervisa el avance del programa."
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/training/dashboard">Ver dashboard</Link>
+          </Button>
+        }
       />
 
-      {/*
-        Panel del módulo, en singular.
-
-        Quien administra ve el estado del PROGRAMA; quien aprende ve SU
-        formación. Son dos preguntas distintas y enseñarlas juntas obliga a
-        leer la pantalla dos veces para saber cuál se está mirando. Quien
-        administra y además tiene cursos asignados los encuentra en «Mis
-        cursos», que es el conmutador explícito entre los dos papeles.
-      */}
-      {canManageTraining ? <AdminTrainingPanel /> : <LearnerTrainingPanel />}
-
+      {/* El panel del módulo (estado, atención, siguiente paso) vive en
+          `/training/dashboard`, la primera pantalla del módulo. Aquí queda la
+          operación: cursos, asignaciones, lanzamientos y supervisión. */}
       <Tabs defaultValue={canManageTraining ? "priorities" : "mine"}>
         <TabsList aria-label="Secciones de aprendizaje">
           {canManageTraining ? (

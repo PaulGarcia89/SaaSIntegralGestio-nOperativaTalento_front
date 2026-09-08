@@ -711,6 +711,46 @@ input, select, textarea {
 }
 
 /* ============================================================================
+   MENÚ LATERAL: FOCO POR ATENUACIÓN
+   ============================================================================
+   El efecto del menú de claude.com: al posar el puntero sobre un enlace, el
+   resto de la lista se atenúa y el enlace señalado queda a plena tinta. La
+   atención va a UN destino sin subrayados ni fondos nuevos.
+
+   · Solo con puntero real (`hover: hover`): en táctil no hay «posar», y un
+     menú medio apagado tras el primer toque se leería como deshabilitado.
+   · El foco de teclado nunca se atenúa: quien navega con Tab necesita ver
+     dónde está aunque el puntero repose sobre otro enlace.
+   · El destino activo (`aria-current="page"`) tampoco se apaga del todo: es
+     la respuesta a «dónde estoy» y tiene que seguir leyéndose.
+   · Si el navegador no soporta `:has()`, el menú se queda como estaba. Vive en
+     `@layer components`: ninguna utilidad pone opacidad a estos enlaces, y
+     así una utilidad futura podría hacerlo sin pelear con esta regla.
+   ========================================================================== */
+@layer components {
+  @media (hover: hover) {
+    .nav-spotlight :is(a, button) {
+      transition:
+        opacity 180ms ease,
+        color 150ms ease,
+        background-color 150ms ease;
+    }
+    .nav-spotlight:has(:is(a, button):hover) :is(a, button):not(:hover):not(:focus-visible) {
+      opacity: 0.42;
+    }
+    .nav-spotlight:has(:is(a, button):hover) a[aria-current="page"]:not(:hover):not(:focus-visible) {
+      opacity: 0.7;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-spotlight :is(a, button) {
+      transition: none;
+    }
+  }
+}
+
+/* ============================================================================
    ARMAZÓN
    ========================================================================== */
 

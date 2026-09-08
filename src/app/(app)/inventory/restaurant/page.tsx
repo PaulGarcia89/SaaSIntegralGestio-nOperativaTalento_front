@@ -1,5 +1,6 @@
-import { RestaurantInventoryShell } from "@/components/restaurant-inventory-shell";
+import { redirect } from "next/navigation";
 
-export default function RestaurantInventoryPage() {
-  return <RestaurantInventoryShell />;
+/** La primera pantalla del módulo es su dashboard. La ruta corta se conserva por compatibilidad con enlaces guardados. */
+export default function RestaurantInventoryIndexPage() {
+  redirect("/inventory/restaurant/dashboard");
 }

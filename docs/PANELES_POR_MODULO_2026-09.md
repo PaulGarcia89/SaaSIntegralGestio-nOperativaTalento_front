@@ -158,6 +158,52 @@ Odoo devolvieron solo el menú de navegación, sin cuerpo, en cinco versiones.
 
 ---
 
+## 2.ter Una página «Dashboard» en cada módulo (2026-09-08)
+
+Hasta aquí el panel de cada módulo vivía **dentro** de su primera pantalla
+operativa (encima de la lista, encima de las pestañas). Ahora cada módulo tiene
+una ruta propia `…/dashboard`, es el **primer ítem** de su sección en el menú y
+se llama «Dashboard» en todos los módulos por igual.
+
+| Módulo | Dashboard | Ruta corta anterior | Qué queda en la operación |
+|---|---|---|---|
+| Reclutamiento | `/ats/dashboard` | `/ats` → redirige | Vacantes, pipeline, candidatos, entrevistas… sin cambios |
+| Contratación | `/hiring/dashboard` | — | `/hiring` conserva la lista con vistas, filtros y buscador (ya sin el panel repetido) |
+| Personas | `/people/dashboard` | `/people` → redirige | `/employees` directorio |
+| Incorporación | `/onboarding/dashboard` (**nuevo**) | `/onboarding` → redirige aquí (antes iba a Incorporaciones) | Incorporaciones, Documentos y firmas, analítica, cumplimiento |
+| Aprendizaje | `/training/dashboard` | — | `/training` conserva las pestañas (prioridades, mis cursos, asignaciones, lanzamientos, supervisión) sin el panel encima |
+| Productividad | `/productivity/dashboard` | `/productivity` → redirige | Cámaras |
+| Inventario de activos | `/inventory/assets/dashboard` (**nuevo componente**) | — | `/inventory/assets` conserva la lista, fichas y diálogos; lee `?status=` y `?search=` de la URL para que las tarjetas del dashboard abran lo que prometen |
+| Inventario de restaurante | `/inventory/restaurant/dashboard` (ya existía, ahora primero y visible) | `/inventory/restaurant` → redirige | Todo lo demás igual |
+| Empresas y sucursales | `/admin/dashboard` (**nuevo**) | — | `/admin` sigue siendo el centro administrativo (índice de destinos) |
+
+Paneles nuevos y sus datos reales:
+
+- **Incorporación** (`components/onboarding/onboarding-module-dashboard.tsx`):
+  `GET /onboarding/analytics` (en riesgo, cumplimiento documental) y
+  `GET /onboarding/flows?pageSize=50` (en curso, tareas vencidas, alertas,
+  línea de tiempo). Si hay más de 50, se dice que las cifras son parciales.
+- **Inventario de activos** (`components/inventory/assets-module-dashboard.tsx`):
+  `GET /inventory/analytics` (cifras), `GET /inventory/assets` ordenado por
+  `updatedAt` («cambió hace poco»), `GET /inventory/maintenance` (atrasadas,
+  solo con `asset_inventory.manage`).
+- **Empresas y sucursales** (`components/admin/admin-module-dashboard.tsx`):
+  `GET /branches`, `GET /users` del tenant, `GET /subscriptions` y
+  `GET /audit/logs?pageSize=6`, cada uno solo si el rol tiene el permiso
+  correspondiente; sin permiso la tarjeta lo dice en vez de quedar vacía.
+
+Invariantes conservadas:
+
+- Ninguna ruta se elimina: las rutas cortas siguen declaradas en `navigation.ts`
+  (fuera del menú) y redirigen con `redirect()` del servidor.
+- Cada dashboard exige el mismo módulo y permiso que el resto de su sección
+  (`navigation-dashboards.test.ts` lo comprueba sobre el menú real).
+- El pipeline `/ats/pipeline` y `/inventory/restaurant/dashboard` conservan sus
+  políticas; `/onboarding/dashboard` hereda `onboarding.view`.
+- Sin cambios de backend, modelos, migraciones ni permisos.
+
+---
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

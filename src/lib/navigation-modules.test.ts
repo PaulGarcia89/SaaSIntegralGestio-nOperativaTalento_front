@@ -147,7 +147,7 @@ describe("los dos inventarios son módulos independientes", () => {
 
   it("contratar restaurante no exige contratar activos", () => {
     const restaurant = withOnly("restaurant_inventory");
-    expect(restaurant.some((item) => item.href === "/inventory/restaurant")).toBe(true);
+    expect(restaurant.some((item) => item.href === "/inventory/restaurant/dashboard")).toBe(true);
     expect(restaurant.some((item) => item.module === "asset_inventory")).toBe(false);
   });
 

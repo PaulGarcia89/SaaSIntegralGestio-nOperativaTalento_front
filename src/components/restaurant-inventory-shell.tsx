@@ -46,7 +46,7 @@ import type { PermissionKey } from "@/lib/contracts";
 type InventoryItem = { key: string; label: string; href: string; permission: PermissionKey };
 type InventoryTask = { key: string; label: string; description: string; items: InventoryItem[] };
 const taskGroups: InventoryTask[] = [
-  { key: "overview", label: "Inicio", description: "Tareas y pendientes", items: [{ key: "dashboard", label: "Resumen", href: "/inventory/restaurant", permission: "restaurant_inventory.view" }] },
+  { key: "overview", label: "Inicio", description: "Tareas y pendientes", items: [{ key: "dashboard", label: "Dashboard", href: "/inventory/restaurant/dashboard", permission: "restaurant_inventory.view" }] },
   { key: "daily", label: "Operación diaria", description: "Registros frecuentes", items: [
     { key: "receipts", label: "Recibir productos", href: "/inventory/restaurant/receipts", permission: "restaurant_inventory.manage" }, { key: "production", label: "Registrar producción", href: "/inventory/restaurant/production", permission: "restaurant_inventory.manage" }, { key: "consumption", label: "Registrar salida", href: "/inventory/restaurant/consumption", permission: "restaurant_inventory.manage" }, { key: "waste", label: "Registrar merma", href: "/inventory/restaurant/waste", permission: "restaurant_inventory.manage" }, { key: "stock-counts", label: "Realizar conteo", href: "/inventory/restaurant/stock-counts", permission: "restaurant_inventory.manage" }, { key: "transfers", label: "Transferir productos", href: "/inventory/restaurant/transfers", permission: "restaurant_inventory.manage" },
   ] },

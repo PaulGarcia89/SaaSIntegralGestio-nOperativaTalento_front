@@ -88,8 +88,19 @@ const TODOS = "ALL";
  * Todo sale de la MISMA consulta. Cuando no hay búsqueda escrita, la clave de
  * las cifras y la de la lista coinciden y React Query hace una sola petición.
  */
-function HiringModuleDashboard() {
+/**
+ * `dashboard`: primera pantalla del módulo (qué hago ahora, cómo va, en qué
+ * etapa está cada una, cuáles requieren atención). `list`: la operación
+ * completa con vistas, filtros y buscador. Antes eran una sola pantalla y el
+ * panel se repetía cada vez que alguien venía a buscar una contratación.
+ */
+type HiringViewMode = "dashboard" | "list";
+
+const MAX_ATENCION = 4;
+
+function HiringModuleDashboard({ mode }: { mode: HiringViewMode }) {
   const { locale, t } = useLocale();
+  const esDashboard = mode === "dashboard";
   const { can, tenantBranches } = useAppStore();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<HiringListView>(HIRING_GUIDED_QUEUE_ENABLED ? "ATTENTION" : "ALL");
@@ -111,7 +122,7 @@ function HiringModuleDashboard() {
   const lista = useQuery({
     queryKey: ["hiring-contracts", search],
     queryFn: () => fetchHiringContracts({ search: search || undefined }),
-    enabled: allowed,
+    enabled: allowed && !esDashboard,
   });
 
   const todas = useMemo(() => panel.data?.data ?? [], [panel.data]);
@@ -179,7 +190,8 @@ function HiringModuleDashboard() {
   ];
 
   // El primero de la cola de «te toca a ti», ya ordenado por urgencia.
-  const siguiente = todas.filter((item) => hiringViewMatches(item, "ATTENTION")).sort(porUrgencia)[0];
+  const atencion = todas.filter((item) => hiringViewMatches(item, "ATTENTION")).sort(porUrgencia);
+  const siguiente = atencion[0];
 
   const reparto = HIRING_STAGES.map((etapa) => ({
     id: etapa.id,
@@ -194,7 +206,7 @@ function HiringModuleDashboard() {
   if (!allowed) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow={t("hiring.list.eyebrow")} title={t("hiring.list.title")} />
+        <PageHeader eyebrow={t("hiring.list.eyebrow")} title={esDashboard ? t("hiring.dashboard.title") : t("hiring.list.title")} />
         <EmptyState reason="no-records" title={t("hiring.panel.noAccessTitle")} description={t("hiring.panel.noAccessHelp")} />
       </div>
     );
@@ -204,17 +216,25 @@ function HiringModuleDashboard() {
     <div className="space-y-6 pb-4">
       <PageHeader
         eyebrow={t("hiring.list.eyebrow")}
-        title={t("hiring.list.title")}
-        description={t("hiring.list.description")}
+        title={esDashboard ? t("hiring.dashboard.title") : t("hiring.list.title")}
+        description={esDashboard ? t("hiring.dashboard.description") : t("hiring.list.description")}
         actions={
-          <Button asChild variant="secondary">
-            <Link href="/ats/candidates">{t("hiring.list.seeCandidates")}</Link>
-          </Button>
+          esDashboard ? (
+            <Button asChild variant="secondary">
+              <Link href="/hiring">{t("hiring.dashboard.openList")}</Link>
+            </Button>
+          ) : (
+            <Button asChild variant="secondary">
+              <Link href="/ats/candidates">{t("hiring.list.seeCandidates")}</Link>
+            </Button>
+          )
         }
       />
 
       <ActiveContext />
 
+      {!esDashboard ? null : (
+      <>
       {/* ---- 1. Qué hago ahora ------------------------------------------ */}
       {panel.isLoading ? (
         <SkeletonRows rows={3} label={t("hiring.list.loading")} />
@@ -288,7 +308,31 @@ function HiringModuleDashboard() {
         </ul>
       </PageSection>
 
-      {/* ---- 4. La lista, con sus filtros ------------------------------- */}
+      {/* ---- 4. Las que requieren atención, resumidas -------------------
+          Las primeras de la cola «te toca a ti». La lista completa, con
+          vistas y filtros, es la segunda pantalla del módulo. */}
+      {panel.data && atencion.length > 0 ? (
+        <PageSection
+          title={t("hiring.metrics.yours")}
+          description={t("hiring.panel.yoursContext")}
+          id="atencion"
+          actions={
+            <Button asChild variant="outline">
+              <Link href="/hiring">{t("hiring.dashboard.openList")}</Link>
+            </Button>
+          }
+        >
+          <EntityCardList label={t("hiring.metrics.yours")} columns={2}>
+            {atencion.slice(0, MAX_ATENCION).map((item) => (
+              <HiringCaseCard key={item.id} item={item} />
+            ))}
+          </EntityCardList>
+        </PageSection>
+      ) : null}
+      </>
+      )}
+
+      {esDashboard ? null : (
       <PageSection title={t("hiring.panel.listTitle")} id="contrataciones">
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label={t("hiring.list.viewsAria")}>
@@ -386,6 +430,7 @@ function HiringModuleDashboard() {
           </div>
         </div>
       </PageSection>
+      )}
     </div>
   );
 }
@@ -460,7 +505,11 @@ function HiringCaseCard({ item }: { item: HiringContractDto }) {
 }
 
 export function HiringContractListPage() {
-  return <HiringModuleDashboard />;
+  return <HiringModuleDashboard mode="list" />;
+}
+
+export function HiringDashboardPage() {
+  return <HiringModuleDashboard mode="dashboard" />;
 }
 
 /* =============================== Detalle ================================ */

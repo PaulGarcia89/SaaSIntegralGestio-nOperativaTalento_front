@@ -414,7 +414,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
       <MobileActionBar>
         <Button asChild size="lg" className="w-full">
-          <Link href="/ats">Volver a Hoy</Link>
+          <Link href="/ats/dashboard">Volver al dashboard</Link>
         </Button>
       </MobileActionBar>
 

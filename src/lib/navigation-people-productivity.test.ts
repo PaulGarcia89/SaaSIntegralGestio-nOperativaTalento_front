@@ -48,8 +48,8 @@ const menu = (ctx: RouteAccessContext) =>
     .filter((item) => item.showInNavigation !== false && evaluateRouteAccess(item, ctx).allowed)
     .map((item) => item.href);
 
-const PERSONAS = ["/people", "/employees"];
-const PRODUCTIVIDAD = ["/productivity", "/productivity/cameras"];
+const PERSONAS = ["/people/dashboard", "/employees"];
+const PRODUCTIVIDAD = ["/productivity/dashboard", "/productivity/cameras"];
 
 describe("Personas y Productividad son módulos independientes", () => {
   it("usuario con acceso solo a Personas: ve Personas y no ve Productividad", () => {
@@ -146,8 +146,10 @@ describe("navegación: dos secciones con nombre e icono propios", () => {
   it("cada sección tiene una ruta principal propia", () => {
     const personas = appNavigation.filter((item) => item.section === "people" && item.showInNavigation !== false);
     const productividad = appNavigation.filter((item) => item.section === "productivity" && item.showInNavigation !== false);
-    expect(personas[0]?.href).toBe("/people");
-    expect(productividad[0]?.href).toBe("/productivity");
+    expect(personas[0]?.href).toBe("/people/dashboard");
+    expect(personas[0]?.label).toBe("Dashboard");
+    expect(productividad[0]?.href).toBe("/productivity/dashboard");
+    expect(productividad[0]?.label).toBe("Dashboard");
   });
 });
 

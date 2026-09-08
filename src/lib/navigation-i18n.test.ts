@@ -56,7 +56,7 @@ describe("el menú lateral está traducido", () => {
   it("ninguna entrada quedó con el mismo texto en los dos idiomas por descuido", () => {
     // Hay términos que se escriben igual —«Pipeline», «Marketing»—; el resto
     // coincidiendo es señal de una traducción copiada sin traducir.
-    const IGUALES_A_PROPOSITO = new Set(["Pipeline", "Onboarding"]);
+    const IGUALES_A_PROPOSITO = new Set(["Pipeline", "Onboarding", "Dashboard"]);
     const sospechosas = etiquetas
       .filter((label) => es[`nav.${label}`] === en[`nav.${label}`])
       .filter((label) => !IGUALES_A_PROPOSITO.has(es[`nav.${label}`]))

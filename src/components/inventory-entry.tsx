@@ -31,7 +31,7 @@ export function InventoryEntry() {
   const restaurantEnabled = hasModule("restaurant_inventory");
   const enabledCount = Number(assetEnabled) + Number(restaurantEnabled);
   const ready = !isBootstrapping && accessContextVerified && Boolean(currentTenant.id);
-  const only = enabledCount === 1 ? (assetEnabled ? "/inventory/assets" : "/inventory/restaurant") : null;
+  const only = enabledCount === 1 ? (assetEnabled ? "/inventory/assets/dashboard" : "/inventory/restaurant/dashboard") : null;
 
   // Elegir entre una sola opción no es elegir. Con un único inventario
   // contratado esta pantalla era una tarjeta y un clic de más.
@@ -70,7 +70,7 @@ export function InventoryEntry() {
               icon={Boxes}
               title="Inventario de activos"
               description="Equipos, mobiliario y herramientas: custodia, entregas, devoluciones y mantenimiento."
-              href="/inventory/assets"
+              href="/inventory/assets/dashboard"
             />
           ) : null}
           {restaurantEnabled ? (
@@ -78,7 +78,7 @@ export function InventoryEntry() {
               icon={ChefHat}
               title="Inventario de restaurante"
               description="Ingredientes y recetas: entradas, consumo, producción, mermas y conteos."
-              href="/inventory/restaurant"
+              href="/inventory/restaurant/dashboard"
             />
           ) : null}
         </div>

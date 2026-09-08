@@ -377,7 +377,7 @@ describe("secciones de navegación", () => {
     expect(visibleSections(soloAdmin)).toEqual(["administracion"]);
 
     const mezcla = appNavigation.filter((item) =>
-      ["/admin/users", "/ats", "/dashboard"].includes(item.href),
+      ["/admin/users", "/ats/dashboard", "/dashboard"].includes(item.href),
     );
     // El orden sale de `navSections`, no del orden en que llegan los ítems.
     expect(visibleSections(mezcla)).toEqual(["inicio", "ats", "administracion"]);

@@ -397,7 +397,7 @@ export const DESCRIBED_AUDIT_ACTIONS = Object.keys(ACTIONS);
  * global que el servidor no tiene.
  */
 export function matchesAuditEntry(
-  entry: { action?: string; route?: string | null; userId?: string | null },
+  entry: { action?: string | null; route?: string | null; userId?: string | null },
   term: string,
 ): boolean {
   const needle = term.trim().toLocaleLowerCase("es");

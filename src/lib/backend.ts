@@ -2279,7 +2279,7 @@ export function assignEmployeePrimaryBranch(id: string, branchId: string, role: 
   });
 }
 
-export type PlatformAuditEntry = { id: string; action: string; route?: string | null; branchId?: string | null; userId?: string | null; createdAt: string; metadata?: unknown };
+export type PlatformAuditEntry = { id: string; action: string | null; route?: string | null; branchId?: string | null; userId?: string | null; createdAt: string; metadata?: unknown };
 export type PlatformAuditResponse = { items: PlatformAuditEntry[]; total: number; page: number; pageSize: number };
 
 export function fetchPlatformAudit(input: { action?: string; page?: number; pageSize?: number } = {}) {

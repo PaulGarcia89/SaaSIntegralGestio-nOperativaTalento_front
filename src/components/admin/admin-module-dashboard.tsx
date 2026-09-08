@@ -20,6 +20,7 @@ import {
 } from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { fetchBranches, fetchPlatformAudit, fetchSubscriptions, fetchTenantUsers, getApiErrorMessage } from "@/lib/backend";
+import { auditActionLabel } from "@/lib/audit-labels";
 import { moduleLabels, roleLabels } from "@/lib/ui-labels";
 import { formatDate, formatDateTime, planTierLabel, subscriptionStatusInfo } from "@/lib/platform-labels";
 import { useAppStore } from "@/store/app-store";
@@ -116,7 +117,7 @@ export function AdminModuleDashboard() {
 
   const cambios: TimelineEntry[] = (auditoria.data?.items ?? []).map((entrada) => ({
     id: entrada.id,
-    title: humanizarAccion(entrada.action),
+    title: auditActionLabel(entrada.action),
     detail: entrada.route ?? undefined,
     when: formatDateTime(entrada.createdAt),
     who: entrada.userId ? nombreUsuario(entrada.userId, usuarios.data) : undefined,
@@ -415,10 +416,6 @@ function describirDias(dias: number) {
   if (dias < 0) return `hace ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "día" : "días"}`;
   if (dias === 0) return "hoy";
   return `en ${dias} ${dias === 1 ? "día" : "días"}`;
-}
-
-function humanizarAccion(accion: string) {
-  return accion.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().replace(/^./, (letra) => letra.toUpperCase());
 }
 
 function nombreUsuario(id: string, usuarios?: Array<{ id: string; name?: string | null; email?: string | null }>) {

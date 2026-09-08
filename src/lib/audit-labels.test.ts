@@ -111,8 +111,8 @@ describe("acciones desconocidas", () => {
     expect(auditActionLabel("TRANSFER_SOMETHING_NEW")).toBe("Transfer something new");
   });
 
-  it("un evento sin acción lo dice en vez de quedarse vacío", () => {
-    const info = auditActionInfo(undefined);
+  it.each([undefined, null, "", "   "])("un evento sin acción (%s) lo dice en vez de quedarse vacío", (action) => {
+    const info = auditActionInfo(action);
     expect(info.label).toBe("Acción sin registrar");
     expect(info.detail.length).toBeGreaterThan(0);
   });

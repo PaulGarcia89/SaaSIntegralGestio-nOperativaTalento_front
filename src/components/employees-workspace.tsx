@@ -746,6 +746,7 @@ type EmployeeDirectoryWithDocuments = EmployeeDirectoryItem & {
 };
 
 export function EmployeeImportPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { can } = useAppStore();
   const branches = useQuery({ queryKey: ["employee-import-branches"], queryFn: () => fetchBranches(), enabled: can("employees.create") });
@@ -756,12 +757,12 @@ export function EmployeeImportPage() {
   const importEmployees = useMutation({
     mutationFn: () => bulkCreateEmployees(validRows.map((item) => ({ name: item.name, email: item.email, status: item.status, primaryBranchId: item.primaryBranchId, primaryRole: item.primaryRole }))),
     onSuccess: async (result) => {
-      toast.success(`${result.created} empleados importados correctamente`);
+      toast.success(t("employees.import.success", { count: result.created }));
       setRows([]);
       setFileName("");
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cargar los empleados.")),
+    onError: (error) => toast.error(getApiErrorMessage(error, t("employees.import.errorBody"))),
   });
   const handleFile = async (file?: File) => {
     if (!file) return;
@@ -794,41 +795,41 @@ export function EmployeeImportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Personas"
-        title="Cargar empleados"
-        description="Hasta 500 personas desde un archivo CSV o Excel. Primero se revisan los errores y después se confirma la carga."
+        eyebrow={t("employees.import.eyebrow")}
+        title={t("employees.import.title")}
+        description={t("employees.import.description")}
         actions={
           <Button asChild type="button" variant="secondary">
             <Link href="/employees">
               <ArrowLeft className="size-4" />
-              Volver al directorio
+              {t("employees.import.backToDirectory")}
             </Link>
           </Button>
         }
       />
       <section className="rounded-lg border border-line bg-surface-1 p-5 shadow-e1 sm:p-6">
         <Stepper
-          label="Pasos de la carga"
-          steps={[{ label: "Preparar", icon: FileSpreadsheet }, { label: "Validar", icon: ShieldCheck }, { label: "Confirmar", icon: CheckCircle2 }]}
+          label={t("employees.import.stepsAria")}
+          steps={[{ label: t("employees.import.step.prepare"), icon: FileSpreadsheet }, { label: t("employees.import.step.validate"), icon: ShieldCheck }, { label: t("employees.import.step.confirm"), icon: CheckCircle2 }]}
           current={current}
         />
         <div className="mt-6 space-y-5 border-t border-line pt-6">
-          {branches.isLoading ? <AsyncState state="loading" title="Cargando sucursales" /> : null}
+          {branches.isLoading ? <AsyncState state="loading" title={t("employees.import.loadingBranches")} /> : null}
 
           {current === 0 ? (
             <div className="rounded-lg border-2 border-dashed border-line-strong bg-surface-2 p-6 text-center">
               <Upload className="mx-auto size-8 text-ink-3" aria-hidden="true" />
-              <h2 className="mt-3 text-lg font-semibold text-ink-1">Sube el archivo con las personas</h2>
-              <p className="mx-auto mt-1 max-w-prose text-sm text-ink-2">XLSX, CSV o TSV con las columnas nombre, correo, sucursal y cargo. El estado es opcional.</p>
+              <h2 className="mt-3 text-lg font-semibold text-ink-1">{t("employees.import.uploadTitle")}</h2>
+              <p className="mx-auto mt-1 max-w-prose text-sm text-ink-2">{t("employees.import.uploadHelp")}</p>
               <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
                 <label className="inline-flex min-h-[var(--control-h-touch)] cursor-pointer items-center justify-center gap-2 rounded-md bg-action px-5 text-base font-medium text-on-action shadow-e1 hover:opacity-90 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
                   <Upload className="size-4" aria-hidden="true" />
-                  Subir archivo
+                  {t("employees.import.uploadFile")}
                   {fileInput}
                 </label>
                 <Button type="button" variant="secondary" onClick={downloadEmployeeTemplate}>
                   <Download className="size-4" />
-                  Descargar plantilla
+                  {t("employees.import.downloadTemplate")}
                 </Button>
               </div>
             </div>
@@ -837,35 +838,35 @@ export function EmployeeImportPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink-1"><FileSpreadsheet className="mr-1.5 inline size-4 align-[-2px] text-ink-3" aria-hidden="true" />{fileName}</p>
-                  <p className="text-sm text-ink-2">{rows.length} filas leídas</p>
+                  <p className="text-sm text-ink-2">{t("employees.import.rowsRead", { count: rows.length })}</p>
                 </div>
                 <label className="inline-flex min-h-[var(--control-h-base)] shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md border border-line bg-surface-1 px-4 text-sm font-medium text-ink-1 hover:bg-surface-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
                   <Upload className="size-4" aria-hidden="true" />
-                  Subir otro archivo
+                  {t("employees.import.uploadAnother")}
                   {fileInput}
                 </label>
               </div>
-              <ProgressMeter label="Filas listas para cargar" value={validRows.length} max={rows.length || 1} detail={`${validRows.length} de ${rows.length} filas`} />
+              <ProgressMeter label={t("employees.import.rowsReady")} value={validRows.length} max={rows.length || 1} detail={t("employees.import.rowsReadyDetail", { valid: validRows.length, total: rows.length })} />
               {invalidRows.length ? (
-                <InlineNote tone="danger" title={`${invalidRows.length} ${invalidRows.length === 1 ? "fila tiene errores" : "filas tienen errores"}`}>
-                  Corrige esas filas en el archivo y vuelve a subirlo. Cada fila necesita nombre, correo válido, sucursal existente y cargo; los correos repetidos también se bloquean.
+                <InlineNote tone="danger" title={invalidRows.length === 1 ? t("employees.import.rowWithErrors") : t("employees.import.rowsWithErrors", { count: invalidRows.length })}>
+                  {t("employees.import.fixHelp")}
                 </InlineNote>
               ) : (
-                <InlineNote tone="success" title="Todas las filas son válidas">
-                  Al confirmar se crearán las {validRows.length} personas en una sola operación.
+                <InlineNote tone="success" title={t("employees.import.allValid")}>
+                  {t("employees.import.allValidHelp", { count: validRows.length })}
                 </InlineNote>
               )}
               <div className="max-h-96 overflow-y-auto">
                 <RowTable
-                  caption="Previsualización de las filas del archivo"
-                  headers={["Fila", "Empleado", "Sucursal", "Cargo", "Validación"]}
+                  caption={t("employees.import.previewCaption")}
+                  headers={[t("employees.import.col.row"), t("employees.import.col.employee"), t("employees.import.col.branch"), t("employees.import.col.role"), t("employees.import.col.validation")]}
                 >
                   {rows.slice(0, 20).map((row) => (
                     <tr key={row.row}>
                       <td className="px-4 py-3 align-top font-mono tabular-figures">{row.row}</td>
                       <td className="px-4 py-3 align-top">
-                        <p className="font-medium">{row.name || "Sin nombre"}</p>
-                        <p className="text-2xs text-ink-3">{row.email || "Sin correo"}</p>
+                        <p className="font-medium">{row.name || t("employees.import.noName")}</p>
+                        <p className="text-2xs text-ink-3">{row.email || t("employees.import.noEmail")}</p>
                       </td>
                       <td className="px-4 py-3 align-top">{row.branchLabel || "—"}</td>
                       <td className="px-4 py-3 align-top">{row.primaryRole || "—"}</td>
@@ -873,18 +874,18 @@ export function EmployeeImportPage() {
                         {row.errors.length ? (
                           <span className="inline-flex items-start gap-1.5 text-status-danger"><CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{row.errors.join(" · ")}</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-status-success"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />Lista</span>
+                          <span className="inline-flex items-center gap-1.5 text-status-success"><CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />{t("employees.import.rowReady")}</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </RowTable>
               </div>
-              {rows.length > 20 ? <p className="text-xs text-ink-3">Se muestran las primeras 20 filas de {rows.length}.</p> : null}
+              {rows.length > 20 ? <p className="text-xs text-ink-3">{t("employees.import.showingFirst", { total: rows.length })}</p> : null}
               <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
-                <Button type="button" variant="secondary" onClick={reset}>Cancelar</Button>
+                <Button type="button" variant="secondary" onClick={reset}>{t("employees.import.cancel")}</Button>
                 <Button type="button" disabled={!validRows.length || invalidRows.length > 0 || importEmployees.isPending} onClick={() => importEmployees.mutate()}>
-                  {importEmployees.isPending ? "Cargando..." : `Cargar ${validRows.length || ""} empleados`}
+                  {importEmployees.isPending ? t("employees.import.loading") : t("employees.import.submit", { count: validRows.length || "" })}
                 </Button>
               </div>
             </>

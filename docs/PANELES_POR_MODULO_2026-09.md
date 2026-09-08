@@ -351,11 +351,20 @@ anchos.
 Ninguno: desde 2026-09-08 cada módulo (incluidos Incorporación y
 Administración) abre con su propia página «Dashboard» (§ 2.ter).
 
-### Deuda menor de código
+### Deuda menor de código — saldada (2026-09-08)
 
-- `restaurant-recipes-workspace.tsx`: `RecipeCard` y `RecipeCost` ya no se usan (quedaron las variantes «Secure»); `employee-360.tsx`: `employeeId` y `onCompleteRequirement` sin uso. Son avisos de ESLint, no errores.
-- `hiring-queue-metrics.tsx` sigue sin ningún importador.
-- Firmas, entrevistas, recetas y carga de empleados mezclan claves `t()` nuevas con literales en español que ya existían; el inglés de esas pantallas queda parcial.
+- Código muerto retirado: `RecipeCard` y `RecipeCost` (recetas), los
+  parámetros `employeeId` y `onCompleteRequirement` de `Documents` en
+  `employee-360.tsx`, y el archivo `hiring/hiring-queue-metrics.tsx`, que
+  nadie importaba.
+- Internacionalización completada en firma electrónica (`signatures.*`),
+  entrevistas (`interviews.*`, incluidos días de la semana, avisos y
+  confirmaciones), carga de empleados (`employees.import.*`) y todo el
+  espacio de recetas (`recipes.*`: lista, tarjeta, ficha de costo, historial,
+  cookbook y los cuatro pasos del editor). es/en con el mismo número de
+  claves (3 063). Quedan como datos, no como interfaz, los valores por
+  defecto que se envían al servidor (título «Entrevista», textos de la
+  plantilla de firma).
 
 ### Docker: no verificado desde esta sesión
 

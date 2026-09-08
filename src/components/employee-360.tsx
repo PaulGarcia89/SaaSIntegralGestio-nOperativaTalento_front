@@ -156,7 +156,6 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
         {can("employees.read") ? <TabsContent value="tax"><TaxEligibility snapshot={payrollCompliance.data} isLoading={payrollCompliance.isLoading} error={payrollCompliance.error} onRetry={() => void payrollCompliance.refetch()} /></TabsContent> : null}
         <TabsContent value="documents">
           <Documents
-            employeeId={employeeId}
             documents={dossier360.data?.documents.documents ?? []}
             summary={dossier360.data?.documents.summary ?? null}
             isLoading={dossier360.isLoading}
@@ -170,14 +169,6 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
               setDocumentDialogOpen(true);
             }}
             onUpload={(file, documentType, expiresAt, notes) => addDocument.mutate({ file, documentType, expiresAt, notes })}
-            onCompleteRequirement={(requirement) => {
-              setTargetRequirement(requirement);
-              setRequirementFile(null);
-              setRequirementExpiresAt("");
-              setRequirementNotes("");
-              setDocumentError(null);
-              setRequirementDialogOpen(true);
-            }}
           />
         </TabsContent>
         <TabsContent value="compliance">
@@ -375,7 +366,6 @@ function TaxEligibility({ snapshot, isLoading, error, onRetry }: SnapshotSection
 }
 
 function Documents({
-  employeeId,
   documents,
   summary,
   isLoading,
@@ -385,9 +375,7 @@ function Documents({
   onSendDocuSeal,
   onOpenDocument,
   onUpload,
-  onCompleteRequirement,
 }: {
-  employeeId: string;
   documents: DossierDocument[];
   summary: EmployeeDossier360Snapshot["documents"]["summary"] | null;
   isLoading: boolean;
@@ -397,7 +385,6 @@ function Documents({
   onSendDocuSeal: (templateKey: string) => void;
   onOpenDocument: (id: string) => void;
   onUpload: (file: File, documentType: string, expiresAt?: string | null, notes?: string | null) => void;
-  onCompleteRequirement: (requirement: DossierRequirement) => void;
 }) {
   if (isLoading) return <AsyncState state="loading" title="Cargando documentos" description="Consultamos el expediente documental." />;
 

@@ -1,11 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import { ArrowRight, BriefcaseBusiness, Search } from "lucide-react";
 import { fetchPublicVacancies, getApiErrorMessage, getCandidateSession } from "@/lib/backend";
 import { useCareerPortal } from "@/components/portal-context";
 import { CandidateAuthCard } from "@/components/candidate-auth-card";
@@ -16,10 +13,10 @@ import {
   ErrorState,
   PageHeader,
   SkeletonRows,
-  StatusBadge,
 } from "@/components/system";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { RevealGroup, RevealItem } from "@/components/public/motion";
+import { CareersFilters, CareersHero, CareersProcess, type Facet } from "@/components/careers/careers-sections";
+import { VacancyCard } from "@/components/careers/vacancy-card";
 import { technicalLabel } from "@/lib/ui-labels";
 import type { PublicVacancyDto } from "@/lib/contracts";
 import { useLocale } from "@/components/locale-provider";
@@ -27,29 +24,32 @@ import { useLocale } from "@/components/locale-provider";
 /**
  * Portal público de empleo.
  *
- * Se había quedado con el modelo anterior mientras el resto del producto
- * cambiaba, y es la única pantalla que ve alguien que todavía no es cliente:
- * la primera impresión del producto se daba con la geometría vieja.
+ * Es la única pantalla que ve alguien que todavía no es cliente ni empleado,
+ * así que se rehízo con la misma gramática de la portada: fondo grafito con
+ * retícula y luz ámbar, entradas cortas y escalonadas, y el producto contado
+ * con piezas de verdad.
  *
- * Qué cambió
- * ----------
- * · Radios de `2rem` y `2xl`, titulares a `text-5xl` y un campo de búsqueda de
- *   48 px de alto: la escala anterior. Ahora usa `PageHeader` y los radios del
- *   sistema, los mismos que el producto al que se entra después.
- * · Los tres estados —cargando, error, sin resultados— estaban resueltos a
- *   mano con tarjetas propias. Pasan a `SkeletonRows`, `ErrorState` y
- *   `EmptyState`, que además distinguen «no hay vacantes» de «tu búsqueda no
- *   encuentra nada», que es lo único que quien busca necesita saber.
- * · El error decía siempre lo mismo y ocultaba lo que respondió el servidor.
- * · El acceso restringido por código era un texto centrado sin salida: quien
- *   llega sin código no sabía a quién pedirlo. Pasa a `BlockedState`, que
- *   nombra al responsable.
- * · La imagen de la vacante usaba un degradado `from-primary/15 via-secondary`
- *   que en la práctica no se ve nunca, porque encima va la foto a `object-cover`.
+ * Qué cambió respecto de la versión anterior
+ * ------------------------------------------
+ * · El buscador era un campo suelto bajo el titular. Ahora vive DENTRO del
+ *   hero, con 56 px de alto y botón de borrar: en un portal de empleo,
+ *   buscar es la primera acción, no una más.
+ * · No había forma de acotar. Se añaden facetas —modalidad, área, ciudad—
+ *   calculadas sobre las vacantes que hay: si nadie publica remoto, «Remoto»
+ *   no aparece. Cada botón lleva su recuento.
+ * · Las tarjetas eran una foto, dos insignias y un botón. Ahora dicen lo que
+ *   se pregunta antes de abrir una oferta: jornada, sueldo cuando existe y
+ *   número de plazas; la tarjeta entera es pulsable con un solo elemento
+ *   enfocable.
+ * · Sin fotografía, la tarjeta ya no pone una imagen de archivo: pinta un
+ *   panel de marca con el icono del área.
+ * · Se añade «cómo es postularse» y el acceso a seguir la postulación, que
+ *   es la duda que de verdad tiene quien está mirando ofertas.
  *
- * Lo que se conserva: la tipografía de marca del inquilino
- * (`--career-font-family`) sigue aplicándose al titular y a la descripción,
- * que es donde una empresa quiere reconocerse.
+ * Se conserva: la tipografía de marca del inquilino
+ * (`--career-font-family`) en titular y descripción, los tres estados
+ * (cargando, error, vacío) resueltos con los componentes del sistema, y el
+ * comportamiento de portales protegidos y por invitación.
  */
 export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string }) {
   const { portal, isResolving } = useCareerPortal();
@@ -57,6 +57,8 @@ export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string })
   const pathname = usePathname();
   const [authenticated, setAuthenticated] = useState(() => Boolean(getCandidateSession()));
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<Record<string, string | null>>({ workMode: null, department: null, city: null });
+
   const requiresAuthentication = Boolean(
     portal?.requireLoginToViewJobs ||
       portal?.accessType === "LOGIN_REQUIRED" ||
@@ -67,9 +69,11 @@ export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string })
     queryFn: () => fetchPublicVacancies(search, portal?.slug),
     enabled: !isResolving && (!requiresAuthentication || authenticated),
   });
-  const vacancies = vacanciesQuery.data?.data ?? [];
+  const vacancies = useMemo(() => vacanciesQuery.data?.data ?? [], [vacanciesQuery.data]);
   const normalized = search.trim().toLocaleLowerCase(locale);
-  const visible = useMemo(
+
+  /** Texto libre: título, área, ciudad, modalidad o empresa. */
+  const searched = useMemo(
     () =>
       vacancies.filter(
         (vacancy) =>
@@ -81,9 +85,47 @@ export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string })
     [vacancies, normalized, locale],
   );
 
+  // Las facetas se calculan sobre lo que la búsqueda deja, para que los
+  // recuentos digan la verdad: pulsar un filtro da exactamente ese número.
+  const facets = useMemo(() => {
+    const build = (pick: (vacancy: PublicVacancyDto) => string | null | undefined, label: (value: string) => string): Facet[] => {
+      const counts = new Map<string, number>();
+      for (const vacancy of searched) {
+        const value = pick(vacancy)?.trim();
+        if (!value) continue;
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b, locale))
+        .slice(0, 6)
+        .map(([value, count]) => ({ value, label: label(value), count }));
+    };
+    return [
+      { key: "workMode", label: t("careers.facet.workMode"), options: build((vacancy) => vacancy.workMode, (value) => technicalLabel(value)) },
+      { key: "department", label: t("careers.facet.department"), options: build((vacancy) => vacancy.department, (value) => value) },
+      { key: "city", label: t("careers.facet.city"), options: build((vacancy) => vacancy.city, (value) => value) },
+    ];
+  }, [searched, locale, t]);
+
+  const visible = useMemo(
+    () =>
+      searched.filter(
+        (vacancy) =>
+          (!filters.workMode || vacancy.workMode === filters.workMode) &&
+          (!filters.department || vacancy.department === filters.department) &&
+          (!filters.city || vacancy.city === filters.city),
+      ),
+    [searched, filters],
+  );
+
+  const cities = useMemo(() => new Set(vacancies.map((vacancy) => vacancy.city).filter(Boolean)).size, [vacancies]);
+  const companies = useMemo(() => new Set(vacancies.map((vacancy) => vacancy.tenant?.id).filter(Boolean)).size, [vacancies]);
+  const filtering = Object.values(filters).some(Boolean);
+  const searching = normalized.length > 0;
+
   if (isResolving) {
     return (
-      <div className="mx-auto w-full max-w-[1440px] px-4 py-8">
+      <div className="mx-auto w-full max-w-[1280px] px-4 py-8">
         <SkeletonRows rows={4} label={t("jobs.resolvingPortal")} />
       </div>
     );
@@ -119,142 +161,80 @@ export function CareerPortalShell({ basePath = "/jobs" }: { basePath?: string })
     );
   }
 
-  const searching = normalized.length > 0;
-
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] min-w-0 flex-col gap-6 pb-14 pt-2">
-      <CandidateNav vacanciesHref={basePath} />
-
-      <div className="min-w-0 px-4">
-        {portal?.branding.logo ? (
-          <div className="mb-5 flex items-center gap-3">
-            <Image
-              src={portal.branding.logo}
-              alt={t("jobs.logoAlt", { company: portal.company?.name ?? t("applicant.portalFallback") })}
-              width={40}
-              height={40}
-              unoptimized
-              className="size-10 rounded-md object-contain"
-            />
-            <span className="min-w-0 truncate text-base font-semibold text-ink-1">{portal.company?.name}</span>
-          </div>
-        ) : null}
-
-        <div style={{ fontFamily: "var(--career-font-family)" }}>
-          <PageHeader
-            eyebrow={
-              portal?.type === "BRANDED"
-                ? t("jobs.careerSite")
-                : portal?.type === "PRIVATE_STANDARD"
-                  ? t("jobs.privatePortal")
-                  : t("jobs.jobsPortal")
-            }
-            title={portal?.branding.title ?? t("jobs.defaultTitle")}
-            description={portal?.branding.description ?? t("jobs.defaultDescription")}
-          />
+    <div className="min-w-0 bg-canvas">
+      <CareersHero
+        portal={portal}
+        search={search}
+        onSearch={setSearch}
+        total={vacanciesQuery.isSuccess ? vacancies.length : null}
+        cities={cities}
+        companies={companies}
+      >
+        <div className="mb-8">
+          <CandidateNav vacanciesHref={basePath} tone="dark" />
         </div>
+      </CareersHero>
 
-        <label className="relative mt-6 block max-w-2xl">
-          <span className="sr-only">{t("jobs.searchLabel")}</span>
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3"
-            aria-hidden="true"
-          />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("jobs.searchPlaceholder")}
-            className="pl-10"
-            autoComplete="off"
-          />
-        </label>
+      <div className="mx-auto w-full min-w-0 max-w-[1280px] px-4 sm:px-6">
+        <section aria-labelledby="vacantes" className="py-10 sm:py-14">
+          <h2 id="vacantes" className="sr-only">
+            {t("jobs.available")}
+          </h2>
+
+          {vacanciesQuery.isSuccess && vacancies.length > 0 ? (
+            <div className="mb-8">
+              <CareersFilters
+                facets={facets}
+                selected={filters}
+                onSelect={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
+                onClear={() => setFilters({ workMode: null, department: null, city: null })}
+                resultCount={visible.length}
+                totalCount={vacancies.length}
+              />
+            </div>
+          ) : null}
+
+          {vacanciesQuery.isLoading ? (
+            <SkeletonRows rows={6} label={t("jobs.loading")} />
+          ) : vacanciesQuery.isError ? (
+            <ErrorState
+              title={t("jobs.error")}
+              detail={getApiErrorMessage(vacanciesQuery.error, t("jobs.tryAgain"))}
+              onRetry={() => void vacanciesQuery.refetch()}
+            />
+          ) : visible.length === 0 ? (
+            // Distinguir «no hay vacantes» de «tu búsqueda no encuentra nada»
+            // es lo único que quien busca necesita saber para decidir qué hacer.
+            <EmptyState
+              reason={searching || filtering ? "no-matches" : "no-records"}
+              title={searching || filtering ? t("jobs.noMatches") : t("jobs.noVacancies")}
+              description={searching || filtering ? t("jobs.tryAgain") : t("jobs.noVacanciesHelp")}
+              onClearFilters={
+                searching || filtering
+                  ? () => {
+                      setSearch("");
+                      setFilters({ workMode: null, department: null, city: null });
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <RevealGroup as="ul" className="grid min-w-0 gap-5 md:grid-cols-2 xl:grid-cols-3 [&>li]:min-w-0" stagger={0.06}>
+              {visible.map((vacancy) => (
+                <RevealItem as="li" key={vacancy.id}>
+                  <VacancyCard
+                    vacancy={vacancy}
+                    href={`${basePath}/${encodeURIComponent((vacancy as PublicVacancyDto).slug ?? vacancy.id)}`}
+                  />
+                </RevealItem>
+              ))}
+            </RevealGroup>
+          )}
+        </section>
+
+        <CareersProcess trackHref="/application-status" />
       </div>
-
-      <div className="min-w-0 px-4">
-        {vacanciesQuery.isLoading ? (
-          <SkeletonRows rows={6} label={t("jobs.loading")} />
-        ) : vacanciesQuery.isError ? (
-          <ErrorState
-            title={t("jobs.error")}
-            detail={getApiErrorMessage(vacanciesQuery.error, t("jobs.tryAgain"))}
-            onRetry={() => void vacanciesQuery.refetch()}
-          />
-        ) : visible.length === 0 ? (
-          // Distinguir «no hay vacantes» de «tu búsqueda no encuentra nada» es
-          // lo único que quien busca necesita saber para decidir qué hacer.
-          <EmptyState
-            reason={searching ? "no-matches" : "no-records"}
-            title={searching ? t("jobs.noMatches") : t("jobs.noVacancies")}
-            description={searching ? t("jobs.tryAgain") : t("jobs.noVacanciesHelp")}
-            onClearFilters={searching ? () => setSearch("") : undefined}
-          />
-        ) : (
-          <section aria-label={t("jobs.available")} className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {visible.map((vacancy) => (
-              <article
-                key={vacancy.id}
-                className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-surface-1"
-              >
-                <VacancyImage imageUrl={vacancy.imageUrl} title={vacancy.title} />
-                <div className="flex flex-1 flex-col gap-4 p-5">
-                  <div className="flex flex-wrap gap-2">
-                    {vacancy.department ? (
-                      <StatusBadge size="sm" tone="neutral" label={vacancy.department} />
-                    ) : null}
-                    {vacancy.employmentType ? (
-                      <StatusBadge size="sm" tone="neutral" label={technicalLabel(vacancy.employmentType)} />
-                    ) : null}
-                  </div>
-
-                  <div className="min-w-0 space-y-1">
-                    <h2 className="text-lg font-semibold text-ink-1">{vacancy.title}</h2>
-                    <p className="truncate text-sm text-ink-2">{vacancy.tenant?.name}</p>
-                  </div>
-
-                  <p className="line-clamp-3 text-sm leading-relaxed text-ink-2">
-                    {vacancy.summary || vacancy.description || t("jobs.defaultSummary")}
-                  </p>
-
-                  <p className="flex flex-wrap items-center gap-2 text-2xs text-ink-3">
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1">
-                      <BriefcaseBusiness className="size-3.5" aria-hidden="true" />
-                      {technicalLabel(vacancy.workMode)}
-                    </span>
-                    {vacancy.city ? <span>{vacancy.city}</span> : null}
-                  </p>
-
-                  <Button asChild className="mt-auto w-full">
-                    <Link
-                      href={`${basePath}/${encodeURIComponent((vacancy as PublicVacancyDto).slug ?? vacancy.id)}`}
-                    >
-                      {t("jobs.viewAndApply")}
-                      <ArrowRight className="size-4" aria-hidden="true" />
-                    </Link>
-                  </Button>
-                </div>
-              </article>
-            ))}
-          </section>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function VacancyImage({ imageUrl, title }: { imageUrl?: string | null; title: string }) {
-  const [hasError, setHasError] = useState(false);
-  const source = !imageUrl || hasError ? "/images/vacancies/operations-leadership-fallback.png" : imageUrl;
-  return (
-    // El degradado anterior no se veía nunca: encima va la foto a `object-cover`.
-    <div className="relative flex aspect-[16/7] items-center justify-center overflow-hidden bg-surface-2">
-      <Image
-        src={source}
-        alt={`Imagen representativa del cargo ${title}`}
-        fill
-        unoptimized
-        className="object-cover"
-        onError={() => setHasError(true)}
-      />
     </div>
   );
 }

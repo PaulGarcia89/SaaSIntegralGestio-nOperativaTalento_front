@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, BarChart3, BriefcaseBusiness, Building2, ClipboardCheck, GraduationCap, PackageCheck, ShieldCheck, Users, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/components/locale-provider";
-import { Float, RotatingWord } from "@/components/landing/landing-motion";
+import { Float, RotatingWord } from "@/components/public/motion";
 import { MockAlert, MockCandidateCard, MockDashboard, MockTaskDone } from "@/components/landing/landing-mocks";
 
 /* ==========================================================================
@@ -43,9 +43,9 @@ export function HeroSection() {
     <section className="relative isolate">
       {/* Fondo: rejilla fina y dos luces que se mueven muy despacio. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="landing-grid landing-grid-dark absolute inset-0" />
-        <div className="landing-glow absolute -top-40 right-[-10%] size-[42rem] rounded-full bg-accent-fill/25 blur-3xl" />
-        <div className="landing-glow-2 absolute -bottom-52 left-[-15%] size-[36rem] rounded-full bg-surface-dark-3 blur-3xl" />
+        <div className="public-grid public-grid-dark absolute inset-0" />
+        <div className="public-glow absolute -top-40 right-[-10%] size-[42rem] rounded-full bg-accent-fill/25 blur-3xl" />
+        <div className="public-glow-2 absolute -bottom-52 left-[-15%] size-[36rem] rounded-full bg-surface-dark-3 blur-3xl" />
       </div>
 
       <div className="grid gap-12 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:py-20">
@@ -89,7 +89,7 @@ export function HeroSection() {
         <div className="relative mx-auto w-full max-w-[640px] lg:max-w-none">
           <p className="sr-only">{t("landing.hero.compositionAlt")}</p>
           <motion.div {...enter(0.2)} className="relative">
-            <div className="landing-tilt">
+            <div className="public-tilt">
               <MockDashboard />
             </div>
           </motion.div>
@@ -117,8 +117,8 @@ export function HeroSection() {
       {/* ---- Cinta de módulos ------------------------------------------- */}
       <div className="border-t border-surface-dark-ink/10 py-6">
         <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.16em] text-surface-dark-ink/50">{t("landing.hero.strip")}</p>
-        <div className="landing-marquee-mask overflow-hidden">
-          <ul className="landing-marquee flex w-max gap-3" aria-label={t("landing.hero.stripAria")}>
+        <div className="public-marquee-mask overflow-hidden">
+          <ul className="public-marquee flex w-max gap-3" aria-label={t("landing.hero.stripAria")}>
             {[...MODULES, ...MODULES].map(({ key, icon: Icon }, index) => (
               <li
                 key={`${key}-${index}`}

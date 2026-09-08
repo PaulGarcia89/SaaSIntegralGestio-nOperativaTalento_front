@@ -5,7 +5,7 @@ import esCommon from "@/i18n/locales/es/common.json";
 import enCommon from "@/i18n/locales/en/common.json";
 
 /**
- * La portada tiene que cambiar de idioma ENTERA.
+ * Las páginas públicas tienen que cambiar de idioma ENTERAS.
  *
  * Por qué existe esta prueba
  * --------------------------
@@ -29,7 +29,15 @@ import enCommon from "@/i18n/locales/en/common.json";
  * llevarlas.
  */
 
-const DIR = join(process.cwd(), "src/components/landing");
+/**
+ * Las dos superficies públicas —la portada y el portal de empleos— comparten
+ * las primitivas de `components/public`, así que se vigilan juntas: el portal
+ * lo ve gente de fuera igual que la portada, y quedarse a medias en inglés se
+ * lee igual de roto en los dos sitios.
+ */
+const DIRS = ["src/components/landing", "src/components/careers", "src/components/public"];
+/** Piezas públicas que viven fuera de esas carpetas por razones de rutas. */
+const SUELTOS = ["src/components/career-portal-shell.tsx", "src/components/candidate-nav.tsx"];
 
 /** Marcas inequívocas de español en un texto de interfaz. */
 const ACENTOS = /[áéíóúüñÁÉÍÓÚÜÑ¿¡]/;
@@ -51,16 +59,23 @@ function limpiar(fuente: string) {
     .replace(/\bt\(\s*`[^`]*`/g, "t(KEY");
 }
 
-const archivos = readdirSync(DIR).filter((nombre) => nombre.endsWith(".tsx"));
+const archivos = [
+  ...DIRS.flatMap((dir) =>
+    readdirSync(join(process.cwd(), dir))
+      .filter((nombre) => nombre.endsWith(".tsx"))
+      .map((nombre) => join(dir, nombre)),
+  ),
+  ...SUELTOS,
+];
 
-describe("la portada no lleva texto escrito a mano", () => {
-  it("encuentra los componentes de la portada", () => {
+describe("las páginas públicas no llevan texto escrito a mano", () => {
+  it("encuentra los componentes públicos", () => {
     expect(archivos.length).toBeGreaterThan(0);
   });
 
-  for (const nombre of archivos) {
-    it(`${nombre} saca todos sus textos del diccionario`, () => {
-      const fuente = limpiar(readFileSync(join(DIR, nombre), "utf8"));
+  for (const ruta of archivos) {
+    it(`${ruta} saca todos sus textos del diccionario`, () => {
+      const fuente = limpiar(readFileSync(join(process.cwd(), ruta), "utf8"));
       const hallazgos: string[] = [];
 
       // Nodos de texto JSX: lo que se lee literalmente entre dos etiquetas.
@@ -92,11 +107,11 @@ describe("los dos diccionarios van al mismo paso", () => {
     expect([...new Set(Object.keys(en))].filter((k) => !(k in es))).toEqual([]);
   });
 
-  it("ninguna clave de la portada quedó sin traducir", () => {
+  it("ninguna clave pública quedó sin traducir", () => {
     // Mismo texto en los dos idiomas es señal de traducción olvidada, salvo
     // cuando la cadena es solo un valor con formato.
     const sospechosas = Object.keys(es)
-      .filter((clave) => clave.startsWith("landing."))
+      .filter((clave) => clave.startsWith("landing.") || clave.startsWith("careers."))
       .filter((clave) => es[clave] === en[clave])
       .filter((clave) => es[clave].replace(/\{\{\w+\}\}/g, "").trim().length > 12)
       // Términos que en este producto se escriben igual en los dos idiomas.

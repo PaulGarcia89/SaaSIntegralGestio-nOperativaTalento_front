@@ -711,65 +711,65 @@ input, select, textarea {
 }
 
 /* ============================================================================
-   PORTADA
+   PÁGINAS PÚBLICAS (portada, portal de empleos)
    ============================================================================
-   Fondos y movimiento de la página pública. Todo lo que se mueve aquí es
+   Fondos y movimiento de las páginas que ve alguien que aún no ha entrado. Todo lo que se mueve aquí es
    lento (decenas de segundos) y decorativo; el bloque global de
    `prefers-reduced-motion` lo deja quieto.
    ========================================================================== */
-@keyframes landing-drift {
+@keyframes public-drift {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
   50%  { transform: translate3d(-6%, 4%, 0) scale(1.08); }
   100% { transform: translate3d(0, 0, 0) scale(1); }
 }
-@keyframes landing-drift-2 {
+@keyframes public-drift-2 {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
   50%  { transform: translate3d(5%, -6%, 0) scale(1.06); }
   100% { transform: translate3d(0, 0, 0) scale(1); }
 }
-@keyframes landing-marquee {
+@keyframes public-marquee {
   from { transform: translate3d(0, 0, 0); }
   to   { transform: translate3d(-50%, 0, 0); }
 }
 
 @layer components {
-  .landing-grid {
-    --landing-grid-color: hsl(var(--ink-1) / 0.07);
+  .public-grid {
+    --public-grid-color: hsl(var(--ink-1) / 0.07);
     background-image:
-      linear-gradient(to right, var(--landing-grid-color) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--landing-grid-color) 1px, transparent 1px);
+      linear-gradient(to right, var(--public-grid-color) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--public-grid-color) 1px, transparent 1px);
     background-size: 44px 44px;
     mask-image: radial-gradient(ellipse at center, black 35%, transparent 78%);
   }
-  .landing-grid-dark {
-    --landing-grid-color: hsl(var(--surface-dark-ink) / 0.09);
+  .public-grid-dark {
+    --public-grid-color: hsl(var(--surface-dark-ink) / 0.09);
   }
-  .landing-glow {
-    animation: landing-drift 28s ease-in-out infinite;
+  .public-glow {
+    animation: public-drift 28s ease-in-out infinite;
     will-change: transform;
   }
-  .landing-glow-2 {
-    animation: landing-drift-2 34s ease-in-out infinite;
+  .public-glow-2 {
+    animation: public-drift-2 34s ease-in-out infinite;
     will-change: transform;
   }
-  .landing-marquee {
-    animation: landing-marquee 46s linear infinite;
+  .public-marquee {
+    animation: public-marquee 46s linear infinite;
   }
-  .landing-marquee-mask {
+  .public-marquee-mask {
     mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
   }
-  .landing-marquee-mask:hover .landing-marquee,
-  .landing-marquee-mask:focus-within .landing-marquee {
+  .public-marquee-mask:hover .public-marquee,
+  .public-marquee-mask:focus-within .public-marquee {
     animation-play-state: paused;
   }
   /* Ligera perspectiva del panel de producto en escritorio; al posar el
      puntero vuelve al plano para poder leerlo. */
   @media (min-width: 1024px) {
-    .landing-tilt {
+    .public-tilt {
       transform: perspective(1600px) rotateY(-7deg) rotateX(3deg);
       transition: transform 600ms var(--ease-out);
     }
-    .landing-tilt:hover {
+    .public-tilt:hover {
       transform: perspective(1600px) rotateY(0deg) rotateX(0deg);
     }
   }

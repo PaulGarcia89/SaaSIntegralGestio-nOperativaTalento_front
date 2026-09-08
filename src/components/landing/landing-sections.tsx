@@ -7,7 +7,7 @@ import { ArrowRight, BarChart3, BriefcaseBusiness, Building2, CalendarCheck2, Ch
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/components/locale-provider";
-import { Reveal, RevealGroup, RevealItem } from "@/components/landing/landing-motion";
+import { Reveal, RevealGroup, RevealItem } from "@/components/public/motion";
 
 /**
  * Los datos de la portada llevan CLAVE, no texto. El texto vive en el
@@ -134,7 +134,7 @@ export function MultiBranchSection() {
 
         <Reveal delay={0.1}>
           <figure className="relative rounded-2xl border border-line bg-[linear-gradient(160deg,hsl(var(--surface-2)),hsl(var(--canvas)))] p-6 sm:p-8">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 landing-grid rounded-2xl opacity-40" />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 public-grid rounded-2xl opacity-40" />
             <figcaption className="sr-only">{t("landing.branches.figureAlt")}</figcaption>
             <div className="relative">
               <div className="mx-auto flex w-fit items-center gap-3 rounded-xl border border-surface-dark-ink/10 bg-surface-dark-1 px-5 py-3 text-surface-dark-ink shadow-e3">
@@ -371,8 +371,8 @@ export function FinalCTA() {
   return (
     <Reveal as="section" className="relative overflow-hidden rounded-3xl bg-surface-dark-1 px-6 py-14 text-surface-dark-ink sm:px-12 sm:py-20">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="landing-grid landing-grid-dark absolute inset-0" />
-        <div className="landing-glow absolute -right-24 -top-24 size-96 rounded-full bg-accent-fill/25 blur-3xl" />
+        <div className="public-grid public-grid-dark absolute inset-0" />
+        <div className="public-glow absolute -right-24 -top-24 size-96 rounded-full bg-accent-fill/25 blur-3xl" />
       </div>
       <div className="relative mx-auto max-w-3xl text-center">
         <p className="text-center text-sm font-semibold text-accent-fill">TalentOS</p>

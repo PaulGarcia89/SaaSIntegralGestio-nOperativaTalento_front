@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BarChart3, BriefcaseBusiness, Check, ClipboardCheck, GraduationCap, PackageCheck, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/locale-provider";
-import { Reveal } from "@/components/landing/landing-motion";
+import { Reveal } from "@/components/public/motion";
 import { MockInventory, MockOnboarding, MockPeople, MockProductivity, MockRecruiting, MockTraining } from "@/components/landing/landing-mocks";
 
 /* ==========================================================================
@@ -142,7 +142,7 @@ export function ModulesShowcase() {
             aria-labelledby={`${baseId}-tab-${current.key}`}
             className="relative min-w-0 overflow-hidden rounded-2xl border border-line bg-[linear-gradient(160deg,hsl(var(--surface-2)),hsl(var(--canvas)))] p-3 sm:p-6 [&>*]:min-w-0"
           >
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 landing-grid rounded-2xl opacity-40" />
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 public-grid rounded-2xl opacity-40" />
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={current.key}

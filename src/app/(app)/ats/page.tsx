@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CircleCheck, CircleSlash, Inbox, MessagesSquare, Plus } from "lucide-react";
 import { MobileActionBar, TaskCard } from "@/components/simple/simple-ui";
 import {
   ActiveContext,
@@ -28,7 +28,6 @@ import type { ApplicationStatusKey } from "@/lib/contracts";
 import { MAIN_PHASES, phaseTitle, phaseMeaning, toTodayItems, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
 import { useLocale } from "@/components/locale-provider";
 import { useAppStore } from "@/store/app-store";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -103,18 +102,27 @@ function ventanaEmbudo(hoy: string, branchId?: string) {
 }
 
 /**
- * Raíl de fases.
+ * Fases del proceso, como tarjetas de destino.
  *
- * Es un gráfico y a la vez una navegación, que es justo lo que un gráfico no
- * puede ser: cada fila lleva su nombre, su cifra y una barra proporcional, y
- * entera es un enlace.
+ * Misma pieza que usa el Centro administrativo: icono en un cuadrado con
+ * borde, título con flecha, descripción debajo y la tarjeta entera pulsable.
+ * Se cambia por petición expresa: la versión anterior era una fila por fase
+ * con una barra proporcional, y se pidió que se viera igual que el resto de
+ * accesos del sistema.
  *
- * La barra es decorativa (`aria-hidden`): la cifra ya está en el texto, así
- * que quien usa un lector de pantalla no pierde nada. Deliberadamente NO se
- * presenta como embudo de conversión: estos totales son ocupación actual de
- * cada fase, no una cohorte seguida en el tiempo, y dibujarlos como embudo
- * afirmaría una conversión que estos números no demuestran.
+ * La cifra sigue siendo el dato —cuánta gente hay ahora en cada fase— y va a
+ * la derecha del título, en cifras de ancho fijo, para que las cuatro
+ * tarjetas se comparen de un vistazo. Se sigue sin presentar como embudo:
+ * estos totales son ocupación actual, no una cohorte seguida en el tiempo.
  */
+const PHASE_ICONS: Record<RecruitmentPhaseId, typeof Inbox> = {
+  POSTULARON: Inbox,
+  CONOCIENDO: MessagesSquare,
+  DECIDIDO: CircleCheck,
+  TRABAJANDO: BriefcaseBusiness,
+  DESCARTADOS: CircleSlash,
+};
+
 function PhaseRail({
   phases,
   locale,
@@ -122,64 +130,34 @@ function PhaseRail({
   phases: Array<{ id: RecruitmentPhaseId; total: number | undefined; loading: boolean }>;
   locale: "es" | "en";
 }) {
-  /*
-   * Todas las barras comparten color a propósito.
-   *
-   * Aquí hay UNA medida —cuántas personas— repartida entre cuatro categorías,
-   * no cuatro series distintas. Darle a cada fase un color de la paleta
-   * categórica sugiere que el color significa algo cuando no significa nada:
-   * lo que informa es la longitud. Además metía el morado de `--series-4` en la
-   * interfaz, y esta dirección no usa morado.
-   */
-  const known = phases.filter((phase) => typeof phase.total === "number");
-  const max = Math.max(1, ...known.map((phase) => phase.total ?? 0));
-  const sum = known.reduce((total, phase) => total + (phase.total ?? 0), 0);
-
   return (
-    <ul className="space-y-1">
+    <ul className="grid gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
       {phases.map((phase) => {
-        const total = phase.total;
-        const share = typeof total === "number" && sum > 0 ? Math.round((total / sum) * 100) : null;
+        const Icon = PHASE_ICONS[phase.id];
         return (
           <li key={phase.id}>
             <Link
               href={`/ats/candidates?phase=${phase.id}`}
-              className={cn(
-                "group flex items-center gap-4 rounded-lg border border-line bg-surface-1 px-4 py-3",
-                "min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)]",
-                "transition-colors hover:border-line-strong hover:bg-surface-2",
-              )}
+              className="flex h-full min-h-[var(--control-h-touch)] items-start gap-3 rounded-lg border border-line bg-surface-1 p-4 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink-1">{phaseTitle(phase.id, locale)}</span>
-                <span className="block truncate text-xs text-ink-3">{phaseMeaning(phase.id, locale)}</span>
-              </span>
-
-              {/* Barra proporcional. Se oculta por debajo de 380px: a ese ancho
-                  compite con el nombre de la fase y gana el nombre. */}
               <span
                 aria-hidden="true"
-                className="hidden h-2 w-24 overflow-hidden rounded-full bg-surface-3 sm:block lg:w-40"
+                className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-surface-2 text-ink-2"
               >
-                <span
-                  className="block h-full rounded-full bg-accent-fill"
-                  style={{ width: `${typeof total === "number" ? Math.round((total / max) * 100) : 0}%` }}
-                />
+                <Icon className="size-4" />
               </span>
-
-              <span className="w-16 shrink-0 text-right">
-                <span className="block font-mono text-lg font-semibold text-ink-1 tabular-figures">
-                  {phase.loading ? "—" : (total ?? 0)}
+              <span className="min-w-0 flex-1">
+                <span className="flex items-start justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-1 font-medium text-ink-1">
+                    <span className="min-w-0">{phaseTitle(phase.id, locale)}</span>
+                    <ArrowRight className="size-3.5 shrink-0 text-ink-3" aria-hidden="true" />
+                  </span>
+                  <span className="shrink-0 font-mono text-2xl font-semibold leading-none tabular-figures text-ink-1">
+                    {phase.loading ? "—" : (phase.total ?? 0)}
+                  </span>
                 </span>
-                {share !== null ? (
-                  <span className="block font-mono text-2xs text-ink-3 tabular-figures">{share}%</span>
-                ) : null}
+                <span className="mt-1 block text-sm leading-relaxed text-ink-2">{phaseMeaning(phase.id, locale)}</span>
               </span>
-
-              <ArrowRight
-                className="size-4 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                aria-hidden="true"
-              />
             </Link>
           </li>
         );

@@ -22,6 +22,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { StrictVideoLesson } from "@/components/strict-video-lesson";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
@@ -1430,7 +1431,7 @@ function CoursePlayer({ courseId, open, onOpenChange }: { courseId: string | nul
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader><DialogTitle>{query.data?.title ?? "Curso"}</DialogTitle><DialogDescription>{query.data?.summary ?? "Contenido y progreso del curso."}</DialogDescription></DialogHeader>
-        {query.isLoading ? <SkeletonRows rows={5} label="Cargando el contenido del curso" /> : query.isError ? <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} /> : query.data ? <CourseContent course={query.data} onVideoProgress={(event) => mutation.mutate({ event })} /> : null}
+        {query.isLoading ? <SkeletonRows rows={5} label="Cargando el contenido del curso" /> : query.isError ? <ErrorState title="No fue posible cargar el curso" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} /> : query.data ? <CourseContent course={query.data} onVideoProgress={(event) => mutation.mutateAsync({ event })} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -1489,7 +1490,11 @@ function LocalVideoLesson({ courseId, lesson, assignmentId, onProgress }: { cour
   return missing ? <InlineNote tone="warning" title="Este video no está disponible aquí">Se guardó localmente en el navegador de quien lo editó y todavía no se ha subido.</InlineNote> : <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">Cargando video local...</p>;
 }
 
-export function VideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
+export function VideoLesson(props: Parameters<typeof StandardVideoLesson>[0]) {
+  return props.lesson.requiredCompletionPercentage === 100 ? <StrictVideoLesson {...props} /> : <StandardVideoLesson {...props} />;
+}
+
+function StandardVideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onProgressRef = useRef(onProgress);
   const sessionRef = useRef<string>(crypto.randomUUID());

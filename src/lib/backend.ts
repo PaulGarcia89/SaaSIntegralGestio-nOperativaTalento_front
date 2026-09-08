@@ -4002,21 +4002,24 @@ export function updateTrainingLessonProgress(
 }
 
 export function startTrainingVideo(input: { assignmentId: string; lessonId: string; playbackSessionId: string }) {
+  const { assignmentId, lessonId, playbackSessionId } = input;
   return request<TrainingVideoProgressResponse>("/training/video/start", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ assignmentId, lessonId, playbackSessionId }),
   });
 }
 
 export function heartbeatTrainingVideo(input: { assignmentId: string; lessonId: string; playbackSessionId: string; currentTimeSeconds: number; durationSeconds: number; isPlaying: boolean; playbackRate?: number; clientTimestamp: string }) {
+  const { assignmentId, lessonId, playbackSessionId, currentTimeSeconds, durationSeconds, isPlaying, playbackRate, clientTimestamp } = input;
   return request<TrainingVideoProgressResponse>("/training/video/heartbeat", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ assignmentId, lessonId, playbackSessionId, currentTimeSeconds, durationSeconds, isPlaying, playbackRate, clientTimestamp }),
   });
 }
 
 export function recordTrainingVideoEvent(path: "pause" | "ended", input: { assignmentId: string; lessonId: string; playbackSessionId: string; currentTimeSeconds: number; durationSeconds: number }) {
-  return request(`/training/video/${path}`, { method: "POST", body: JSON.stringify(input) });
+  const { assignmentId, lessonId, playbackSessionId, currentTimeSeconds, durationSeconds } = input;
+  return request(`/training/video/${path}`, { method: "POST", body: JSON.stringify({ assignmentId, lessonId, playbackSessionId, currentTimeSeconds, durationSeconds }) });
 }
 
 export function fetchTrainingAdminAssignments(filters: {

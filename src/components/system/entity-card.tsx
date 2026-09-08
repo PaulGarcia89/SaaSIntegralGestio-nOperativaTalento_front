@@ -282,7 +282,7 @@ export function EntityCardList({
 }) {
   const rejilla = { 1: "", 2: "md:grid-cols-2", 3: "md:grid-cols-2 xl:grid-cols-3" }[columns];
   return (
-    <ul aria-label={label} className={cn("grid min-w-0 gap-3", rejilla, className)}>
+    <ul aria-label={label} className={cn("grid min-w-0 gap-3 [&>li]:min-w-0", rejilla, className)}>
       {children}
     </ul>
   );

@@ -304,8 +304,8 @@ export function RestaurantModulePanel() {
                 key={item.id}
                 className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface-1 px-4 py-3"
               >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink-1">{item.name}</span>
+                <span className="min-w-0 flex-1 basis-40">
+                  <span className="block break-words text-sm font-medium text-ink-1">{item.name}</span>
                   <span className="block truncate text-xs text-ink-3">{warehouseName}</span>
                 </span>
                 <span className="shrink-0 text-right">
@@ -340,8 +340,8 @@ export function RestaurantModulePanel() {
                 key={`${lote.name}-${lote.lot}`}
                 className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface-1 px-4 py-3"
               >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink-1">{lote.name}</span>
+                <span className="min-w-0 flex-1 basis-40">
+                  <span className="block break-words text-sm font-medium text-ink-1">{lote.name}</span>
                   <span className="block truncate font-mono text-xs text-ink-3">Lote {lote.lot}</span>
                 </span>
                 <span className="shrink-0 font-mono text-sm tabular-figures text-ink-1">{lote.quantity}</span>

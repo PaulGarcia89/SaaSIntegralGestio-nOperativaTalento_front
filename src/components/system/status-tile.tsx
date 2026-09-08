@@ -152,7 +152,7 @@ export function StatusTileRow({
   className?: string;
 }) {
   return (
-    <ul aria-label={label} className={cn("grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4", className)}>
+    <ul aria-label={label} className={cn("grid min-w-0 gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-4", className)}>
       {children}
     </ul>
   );

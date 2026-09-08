@@ -332,8 +332,8 @@ export default function ProductivityPage() {
                 key={item.zone.id}
                 className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface-1 px-4 py-3"
               >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink-1">{item.zone.name}</span>
+                <span className="min-w-0 flex-1 basis-40">
+                  <span className="block break-words text-sm font-medium text-ink-1">{item.zone.name}</span>
                   <span className="block truncate text-xs text-ink-3">
                     {item.events} eventos · {formatMinutes(item.activeSeconds)} activos · {formatMinutes(item.idleSeconds)} inactivos
                   </span>

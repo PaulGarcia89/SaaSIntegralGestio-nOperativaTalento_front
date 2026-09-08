@@ -310,7 +310,7 @@ function SidebarContent({
       <nav
         aria-label={t("workspace.mainAccess")}
         className={cn(
-          "nav-spotlight min-h-0 flex-1 overflow-y-auto p-3",
+          "min-h-0 flex-1 overflow-y-auto p-3",
           mobile && "pb-[calc(4rem+env(safe-area-inset-bottom))]",
         )}
       >

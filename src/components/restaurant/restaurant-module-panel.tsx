@@ -145,6 +145,10 @@ export function RestaurantModulePanel() {
   });
 
   const datos = avanzado.data;
+  // Un punto por día: si el servidor aún manda un punto por movimiento (misma
+  // fecha repetida), aquí se suman. Sin esto, diez salidas del mismo día eran
+  // diez barras superpuestas con cifras encima unas de otras.
+  const tendencia = agruparPorDia(datos?.consumptionTrend ?? []);
   const entradasBorrador = basico.data?.recentReceipts.filter((item) => item.status === "DRAFT").length;
 
   const bajoMinimo = (existencias.data ?? [])
@@ -189,7 +193,7 @@ export function RestaurantModulePanel() {
     : vencimientos.length
       ? {
           title: `${vencimientos.length} lote${vencimientos.length === 1 ? "" : "s"} próximo${vencimientos.length === 1 ? "" : "s"} a vencer`,
-          detail: `El primero es ${vencimientos[0].name}, lote ${vencimientos[0].lot}, el ${vencimientos[0].expiresAt}.`,
+          detail: `El primero es ${vencimientos[0].name}, lote ${vencimientos[0].lot}, el ${fechaCorta(vencimientos[0].expiresAt)}.`,
           href: "/inventory/restaurant/lots?filter=7",
           actionLabel: "Revisar lotes",
           tone: "warning" as const,
@@ -345,7 +349,7 @@ export function RestaurantModulePanel() {
                   <span className="block truncate font-mono text-xs text-ink-3">Lote {lote.lot}</span>
                 </span>
                 <span className="shrink-0 font-mono text-sm tabular-figures text-ink-1">{lote.quantity}</span>
-                <StatusBadge size="sm" tone="warning" label={`Vence ${lote.expiresAt}`} />
+                <StatusBadge size="sm" tone="warning" label={`Vence ${fechaCorta(lote.expiresAt)}`} />
               </li>
             ))}
           </ul>
@@ -425,12 +429,12 @@ export function RestaurantModulePanel() {
           </InlineNote>
         ) : (
           <BarChart
-            categories={(datos?.consumptionTrend ?? []).map((punto) => punto.label)}
+            categories={tendencia.map((punto) => punto.label)}
             series={[
               {
                 id: "consumo",
                 name: "Consumo",
-                values: (datos?.consumptionTrend ?? []).map((punto) => punto.value),
+                values: tendencia.map((punto) => punto.value),
               },
             ]}
             categoryLabel="Periodo"
@@ -445,6 +449,19 @@ export function RestaurantModulePanel() {
 }
 
 /* ============================== Auxiliares ============================== */
+
+function agruparPorDia(puntos: Array<{ label: string; value: number }>) {
+  const porDia = new Map<string, number>();
+  for (const punto of puntos) porDia.set(punto.label, (porDia.get(punto.label) ?? 0) + punto.value);
+  return [...porDia.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([label, value]) => ({ label: fechaCorta(label), value }));
+}
+
+/** «2026-09-01T05:22:36.580Z» → «1 sept 2026». Si no es fecha, se deja tal cual. */
+function fechaCorta(valor: string) {
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return valor;
+  return new Intl.DateTimeFormat("es", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(fecha);
+}
 
 function formatoMoneda(valor: number) {
   return new Intl.NumberFormat(undefined, {

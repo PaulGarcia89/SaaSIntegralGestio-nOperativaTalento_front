@@ -133,7 +133,13 @@ export function BarChart({
     range: horizontal ? [area.left, area.right] : [area.bottom, area.top],
   });
 
-  const anchoBanda = escalaCategoria.bandwidth();
+  // Con una o dos categorías la banda ocuparía media pantalla; una barra de
+  // 400 px no dice más que una de 96 y desplaza el rótulo del valor. Se
+  // limita el grosor y la barra se centra en su banda.
+  const ANCHO_MAXIMO_BANDA = 96;
+  const anchoBandaBruto = escalaCategoria.bandwidth();
+  const anchoBanda = Math.min(anchoBandaBruto, ANCHO_MAXIMO_BANDA);
+  const desplazamientoBanda = (anchoBandaBruto - anchoBanda) / 2;
   const anchoSubbarra = apilado ? anchoBanda : anchoBanda / utiles.length;
   const cero = escalaValor(0);
 
@@ -224,7 +230,7 @@ export function BarChart({
   /** Geometría de una barra concreta, en coordenadas del viewBox. */
   const rectangulo = (indiceSerie: number, indiceCategoria: number) => {
     const categoria = categories[indiceCategoria];
-    const inicioBanda = escalaCategoria(categoria);
+    const inicioBanda = escalaCategoria(categoria) + desplazamientoBanda;
     const valor = valorSeguro(utiles[indiceSerie].values[indiceCategoria]);
 
     if (apilado) {

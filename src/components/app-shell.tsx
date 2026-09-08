@@ -264,8 +264,14 @@ function SidebarContent({
   }
   const openSection = pinnedSection ?? activeSection;
 
+  // En escritorio la barra vive en un contenedor de alto fijo (100svh): con
+  // `h-full` el bloque de navegación (`flex-1 min-h-0 overflow-y-auto`) recibe
+  // un alto real y se desplaza. Con solo `min-h-full` crecía por debajo del
+  // borde, `overflow-hidden` lo recortaba y las últimas entradas del menú
+  // quedaban inalcanzables. En el cajón móvil (< xl) desplaza el cajón
+  // entero, así que ahí se mantiene `min-h-full`.
   return (
-    <div className="flex min-h-full flex-col overflow-hidden rounded-xl border border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <div className="flex min-h-full flex-col overflow-hidden rounded-xl border border-sidebar-border bg-sidebar text-sidebar-foreground xl:h-full">
       {/* ---- Marca y contexto ------------------------------------------- */}
       <div className="shrink-0 space-y-3 border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">

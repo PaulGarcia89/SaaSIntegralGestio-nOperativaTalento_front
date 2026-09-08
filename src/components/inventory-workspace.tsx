@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, History, Plus, RotateCcw } from "lucide-react";
+import { ArrowRightLeft, History, Plus, QrCode, RotateCcw, Wrench } from "lucide-react";
 import {
   assignInventoryAsset,
   createInventoryAsset,
   createInventoryCatalogItem,
   deliverInventoryAsset,
   downloadInventoryEvidence,
+  fetchInventoryAnalytics,
   fetchInventoryAsset,
   fetchInventoryAssets,
   fetchInventoryCatalog,
@@ -24,17 +25,18 @@ import {
 import type { InventoryAssetDto, InventoryAssetStatus } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 import {
+  ActiveContext,
   ConfirmPanel,
   DataView,
   ErrorState,
   ImpactReview,
   InlineNote,
-  Metric,
-  MetricRow,
   NextAction,
   PageHeader,
   PageSection,
   StatusBadge,
+  StatusTile,
+  StatusTileRow,
   type DataColumn,
 } from "@/components/system";
 import { Button } from "@/components/ui/button";
@@ -139,6 +141,23 @@ export function InventoryWorkspace({
     queryFn: () =>
       fetchInventoryAssets({ status: status || undefined, search: search || undefined, branchId: currentBranch?.id }),
   });
+  /*
+   * Cifras del módulo.
+   *
+   * Antes se contaban en el navegador sobre la página de activos que había
+   * llegado, así que «Activos visibles» era literalmente eso —lo visible— y
+   * «Disponibles» dependía del filtro puesto. `/inventory/analytics` los
+   * cuenta en el servidor sobre TODO el inventario de la sucursal, que es lo
+   * que un panel tiene que responder, y trae además el stock bajo mínimo y
+   * las operaciones abiertas, que el listado de activos no conoce.
+   */
+  const analytics = useQuery({
+    queryKey: ["inventory-analytics", currentBranch?.id ?? null],
+    queryFn: () => fetchInventoryAnalytics(currentBranch?.id),
+    enabled: intent === "assets",
+    staleTime: 60_000,
+  });
+
   const detail = useQuery({
     queryKey: ["inventory-asset", selectedId],
     queryFn: () => fetchInventoryAsset(selectedId),
@@ -157,8 +176,10 @@ export function InventoryWorkspace({
     ]);
   };
 
-  // Las cifras solo se calculan sobre datos reales: mientras la consulta está
-  // en vuelo no hay «0 activos visibles», que sería una afirmación falsa.
+  // `intentAction` sigue necesitando un recuento para decidir qué proponer en
+  // Entregas y Devoluciones, donde no se pide la analítica. Es un recuento
+  // sobre lo cargado y NO se pinta como cifra del módulo: solo elige la
+  // acción recomendada.
   const counts = useMemo(() => {
     if (!assets.data) return null;
     return {
@@ -170,6 +191,12 @@ export function InventoryWorkspace({
       ).length,
     };
   }, [assets.data]);
+
+  const resumen = analytics.data;
+  /** `undefined` mientras carga · `null` si el servidor no lo entrega. */
+  const cifra = (valor?: number) =>
+    analytics.isError ? null : analytics.isLoading ? undefined : resumen ? (valor ?? 0) : null;
+  const porAtender = resumen ? resumen.assets.returnPending + resumen.assets.maintenance : undefined;
 
   const nextAction = intentAction(intent, counts, canManage);
   const hasFilters = Boolean(search || (status && status !== initialStatus));
@@ -227,7 +254,6 @@ export function InventoryWorkspace({
         eyebrow="Operaciones"
         title={title}
         description={INTENT_DESCRIPTION[intent]}
-        meta={<span>{currentBranch?.name ?? "Sin sucursal"}</span>}
         actions={
           canManage ? (
             <Button onClick={() => setDialog("asset")}>
@@ -237,6 +263,8 @@ export function InventoryWorkspace({
           ) : undefined
         }
       />
+
+      <ActiveContext />
 
       {requestedEmployee ? (
         <InlineNote tone="info" title={`Incorporación de ${requestedEmployee.name}`}>
@@ -267,18 +295,83 @@ export function InventoryWorkspace({
         />
       ) : null}
 
-      {counts ? (
-        <MetricRow>
-          <Metric label="Activos visibles" value={String(counts.total)} />
-          <Metric label="Disponibles" value={String(counts.available)} tone="success" />
-          <Metric label="En custodia" value={String(counts.assigned)} />
-          <Metric
-            label="Requieren atención"
-            value={String(counts.attention)}
-            tone={counts.attention > 0 ? "warning" : undefined}
-            detail="devoluciones, mantenimiento y pérdidas"
-          />
-        </MetricRow>
+      {/* ---- Estado del inventario --------------------------------------
+          Cifras del servidor sobre TODO el inventario de la sucursal, no
+          sobre la página cargada. Solo en la primera pantalla del módulo:
+          Entregas y Devoluciones son el segundo nivel y no repiten el
+          resumen. */}
+      {intent === "assets" ? (
+        <StatusTileRow label="Estado del inventario de activos">
+          <li className="min-w-0">
+            <StatusTile
+              title="Disponibles"
+              value={cifra(resumen?.assets.available)}
+              context="Listos para entregar a alguien."
+              onAction={() => {
+                setStatus("AVAILABLE");
+                setSelectedId("");
+              }}
+              actionLabel="Ver disponibles"
+            />
+          </li>
+          <li className="min-w-0">
+            <StatusTile
+              title="En custodia"
+              value={cifra(resumen?.assets.assigned)}
+              context="Entregados y bajo la responsabilidad de una persona."
+              onAction={() => {
+                setStatus("ASSIGNED");
+                setSelectedId("");
+              }}
+              actionLabel="Ver en custodia"
+            />
+          </li>
+          <li className="min-w-0">
+            <StatusTile
+              title="Requieren atención"
+              value={cifra(porAtender)}
+              context="Devoluciones pendientes y equipos en mantenimiento."
+              status={
+                typeof porAtender === "number" && porAtender > 0
+                  ? { label: "Hay pendientes", tone: "warning" as const }
+                  : undefined
+              }
+              onAction={() => {
+                setStatus("RETURN_PENDING");
+                setSelectedId("");
+              }}
+              actionLabel="Ver devoluciones"
+            />
+          </li>
+          <li className="min-w-0">
+            <StatusTile
+              title="Existencias bajo mínimo"
+              value={cifra(resumen?.stock.belowMinimum)}
+              context="Referencias del almacén por debajo de su mínimo."
+              status={
+                resumen && resumen.stock.belowMinimum > 0
+                  ? { label: "Reponer", tone: "danger" as const }
+                  : undefined
+              }
+              href="/inventory/assets/warehouse"
+              actionLabel="Ver almacén"
+            />
+          </li>
+        </StatusTileRow>
+      ) : null}
+
+      {/* ---- Acciones frecuentes ----------------------------------------
+          Las cuatro operaciones del día, con icono Y texto. Sin esto, cada
+          una vivía a dos o tres pulsaciones dentro del menú lateral. */}
+      {intent === "assets" ? (
+        <PageSection title="Acciones frecuentes" id="acciones">
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <QuickAction href="/inventory/deliveries" icon={<ArrowRightLeft className="size-5" aria-hidden="true" />} title="Entregar equipo" detail="Reservas esperando confirmación de entrega." />
+            <QuickAction href="/inventory/returns" icon={<RotateCcw className="size-5" aria-hidden="true" />} title="Recibir devolución" detail="Equipos que vuelven y hay que validar." />
+            <QuickAction href="/inventory/assets/maintenance" icon={<Wrench className="size-5" aria-hidden="true" />} title="Enviar a mantenimiento" detail={resumen ? `${resumen.operations.openMaintenance} órdenes abiertas.` : "Órdenes de mantenimiento."} />
+            <QuickAction href="/inventory/scan" icon={<QrCode className="size-5" aria-hidden="true" />} title="Escanear activo" detail="Abre la ficha leyendo su etiqueta." />
+          </ul>
+        </PageSection>
       ) : null}
 
       <PageSection title="Filtros" boxed>
@@ -389,6 +482,43 @@ export function InventoryWorkspace({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Acceso frecuente.
+ *
+ * Icono Y texto, nunca el icono solo: un icono sin etiqueta obliga a
+ * adivinar, y este producto lo usan personas que no vienen de sistemas. La
+ * tarjeta entera es el objetivo pulsable, así que en móvil no hay que apuntar
+ * a un enlace de 20px.
+ */
+function QuickAction({
+  href,
+  icon,
+  title,
+  detail,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <li className="min-w-0">
+      <Link
+        href={href}
+        className="group flex h-full min-w-0 items-start gap-3 rounded-lg border border-line bg-surface-1 p-4 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-2">
+          {icon}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-ink-1">{title}</span>
+          <span className="mt-0.5 block text-sm text-ink-2">{detail}</span>
+        </span>
+      </Link>
+    </li>
   );
 }
 

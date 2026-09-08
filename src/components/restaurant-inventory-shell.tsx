@@ -36,11 +36,11 @@ import { RestaurantOperations } from "@/components/restaurant-operations";
 import { RestaurantRecipesWorkspace } from "@/components/restaurant-recipes-workspace";
 import { RestaurantInventoryContextBar, RestaurantInventoryContextProvider, useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
 import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
+import { RestaurantModulePanel } from "@/components/restaurant/restaurant-module-panel";
 import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
 import { RestaurantPurchasingWorkspace } from "@/components/restaurant-purchasing-workspace";
 import { RestaurantAdvancedControlWorkspace } from "@/components/restaurant-advanced-control-workspace";
 import { RestaurantCommercialIntelligenceWorkspace } from "@/components/restaurant-commercial-intelligence-workspace";
-import { RestaurantDecisionDashboard } from "@/components/restaurant-decision-dashboard";
 import type { PermissionKey } from "@/lib/contracts";
 
 type InventoryItem = { key: string; label: string; href: string; permission: PermissionKey };
@@ -62,7 +62,7 @@ export function RestaurantInventoryShell() {
 function RestaurantInventoryInner() {
   const pathname = usePathname();
   const section = pathname.includes("/recipes") ? "recipes" : taskGroups.flatMap((task) => task.items).find((item) => item.key !== "dashboard" && pathname.endsWith(`/${item.key}`))?.key ?? "dashboard";
-  const { currentBranch, can, canAny } = useAppStore();
+  const { currentBranch, can } = useAppStore();
   const { warehouseId, warehouseName, compactMode } = useRestaurantInventoryContext();
   const visibleTasks = taskGroups.map((task) => ({ ...task, items: task.items.filter((item) => can(item.permission)) })).filter((task) => task.items.length);
   const activeTask = visibleTasks.find((task) => task.items.some((item) => item.key === section))?.key ?? "overview";
@@ -122,10 +122,22 @@ function RestaurantInventoryInner() {
       </nav>
     ) : null}
 
-    {section === "dashboard" ? <RestaurantInventoryQuickStart canAny={canAny} /> : null}
     <RestaurantInventoryContextBar />
 
-    {section === "dashboard" ? <RestaurantDecisionDashboard /> : null}
+    {/*
+      Un panel, no tres pantallas apiladas.
+
+      Aquí se pintaban a la vez «¿Qué necesitas hacer?» y «Dashboard orientado
+      a decisiones»: dos cabeceras más la del armazón, dos acciones
+      recomendadas distintas, ocho cifras, cuatro tarjetas de acción, dos
+      listas y dos gráficos dibujados con `div`. Y dos peticiones que contaban
+      cosas parecidas.
+
+      El análisis de decisiones NO se pierde: ya vive en «Análisis»
+      (`/inventory/restaurant/analytics`), que es donde corresponde a un
+      informe de tercer nivel.
+    */}
+    {section === "dashboard" ? <RestaurantModulePanel /> : null}
     {section === "ingredients" ? <RestaurantInventoryCatalog kind="ingredients" /> : null}
     {section === "purchase-orders" ? <RestaurantPurchasingWorkspace initialView="orders" /> : null}
     {section === "price-history" ? <RestaurantPurchasingWorkspace initialView="prices" /> : null}
@@ -155,38 +167,6 @@ function RestaurantInventoryInner() {
     {["reports", "analytics", "costs", "audit"].includes(section) ? <RestaurantReportsView section={section} /> : null}
     {["categories", "units", "suppliers", "warehouses"].includes(section) ? <RestaurantInventoryCatalog kind={section as "categories" | "units" | "suppliers" | "warehouses"} /> : null}
   </div>;
-}
-
-function RestaurantInventoryQuickStart({ canAny }: { canAny: (permissions: PermissionKey[]) => boolean }) {
-  const { currentBranch } = useAppStore();
-  const { warehouseId, warehouseName } = useRestaurantInventoryContext();
-  const dashboard = useQuery({
-    queryKey: ["restaurant-operational-home", currentBranch?.id, warehouseId],
-    queryFn: () => fetchRestaurantDashboard({ branchId: currentBranch?.id, warehouseId }),
-    enabled: Boolean(currentBranch?.id && warehouseId),
-  });
-  const actions: Array<{ label: string; detail: string; href: string; permissions: PermissionKey[] }> = [
-    { label: "Recibir productos", detail: "Registra una entrada de mercancía", href: "/inventory/restaurant/receipts", permissions: ["restaurant_inventory.manage", "restaurant_inventory.receipts.create"] },
-    { label: "Registrar salida", detail: "Descuenta consumo o producción", href: "/inventory/restaurant/consumption", permissions: ["restaurant_inventory.manage", "restaurant_inventory.operations.create"] },
-    { label: "Registrar merma", detail: "Registra producto perdido o dañado", href: "/inventory/restaurant/waste", permissions: ["restaurant_inventory.manage", "restaurant_inventory.operations.create"] },
-    { label: "Realizar conteo", detail: "Compara existencia física y teórica", href: "/inventory/restaurant/stock-counts", permissions: ["restaurant_inventory.manage", "restaurant_inventory.counts.approve"] },
-    { label: "Transferir productos", detail: "Mueve stock entre almacenes", href: "/inventory/restaurant/transfers", permissions: ["restaurant_inventory.manage", "restaurant_inventory.transfers.manage"] },
-  ];
-  const visibleActions = actions.filter((action) => canAny(action.permissions));
-  const belowMinimum = dashboard.data?.belowMinimum ?? 0;
-  const draftReceipts = dashboard.data?.recentReceipts.filter((item) => item.status === "DRAFT").length ?? 0;
-  const recommended = belowMinimum > 0
-    ? { label: "Reponer productos bajo mínimo", detail: `${belowMinimum} ingrediente${belowMinimum === 1 ? "" : "s"} requiere${belowMinimum === 1 ? "" : "n"} atención.`, href: "/inventory/restaurant/stock?filter=LOW" }
-    : draftReceipts > 0
-      ? { label: "Revisar entradas pendientes", detail: `${draftReceipts} entrada${draftReceipts === 1 ? "" : "s"} espera confirmación.`, href: "/inventory/restaurant/receipts?status=DRAFT" }
-      : visibleActions[0] ?? { label: "Consultar existencias", detail: "Revisa el inventario del almacén activo.", href: "/inventory/restaurant/stock" };
-  const secondaryActions = visibleActions.filter((action) => action.href !== recommended.href).slice(0, 4);
-  return <section aria-labelledby="inventory-quick-start" className="space-y-4">
-    <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Inicio operativo</p><h2 id="inventory-quick-start" className="mt-1 text-xl font-semibold">¿Qué necesitas hacer?</h2><p className="mt-1 text-sm text-text-secondary">{currentBranch?.name ?? "Sin sucursal"} · {warehouseName}</p></div>
-    <Card level={2} className="border-l-4 border-l-primary"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-brand">Siguiente acción recomendada</p><h3 className="mt-1 text-lg font-semibold">{recommended.label}</h3><p className="mt-1 text-sm text-text-secondary">{dashboard.isLoading ? "Consultando el estado del inventario…" : recommended.detail}</p></div><Button asChild className="min-h-11 shrink-0"><Link href={recommended.href}>Abrir acción</Link></Button></CardContent></Card>
-    <div className="flex flex-wrap items-center gap-2" aria-label="Acciones secundarias"><span className="mr-1 text-sm font-medium text-text-secondary">Acciones frecuentes:</span>{secondaryActions.map((action) => <Button key={action.href} asChild size="sm" variant="secondary"><Link href={action.href}>{action.label}</Link></Button>)}</div>
-    {dashboard.error ? <InlineFeedback tone="warning" title="No se pudo actualizar la recomendación">Puedes continuar usando las acciones frecuentes.</InlineFeedback> : null}
-  </section>;
 }
 
 function RestaurantInventorySettings() {

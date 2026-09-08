@@ -564,17 +564,8 @@ function LearnerTrainingSummary({
     <section aria-labelledby="training-summary-title" className="space-y-4">
       <h2 id="training-summary-title" className="sr-only">Tu formación</h2>
 
-      <MetricRow>
-        <Metric label="Pendientes" value={String(summary?.notStarted ?? 0)} />
-        <Metric label="En progreso" value={String(summary?.inProgress ?? 0)} />
-        <Metric label="Completados" value={String(summary?.completed ?? 0)} tone="success" />
-        <Metric
-          label="Vencidos"
-          value={String(summary?.overdue ?? 0)}
-          tone={(summary?.overdue ?? 0) > 0 ? "danger" : undefined}
-        />
-      </MetricRow>
-
+      {/* Las cuatro cifras (pendientes, en progreso, completados, vencidos)
+          viven en /training/dashboard; aquí solo la acción recomendada. */}
       {/* Una sola acción recomendada, con su porqué. Antes la formación
           pendiente se anunciaba en una tarjeta más entre otras, y el botón de
           continuar competía con dos enlaces del encabezado que ya estaban en
@@ -1464,7 +1455,7 @@ function CourseCurrentStep({ course, currentLesson, pendingQuiz }: { course: Lea
   return <Card className="border-status-success/30 bg-status-success/15"><CardContent className="flex items-center gap-3 p-4"><CheckCircle2 className="size-5 text-status-success" /><div><p className="font-semibold">Contenido completado</p><p className="text-sm text-muted-foreground">No hay lecciones pendientes en este curso.</p></div></CardContent></Card>;
 }
 
-function LocalVideoLesson({ courseId, lesson, assignmentId, onProgress }: { courseId: string; lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
+export function LocalVideoLesson({ courseId, lesson, assignmentId, onProgress }: { courseId: string; lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {

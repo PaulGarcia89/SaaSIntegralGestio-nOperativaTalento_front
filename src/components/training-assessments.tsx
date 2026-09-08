@@ -505,14 +505,18 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
 
 function LearnerAssessments() {
   const queryClient = useQueryClient();
+  // El reproductor del curso enlaza aquí con `?courseId=`: la evaluación de
+  // ese curso va primero y resaltada, para no tener que buscarla en la lista.
+  const focusCourseId = useSearchParams().get("courseId") ?? "";
   const [attempt, setAttempt] = useState<AssessmentPlayerAttempt | null>(null);
   const query = useQuery({
     queryKey: ["learner-assessments"],
     queryFn: async () => {
       const assignments = await fetchMyTrainingAssignments({ pageSize: 100 });
       const courses = await Promise.all(assignments.items.filter((item) => item.courseId).map((item) => fetchLearnerTrainingCourse(item.courseId!)));
-      return courses.flatMap((course) => course.quizSummary ?? []);
+      return courses.flatMap((course) => (course.quizSummary ?? []).map((quiz) => ({ ...quiz, courseId: course.id, courseTitle: course.title })));
     },
+    select: (quizzes) => (focusCourseId ? [...quizzes].sort((a, b) => Number(b.courseId === focusCourseId) - Number(a.courseId === focusCourseId)) : quizzes),
   });
   useEffect(() => {
     query.data?.forEach((quiz) => {
@@ -538,7 +542,7 @@ function LearnerAssessments() {
       <PageHeader eyebrow="Aprendizaje" title="Mis evaluaciones" description="Completa tus evaluaciones pendientes y consulta claramente el resultado de cada intento." />
       {query.isLoading ? <SkeletonRows rows={4} label="Cargando tus evaluaciones" /> : null}
       {query.data?.length ? <LearnerAssessmentSummary quizzes={query.data} /> : null}
-      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; return <Card key={quiz.id}><CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">Último resultado: <strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">Retroalimentación: {quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : "Comenzar evaluación"}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyState reason="no-records" title="No tienes evaluaciones pendientes" description="Cuando un curso asignado incluya una evaluación, aparecerá aquí." /> : null}
+      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; const focused = Boolean(focusCourseId) && quiz.courseId === focusCourseId; return <Card key={quiz.id} className={focused ? "border-accent-line ring-2 ring-accent-fill/30" : undefined}>{focused ? <p className="px-6 pt-4 text-2xs font-semibold uppercase tracking-[0.14em] text-accent-ink">Evaluación de {quiz.courseTitle}</p> : null}<CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">Último resultado: <strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">Retroalimentación: {quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : "Comenzar evaluación"}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyState reason="no-records" title="No tienes evaluaciones pendientes" description="Cuando un curso asignado incluya una evaluación, aparecerá aquí." /> : null}
       <AssessmentPlayer key={attempt?.id ?? "no-attempt"} attempt={attempt} onClose={() => setAttempt(null)} onSubmitted={() => queryClient.invalidateQueries({ queryKey: ["learner-assessments"] })} />
     </div>
   );

@@ -230,6 +230,25 @@ Sin cambios de backend ni de la máquina de estados: `resolveHiringCase`,
 `stageForView` y las mutaciones son las mismas. Verificado con specimen a 390 y
 1440 px: sin desbordamiento, todos los controles ≥ 44 px.
 
+## 2.quinquies Flujo de aprendizaje: revisión de usabilidad (2026-09-08)
+
+Objetivo: que aprender un curso sea un camino guiado, gráfico y con solo lo
+necesario en pantalla.
+
+| Antes | Ahora |
+|---|---|
+| `/training/learn/[id]` pintaba todos los módulos con todas las lecciones desplegadas (video y bloques de cada una); había que recorrer la página entera para saber por dónde ibas | **Reproductor guiado**: una sola lección en pantalla —la que toca— y un índice al lado (escritorio) o plegado arriba (móvil) con el estado de cada lección: hecha (verde con marca), actual (play), pendiente (hueca) |
+| Barra de avance con porcentaje | Barra **segmentada**: un tramo por lección; se ve cuántas faltan sin leer el número |
+| Lecciones de lectura sin forma de darlas por terminadas (solo el video avanzaba) | **«Marcar como completada»** para lecturas, archivos y tareas (`PATCH /training/progress/lessons/:id`); el video sigue completándose al verlo |
+| Bloques `RICH_TEXT` pintados como `{"html":"<p>…"}` | Texto enriquecido saneado por lista blanca (`training-rich-text.ts`, probado), enlaces y archivos con su botón |
+| Lecciones de lectura mostraban «Cargando video local…» | Solo las lecciones de video buscan video |
+| Evaluación y certificado en otras pantallas, sin relación visible | Aparecen como **últimos pasos del mismo índice** («Para terminar»); la evaluación se desbloquea al completar el contenido y el enlace lleva a `/training/evaluations?courseId=` |
+| `/training/evaluations` ignoraba `courseId` | La evaluación del curso del que vienes va primero y resaltada |
+| «Mis cursos» repetía las cuatro cifras del dashboard | Solo la acción recomendada y las fichas |
+
+Sin cambios de backend. Verificado con specimen a 390 y 1440 px: sin
+desbordamiento, todos los controles ≥ 44 px.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

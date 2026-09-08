@@ -5,8 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { ErrorState, PageHeader, SkeletonRows } from "@/components/system";
-import { CourseContent, type VideoProgressEvent } from "@/components/training-learning-hub";
+import { ErrorState, SkeletonRows } from "@/components/system";
+import { type VideoProgressEvent } from "@/components/training-learning-hub";
+import { CoursePlayerView } from "@/components/training/course-player";
 import { Button } from "@/components/ui/button";
 import { fetchLearnerTrainingCourse, getApiErrorMessage, heartbeatTrainingVideo, recordTrainingVideoEvent, startTrainingVideo, updateTrainingLessonProgress } from "@/lib/backend";
 
@@ -43,19 +44,12 @@ export default function TrainingCourseLearnPage() {
       <Button asChild variant="ghost" className="-ml-3">
         <Link href="/training">
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a mis capacitaciones
+          Volver a mis cursos
         </Link>
       </Button>
 
-      {/* El título del curso vive en el PageHeader del sistema: antes era un
-          <h1> escrito a mano que además desaparecía durante la carga, así que
-          al recargar la página el aprendiz perdía de vista qué estaba haciendo. */}
-      <PageHeader
-        eyebrow="Capacitación"
-        title={query.data?.title ?? "Cargando la capacitación"}
-        description={query.data?.summary ?? undefined}
-      />
-
+      {/* La cabecera (título, categoría, duración, avance) la pinta el
+          reproductor guiado, que es quien conoce el curso. */}
       {query.isLoading ? (
         <SkeletonRows rows={5} label="Cargando el contenido de la capacitación" />
       ) : query.isError ? (
@@ -65,7 +59,7 @@ export default function TrainingCourseLearnPage() {
           onRetry={() => void query.refetch()}
         />
       ) : query.data ? (
-        <CourseContent course={query.data} onVideoProgress={(event) => progress.mutateAsync(event)} />
+        <CoursePlayerView course={query.data} onVideoProgress={(event) => progress.mutateAsync(event)} />
       ) : null}
     </main>
   );

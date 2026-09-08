@@ -78,6 +78,84 @@ tarjetas no navegan: dejan aplicado el filtro del directorio que está debajo.
 Cada cifra es una consulta al listado con `pageSize: 1` leyendo `meta.total`:
 cuenta el servidor y el navegador no recibe expedientes que no va a mostrar.
 
+### 2.4 Aprendizaje — `/training`
+
+**Un panel por papel, nunca los dos a la vez.** Quien administra ve el estado
+del programa (vencidas, sin comenzar, en progreso, tasa de finalización);
+quien aprende ve su formación (qué continuar, qué debe, qué vence, qué
+completó). Quien es las dos cosas usa la pestaña «Mis cursos» como
+conmutador explícito.
+
+Se retiró el bloque de métricas duplicado de «Prioridades», que traía
+«Asignaciones vencidas» con su propia consulta además de la del panel.
+
+La tasa de finalización solo aparece si hay denominador: un «0 %» sobre cero
+asignaciones no informa de nada, y sin base la tarjeta lo dice en palabras.
+
+### 2.5 Inventario de activos — `/inventory/assets`
+
+Las cifras se contaban en el navegador sobre la página de activos que había
+llegado, así que «Activos visibles» era literalmente eso. Ahora salen de
+`/inventory/analytics`, que las cuenta en el servidor sobre todo el
+inventario de la sucursal y trae además el stock bajo mínimo y las órdenes
+de mantenimiento abiertas, que el listado de activos no conoce.
+
+Cuatro tarjetas y una fila de acciones frecuentes: entregar, recibir
+devolución, mantenimiento y escanear, con icono **y** texto.
+
+### 2.6 Inventario de restaurante — `/inventory/restaurant`
+
+La primera pantalla apilaba tres cabeceras, dos acciones recomendadas
+distintas, ocho cifras, cuatro tarjetas de acción, dos listas y dos gráficos
+dibujados con `div`. Y dos peticiones que contaban cosas parecidas.
+
+Queda una sola lectura. **Producto, cantidad, unidad y ubicación van
+siempre juntos**: la unidad sale de `/restaurant-inventory/stock`, la única
+fuente que la entrega, y es además la misma clave de consulta que usa la
+pantalla «Existencias», así que al navegar allí no se vuelve a pedir.
+
+El valor del inventario solo aparece con
+`restaurant_inventory.commercial.view`. Sin ese permiso, esa cuarta tarjeta
+muestra la diferencia de conteo, que no es dinero.
+
+El análisis de decisiones no se pierde: ya vivía también en «Análisis», que
+es donde corresponde a un informe de tercer nivel.
+
+### 2.7 Productividad — `/productivity`
+
+Al abrir la pantalla, el módulo empezaba a generar eventos inventados y a
+guardarlos en la base de datos cada 3,2 segundos. Nadie había pedido nada:
+bastaba con entrar. Ahora la simulación **arranca detenida**, vive en su
+propia sección al final, y el aviso dice lo que va a pasar antes de que
+nadie pulse.
+
+El panel usa datos reales de `/productivity/overview`, `/alerts` e
+`/insights`. La **confianza** de cada zona va escrita al lado de su medida:
+sin ella, la medición de una cámara mal calibrada se lee igual que una
+fiable.
+
+---
+
+## 2.bis Referencias comerciales estudiadas
+
+Documentación oficial consultada. Se distingue lo verificado de lo propuesto.
+
+| Patrón | Producto | Fuente | Aplicado en |
+|---|---|---|---|
+| La tarjeta de curso es la unidad completa: progreso, plazo, entrada y salida | TalentLMS | help.talentlms.com | `TrainingAssignmentCard` |
+| La obligatoriedad se imprime en la tarjeta, no en la configuración | Docebo | help.docebo.com | `TrainingAssignmentCard` |
+| El objeto se reconoce por su imagen | Sortly | help.sortly.com | `EntityCard.coverSrc` |
+| Escala ordinal corta con color, sin promedios numéricos | Greenhouse | support.greenhouse.io | Pendiente (evaluaciones) |
+| Persona única con estados encadenados | Workday | doc.workday.com | Pendiente |
+| Etapa tipada, no solo nombrada | Workable | help.workable.com | Pendiente |
+| Cada paso físico es un documento validable encadenado | Odoo | odoo.com/documentation | Pendiente |
+| Transferencia con estado intermedio «En tránsito» | Zoho Inventory | zoho.com/inventory/help | Pendiente |
+
+**No verificado.** `help.csod.com` (Cornerstone) devuelve `ROBOTS_DISALLOWED`
+en toda su documentación de soporte; lo único accesible es material de
+marketing, que no describe la interfaz. Las páginas de la app Barcode de
+Odoo devolvieron solo el menú de navegación, sin cuerpo, en cinco versiones.
+
 ---
 
 ## 3. Componentes nuevos del sistema
@@ -86,7 +164,7 @@ cuenta el servidor y el navegador no recibe expedientes que no va a mostrar.
 |---|---|
 | `StatusTile` / `StatusTileRow` | La tarjeta con la que abre cada panel. Distingue cargando / sin dato / cifra. Admite `href` o `onAction`. |
 | `ActiveContext` | Empresa y sucursal sobre las que hablan las cifras, con rótulos para lector de pantalla. |
-| `EntityCard` / `EntityCardList` | Ficha de persona u objeto: hasta tres datos, progreso y próximo paso. |
+| `EntityCard` / `EntityCardList` | Ficha de persona u objeto: hasta tres datos, progreso y próximo paso. Admite portada rectangular (`coverSrc`). |
 
 ---
 
@@ -106,6 +184,15 @@ Correcciones que salieron de esa revisión:
 2. «3 de septiembre · Fu…» escondía «Fuera de plazo» → `line-clamp-2`.
 3. La barra proporcional del raíl le robaba sitio al nombre de la fase a
    390 px → aparece a partir de `sm`.
+4. **37 px de desplazamiento horizontal a 390 px.** Un elemento de rejilla
+   tiene `min-width: auto` y se niega a encogerse por debajo de su contenido
+   mínimo; con un título largo la ficha medía 407 px dentro de 390.
+   Arreglado con `[&>li]:min-w-0` en `EntityCardList` y `StatusTileRow` —en
+   la lista, no en cada llamada, para que ninguna pantalla futura pueda
+   reintroducirlo.
+5. El nombre del producto llevaba `truncate` con `flex-1`, así que nunca
+   forzaba el salto: a 390 px se leía «Harina de …». Ahora envuelve y baja
+   la cantidad.
 
 **Nada se ha verificado en un iPhone físico.** Todo es Chromium emulando esos
 anchos.
@@ -117,13 +204,30 @@ anchos.
 ### Paneles que faltan
 
 - `onboarding` — `/onboarding/documents`
-- `training` — `/training`, separando la experiencia del empleado de la
-  administrativa
-- `asset_inventory` — `/inventory/assets`
-- `restaurant_inventory` — `/inventory/restaurant`, que debe pasar a ser el
-  panel (hoy vive en `/inventory/restaurant/dashboard`)
-- `productivity` — `/productivity`
-- Empresas y sucursales, suscripciones
+- Empresas y sucursales, suscripciones, roles y permisos
+
+### Docker: no verificado desde esta sesión
+
+El acceso a la máquina va por un shell aislado que solo monta la carpeta del
+proyecto: no ve `/Applications`, no encuentra el binario `docker` y
+`localhost` no responde. **La reconstrucción de imágenes y la comprobación
+en localhost no se han ejecutado.** El script del repositorio
+`reconstruir-local.command` hace lo correcto —`down --remove-orphans`
+seguido de `up -d --build`, sin borrar volúmenes con nombre— y debe
+ejecutarlo una persona en la máquina.
+
+### Separar Personas de Productividad
+
+`/employees` exige hoy el permiso `productivity.view`. Separarlo toca
+permisos y migración en el backend; queda identificado y **sin tocar** a la
+espera de confirmación explícita.
+
+### Prueba de usabilidad
+
+Sin realizar: requiere personas. El protocolo pedido —cinco usuarios, tres
+tareas (evaluar un candidato, continuar un curso, recibir mercancía),
+registrando éxito, errores, tiempo y peticiones de ayuda— queda como
+entregable pendiente.
 
 ### Datos que el backend no agrega hoy
 

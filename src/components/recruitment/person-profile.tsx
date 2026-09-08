@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, FileText, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/simple/reason-dialog";
 import { SimpleSection } from "@/components/simple/simple-ui";
+import { RecruitmentPhaseRail } from "@/components/recruitment/phase-rail";
 import { ErrorState, SkeletonRows, StatusBadge, Timeline, type TimelineEntry } from "@/components/system";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,6 @@ import {
 import type { VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import { formatApplicationDate } from "@/lib/applications";
 import {
-  MAIN_PHASES,
   firstNameOf,
   recruitmentPhase,
   recruitmentPhaseOf,
@@ -32,7 +32,6 @@ import {
   phaseTitle,
 } from "@/lib/recruitment-ux";
 import { useAppStore } from "@/store/app-store";
-import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/locale-provider";
 
 /**
@@ -77,35 +76,6 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
  * Quien fue descartado sale del camino principal, así que no se le dibuja un
  * recorrido con fases futuras que ya no va a recorrer.
  */
-function PhaseProgress({ currentStep, locale }: { currentStep: number; locale: "es" | "en" }) {
-  return (
-    <ol className="flex flex-wrap gap-1.5">
-      {MAIN_PHASES.map((phase) => {
-        const step = phase.step ?? 0;
-        const done = step < currentStep;
-        const active = step === currentStep;
-        return (
-          <li key={phase.id}>
-            <span
-              aria-current={active ? "step" : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
-                active && "border-accent-line/50 bg-accent-fill/10 font-medium text-ink-1",
-                done && "border-status-success/30 bg-status-success/10 text-status-success",
-                !active && !done && "border-line text-ink-3",
-              )}
-            >
-              {done ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}
-              {phaseTitle(phase.id, locale)}
-              {active ? <span className="text-2xs uppercase tracking-[0.1em] text-accent-ink">Aquí</span> : null}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 function PersonProfile({ application }: { application: VacancyApplicationDto }) {
   const { locale, t } = useLocale();
   const client = useQueryClient();
@@ -233,7 +203,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
               «{phaseTitle(phase.id, locale)}».
             </p>
           ) : (
-            <PhaseProgress currentStep={phase.step ?? 1} locale={locale} />
+            <RecruitmentPhaseRail currentStep={phase.step ?? 1} locale={locale} />
           )}
         </div>
 

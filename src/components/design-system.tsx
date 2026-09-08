@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Check, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/locale-provider";
 import {
   InlineNote,
   PageHeader as SystemPageHeader,
-  Pagination as SystemPagination,
-} from "@/components/system";
+  Pagination as SystemPagination, Stepper } from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -101,7 +100,8 @@ export function Pagination({ page, totalItems, pageSize, onPageChange }: { page:
 
 export function Wizard({ steps, current, onStepChange, children }: { steps: string[]; current: number; onStepChange?: (step: number) => void; children: ReactNode }) {
   const { t } = useLocale();
-  return <div className="space-y-6"><nav aria-label={t("common.progress")}><ol className="flex min-w-0 gap-2 overflow-x-auto pb-2 [scrollbar-width:thin]">{steps.map((step, index) => <li key={step} className="shrink-0"><button type="button" disabled={index > current || !onStepChange} onClick={() => onStepChange?.(index)} aria-current={index === current ? "step" : undefined} className={cn("min-h-11 whitespace-nowrap rounded-full border px-3 text-sm sm:px-4", index === current && "border-primary bg-primary text-text-on-accent", index < current && "bg-surface-interactive")} >{index < current ? <Check className="mr-1 inline size-4" /> : null}{index + 1}. {step}</button></li>)}</ol></nav><section aria-labelledby={`wizard-step-${current}`}><h2 id={`wizard-step-${current}`} className="sr-only">{steps[current]}</h2>{children}</section></div>;
+  // El paso a paso es el del sistema: mismo dibujo en todos los flujos.
+  return <div className="space-y-6"><Stepper label={t("common.progress")} steps={steps.map((label) => ({ label }))} current={current} onSelect={onStepChange} /><section aria-labelledby={`wizard-step-${current}`}><h2 id={`wizard-step-${current}`} className="sr-only">{steps[current]}</h2>{children}</section></div>;
 }
 
 export function ContextSwitcher({ tenantId, branchId, tenants, branches, onTenantChange, onBranchChange, global }: { tenantId: string; branchId?: string; tenants: Array<{ id: string; name: string }>; branches: Array<{ id: string; name: string }>; onTenantChange?: (id: string) => void; onBranchChange?: (id: string) => void; global?: boolean }) {

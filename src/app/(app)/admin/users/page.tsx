@@ -25,8 +25,6 @@ import {
   EmptyState,
   ErrorState,
   InlineNote,
-  Metric,
-  MetricRow,
   PageHeader,
   PageSection,
   SkeletonRows,
@@ -181,7 +179,6 @@ export default function UsersPage() {
     );
   }
 
-  const users = usersQuery.data ?? [];
 
   function tenantName(user: UserDto) {
     const match = tenants.find((tenant) => tenant.id === user.tenantId);
@@ -223,24 +220,8 @@ export default function UsersPage() {
         />
       ) : (
         <>
-          <MetricRow>
-            <Metric label="Con acceso" value={String(users.filter((user) => user.status === "active").length)} />
-            <Metric
-              label="Invitaciones sin usar"
-              value={String(users.filter((user) => user.status === "invited").length)}
-              detail="Todavía no han entrado"
-            />
-            <Metric
-              label="Suspendidos"
-              value={String(users.filter((user) => user.status === "suspended").length)}
-              detail="No pueden entrar"
-              tone={users.some((user) => user.status === "suspended") ? "warning" : undefined}
-            />
-            <Metric
-              label="Con permisos de administración"
-              value={String(users.filter((user) => user.role === "admin_empresa" || user.role === "admin_saas").length)}
-            />
-          </MetricRow>
+          {/* Las cifras de usuarios (con acceso, invitados, suspendidos) viven en
+              /admin/dashboard; aquí queda la lista y el alta. */}
 
           {isGlobalView ? (
             <InlineNote tone="info" title="Vista de solo lectura">

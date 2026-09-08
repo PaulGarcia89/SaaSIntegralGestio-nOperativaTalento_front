@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, MapPinned, Plus, Radio, RefreshCw, Video } from "lucide-react";
+import { Camera, MapPinned, Plus, Radio, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   createProductivityCamera,
@@ -138,11 +138,14 @@ export default function CamerasPage() {
         }
       />
 
-      <InlineFeedback tone="info" title="Flujo sin popups">
-        Todo el alta, edición y simulación ocurre dentro de páginas normales. Las cámaras y zonas se administran aquí, mientras la vista previa demo vive en Productividad.
-      </InlineFeedback>
-
-      <div className="grid gap-5 lg:grid-cols-2">
+      {/* Primero lo que existe (fuentes y zonas); el alta va plegada y solo
+          se abre sola cuando todavía no hay ninguna cámara. */}
+      <details className="group rounded-lg border border-line bg-surface-1" open={currentCameras.length === 0}>
+        <summary className="flex min-h-[var(--control-h-touch)] cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-base font-semibold text-ink-1 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-2"><Plus className="size-4" aria-hidden="true" />Agregar cámara o zona</span>
+          <span className="text-sm font-normal text-ink-2 group-open:hidden">{currentCameras.length} {currentCameras.length === 1 ? "cámara" : "cámaras"} · {currentZones.length} {currentZones.length === 1 ? "zona" : "zonas"}</span>
+        </summary>
+      <div className="grid gap-5 border-t border-line p-4 lg:grid-cols-2">
         <Card level={2}>
           <CardContent className="space-y-4 p-5">
             <div className="flex items-start gap-3">
@@ -254,6 +257,7 @@ export default function CamerasPage() {
           </CardContent>
         </Card>
       </div>
+      </details>
 
       <section aria-labelledby="registered-cameras" className="space-y-4">
         <div className="flex items-center gap-2">
@@ -324,20 +328,6 @@ export default function CamerasPage() {
         )}
       </section>
 
-      <section aria-labelledby="sources-note">
-        <Card level={2}>
-          <CardContent className="space-y-3 p-5">
-            <div className="flex items-center gap-2">
-              <Video className="size-4 text-brand" />
-              <h2 id="sources-note" className="font-semibold">Notas del demo</h2>
-            </div>
-            <p className="text-sm text-text-secondary">
-              Esta página solo administra fuentes y zonas persistentes. La grabación simulada, sus eventos y sus indicadores se consultan exclusivamente en
-              <strong> Productividad</strong>.
-            </p>
-          </CardContent>
-        </Card>
-      </section>
     </div>
   );
 }

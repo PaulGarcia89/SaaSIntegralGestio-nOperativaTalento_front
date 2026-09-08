@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, BriefcaseBusiness, Clock3, Download, FilePenLine, FileText, MapPin, Pencil, ShieldCheck, Upload, UserRound, WalletCards } from "lucide-react";
 import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
+import { InlineFeedback } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -111,32 +111,29 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Personas / Empleados"
-        title={employee.name}
-        description={<span className="flex flex-wrap gap-x-3 gap-y-1"><span>{employee.jobTitle ?? primary?.role ?? "Cargo sin definir"}</span><span>{primary?.branch.name ?? "Sucursal sin asignar"}</span></span>}
-        actions={<><Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />Directorio</Link></Button>{can("employees.update") ? <Button asChild><Link href={`/employees/${employeeId}/edit`}><Pencil className="size-4" />Editar</Link></Button> : null}</>}
-      />
-
-      <Card level={2}>
-        <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      {/* Una sola cabecera. Antes el nombre salía tres veces (título, tarjeta
+          y «Información básica») y el puesto dos. Aquí: quién es, cómo está,
+          dónde trabaja, y las dos acciones. */}
+      <section aria-labelledby="employee-name" className="rounded-lg border border-line bg-surface-1 p-5 sm:p-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-semibold text-brand">{initials(employee.name)}</div>
+            <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-action text-lg font-semibold text-on-action">{initials(employee.name)}</span>
             <div className="min-w-0">
-              <p className="truncate text-xl font-semibold">{employee.name}</p>
-              <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
+              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">Empleado</p>
+              <h1 id="employee-name" className="mt-0.5 text-2xl font-semibold leading-tight text-ink-1 sm:text-3xl">{employee.name}</h1>
+              <p className="mt-1 text-base text-ink-2">{employee.jobTitle ?? primary?.role ?? "Cargo sin definir"} · {primary?.branch.name ?? "Sucursal sin asignar"}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{statusLabel(employee.status)}</Badge>
-                {primary ? <Badge variant="outline"><MapPin className="mr-1 size-3.5" />{primary.branch.name}</Badge> : null}
+                {assignments.length > 1 ? <Badge variant="outline"><MapPin className="mr-1 size-3.5" />{assignments.length} sucursales</Badge> : null}
               </div>
             </div>
           </div>
-          <div className="min-w-0 grid grid-cols-2 gap-3 sm:min-w-64">
-            <Metric label="Documentos" value={String(dossier360.data?.documents.summary.total ?? documents.length)} />
-            <Metric label="Asignaciones" value={String(assignments.length)} />
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />Directorio</Link></Button>
+            {can("employees.update") ? <Button asChild><Link href={`/employees/${employeeId}/edit`}><Pencil className="size-4" />Editar</Link></Button> : null}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <Tabs defaultValue="overview" className="space-y-5">
         <div className="overflow-x-auto pb-1">
@@ -340,13 +337,9 @@ function Overview({ employee, documents, snapshot }: { employee: Awaited<ReturnT
   const source = "recordSource" in employee ? employee.recordSource : undefined;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-      <Card level={2}><CardContent className="p-5"><SectionTitle icon={<UserRound className="size-4" />} title="Información básica" /><dl className="mt-4 grid gap-4 sm:grid-cols-2"><Datum label="ID de empleado" value={employee.id} /><Datum label="Correo" value={employee.email} /><Datum label="Estado" value={statusLabel(employee.status)} /><Datum label="Origen" value={source === "CANDIDATE_CONVERSION" ? "Conversión de candidato" : "Directorio"} /></dl></CardContent></Card>
-      <div className="space-y-5">
-        <Card level={2}><CardContent className="p-5"><SectionTitle icon={<BriefcaseBusiness className="size-4" />} title="Relación laboral" /><dl className="mt-4 grid gap-4"><Datum label="Cargo" value={employee.jobTitle ?? primary?.role ?? "Sin definir"} /><Datum label="Sucursal" value={primary?.branch.name ?? "Sin asignar"} /></dl></CardContent></Card>
-        <Card level={2}><CardContent className="p-5"><SectionTitle icon={<FileText className="size-4" />} title="Documentos" /><p className="mt-3 text-3xl font-semibold">{documents}</p><p className="mt-1 text-sm text-text-secondary">documentos en el expediente</p></CardContent></Card>
-      </div>
-      {snapshot ? <InlineFeedback tone="info" title="Cumplimiento del expediente">{snapshot.requirements.length} requisitos activos y {snapshot.alerts?.length ?? 0} alertas de cumplimiento.</InlineFeedback> : <InlineFeedback tone="info" title="Sin datos de cumplimiento">Aún no hay datos de cumplimiento asociados a este expediente.</InlineFeedback>}
+    <div className="space-y-5">
+      <Card level={2}><CardContent className="p-5"><SectionTitle icon={<UserRound className="size-4" />} title="Ficha" /><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label="Correo" value={employee.email} /><Datum label="Cargo" value={employee.jobTitle ?? primary?.role ?? "Sin definir"} /><Datum label="Sucursal principal" value={primary?.branch.name ?? "Sin asignar"} /><Datum label="Estado" value={statusLabel(employee.status)} /><Datum label="Origen" value={source === "CANDIDATE_CONVERSION" ? "Conversión de candidato" : "Directorio"} /><Datum label="Documentos en el expediente" value={String(documents)} /></dl></CardContent></Card>
+      {snapshot ? <InlineFeedback tone="info" title="Cumplimiento del expediente">{snapshot.requirements.length} requisitos activos y {snapshot.alerts?.length ?? 0} alertas de cumplimiento.</InlineFeedback> : null}
     </div>
   );
 }
@@ -561,7 +554,6 @@ async function openDocumentFile(employeeId: string, document: DossierDocument, s
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) { return <h2 className="flex items-center gap-2 font-semibold">{icon}{title}</h2>; }
 function Datum({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div>; }
-function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-border-default bg-surface-section p-3"><p className="text-xs text-text-secondary">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></div>; }
 function MetricCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) { return <Card level={2}><CardContent className="p-5"><div className="flex items-center justify-between text-text-secondary"><p className="text-sm">{label}</p>{icon}</div><p className="mt-3 text-3xl font-semibold">{value}</p></CardContent></Card>; }
 function EmptyState({ title, description }: { title: string; description: string }) { return <Card level={2}><CardContent className="p-8 text-center"><FileText className="mx-auto size-8 text-text-secondary" /><h2 className="mt-3 font-semibold">{title}</h2><p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">{description}</p></CardContent></Card>; }
 function Summary({ label, value }: { label: string; value: string }) { return <div><p className="text-xs uppercase tracking-wide text-text-secondary">{label}</p><p className="mt-1 font-medium">{value}</p></div>; }

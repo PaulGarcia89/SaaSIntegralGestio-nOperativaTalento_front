@@ -83,3 +83,4 @@ export type { StatusTileProps } from "./status-tile";
 /* Contexto activo: empresa y sucursal sobre las que hablan las cifras.
    Ver `active-context.tsx`. */
 export { ActiveContext } from "./active-context";
+export { Stepper, type StepperStep } from "@/components/system/stepper";

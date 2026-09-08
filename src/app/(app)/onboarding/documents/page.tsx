@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  CalendarClock,
   Check,
   ChevronDown,
   ChevronUp,
@@ -14,11 +13,9 @@ import {
   FileCheck2,
   FileSignature,
   History,
-  Pencil,
   Plus,
   Upload,
   UserRoundCheck,
-  ArrowRight,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -83,8 +80,6 @@ import {
   ErrorState,
   FilterBar,
   InlineNote,
-  Metric,
-  MetricRow,
   PageHeader,
   SkeletonRows,
   StatusBadge,
@@ -99,7 +94,7 @@ import {
 import { FileUpload } from "@/components/ui/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -474,8 +469,8 @@ export default function OnboardingDocumentsPage() {
     <div className="space-y-7">
       <PageHeader
         eyebrow="Personas"
-        title="Incorporación y documentos"
-        description="Coordina responsables, vencimientos, dependencias y evidencias desde la contratación hasta un primer día listo."
+        title="Incorporaciones"
+        description="Cada persona que entra, con sus tareas, responsables y evidencias hasta el primer día."
         actions={
           can("onboarding.manage") ? (
             <>
@@ -485,9 +480,8 @@ export default function OnboardingDocumentsPage() {
                 ruta con nombres distintos. Queda una acción principal y los
                 destinos, sin repetir ninguno.
               */}
-              <Button asChild variant="ghost"><Link href="/onboarding/operations">Automatización</Link></Button>
-              <Button asChild variant="ghost"><Link href="/onboarding/analytics">Analítica</Link></Button>
-              <Button asChild variant="ghost"><Link href="/onboarding/compliance">Cumplimiento</Link></Button>
+              {/* Automatización, analítica y cumplimiento viven en el
+                  dashboard del módulo; aquí solo lo que se hace en esta pantalla. */}
               <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Plantillas</Button>
               <Button onClick={() => { setRevisionSourceId(null); setTemplateOpen(true); }}>
                 <Plus className="size-4" aria-hidden="true" />
@@ -568,28 +562,10 @@ export default function OnboardingDocumentsPage() {
             <StatusBadge label={onboardingHeadline(selected).label} tone={onboardingHeadline(selected).tone} />
           </div>
 
-          <MetricRow>
-            <Metric
-              label="Avance"
-              value={`${selected.progressPercent}%`}
-              detail={`${onboardingProgress(selected).completed} de ${onboardingProgress(selected).total} tareas`}
-            />
-            <Metric
-              label="Tareas pendientes"
-              value={String(onboardingProgress(selected).pending)}
-              tone={onboardingProgress(selected).pending > 0 ? "warning" : "success"}
-            />
-            <Metric
-              label="Vencidas"
-              value={String(onboardingProgress(selected).overdue)}
-              tone={onboardingProgress(selected).overdue > 0 ? "danger" : undefined}
-            />
-            <Metric
-              label="Documentos"
-              value={String(selected.documents.length)}
-              detail={`${selected.documents.filter((document) => document.status === "APPROVED").length} aprobados`}
-            />
-          </MetricRow>
+          {/* Avance gráfico: un tramo por tarea. Verde = hecha, ámbar =
+              bloqueada, rojo = vencida, gris = pendiente. Sustituye a cuatro
+              cifras que decían lo mismo en números. */}
+          <TaskProgress flow={selected} />
 
           {/* La siguiente tarea, en singular y con su responsable. */}
           {selected.nextAction ? (
@@ -645,12 +621,6 @@ export default function OnboardingDocumentsPage() {
             <Button asChild variant="secondary">
               <Link href={`/training/paths?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}&templateId=${encodeURIComponent(selected.template?.id ?? "")}`}>
                 Capacitación
-              </Link>
-            </Button>
-            <Button asChild variant="ghost">
-              <Link href="/ats/candidates">
-                Volver a Personas
-                <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
             </Button>
           </ActionBar>
@@ -711,7 +681,6 @@ export default function OnboardingDocumentsPage() {
           </aside>
 
           <main className="space-y-5">
-            <FlowSummary flow={selected} />
 
             {!selected.template ? (
               <InlineFeedback
@@ -746,39 +715,24 @@ export default function OnboardingDocumentsPage() {
               </InlineFeedback>
             ) : null}
 
-            {selected.alerts.length ? (
-              <section className="space-y-2" aria-labelledby="onboarding-alerts">
-                <h2 id="onboarding-alerts" className="font-semibold">
-                  Alertas y bloqueos
-                </h2>
-                {selected.alerts.map((alert) => (
-                  <InlineFeedback
-                    key={`${alert.taskId}-${alert.message}`}
-                    tone={alert.severity}
-                    title={alert.severity === "danger" ? "Atención inmediata" : "Tarea bloqueada"}
-                  >
-                    {alert.message}
-                  </InlineFeedback>
-                ))}
-              </section>
-            ) : null}
-
+            {/* Las alertas ya están arriba, con causa, responsable y salida
+                (`BlockerList` y los avisos). Repetirlas aquí era leerlas dos veces. */}
             <section className="space-y-3" aria-labelledby="onboarding-checklist">
-              <div className="flex items-center justify-between">
-                <h2 id="onboarding-checklist" className="text-lg font-semibold">
-                  Checklist operativo
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="onboarding-checklist" className="text-lg font-semibold text-ink-1">
+                  Tareas
+                  <span className="ml-2 font-mono text-sm font-normal text-ink-2 tabular-figures">
+                    {selected.tasks.filter((task) => task.status === "COMPLETED").length}/{selected.tasks.length}
+                  </span>
                 </h2>
-                <span className="text-sm text-text-secondary">
-                  {selected.tasks.filter((task) => task.status === "COMPLETED").length} de{" "}
-                  {selected.tasks.length} completadas
-                </span>
+                {can("onboarding.manage") ? (
+                  <Button size="sm" variant="secondary" onClick={() => openTaskEditor()}>
+                    <Plus className="size-4" />
+                    Agregar tarea
+                  </Button>
+                ) : null}
               </div>
-              {can("onboarding.manage") ? (
-                <Button size="sm" variant="secondary" onClick={() => openTaskEditor()}>
-                  <Plus className="size-4" />
-                  Agregar tarea
-                </Button>
-              ) : null}
+              <ol className="space-y-3">
               {selected.tasks.map((task, index) => (
                 <TaskRow
                   key={task.id}
@@ -802,6 +756,7 @@ export default function OnboardingDocumentsPage() {
                   last={index === selected.tasks.length - 1}
                 />
               ))}
+              </ol>
             </section>
 
             <Timeline flow={selected} />
@@ -1588,47 +1543,6 @@ function RuntimeTaskDialog({
   );
 }
 
-function FlowSummary({ flow }: { flow: EmployeeOnboardingFlowDto }) {
-  return (
-    <Card level={1}>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <CardTitle>{flow.employee.name}</CardTitle>
-            <p className="text-sm text-text-secondary">
-              {flow.employee.jobTitle || "Puesto por confirmar"} · {flow.branch.name}
-            </p>
-          </div>
-          <Badge>
-            {flow.readinessStatus === "READY"
-              ? "Expediente cerrado"
-              : flow.readinessStatus === "READY_FOR_REVIEW"
-                ? "Listo para revisión"
-                : "En incorporación"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-3">
-        <IconMetric icon={UserRoundCheck} label="Avance" value={`${flow.progressPercent}%`} />
-        <IconMetric icon={CalendarClock} label="Inicio" value={new Date(flow.startedAt).toLocaleDateString()} />
-        <IconMetric icon={FileCheck2} label="Expediente" value={`${flow.documents.length} documentos`} />
-        {flow.nextAction ? (
-          <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:col-span-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand">Siguiente acción</p>
-            <p className="mt-1 font-semibold">{flow.nextAction.title}</p>
-            <p className="text-sm text-text-secondary">{flow.nextAction.description}</p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
-              <span>Responsable: <strong className="font-medium text-text-primary">{flow.nextAction.owner?.name ?? ownerTypeLabel(flow.nextAction.ownerType)}</strong></span>
-              <span>Fecha límite: <strong className="font-medium text-text-primary">{flow.nextAction.dueDate ? new Date(flow.nextAction.dueDate).toLocaleDateString("es") : "Sin fecha"}</strong></span>
-              {flow.nextAction.blocked ? <span className="font-medium text-status-danger">Bloqueada{flow.nextAction.blockingReason ? `: ${flow.nextAction.blockingReason}` : ""}</span> : null}
-            </div>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
 function TaskRow({
   task,
   index,
@@ -1664,81 +1578,137 @@ function TaskRow({
   first: boolean;
   last: boolean;
 }) {
+  const done = task.status === "COMPLETED";
+  const cancelled = task.status === "CANCELLED";
+  const due = task.dueDate ? new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(task.dueDate)) : null;
   return (
-    <Card level={task.overdue || task.blocked ? 1 : 2}>
-      <CardContent className="flex min-w-0 flex-col gap-4 p-4">
-        <div
-          className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
-            task.status === "COMPLETED"
-              ? "bg-status-success/15 text-status-success"
-              : task.blocked
-                ? "bg-status-warning/15 text-status-warning"
-                : "bg-secondary text-text-secondary"
-          }`}
-        >
-          {task.status === "COMPLETED" ? (
-            <Check className="size-5" />
-          ) : task.blocked ? (
-            <AlertTriangle className="size-5" />
-          ) : (
-            index + 1
+    <li
+      className={`flex min-w-0 items-start gap-3 rounded-lg border bg-surface-1 p-4 ${
+        task.overdue && !done ? "border-status-danger/40" : task.blocked ? "border-status-warning/40" : "border-line"
+      }`}
+    >
+      {/* Marca de estado: hecha, bloqueada, vencida o su número de orden. */}
+      <span
+        aria-hidden="true"
+        className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+          done
+            ? "bg-status-success text-white"
+            : task.blocked
+              ? "bg-status-warning/15 text-status-warning"
+              : task.overdue
+                ? "bg-status-danger/10 text-status-danger"
+                : "border-2 border-line-strong text-ink-2"
+        }`}
+      >
+        {done ? <Check className="size-5" strokeWidth={2.5} /> : task.blocked ? <AlertTriangle className="size-4" /> : index + 1}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className={`font-semibold ${done || cancelled ? "text-ink-2" : "text-ink-1"}`}>{task.title}</h3>
+          {done ? null : (
+            <StatusBadge
+              size="sm"
+              tone={cancelled ? "neutral" : task.overdue ? "danger" : task.blocked ? "warning" : task.status === "IN_PROGRESS" ? "progress" : "neutral"}
+              label={task.overdue && !cancelled ? "Vencida" : taskStatusLabel(task.status)}
+            />
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold">{task.title}</h3>
-            <Badge>{taskStatusLabel(task.status)}</Badge>
-            {task.overdue ? <Badge variant="destructive">Vencida</Badge> : null}
-          </div>
-          <p className="mt-1 text-sm text-text-secondary">{task.description}</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-text-secondary">
-            <span>Responsable: {task.owner?.name ?? ownerTypeLabel(task.ownerType)}</span>
-            <span>
-              Fecha límite: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "Sin definir"}
-            </span>
-            {task.waitingForLabels.length ? <span>Espera a: {task.waitingForLabels.join(", ")}</span> : null}
-          </div>
-          {task.blockingReason ? (
-            <p className="mt-2 text-sm text-status-warning">{task.blockingReason}</p>
-          ) : null}
-        </div>
-        {canManage ? (
-          <div className="flex min-w-0 flex-wrap gap-2 border-t border-border-default pt-3">
-            <Button size="sm" variant="secondary" onClick={onAssign}>
-              <Pencil className="size-4" />
-              Asignar
+        {task.description && !done ? <p className="mt-1 line-clamp-2 text-sm text-ink-2">{task.description}</p> : null}
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2">
+          <span>{task.owner?.name ?? ownerTypeLabel(task.ownerType)}</span>
+          {due ? <span>{done ? "" : "Vence "}{due}</span> : null}
+          {task.waitingForLabels.length ? <span className="text-ink-3">Espera a: {task.waitingForLabels.join(", ")}</span> : null}
+        </p>
+        {task.blockingReason && !done ? <p className="mt-2 text-sm text-status-warning">{task.blockingReason}</p> : null}
+
+        {/* Una acción principal visible; el resto, plegado en «Más». Antes
+            cada tarea enseñaba nueve botones a la vez. */}
+        {canManage && !done && !cancelled ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {task.status === "BLOCKED" ? (
+              <Button size="sm" onClick={onUnblock} disabled={pending}>Desbloquear</Button>
+            ) : (
+              <Button size="sm" onClick={onComplete} disabled={task.blocked || pending}>
+                <Check className="size-4" aria-hidden="true" />
+                Completar
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={onUpload}>
+              <Upload className="size-4" aria-hidden="true" />
+              Evidencia
             </Button>
-            <Button size="icon" variant="ghost" onClick={onEdit} aria-label={`Editar ${task.title}`}><Pencil className="size-4" /></Button>
-            <Button size="icon" variant="ghost" disabled={first || pending} onClick={onMoveUp} aria-label={`Subir ${task.title}`}><ChevronUp className="size-4" /></Button>
-            <Button size="icon" variant="ghost" disabled={last || pending} onClick={onMoveDown} aria-label={`Bajar ${task.title}`}><ChevronDown className="size-4" /></Button>
-            {task.status !== "COMPLETED" ? (
-              <>
-                <Button size="sm" variant="secondary" onClick={onUpload}>
-                  <Upload className="size-4" />
-                  Evidencia
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={task.status === "BLOCKED" ? onUnblock : onBlock}
-                  disabled={pending}
-                >
-                  {task.status === "BLOCKED" ? "Desbloquear" : "Bloquear"}
-                </Button>
-                <Button size="sm" onClick={onComplete} disabled={task.blocked || pending}>
-                  Completar
-                </Button>
-                <Button size="sm" variant="ghost" onClick={onCancel} disabled={pending}>Cancelar</Button>
-                <Button size="icon" variant="ghost" onClick={onDelete} disabled={pending} aria-label={`Eliminar ${task.title}`}><Trash2 className="size-4 text-status-danger" /></Button>
-              </>
-            ) : null}
+            <details className="group relative">
+              <summary className="inline-flex min-h-[var(--control-h-base)] cursor-pointer list-none items-center gap-1 rounded-md px-3 text-sm font-medium text-ink-2 hover:bg-surface-2 hover:text-ink-1 [&::-webkit-details-marker]:hidden">
+                Más
+                <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="absolute left-0 top-full z-[var(--z-popover)] mt-1 flex min-w-44 flex-col rounded-md border border-line bg-surface-1 p-1 shadow-e3">
+                <Button size="sm" variant="ghost" className="justify-start" onClick={onAssign}>Asignar responsable</Button>
+                <Button size="sm" variant="ghost" className="justify-start" onClick={onEdit}>Editar</Button>
+                <Button size="sm" variant="ghost" className="justify-start" disabled={first || pending} onClick={onMoveUp}>Subir</Button>
+                <Button size="sm" variant="ghost" className="justify-start" disabled={last || pending} onClick={onMoveDown}>Bajar</Button>
+                {task.status !== "BLOCKED" ? (
+                  <Button size="sm" variant="ghost" className="justify-start" onClick={onBlock} disabled={pending}>Bloquear</Button>
+                ) : null}
+                <Button size="sm" variant="ghost" className="justify-start" onClick={onCancel} disabled={pending}>Cancelar tarea</Button>
+                <Button size="sm" variant="ghost" className="justify-start text-status-danger" onClick={onDelete} disabled={pending}>Eliminar</Button>
+              </div>
+            </details>
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </li>
   );
 }
 
+/** Un tramo por tarea. Se lee de un vistazo cuántas faltan y cuáles están mal. */
+function TaskProgress({ flow }: { flow: EmployeeOnboardingFlowDto }) {
+  const tasks = flow.tasks.filter((task) => task.status !== "CANCELLED");
+  const done = tasks.filter((task) => task.status === "COMPLETED").length;
+  if (tasks.length === 0) return <p className="text-sm text-ink-2">Esta incorporación todavía no tiene tareas.</p>;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <p className="font-medium text-ink-1">{done} de {tasks.length} tareas completadas</p>
+        <p className="font-mono text-ink-2 tabular-figures">{flow.progressPercent} %</p>
+      </div>
+      <ol
+        className="mt-2 flex gap-1"
+        role="progressbar"
+        aria-valuenow={done}
+        aria-valuemin={0}
+        aria-valuemax={tasks.length}
+        aria-valuetext={`${done} de ${tasks.length} tareas completadas`}
+      >
+        {tasks.map((task) => (
+          <li
+            key={task.id}
+            title={task.title}
+            className={`h-2 flex-1 rounded-full ${
+              task.status === "COMPLETED" ? "bg-status-success" : task.overdue ? "bg-status-danger" : task.blocked ? "bg-status-warning" : "bg-surface-3"
+            }`}
+          />
+        ))}
+      </ol>
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
+        <Legend className="bg-status-success" label="Completada" />
+        <Legend className="bg-status-warning" label="Bloqueada" />
+        <Legend className="bg-status-danger" label="Vencida" />
+        <Legend className="bg-surface-3" label="Pendiente" />
+      </p>
+    </div>
+  );
+}
+
+function Legend({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden="true" className={`inline-block size-2.5 rounded-full ${className}`} />
+      {label}
+    </span>
+  );
+}
 
 function Timeline({ flow }: { flow: EmployeeOnboardingFlowDto }) {
   return (
@@ -1876,26 +1846,6 @@ function Documents({
         })
       )}
     </section>
-  );
-}
-
-function IconMetric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof UserRoundCheck;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl bg-secondary/40 p-3">
-      <Icon className="size-5 text-brand" />
-      <div>
-        <p className="text-xs text-text-secondary">{label}</p>
-        <p className="font-semibold">{value}</p>
-      </div>
-    </div>
   );
 }
 

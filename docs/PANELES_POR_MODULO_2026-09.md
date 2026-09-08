@@ -249,6 +249,24 @@ necesario en pantalla.
 Sin cambios de backend. Verificado con specimen a 390 y 1440 px: sin
 desbordamiento, todos los controles ≥ 44 px.
 
+## 2.sexies Revisión de usabilidad del resto de módulos (2026-09-08)
+
+Misma vara que en Contratación y Aprendizaje: intuitivo, gráfico, solo lo
+necesario. Qué se cambió en cada flujo:
+
+| Módulo · pantalla | Antes | Ahora |
+|---|---|---|
+| Incorporación · `/onboarding/documents` | El expediente repetía nombre y estado tres veces (cabecera, `FlowSummary`, alertas), cuatro cifras, y cada tarea enseñaba nueve botones | Una cabecera; **barra segmentada por tarea** (verde hecha, ámbar bloqueada, rojo vencida, gris pendiente) con leyenda; «Lo siguiente» y bloqueos una sola vez; cada tarea con **una acción principal** (Completar / Desbloquear), Evidencia y el resto en «Más»; sin los tres enlaces del encabezado que ya están en el dashboard |
+| Reclutamiento · perfil de candidato | Fases como pastillas de texto | **Paso a paso con iconos** (`RecruitmentPhaseRail`), el mismo dibujo que en Contratación |
+| Personas · expediente de empleado | Nombre y puesto repetidos en título, tarjeta y «Información básica»; ID interno visible | Una sola cabecera (quién, estado, sucursales, acciones) y una ficha sin el UUID |
+| Inventario de restaurante · entrada de mercancía | Paso a paso propio con tokens antiguos | **`Stepper` del sistema**, compartido: lo usan también `Wizard` (vacante nueva, importación de empleados, importación de ventas) |
+| Productividad · cámaras y zonas | Dos formularios primero, dos avisos explicativos, las cámaras al final | Primero lo que existe; el alta plegada en «Agregar cámara o zona» (abierta solo si no hay ninguna); sin avisos |
+| Administración · usuarios | Cuatro cifras que ya da `/admin/dashboard` | Solo la lista y el alta |
+
+Componente nuevo del sistema: `Stepper` (`components/system/stepper.tsx`).
+Sin cambios de backend. Verificado con specimen del expediente de
+incorporación a 390 y 1440 px.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

@@ -91,28 +91,83 @@ export function HowItWorks() { const { t } = useLocale(); const steps = [{ icon:
 
 export function CandidateSection() {
   const { t } = useLocale();
+  const steps = ["application", "interview", "offer"] as const;
 
-  // Una franja, no un bloque. El filo ámbar a la izquierda es la forma de un
-  // apunte al margen: distingue el aviso del resto de la página sin pedir el
-  // peso de una sección de producto, y sin añadir otra superficie más.
-  return <section id="candidatos" className="scroll-mt-8 rounded-lg border border-line border-l-2 border-l-accent-line bg-surface-2 p-5 sm:p-6">
-    <div className="flex min-w-0 flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-8">
-      <div className="flex min-w-0 items-start gap-3.5">
-        <span aria-hidden="true" className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent-fill/12 text-accent-ink">
-          <BriefcaseBusiness className="size-4.5" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-ink-1">{t("landing.candidates.title")}</h2>
-          <p className="mt-1 max-w-xl text-sm leading-6 text-ink-2">{t("landing.candidates.detail")}</p>
+  // Un bloque de portada para quien busca empleo, con la misma paleta que el
+  // resto de la página (lavado ámbar, grafito para la acción). A la derecha,
+  // una ficha ILUSTRATIVA —rotulada como tal— de cómo se ve el seguimiento de
+  // una postulación; no son datos reales.
+  return <section id="candidatos" className="relative scroll-mt-8 overflow-hidden rounded-[2rem] border border-accent-line/25 bg-[radial-gradient(circle_at_88%_0%,hsl(38_94%_52%_/_.16),transparent_28%),linear-gradient(135deg,hsl(0_0%_100%)_0%,hsl(38_60%_96%)_55%,hsl(38_70%_94%)_100%)] px-5 py-10 shadow-[0_18px_50px_hsl(213_40%_10%_/_.07)] sm:px-8 sm:py-14">
+    <div aria-hidden="true" className="pointer-events-none absolute -left-20 bottom-0 size-64 rounded-full bg-accent-fill/20 blur-3xl" />
+    <div className="relative grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:items-center">
+      <div>
+        <p className="text-sm font-semibold text-accent-ink">{t("landing.candidates.eyebrow")}</p>
+        <h2 className="mt-3 text-4xl font-semibold tracking-tight text-ink-1 sm:text-5xl">{t("landing.candidates.title")}</h2>
+        <p className="mt-4 max-w-xl text-lg leading-8 text-ink-2">{t("landing.candidates.detail")}</p>
+        <ul className="mt-5 flex flex-wrap gap-2" aria-label={t("landing.candidates.eyebrow")}>
+          {["jobs", "tracking"].map((chip) => (
+            <li key={chip} className="rounded-full border border-line bg-surface-1/80 px-4 py-1.5 text-sm font-medium text-ink-1">
+              {t(`landing.candidates.chip.${chip}`)}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <Button asChild size="lg" className="sm:min-w-48">
+            <Link href="/jobs">{t("landing.candidates.viewJobs")}<ArrowRight className="size-4" aria-hidden="true" /></Link>
+          </Button>
+          <Button asChild size="lg" variant="secondary" className="sm:min-w-48">
+            <Link href="/application-status">{t("landing.candidates.track")}</Link>
+          </Button>
         </div>
       </div>
-      <div className="flex shrink-0 flex-col gap-2.5 sm:flex-row">
-        <Button asChild>
-          <Link href="/jobs">{t("landing.nav.searchJobs")}<ArrowRight className="size-4" aria-hidden="true" /></Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href="/application-status">{t("landing.nav.trackApplication")}</Link>
-        </Button>
+
+      <div aria-hidden="true" className="rounded-2xl border border-line bg-surface-1/90 p-5 shadow-[0_16px_40px_hsl(213_40%_10%_/_.10)] backdrop-blur sm:p-6">
+        <div className="flex flex-wrap items-start gap-3 sm:gap-4">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent-fill/15 text-accent-ink">
+            <BriefcaseBusiness className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1 basis-40">
+            <p className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-ink">{t("landing.candidates.preview.label")}</p>
+            <p className="mt-0.5 text-lg font-semibold text-ink-1">{t("landing.candidates.preview.title")}</p>
+            <p className="text-sm text-ink-2">{t("landing.candidates.preview.role")}</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-status-success/10 px-3 py-1 text-xs font-semibold text-status-success sm:ml-auto">{t("landing.candidates.preview.status")}</span>
+        </div>
+
+        <ol className="mt-6 grid grid-cols-3 gap-2">
+          {steps.map((step, index) => (
+            <li key={step}>
+              <span className={`block h-2 rounded-full ${index < 2 ? "bg-accent-fill" : "bg-accent-fill/20"}`} />
+              <span className="mt-2 block text-sm text-ink-2">{t(`landing.candidates.preview.step.${step}`)}</span>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-accent-line/30 bg-accent-fill/[.07] p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-1 text-accent-ink shadow-sm">
+            <CalendarCheck2 className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink-1">{t("landing.candidates.preview.nextLabel")}</p>
+            <p className="text-sm text-ink-2">{t("landing.candidates.preview.next")}</p>
+          </div>
+        </div>
+
+        <dl className="mt-4 grid grid-cols-2 gap-3">
+          <div className="min-w-0 rounded-xl bg-surface-2 p-3 sm:p-4">
+            <dt className="text-xs text-ink-2 sm:text-sm">{t("landing.candidates.preview.stagesLabel")}</dt>
+            <dd className="mt-1 text-xl font-semibold text-ink-1">{t("landing.candidates.preview.stagesValue")}</dd>
+          </div>
+          <div className="min-w-0 rounded-xl bg-surface-2 p-3 sm:p-4">
+            <dt className="text-xs text-ink-2 sm:text-sm">{t("landing.candidates.preview.updatesLabel")}</dt>
+            <dd className="mt-1 text-xl font-semibold text-ink-1">{t("landing.candidates.preview.updatesValue")}</dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 flex items-center gap-2 rounded-xl border border-line bg-surface-1 px-4 py-3 text-sm text-ink-1">
+          <Check className="size-4 shrink-0 text-status-success" />
+          {t("landing.candidates.preview.note")}
+        </p>
       </div>
     </div>
   </section>;

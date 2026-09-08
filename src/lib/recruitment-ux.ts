@@ -1,5 +1,6 @@
 import type { ApplicationStatusKey, OperationalDashboardItemDto, VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import { currentApplicationStage } from "@/lib/applications";
+import { translateUiCopy } from "@/i18n/ui-copy";
 import { translate } from "@/i18n";
 import type { SupportedLocale } from "@/i18n/types";
 
@@ -204,7 +205,7 @@ export function toTodayItems(items: OperationalDashboardItemDto[] | undefined, n
       const due = dueLabel(item.dueAt, now, locale);
       return {
         id: item.id,
-        title: item.title,
+        title: translateUiCopy(locale, item.title),
         who: item.recordLabel ?? who ?? "",
         detail: rest.join(" · "),
         when: due ?? waitingLabel(item.occurredAt, now, locale),

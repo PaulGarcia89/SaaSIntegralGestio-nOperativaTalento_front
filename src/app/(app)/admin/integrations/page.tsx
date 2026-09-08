@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -58,6 +60,7 @@ function evidenceValue(value: unknown): string {
 }
 
 export default function QueueManagementPage() {
+  const uiText = useUiText();
   const { currentRole, tenants } = useAppStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -121,7 +124,7 @@ export default function QueueManagementPage() {
   if (currentRole !== "admin_saas") {
     return (
       <BlockedState
-        title="Sin acceso a la consola de plataforma"
+        title={uiText("Sin acceso a la consola de plataforma")}
         cause="La supervisión del bus y las colas abarca la actividad de todas las empresas a la vez."
         owner="Quien administra la plataforma"
         resolution="Si necesitas consultarla, pide acceso de administración de plataforma."
@@ -130,7 +133,7 @@ export default function QueueManagementPage() {
   }
 
   if (monitoringQuery.isLoading) {
-    return <AsyncState state="loading" title="Consultando el bus y las colas" />;
+    return <AsyncState state="loading" title={uiText("Consultando el bus y las colas")} />;
   }
 
   if (monitoringQuery.isError || !monitoringQuery.data) {
@@ -148,7 +151,7 @@ export default function QueueManagementPage() {
     return (
       <AsyncState
         state="error"
-        title="No fue posible cargar la operación del bus"
+        title={uiText("No fue posible cargar la operación del bus")}
         description={errorDescription}
         onRetry={() => void monitoringQuery.refetch()}
       />
@@ -166,30 +169,30 @@ export default function QueueManagementPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Gobierno de plataforma"
-        title="Integraciones y colas"
-        description="Procesamiento, reintentos, latencia y eventos descartados de toda la plataforma. Vista de solo lectura: desde aquí no se reintenta ni se borra nada."
+        eyebrow={uiText("Gobierno de plataforma")}
+        title={uiText("Integraciones y colas")}
+        description={uiText("Procesamiento, reintentos, latencia y eventos descartados de toda la plataforma. Vista de solo lectura: desde aquí no se reintenta ni se borra nada.")}
         actions={
           <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:w-auto lg:flex-wrap lg:items-center">
             <FormSelect
-              aria-label="Filtrar por empresa"
+              aria-label={uiText("Filtrar por empresa")}
               className="min-w-0 lg:min-w-52"
               value={tenantId}
               onValueChange={setTenantId}
               options={[
-                { label: "Todas las empresas", value: "all" },
+                { label: uiText("Todas las empresas"), value: "all" },
                 ...tenants.map((tenant) => ({ label: tenant.name, value: tenant.id })),
               ]}
             />
             <FormSelect
-              aria-label="Seleccionar periodo"
+              aria-label={uiText("Seleccionar periodo")}
               className="min-w-0 lg:min-w-44"
               value={periodHours}
               onValueChange={setPeriodHours}
               options={periodOptions}
             />
             <FormSelect
-              aria-label="Configurar actualización automática"
+              aria-label={uiText("Configurar actualización automática")}
               className="min-w-0 lg:min-w-48"
               value={refreshSeconds}
               onValueChange={setRefreshSeconds}
@@ -197,8 +200,7 @@ export default function QueueManagementPage() {
             />
             <Button type="button" variant="secondary" onClick={() => setAsOf(Date.now())}>
               <RefreshCw className="size-4" aria-hidden="true" />
-              Actualizar
-            </Button>
+              {uiText("Actualizar")}</Button>
           </div>
         }
       />
@@ -207,35 +209,32 @@ export default function QueueManagementPage() {
         <div className="flex items-center gap-3">
           <Activity className="size-5 text-brand" aria-hidden="true" />
           <div>
-            <p className="font-medium">Estado operativo</p>
+            <p className="font-medium">{uiText("Estado operativo")}</p>
             <p className="text-sm text-muted-foreground">
-              Actualizado {formatDate(overview.generatedAt)} · Alcance {tenantId === "all" ? "global" : "por empresa"}
+              {uiText("Actualizado")}{formatDate(overview.generatedAt)} {uiText(" · Alcance ")}{tenantId === "all" ? "global" : "por empresa"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Controlador {overview.bus.driver} · {overview.bus.enabled ? "habilitado" : "deshabilitado"} ·{" "}
-              {overview.bus.workerCount} workers activos
-            </p>
+              {uiText("Controlador")}{overview.bus.driver} · {overview.bus.enabled ? "habilitado" : "deshabilitado"} ·{" "}
+              {overview.bus.workerCount} {uiText("workers activos")}</p>
           </div>
         </div>
         <Badge variant={healthy ? "success" : "warning"}>
-          {healthy ? "Sin incidencias abiertas" : "Requiere atención"}
+          {healthy ? "Sin incidencias abiertas" : uiText("Requiere atención")}
         </Badge>
       </div>
 
       <SectionCard
-        title="Certificación de integraciones de producción"
-        subtitle={certification?.mode === "ACTIVE" ? "Evidencia activa" : "Configuración"}
+        title={uiText("Certificación de integraciones de producción")}
+        subtitle={certification?.mode === "ACTIVE" ? "Evidencia activa" : uiText("Configuración")}
       >
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex max-w-3xl gap-3">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
               <div>
-                <p className="font-medium">Resend, almacenamiento privado, antivirus y calendarios</p>
+                <p className="font-medium">{uiText("Resend, almacenamiento privado, antivirus y calendarios")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  La prueba activa autentica Resend, escribe y elimina un objeto efímero en cada bucket,
-                  valida una muestra limpia y EICAR en ClamAV, y comprueba perfiles OAuth sin crear reuniones.
-                </p>
+                  {uiText("La prueba activa autentica Resend, escribe y elimina un objeto efímero en cada bucket, valida una muestra limpia y EICAR en ClamAV, y comprueba perfiles OAuth sin crear reuniones.")}</p>
               </div>
             </div>
             <Button
@@ -249,22 +248,21 @@ export default function QueueManagementPage() {
           </div>
 
           {certificationQuery.isLoading && !certification ? (
-            <p className="text-sm text-muted-foreground">Revisando la configuración desplegada...</p>
+            <p className="text-sm text-muted-foreground">{uiText("Revisando la configuración desplegada...")}</p>
           ) : certificationQuery.isError && !certification ? (
             <StateCard
               tone="empty"
-              title="No fue posible inspeccionar las integraciones"
-              description="Verifica que el backend actualizado esté desplegado y que tu rol tenga permisos operativos."
+              title={uiText("No fue posible inspeccionar las integraciones")}
+              description={uiText("Verifica que el backend actualizado esté desplegado y que tu rol tenga permisos operativos.")}
             />
           ) : certification ? (
             <>
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-4 py-3">
                 <Badge variant={certification.status === "PASS" ? "success" : certification.status === "FAIL" ? "destructive" : "warning"}>
-                  {certification.status === "PASS" ? "Certificado" : certification.status === "FAIL" ? "Fallido" : "Con advertencias"}
+                  {certification.status === "PASS" ? uiText("Certificado") : certification.status === "FAIL" ? uiText("Fallido") : "Con advertencias"}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  {certification.summary.passed} correctas · {certification.summary.warnings} advertencias · {certification.summary.failed} fallidas
-                </span>
+                  {certification.summary.passed} {uiText(" correctas · ")}{certification.summary.warnings} {uiText(" advertencias · ")}{certification.summary.failed} {uiText("fallidas")}</span>
                 <span className="text-sm text-muted-foreground">
                   {formatDate(certification.generatedAt)} · {formatDuration(certification.durationMs)}
                 </span>
@@ -278,7 +276,7 @@ export default function QueueManagementPage() {
                         <p className="mt-1 text-sm text-muted-foreground">{check.summary}</p>
                       </div>
                       <Badge variant={check.status === "PASS" ? "success" : check.status === "FAIL" ? "destructive" : "warning"}>
-                        {check.status === "PASS" ? "Correcto" : check.status === "FAIL" ? "Falló" : check.status === "SKIPPED" ? "Omitido" : "Advertencia"}
+                        {check.status === "PASS" ? "Correcto" : check.status === "FAIL" ? "Falló" : check.status === "SKIPPED" ? "Omitido" : uiText("Advertencia")}
                       </Badge>
                     </div>
                     <dl className="mt-4 space-y-2 text-xs">
@@ -307,17 +305,15 @@ export default function QueueManagementPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Almacenamiento privado ATS" subtitle="Plan sin gasto adicional">
+      <SectionCard title={uiText("Almacenamiento privado ATS")} subtitle="Plan sin gasto adicional">
         <div className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex max-w-3xl gap-3">
               <Database className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
               <div>
-                <p className="font-medium">R2 privado, cifrado y con retención automática</p>
+                <p className="font-medium">{uiText("R2 privado, cifrado y con retención automática")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Los archivos se entregan mediante enlaces temporales directos. El sistema elimina objetos vencidos
-                  y avisa antes de alcanzar 8 GB de consumo administrado.
-                </p>
+                  {uiText("Los archivos se entregan mediante enlaces temporales directos. El sistema elimina objetos vencidos y avisa antes de alcanzar 8 GB de consumo administrado.")}</p>
               </div>
             </div>
             <Button
@@ -332,20 +328,20 @@ export default function QueueManagementPage() {
           </div>
 
           {storageQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">Calculando uso y retención...</p>
+            <p className="text-sm text-muted-foreground">{uiText("Calculando uso y retención...")}</p>
           ) : storageQuery.isError || !storageQuery.data ? (
             <StateCard
               tone="empty"
-              title="No fue posible consultar el almacenamiento"
-              description="Verifica que el backend actualizado esté desplegado y que tu rol tenga permisos operativos."
+              title={uiText("No fue posible consultar el almacenamiento")}
+              description={uiText("Verifica que el backend actualizado esté desplegado y que tu rol tenga permisos operativos.")}
             />
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <MetricCard label="Uso actual" value={formatBytes(storageQuery.data.usage.usedBytes)} detail={`${storageQuery.data.usage.files} archivos privados`} period={`${storageQuery.data.usage.usedPercentOfFreeTier}% del nivel configurado`} />
-                <MetricCard label="Alerta preventiva" value={formatBytes(storageQuery.data.usage.alertBytes)} detail={storageQuery.data.usage.alertReached ? "Umbral alcanzado" : `${formatBytes(storageQuery.data.usage.bytesUntilAlert)} disponibles antes de alertar`} />
-                <MetricCard label="CV" value={String(storageQuery.data.usage.resumes.files)} detail={formatBytes(storageQuery.data.usage.resumes.bytes)} />
-                <MetricCard label="Imágenes" value={String(storageQuery.data.usage.vacancyImages.files)} detail={formatBytes(storageQuery.data.usage.vacancyImages.bytes)} />
+                <MetricCard label={uiText("Uso actual")} value={formatBytes(storageQuery.data.usage.usedBytes)} detail={`${storageQuery.data.usage.files} archivos privados`} period={`${storageQuery.data.usage.usedPercentOfFreeTier}% del nivel configurado`} />
+                <MetricCard label={uiText("Alerta preventiva")} value={formatBytes(storageQuery.data.usage.alertBytes)} detail={storageQuery.data.usage.alertReached ? "Umbral alcanzado" : `${formatBytes(storageQuery.data.usage.bytesUntilAlert)} disponibles antes de alertar`} />
+                <MetricCard label={uiText("CV")} value={String(storageQuery.data.usage.resumes.files)} detail={formatBytes(storageQuery.data.usage.resumes.bytes)} />
+                <MetricCard label={uiText("Imágenes")} value={String(storageQuery.data.usage.vacancyImages.files)} detail={formatBytes(storageQuery.data.usage.vacancyImages.bytes)} />
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {[
@@ -356,22 +352,19 @@ export default function QueueManagementPage() {
                 ].map(([label, enabled]) => (
                   <div key={String(label)} className="flex items-center justify-between rounded-xl border border-border/70 bg-background/55 px-4 py-3">
                     <span className="text-sm">{label}</span>
-                    <Badge variant={enabled ? "success" : "warning"}>{enabled ? "Activo" : "Pendiente"}</Badge>
+                    <Badge variant={enabled ? "success" : "warning"}>{enabled ? uiText("Activo", undefined, "status") : uiText("Pendiente")}</Badge>
                   </div>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Proveedor {storageQuery.data.configuration.provider} · Retención de CV {storageQuery.data.retention.resumeDays} días ·
-                Imágenes {storageQuery.data.retention.vacancyImageDays} días · {storageQuery.data.retention.pendingExpiration} pendientes de vencer ·
-                Actualizado {formatDate(storageQuery.data.generatedAt)}
+                {uiText("Proveedor")}{storageQuery.data.configuration.provider} {uiText(" · Retención de CV ")}{storageQuery.data.retention.resumeDays} {uiText("días · Imágenes")}{storageQuery.data.retention.vacancyImageDays} {uiText(" días · ")}{storageQuery.data.retention.pendingExpiration} {uiText("pendientes de vencer · Actualizado")}{formatDate(storageQuery.data.generatedAt)}
               </p>
             </>
           )}
 
           {storageMaintenanceMutation.isSuccess ? (
             <p className="rounded-lg border border-status-success/30 bg-status-success/10 px-3 py-2 text-sm text-ink-1">
-              Mantenimiento completado: {storageMaintenanceMutation.data.expiredResumes ?? 0} CV y {storageMaintenanceMutation.data.expiredImages ?? 0} imágenes vencidas.
-            </p>
+              {uiText("Mantenimiento completado:")}{storageMaintenanceMutation.data.expiredResumes ?? 0} {uiText(" CV y ")}{storageMaintenanceMutation.data.expiredImages ?? 0} {uiText("imágenes vencidas.")}</p>
           ) : null}
           {storageMaintenanceMutation.isError ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -385,15 +378,15 @@ export default function QueueManagementPage() {
       </SectionCard>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
-        <MetricCard label="Eventos procesados" value={String(overview.summary.processedEvents)} detail={`${overview.summary.totalEvents} eventos recibidos`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
-        <MetricCard label="Pendientes" value={String(overview.summary.pendingEvents)} detail={`${overview.summary.retryingJobs} en reintento`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
-        <MetricCard label="Fallidos" value={String(overview.summary.failedJobs)} detail={`${deadLetter.openCount} descartados sin resolver`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
-        <MetricCard label="Latencia p95" value={formatDuration(overview.performance.p95ProcessingMs)} detail={`Promedio ${formatDuration(overview.performance.averageProcessingMs)}`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
+        <MetricCard label={uiText("Eventos procesados")} value={String(overview.summary.processedEvents)} detail={`${overview.summary.totalEvents} eventos recibidos`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
+        <MetricCard label={uiText("Pendientes")} value={String(overview.summary.pendingEvents)} detail={`${overview.summary.retryingJobs} en reintento`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
+        <MetricCard label={uiText("Fallidos")} value={String(overview.summary.failedJobs)} detail={`${deadLetter.openCount} descartados sin resolver`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
+        <MetricCard label={uiText("Latencia p95")} value={formatDuration(overview.performance.p95ProcessingMs)} detail={`Promedio ${formatDuration(overview.performance.averageProcessingMs)}`} period={periodOptions.find((option) => option.value === periodHours)?.label} />
       </div>
 
-      <SectionCard title="Estado por cola" subtitle="Procesamiento">
+      <SectionCard title={uiText("Estado por cola")} subtitle="Procesamiento">
         {overview.queueStatus.length === 0 ? (
-          <StateCard tone="empty" title="Sin actividad de colas" description="No se registraron despachos durante el periodo seleccionado." />
+          <StateCard tone="empty" title={uiText("Sin actividad de colas")} description={uiText("No se registraron despachos durante el periodo seleccionado.")} />
         ) : (
           <DomainTable
             data={overview.queueStatus}
@@ -402,7 +395,7 @@ export default function QueueManagementPage() {
               { key: "queue", header: "Cola", render: (queue) => queue.queueName, exportValue: (queue) => queue.queueName },
               { key: "queued", header: "En cola", sortable: true, render: (queue) => queue.queued, sortValue: (queue) => queue.queued },
               { key: "ack", header: "Confirmados", sortable: true, render: (queue) => queue.acknowledged, sortValue: (queue) => queue.acknowledged },
-              { key: "failed", header: "Fallidos", sortable: true, render: (queue) => queue.failed, sortValue: (queue) => queue.failed },
+              { key: "failed", header: uiText("Fallidos"), sortable: true, render: (queue) => queue.failed, sortValue: (queue) => queue.failed },
               { key: "total", header: "Total", sortable: true, render: (queue) => queue.total, sortValue: (queue) => queue.total },
             ]}
           />
@@ -410,34 +403,34 @@ export default function QueueManagementPage() {
       </SectionCard>
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-2 [&>*]:min-w-0">
-        <SectionCard title="Rendimiento por dominio" subtitle="Eventos">
+        <SectionCard title={uiText("Rendimiento por dominio")} subtitle="Eventos">
           {throughput.domains.length === 0 ? (
-            <StateCard tone="empty" title="Sin eventos por dominio" description="Amplía el periodo para consultar actividad histórica." />
+            <StateCard tone="empty" title={uiText("Sin eventos por dominio")} description={uiText("Amplía el periodo para consultar actividad histórica.")} />
           ) : (
             <DomainTable
               data={throughput.domains}
               getKey={(domain) => domain.domain}
               columns={[
-                { key: "domain", header: "Dominio", render: (domain) => domain.domain },
+                { key: "domain", header: uiText("Dominio"), render: (domain) => domain.domain },
                 { key: "processed", header: "Procesados", sortable: true, render: (domain) => domain.processed, sortValue: (domain) => domain.processed },
-                { key: "failed", header: "Fallidos", sortable: true, render: (domain) => domain.failed + domain.deadLetter, sortValue: (domain) => domain.failed + domain.deadLetter },
-                { key: "last", header: "Última actividad", render: (domain) => formatDate(domain.lastSeenAt) },
+                { key: "failed", header: uiText("Fallidos"), sortable: true, render: (domain) => domain.failed + domain.deadLetter, sortValue: (domain) => domain.failed + domain.deadLetter },
+                { key: "last", header: uiText("Última actividad"), render: (domain) => formatDate(domain.lastSeenAt) },
               ]}
             />
           )}
         </SectionCard>
 
-        <SectionCard title="Errores por empresa" subtitle="Riesgo">
+        <SectionCard title={uiText("Errores por empresa")} subtitle="Riesgo">
           {errorsByTenant.tenants.length === 0 ? (
-            <StateCard tone="empty" title="Sin errores por empresa" description="No hay fallos registrados en el periodo seleccionado." />
+            <StateCard tone="empty" title={uiText("Sin errores por empresa")} description={uiText("No hay fallos registrados en el periodo seleccionado.")} />
           ) : (
             <DomainTable
               data={errorsByTenant.tenants}
               getKey={(tenant) => tenant.tenantId}
               columns={[
-                { key: "tenant", header: "Empresa", render: (tenant) => tenant.tenantName },
-                { key: "failed", header: "Fallidos", sortable: true, render: (tenant) => tenant.failed, sortValue: (tenant) => tenant.failed },
-                { key: "dead", header: "Descartados", sortable: true, render: (tenant) => tenant.deadLetter, sortValue: (tenant) => tenant.deadLetter },
+                { key: "tenant", header: uiText("Empresa"), render: (tenant) => tenant.tenantName },
+                { key: "failed", header: uiText("Fallidos"), sortable: true, render: (tenant) => tenant.failed, sortValue: (tenant) => tenant.failed },
+                { key: "dead", header: uiText("Descartados"), sortable: true, render: (tenant) => tenant.deadLetter, sortValue: (tenant) => tenant.deadLetter },
                 { key: "last", header: "Último error", render: (tenant) => formatDate(tenant.lastErrorAt) },
               ]}
             />
@@ -446,14 +439,14 @@ export default function QueueManagementPage() {
       </div>
 
       <SectionCard
-        title="Eventos descartados"
+        title={uiText("Eventos descartados")}
         subtitle={`${deadLetter.openCount} sin resolver · cola «dead letter»`}
       >
         {deadLetter.events.length === 0 ? (
           <StateCard
             tone="empty"
-            title="Ningún evento fue descartado"
-            description="Todo lo que entró a la cola acabó procesándose o sigue en reintento."
+            title={uiText("Ningún evento fue descartado")}
+            description={uiText("Todo lo que entró a la cola acabó procesándose o sigue en reintento.")}
           />
         ) : (
           <DomainTable
@@ -461,41 +454,40 @@ export default function QueueManagementPage() {
             data={deadLetter.events}
             getKey={(event) => event.id}
             columns={[
-              { key: "status", header: "Estado", render: (event) => event.resolvedAt ? "Resuelto" : "Abierto", exportValue: (event) => event.resolvedAt ? "Resuelto" : "Abierto" },
+              { key: "status", header: uiText("Estado"), render: (event) => event.resolvedAt ? "Resuelto" : "Abierto", exportValue: (event) => event.resolvedAt ? "Resuelto" : "Abierto" },
               { key: "queue", header: "Cola", render: (event) => event.queueName },
-              { key: "event", header: "Evento", render: (event) => event.eventName },
-              { key: "tenant", header: "Empresa", render: (event) => event.tenant.name },
+              { key: "event", header: uiText("Evento"), render: (event) => event.eventName },
+              { key: "tenant", header: uiText("Empresa"), render: (event) => event.tenant.name },
               { key: "retries", header: "Reintentos", sortable: true, render: (event) => event.retryCount, sortValue: (event) => event.retryCount },
-              { key: "reason", header: "Motivo", render: (event) => event.reason },
+              { key: "reason", header: uiText("Motivo"), render: (event) => event.reason },
               { key: "date", header: "Último fallo", render: (event) => formatDate(event.lastFailedAt) },
             ]}
           />
         )}
         <p className="mt-4 text-xs text-muted-foreground">
-          Vista de solo lectura. El backend aún no expone acciones seguras para reintentar o resolver eventos.
-        </p>
+          {uiText("Vista de solo lectura. El backend aún no expone acciones seguras para reintentar o resolver eventos.")}</p>
       </SectionCard>
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-3 [&>*]:min-w-0">
-        <SectionCard title="Eventos y trazabilidad" subtitle="Todavía no disponible">
+        <SectionCard title={uiText("Eventos y trazabilidad")} subtitle="Todavía no disponible">
           <StateCard
             tone="empty"
-            title="No se puede seguir un evento concreto"
-            description="Para ver el contenido de un evento, sus intentos y su identificador de correlación hace falta una versión del servidor que todavía no está desplegada."
+            title={uiText("No se puede seguir un evento concreto")}
+            description={uiText("Para ver el contenido de un evento, sus intentos y su identificador de correlación hace falta una versión del servidor que todavía no está desplegada.")}
           />
         </SectionCard>
-        <SectionCard title="Consumidores" subtitle="Todavía no disponible">
+        <SectionCard title={uiText("Consumidores")} subtitle="Todavía no disponible">
           <StateCard
             tone="empty"
-            title="No se pueden ver los procesos que consumen la cola"
-            description="Cuántas instancias hay, cuánto procesan y cuándo dieron señal de vida requiere una versión del servidor que todavía no está desplegada."
+            title={uiText("No se pueden ver los procesos que consumen la cola")}
+            description={uiText("Cuántas instancias hay, cuánto procesan y cuándo dieron señal de vida requiere una versión del servidor que todavía no está desplegada.")}
           />
         </SectionCard>
-        <SectionCard title="Auditoría operativa" subtitle="Todavía no disponible">
+        <SectionCard title={uiText("Auditoría operativa")} subtitle="Todavía no disponible">
           <StateCard
             tone="empty"
-            title="No hay auditoría de las acciones sobre la cola"
-            description="Requiere una versión del servidor que todavía no está desplegada. No se muestra nada inventado mientras tanto."
+            title={uiText("No hay auditoría de las acciones sobre la cola")}
+            description={uiText("Requiere una versión del servidor que todavía no está desplegada. No se muestra nada inventado mientras tanto.")}
           />
         </SectionCard>
       </div>

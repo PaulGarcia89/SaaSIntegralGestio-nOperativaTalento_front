@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -96,6 +98,7 @@ export function RestaurantProductionWorkflow({
   recipeOptions: RecipeOption[];
   canManage: boolean;
 }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const { currentUser } = useAppStore();
 
@@ -310,44 +313,43 @@ export function RestaurantProductionWorkflow({
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Operación diaria"
-        title="Producción"
-        description="Elige las recetas, define cantidades, revisa cómo queda el almacén y confirma."
-        meta={warehouseName ? <span>Almacén: {warehouseName}</span> : null}
+        eyebrow={uiText("Operación diaria")}
+        title={uiText("Producción")}
+        description={uiText("Elige las recetas, define cantidades, revisa cómo queda el almacén y confirma.")}
+        meta={warehouseName ? <span>{uiText("Almacén: ")}{warehouseName}</span> : null}
       />
 
       <OperationStepper state={operationState} onStepChange={setStep} />
 
       {!warehouseId ? (
-        <InlineNote tone="warning" title="Falta elegir el almacén">
-          Sin almacén no se sabe de dónde salen los ingredientes. Selecciónalo arriba para continuar.
-        </InlineNote>
+        <InlineNote tone="warning" title={uiText("Falta elegir el almacén")}>
+          {uiText("Sin almacén no se sabe de dónde salen los ingredientes. Selecciónalo arriba para continuar.")}</InlineNote>
       ) : null}
 
       {calculate.error ? (
-        <InlineNote tone="danger" title="No se pudo calcular el impacto">
+        <InlineNote tone="danger" title={uiText("No se pudo calcular el impacto")}>
           {getApiErrorMessage(calculate.error, "Revisa las recetas y las cantidades.")}
         </InlineNote>
       ) : null}
 
       {step === "select" ? (
         <PageSection
-          title="Recetas a producir"
-          description="Puedes agrupar varias recetas en una misma operación."
+          title={uiText("Recetas a producir")}
+          description={uiText("Puedes agrupar varias recetas en una misma operación.")}
           boxed
         >
           <div className="space-y-3">
             {lines.map((line, index) => (
               <div key={index} className="flex flex-wrap items-end gap-3">
                 <div className="min-w-0 flex-1">
-                  <Label htmlFor={`production-recipe-${index}`}>Receta {index + 1}</Label>
+                  <Label htmlFor={`production-recipe-${index}`}>{uiText("Receta ")}{index + 1}</Label>
                   <select
                     id={`production-recipe-${index}`}
                     className={SELECT_CLASS}
                     value={line.recipeId}
                     onChange={(event) => updateLine(index, "recipeId", event.target.value)}
                   >
-                    <option value="">Seleccionar</option>
+                    <option value="">{uiText("Seleccionar")}</option>
                     {recipeOptions.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
@@ -370,19 +372,17 @@ export function RestaurantProductionWorkflow({
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Button size="sm" variant="secondary" onClick={() => setLines([...lines, emptyLine()])}>
               <Plus className="size-4" aria-hidden="true" />
-              Agregar otra receta
-            </Button>
+              {uiText("Agregar otra receta")}</Button>
             <Button size="lg" disabled={!recipesChosen} onClick={() => setStep("record")}>
-              Continuar
-            </Button>
+              {uiText("Continuar")}</Button>
           </div>
         </PageSection>
       ) : null}
 
       {step === "record" ? (
         <PageSection
-          title="Cantidades"
-          description="Cuánto se planificó producir y cuánto rindió realmente."
+          title={uiText("Cantidades")}
+          description={uiText("Cuánto se planificó producir y cuánto rindió realmente.")}
           boxed
         >
           <div className="space-y-4">
@@ -390,7 +390,7 @@ export function RestaurantProductionWorkflow({
               <div key={index} className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
                 <p className="min-w-0 truncate font-medium text-ink-1">{recipeLabel(line, index)}</p>
                 <div>
-                  <Label htmlFor={`production-planned-${index}`}>Cantidad planificada</Label>
+                  <Label htmlFor={`production-planned-${index}`}>{uiText("Cantidad planificada")}</Label>
                   <Input
                     id={`production-planned-${index}`}
                     type="number"
@@ -402,7 +402,7 @@ export function RestaurantProductionWorkflow({
                   />
                 </div>
                 <div>
-                  <Label htmlFor={`production-yield-${index}`}>Rendimiento real</Label>
+                  <Label htmlFor={`production-yield-${index}`}>{uiText("Rendimiento real")}</Label>
                   <Input
                     id={`production-yield-${index}`}
                     type="number"
@@ -418,8 +418,7 @@ export function RestaurantProductionWorkflow({
           </div>
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setStep("select")}>
-              Cambiar las recetas
-            </Button>
+              {uiText("Cambiar las recetas")}</Button>
             <Button
               size="lg"
               disabled={!ready}
@@ -427,8 +426,7 @@ export function RestaurantProductionWorkflow({
               loadingLabel="Calculando…"
               onClick={() => calculate.mutate()}
             >
-              Revisar impacto
-            </Button>
+              {uiText("Revisar impacto")}</Button>
           </div>
         </PageSection>
       ) : null}
@@ -438,34 +436,30 @@ export function RestaurantProductionWorkflow({
           <ImpactReview impact={impact} />
 
           {impact.blockers.length > 0 || justificationReady ? (
-            <PageSection title="Autorizar el faltante" boxed>
+            <PageSection title={uiText("Autorizar el faltante")} boxed>
               <p className="text-sm text-ink-2">
-                El servidor permite producir aunque no haya existencia suficiente, pero exige dejar por escrito
-                por qué. Queda en la auditoría a nombre de {currentUser.fullName}.
+                {uiText("El servidor permite producir aunque no haya existencia suficiente, pero exige dejar por escrito por qué. Queda en la auditoría a nombre de")}{currentUser.fullName}.
               </p>
               <div className="mt-3">
-                <Label htmlFor="production-justification">Justificación</Label>
+                <Label htmlFor="production-justification">{uiText("Justificación")}</Label>
                 <Input
                   id="production-justification"
                   value={justification}
                   onChange={(event) => setJustification(event.target.value)}
-                  placeholder="Explica por qué se autoriza el faltante"
+                  placeholder={uiText("Explica por qué se autoriza el faltante")}
                   aria-describedby="production-justification-help"
                 />
                 <p id="production-justification-help" className="mt-1 font-mono text-2xs text-ink-3 tabular-figures">
-                  {justification.trim().length} / {JUSTIFICATION_MIN} caracteres mínimos
-                </p>
+                  {justification.trim().length} / {JUSTIFICATION_MIN} {uiText("caracteres mínimos")}</p>
               </div>
             </PageSection>
           ) : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setStep("record")}>
-              Corregir las cantidades
-            </Button>
+              {uiText("Corregir las cantidades")}</Button>
             <Button size="lg" disabled={!canManage || impact.blockers.length > 0} onClick={prepare}>
-              Continuar
-            </Button>
+              {uiText("Continuar")}</Button>
           </div>
         </div>
       ) : null}
@@ -506,17 +500,18 @@ function PendingProductionInbox({
 }: {
   query: ReturnType<typeof useQuery<RestaurantProductionDto[]>>;
 }) {
+  const uiText = useUiText();
   return (
     <PageSection
-      title="Producción pendiente"
-      description="Documentos en borrador que todavía no actualizan existencias."
+      title={uiText("Producción pendiente")}
+      description={uiText("Documentos en borrador que todavía no actualizan existencias.")}
       boxed
     >
       <RestaurantQueryState
         loading={query.isLoading}
         error={query.error}
         retry={() => void query.refetch()}
-        label="Cargando la producción pendiente"
+        label={uiText("Cargando la producción pendiente")}
       >
         {query.data?.length ? (
           <ul className="divide-y divide-line">
@@ -525,7 +520,7 @@ function PendingProductionInbox({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink-1">{item.preparationName}</p>
                   <p className="font-mono text-2xs text-ink-3 tabular-figures">
-                    {formatQuantity(item.plannedQuantity)} planificadas · {formatMoney(item.consumedCost)}
+                    {formatQuantity(item.plannedQuantity)} {uiText(" planificadas · ")}{formatMoney(item.consumedCost)}
                   </p>
                 </div>
                 <RestaurantStatusBadge status={item.status} size="sm" />
@@ -535,8 +530,8 @@ function PendingProductionInbox({
         ) : (
           <EmptyState
             reason="no-records"
-            title="No hay producción pendiente"
-            description="Todo lo registrado ya se aplicó al inventario."
+            title={uiText("No hay producción pendiente")}
+            description={uiText("Todo lo registrado ya se aplicó al inventario.")}
           />
         )}
       </RestaurantQueryState>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -22,6 +24,7 @@ import { InfoList, SectionCard } from "@/components/ui";
 import { AsyncState } from "@/components/async-state";
 
 export default function ModulesPage() {
+  const uiText = useUiText();
   const { can, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
@@ -61,7 +64,7 @@ export default function ModulesPage() {
   if (!can("admin.company")) {
     return (
       <BlockedState
-        title="Sin acceso a los módulos por empresa"
+        title={uiText("Sin acceso a los módulos por empresa")}
         cause="Habilitar o apagar un módulo afecta al menú de todas las personas de una empresa."
         owner="Quien administra la plataforma"
         resolution="Si necesitas consultarlo, pide el permiso «Configuración de empresa»."
@@ -69,20 +72,20 @@ export default function ModulesPage() {
     );
   }
 
-  if (modulesQuery.isLoading || tenantsQuery.isLoading) return <AsyncState state="loading" title="Cargando módulos" />;
-  if (modulesQuery.isError || tenantsQuery.isError) return <AsyncState state="error" title="No fue posible cargar los módulos" onRetry={() => { void modulesQuery.refetch(); void tenantsQuery.refetch(); }} />;
+  if (modulesQuery.isLoading || tenantsQuery.isLoading) return <AsyncState state="loading" title={uiText("Cargando módulos")} />;
+  if (modulesQuery.isError || tenantsQuery.isError) return <AsyncState state="error" title={uiText("No fue posible cargar los módulos")} onRetry={() => { void modulesQuery.refetch(); void tenantsQuery.refetch(); }} />;
 
   return (
     <div className="space-y-5">
       <CrudHeader
-        title="Gestión de módulos"
-        description="Qué módulos ve cada empresa. Apagar uno lo quita del menú de todas sus personas de inmediato; los datos se conservan."
+        title={uiText("Gestión de módulos")}
+        description={uiText("Qué módulos ve cada empresa. Apagar uno lo quita del menú de todas sus personas de inmediato; los datos se conservan.")}
         badge="Gobierno SaaS"
       />
       <FilterToolbar
         searchPlaceholder="Buscar por módulo, origen o estado"
         options={[
-          { label: "Todos", value: "" },
+          { label: uiText("Todos"), value: "" },
           { label: "Habilitados", value: "enabled" },
           { label: "Deshabilitados", value: "disabled" },
           { label: "Plan", value: "plan" },
@@ -96,8 +99,8 @@ export default function ModulesPage() {
         <CrudPanel>
           <StateCard
             tone="empty"
-            title="No hay módulos visibles"
-            description="Ajusta el filtro para revisar las asignaciones disponibles."
+            title={uiText("No hay módulos visibles")}
+            description={uiText("Ajusta el filtro para revisar las asignaciones disponibles.")}
           />
         </CrudPanel>
       ) : (
@@ -110,17 +113,17 @@ export default function ModulesPage() {
               columns={[
                 {
                   key: "tenant",
-                  header: "Empresa",
+                  header: uiText("Empresa"),
                   render: (assignment) =>
                     tenantsQuery.data?.find((tenant) => tenant.id === assignment.tenantId)?.name ??
                     `Empresa sin cargar (${shortId(assignment.tenantId)})`,
                 },
                 { key: "module", header: "Módulo", render: (assignment) => moduleLabels[assignment.module] },
-                { key: "source", header: "Origen", render: (assignment) => moduleSourceLabels[assignment.source] },
-                { key: "status", header: "Estado", render: (assignment) => (assignment.enabled ? "Habilitado" : "Deshabilitado") },
+                { key: "source", header: uiText("Origen"), render: (assignment) => moduleSourceLabels[assignment.source] },
+                { key: "status", header: uiText("Estado"), render: (assignment) => (assignment.enabled ? "Habilitado" : "Deshabilitado") },
                 {
                   key: "actions",
-                  header: "Acciones",
+                  header: uiText("Acciones"),
                   render: (assignment) => (
                     <Button
                       size="sm"
@@ -153,7 +156,7 @@ export default function ModulesPage() {
               <div className="space-y-4">
                 <div className="rounded-2xl border border-border/70 bg-secondary/20 p-4">
                   <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Asignación</p>
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{uiText("Asignación")}</p>
                     <h3 className="text-xl font-semibold tracking-tight text-foreground">
                       {selectedTenant?.name ?? "Sin empresa"}
                     </h3>
@@ -163,8 +166,8 @@ export default function ModulesPage() {
 
                 <InfoList
                   items={[
-                    { title: "Estado", description: selectedAssignment.enabled ? "Módulo habilitado" : "Módulo deshabilitado", badge: selectedAssignment.enabled ? "Activo" : "Inactivo" },
-                    { title: "Origen", description: moduleSourceLabels[selectedAssignment.source] },
+                    { title: uiText("Estado"), description: selectedAssignment.enabled ? "Módulo habilitado" : "Módulo deshabilitado", badge: selectedAssignment.enabled ? "Activo" : "Inactivo" },
+                    { title: uiText("Origen"), description: moduleSourceLabels[selectedAssignment.source] },
                     {
                       title: "Plan de la empresa",
                       description: selectedTenant ? planTierLabel(selectedTenant.plan) : "Sin plan",

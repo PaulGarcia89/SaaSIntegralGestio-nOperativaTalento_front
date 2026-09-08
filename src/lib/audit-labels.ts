@@ -365,7 +365,11 @@ export function auditActionInfo(code: unknown): AuditActionInfo {
   };
 }
 
-export const auditActionLabel = (code: unknown) => auditActionInfo(code).label;
+export const auditActionLabel = (code: unknown, locale: "es" | "en" = "es") => {
+  if (locale === "es") return auditActionInfo(code).label;
+  if (typeof code !== "string" || !code.trim()) return "Action not recorded";
+  return code.toLowerCase().replace(/[._-]+/g, " ").trim().replace(/^./, (letter) => letter.toUpperCase());
+};
 
 /** Todos los códigos descritos, ya agrupados y ordenados para un desplegable. */
 export function auditActionOptions(): Array<{ group: string; options: Array<{ value: string; label: string }> }> {

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -61,6 +63,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
   history: NonNullable<HiringContractDto["stateHistory"]>;
   onRefresh: () => Promise<void>;
 }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
@@ -72,7 +75,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
       <h2 id="hiring-more" className="text-xl font-semibold text-ink-1">{t("hiring.details.more")}</h2>
       <p className="text-base text-ink-2">{t("hiring.details.moreHint")}</p>
 
-      <HiringDisclosure title="Oferta laboral" hint={hiringOfferStatusLabel(contract.jobOffer?.status)}>
+      <HiringDisclosure title={uiText("Oferta laboral")} hint={hiringOfferStatusLabel(contract.jobOffer?.status)}>
         {contract.jobOffer?.versions?.length ? (
           <dl>
             {contract.jobOffer.versions.map((version) => (
@@ -135,7 +138,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
       <HiringDisclosure title={t("hiring.details.audit")} hint={t("hiring.details.auditHint")}>
         <dl>
           <Row label={t("hiring.details.contractId")} value={<code className="text-base">{contract.id}</code>} />
-          <Row label="Estado interno" value={<code className="text-base">{contract.status}</code>} />
+          <Row label={uiText("Estado interno")} value={<code className="text-base">{contract.status}</code>} />
           <Row label={t("hiring.details.internalStage")} value={<code className="text-base">{contract.currentStage}</code>} />
           <Row label={t("hiring.details.createdOn")} value={longDate(contract.createdAt) ?? contract.createdAt} />
           <Row label={t("hiring.details.updatedOn")} value={longDate(contract.updatedAt) ?? contract.updatedAt} />
@@ -143,7 +146,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
       </HiringDisclosure>
 
       {canUpdate && !state.completed && !state.cancelled ? (
-        <HiringDisclosure title="Opciones avanzadas" hint={t("hiring.details.settingsHint")}>
+        <HiringDisclosure title={uiText("Opciones avanzadas")} hint={t("hiring.details.settingsHint")}>
           <div className="space-y-5">
             <HiringContractMetadataEditor
               key={`${contract.id}-${contract.priority ?? "MEDIUM"}-${contract.deadlineAt ?? ""}`}
@@ -152,11 +155,9 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
             <div className="rounded-lg border border-status-danger/40 bg-status-danger/[0.04] p-4">
               <h3 className="text-lg font-semibold text-ink-1">{t("hiring.details.cancelThis")}</h3>
               <p className="mt-1 text-base text-ink-2">
-                La contratación se cerrará y no se podrá retomar desde aquí. Tendrás que escribir el motivo.
-              </p>
+                {uiText("La contratación se cerrará y no se podrá retomar desde aquí. Tendrás que escribir el motivo.")}</p>
               <Button variant="destructive" className="mt-3" onClick={() => setCancelOpen(true)}>
-                Cancelar contratación
-              </Button>
+                {uiText("Cancelar contratación")}</Button>
               {cancel.error ? <InlineNote tone="danger" title={t("hiring.details.cancelFailed")}>{hiringErrorMessage(cancel.error, locale)}</InlineNote> : null}
             </div>
           </div>

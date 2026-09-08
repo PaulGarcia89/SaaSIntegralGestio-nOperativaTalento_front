@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { Check, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +44,7 @@ export function Stepper({
   label?: string;
   className?: string;
 }) {
+  const uiText = useUiText();
   return (
     <nav aria-label={label} className={className}>
       <ol className="flex items-start">
@@ -100,7 +103,7 @@ export function Stepper({
         })}
       </ol>
       <p className="mt-2 text-center text-sm text-ink-2 sm:hidden" aria-hidden="true">
-        Paso {current + 1} de {steps.length}
+        {uiText("Paso")}{current + 1} {uiText(" de ")}{steps.length}
       </p>
     </nav>
   );

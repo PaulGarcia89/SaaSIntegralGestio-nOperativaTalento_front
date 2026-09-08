@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect, useState } from "react";
 import { Plus, Send, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -78,6 +80,7 @@ const SELECT_CLASS = cn(
 const emptyLine = (): CountLine => ({ ingredientId: "", quantity: "", reason: "" });
 
 export function RestaurantStockCountWorkflow({ branchId }: { branchId: string }) {
+  const uiText = useUiText();
   const { warehouseId, warehouseName, setHasPendingChanges } = useRestaurantInventoryContext();
   const queryClient = useQueryClient();
   const { currentUser } = useAppStore();
@@ -275,23 +278,23 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Control físico"
-        title="Conteo físico"
-        description="Cuenta en la estantería, compara contra lo que el sistema cree que hay y aprueba el ajuste."
+        eyebrow={uiText("Control físico")}
+        title={uiText("Conteo físico")}
+        description={uiText("Cuenta en la estantería, compara contra lo que el sistema cree que hay y aprueba el ajuste.")}
         meta={
           <>
-            {warehouseName ? <span>Almacén: {warehouseName}</span> : null}
-            <span>{blind ? "Conteo ciego" : "Conteo abierto"}</span>
+            {warehouseName ? <span>{uiText("Almacén: ")}{warehouseName}</span> : null}
+            <span>{blind ? uiText("Conteo ciego") : "Conteo abierto"}</span>
           </>
         }
       />
 
       {loading ? (
-        <SkeletonRows rows={6} label="Cargando ingredientes y existencias" />
+        <SkeletonRows rows={6} label={uiText("Cargando ingredientes y existencias")} />
       ) : loadError ? (
         <ErrorState
-          title="No fue posible cargar el conteo físico"
-          detail={getApiErrorMessage(loadError, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar el conteo físico")}
+          detail={getApiErrorMessage(loadError, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => {
             void ingredients.refetch();
             void stock.refetch();
@@ -303,21 +306,20 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
           <OperationStepper state={operationState} onStepChange={setStep} />
 
           {!warehouseId ? (
-            <InlineNote tone="warning" title="Falta elegir el almacén">
-              Sin almacén no hay existencia teórica contra la que comparar. Selecciónalo arriba para empezar.
-            </InlineNote>
+            <InlineNote tone="warning" title={uiText("Falta elegir el almacén")}>
+              {uiText("Sin almacén no hay existencia teórica contra la que comparar. Selecciónalo arriba para empezar.")}</InlineNote>
           ) : null}
 
           {create.error ? (
-            <InlineNote tone="danger" title="No se pudo crear el conteo">
+            <InlineNote tone="danger" title={uiText("No se pudo crear el conteo")}>
               {getApiErrorMessage(create.error, "Revisa las cantidades e inténtalo de nuevo.")}
             </InlineNote>
           ) : null}
 
           {step === "select" || step === "record" ? (
             <PageSection
-              title="Captura del conteo"
-              description="Una línea por ingrediente contado. La observación es opcional."
+              title={uiText("Captura del conteo")}
+              description={uiText("Una línea por ingrediente contado. La observación es opcional.")}
               boxed
               actions={
                 <label className="flex items-center gap-2 text-sm text-ink-2">
@@ -327,15 +329,12 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
                     checked={blind}
                     onChange={(event) => setBlind(event.target.checked)}
                   />
-                  Conteo ciego
-                </label>
+                  {uiText("Conteo ciego")}</label>
               }
             >
               {blind ? (
-                <InlineNote tone="info" title="Conteo ciego activo">
-                  No se muestra la existencia que el sistema tiene registrada hasta el momento de aprobar, para que
-                  el conteo no se sesgue.
-                </InlineNote>
+                <InlineNote tone="info" title={uiText("Conteo ciego activo")}>
+                  {uiText("No se muestra la existencia que el sistema tiene registrada hasta el momento de aprobar, para que el conteo no se sesgue.")}</InlineNote>
               ) : null}
 
               <div className="mt-4 space-y-4">
@@ -345,14 +344,14 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
                     className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end"
                   >
                     <div className="min-w-0">
-                      <Label htmlFor={`count-ingredient-${index}`}>Ingrediente</Label>
+                      <Label htmlFor={`count-ingredient-${index}`}>{uiText("Ingrediente")}</Label>
                       <select
                         id={`count-ingredient-${index}`}
                         className={SELECT_CLASS}
                         value={line.ingredientId}
                         onChange={(event) => updateLine(index, "ingredientId", event.target.value)}
                       >
-                        <option value="">Seleccionar</option>
+                        <option value="">{uiText("Seleccionar")}</option>
                         {ingredientOptions.map((item) => (
                           <option key={item.id} value={item.id}>
                             {[item.sku, item.name].filter(Boolean).join(" · ")}
@@ -361,7 +360,7 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
                       </select>
                     </div>
                     <div>
-                      <Label htmlFor={`count-quantity-${index}`}>Cantidad contada</Label>
+                      <Label htmlFor={`count-quantity-${index}`}>{uiText("Cantidad contada")}</Label>
                       <Input
                         id={`count-quantity-${index}`}
                         type="number"
@@ -373,11 +372,11 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`count-reason-${index}`}>Observación</Label>
+                      <Label htmlFor={`count-reason-${index}`}>{uiText("Observación")}</Label>
                       <Input
                         id={`count-reason-${index}`}
                         value={line.reason}
-                        placeholder="Opcional"
+                        placeholder={uiText("Opcional")}
                         onChange={(event) => updateLine(index, "reason", event.target.value)}
                       />
                     </div>
@@ -396,11 +395,9 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
               <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <Button size="sm" variant="secondary" onClick={() => setLines([...lines, emptyLine()])}>
                   <Plus className="size-4" aria-hidden="true" />
-                  Agregar ingrediente
-                </Button>
+                  {uiText("Agregar ingrediente")}</Button>
                 <Button size="lg" disabled={invalid} onClick={() => setStep("review")}>
-                  Comparar con el sistema
-                </Button>
+                  {uiText("Comparar con el sistema")}</Button>
               </div>
             </PageSection>
           ) : null}
@@ -409,11 +406,9 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
             <div className="space-y-4">
               {blind ? (
                 <>
-                  <InlineNote tone="info" title="La comparación queda oculta hasta la aprobación">
-                    Elegiste conteo ciego: quien cuenta no ve la existencia registrada. El detalle completo aparece
-                    en el paso de aprobación.
-                  </InlineNote>
-                  <PageSection title="Lo que registraste" boxed>
+                  <InlineNote tone="info" title={uiText("La comparación queda oculta hasta la aprobación")}>
+                    {uiText("Elegiste conteo ciego: quien cuenta no ve la existencia registrada. El detalle completo aparece en el paso de aprobación.")}</InlineNote>
+                  <PageSection title={uiText("Lo que registraste")} boxed>
                     <ul className="divide-y divide-line">
                       {rows.map((row, index) => (
                         <li key={`${row.name}-${index}`} className="flex items-center justify-between gap-4 py-3">
@@ -432,17 +427,15 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button variant="secondary" onClick={() => setStep("record")}>
-                  Corregir la captura
-                </Button>
+                  {uiText("Corregir la captura")}</Button>
                 <Button
                   size="lg"
                   disabled={invalid}
                   loading={create.isPending}
-                  loadingLabel="Guardando…"
+                  loadingLabel={uiText("Guardando…")}
                   onClick={() => create.mutate()}
                 >
-                  Crear el conteo
-                </Button>
+                  {uiText("Crear el conteo")}</Button>
               </div>
             </div>
           ) : null}
@@ -465,16 +458,14 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
                   disabled={action.isPending}
                   onClick={() => action.mutate("cancel")}
                 >
-                  Descartar el conteo
-                </Button>
+                  {uiText("Descartar el conteo")}</Button>
                 <Button
                   variant="secondary"
                   disabled={action.isPending}
                   onClick={() => action.mutate("submit")}
                 >
                   <Send className="size-4" aria-hidden="true" />
-                  Enviar a revisión de otra persona
-                </Button>
+                  {uiText("Enviar a revisión de otra persona")}</Button>
               </div>
             </div>
           ) : null}
@@ -497,11 +488,12 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
 
 /** Conteos que todavía no ajustaron existencias. */
 function PendingCounts({ counts }: { counts: RestaurantStockCountDto[] }) {
+  const uiText = useUiText();
   const pending = counts.filter((item) => !["APPROVED", "CANCELLED"].includes(item.status));
   return (
     <PageSection
-      title="Conteos pendientes"
-      description="Documentos abiertos que todavía no ajustaron el inventario."
+      title={uiText("Conteos pendientes")}
+      description={uiText("Documentos abiertos que todavía no ajustaron el inventario.")}
       boxed
     >
       {pending.length ? (
@@ -522,8 +514,8 @@ function PendingCounts({ counts }: { counts: RestaurantStockCountDto[] }) {
       ) : (
         <EmptyState
           reason="no-records"
-          title="No hay conteos pendientes"
-          description="Todos los conteos registrados ya se aprobaron o se descartaron."
+          title={uiText("No hay conteos pendientes")}
+          description={uiText("Todos los conteos registrados ya se aprobaron o se descartaron.")}
         />
       )}
     </PageSection>

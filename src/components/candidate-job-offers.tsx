@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Download, FileSignature, MessageSquareMore, X } from "lucide-react";
@@ -40,4 +42,5 @@ export function CandidateJobOffers({ offers, onRefresh }: { offers: JobOfferDto[
 async function openPdf(offerId: string, version: number) { const blob = await downloadCandidateJobOfferPdf(offerId, version); const url = URL.createObjectURL(blob); window.open(url, "_blank", "noopener,noreferrer"); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
 function Summary({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>; }
 function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) { return <label className="space-y-2 text-sm font-medium">{label}<Input type={type} value={value} onChange={(event) => onChange(event.target.value)} /></label>; }
-function Reason({ value, onChange }: { value: string; onChange: (value: string) => void }) { return <label className="block space-y-2 text-sm font-medium"><Label>Motivo o condiciones propuestas</Label><textarea rows={4} maxLength={4000} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border bg-background p-3" /></label>; }
+function Reason({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const uiText = useUiText(); return <label className="block space-y-2 text-sm font-medium"><Label>{uiText("Motivo o condiciones propuestas")}</Label><textarea rows={4} maxLength={4000} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border bg-background p-3" /></label>; }

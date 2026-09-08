@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -95,6 +97,7 @@ type Draft = {
 const EMPTY_DRAFT: Draft = { name: "", scope: "module", permissions: ["dashboard.view"] };
 
 export default function RolesPage() {
+  const uiText = useUiText();
   const { can, currentTenant } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -161,7 +164,7 @@ export default function RolesPage() {
   if (!can("admin.roles")) {
     return (
       <BlockedState
-        title="Sin acceso a roles y permisos"
+        title={uiText("Sin acceso a roles y permisos")}
         cause="Tu rol actual no incluye el permiso de administrar la matriz de permisos."
         owner="Quien administra los roles de tu empresa"
         resolution="Pídele que añada «Administrar roles y permisos» a tu rol."
@@ -172,14 +175,14 @@ export default function RolesPage() {
   const columns: Array<DataColumn<RoleDefinitionDto>> = [
     {
       key: "name",
-      header: "Rol",
+      header: uiText("Rol"),
       priority: "identity",
       render: (role) => role.name,
       sortValue: (role) => role.name,
     },
     {
       key: "members",
-      header: "Personas",
+      header: uiText("Personas"),
       priority: "primary",
       numeric: true,
       render: (role) => (
@@ -191,14 +194,14 @@ export default function RolesPage() {
     },
     {
       key: "scope",
-      header: "Alcance",
+      header: uiText("Alcance"),
       priority: "primary",
       render: (role) => <StatusBadge size="sm" tone="neutral" label={scopeLabels[role.scope]} />,
       sortValue: (role) => role.scope,
     },
     {
       key: "permissions",
-      header: "Permisos",
+      header: uiText("Permisos"),
       priority: "secondary",
       // El número solo decía «34». Los de mayor alcance dicen qué es el rol.
       render: (role) => <PermissionSummary permissions={role.permissions} />,
@@ -209,15 +212,14 @@ export default function RolesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Empresa"
-        title="Roles y permisos"
-        description="Qué puede hacer cada persona. Un cambio aquí afecta a todo el mundo que tenga ese rol."
+        eyebrow={uiText("Empresa")}
+        title={uiText("Roles y permisos")}
+        description={uiText("Qué puede hacer cada persona. Un cambio aquí afecta a todo el mundo que tenga ese rol.")}
         meta={<span>{roles.length} roles</span>}
         actions={
           <Button onClick={() => setCreating(true)}>
             <Plus className="size-4" aria-hidden="true" />
-            Nuevo rol
-          </Button>
+            {uiText("Nuevo rol")}</Button>
         }
       />
 
@@ -227,22 +229,21 @@ export default function RolesPage() {
           aria-hidden="true"
         />
         <label htmlFor="roles-search" className="sr-only">
-          Buscar por rol, alcance o permiso
-        </label>
+          {uiText("Buscar por rol, alcance o permiso")}</label>
         <Input
           id="roles-search"
           type="search"
           className="pl-9"
           value={search}
-          placeholder="Buscar por rol, alcance o permiso"
+          placeholder={uiText("Buscar por rol, alcance o permiso")}
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
 
       {rolesQuery.isError ? (
         <ErrorState
-          title="No fue posible cargar los roles"
-          detail={getApiErrorMessage(rolesQuery.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar los roles")}
+          detail={getApiErrorMessage(rolesQuery.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void rolesQuery.refetch()}
         />
       ) : (
@@ -251,25 +252,22 @@ export default function RolesPage() {
           loading={rolesQuery.isLoading}
           columns={columns}
           getKey={(role) => role.id}
-          caption="Roles de la empresa"
+          caption={uiText("Roles de la empresa")}
           emptyReason={search ? "no-matches" : "no-records"}
           onClearFilters={search ? () => setSearch("") : undefined}
           emptyAction={
             !search ? (
               <Button onClick={() => setCreating(true)}>
                 <Plus className="size-4" aria-hidden="true" />
-                Crear el primer rol
-              </Button>
+                {uiText("Crear el primer rol")}</Button>
             ) : undefined
           }
           rowActions={(role) => (
             <div className="flex flex-wrap justify-end gap-2">
               <Button size="sm" variant="secondary" onClick={() => setEditing(role)}>
-                Editar
-              </Button>
+                {uiText("Editar")}</Button>
               <Button size="sm" variant="ghost" onClick={() => setDeleting(role)}>
-                Eliminar
-              </Button>
+                {uiText("Eliminar")}</Button>
             </div>
           )}
         />
@@ -293,16 +291,14 @@ export default function RolesPage() {
         open={Boolean(deleting)}
         onOpenChange={(next) => !next && setDeleting(null)}
         title={`¿Eliminar el rol «${deleting?.name ?? ""}»?`}
-        description="El rol deja de existir y de poder asignarse."
+        description={uiText("El rol deja de existir y de poder asignarse.")}
         confirmLabel="Eliminar el rol"
         pending={deleteMutation.isPending}
         onConfirm={() => deleting && deleteMutation.mutate(deleting)}
         consequences={
           deleting && deleting.members > 0 ? (
             <>
-              {deleting.members} {deleting.members === 1 ? "persona lo tiene" : "personas lo tienen"} asignado y
-              perderán de golpe todo lo que este rol les permitía. Asígnales otro rol antes de eliminarlo.
-            </>
+              {deleting.members} {deleting.members === 1 ? "persona lo tiene" : "personas lo tienen"} {uiText("asignado y perderán de golpe todo lo que este rol les permitía. Asígnales otro rol antes de eliminarlo.")}</>
           ) : (
             "Ninguna persona lo tiene asignado ahora mismo."
           )
@@ -343,6 +339,7 @@ function RoleEditor({
   onSave: (draft: Draft) => void;
   onClose: () => void;
 }) {
+  const uiText = useUiText();
   const { can, currentUser } = useAppStore();
   const [draft, setDraft] = useState<Draft>(() =>
     role ? { name: role.name, scope: role.scope, permissions: [...role.permissions] } : EMPTY_DRAFT,
@@ -436,10 +433,10 @@ function RoleEditor({
     affectedLabel: (role?.members ?? 0) === 1 ? "persona con este rol" : "personas con este rol",
     lines: [
       ...(role && role.name !== draft.name
-        ? [{ label: "Nombre", before: role.name, after: draft.name }]
+        ? [{ label: uiText("Nombre"), before: role.name, after: draft.name }]
         : []),
       ...(role && role.scope !== draft.scope
-        ? [{ label: "Alcance", before: scopeLabels[role.scope], after: scopeLabels[draft.scope] }]
+        ? [{ label: uiText("Alcance"), before: scopeLabels[role.scope], after: scopeLabels[draft.scope] }]
         : []),
       ...diff.added.map((key) => ({
         label: permissionLabel(key),
@@ -475,7 +472,7 @@ function RoleEditor({
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="flex max-h-[92dvh] flex-col overflow-hidden sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{role ? `Editar «${role.name}»` : "Nuevo rol"}</DialogTitle>
+          <DialogTitle>{role ? `Editar «${role.name}»` : uiText("Nuevo rol")}</DialogTitle>
           <DialogDescription>
             {role && role.members > 0
               ? `${role.members} ${role.members === 1 ? "persona tiene" : "personas tienen"} este rol. Lo que cambies aquí les afecta a todas.`
@@ -490,7 +487,7 @@ function RoleEditor({
               {gaps.length ? (
                 <InlineNote
                   tone="warning"
-                  title="Faltan permisos de acceso"
+                  title={uiText("Faltan permisos de acceso")}
                   action={
                     <Button
                       size="sm"
@@ -502,8 +499,7 @@ function RoleEditor({
                         }))
                       }
                     >
-                      Añadir los que faltan
-                    </Button>
+                      {uiText("Añadir los que faltan")}</Button>
                   }
                 >
                   {gaps.length === 1
@@ -512,7 +508,7 @@ function RoleEditor({
                 </InlineNote>
               ) : null}
               {error ? (
-                <InlineNote tone="danger" title="No se pudo guardar">
+                <InlineNote tone="danger" title={uiText("No se pudo guardar")}>
                   {getApiErrorMessage(error, "El servidor rechazó el cambio.")}
                 </InlineNote>
               ) : null}
@@ -538,9 +534,7 @@ function RoleEditor({
                     onChange={(event) => setAcknowledged(event.target.checked)}
                   />
                   <span>
-                    Entiendo que si este es mi rol perderé el acceso a esta pantalla y necesitaré que otra persona me
-                    lo devuelva.
-                  </span>
+                    {uiText("Entiendo que si este es mi rol perderé el acceso a esta pantalla y necesitaré que otra persona me lo devuelva.")}</span>
                 </label>
               ) : null}
             </>
@@ -548,16 +542,16 @@ function RoleEditor({
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="role-name">Nombre del rol</Label>
+                  <Label htmlFor="role-name">{uiText("Nombre del rol")}</Label>
                   <Input
                     id="role-name"
                     value={draft.name}
-                    placeholder="Encargado de almacén"
+                    placeholder={uiText("Encargado de almacén")}
                     onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="role-scope">Alcance</Label>
+                  <Label htmlFor="role-scope">{uiText("Alcance")}</Label>
                   <Select
                     value={draft.scope}
                     onValueChange={(value) =>
@@ -581,13 +575,11 @@ function RoleEditor({
               {role ? (
                 <p className="text-sm text-ink-2">
                   <span className="font-mono tabular-figures text-ink-1">{role.members}</span>{" "}
-                  {role.members === 1 ? "persona tiene" : "personas tienen"} este rol. El recuento lo lleva el
-                  servidor.
-                </p>
+                  {role.members === 1 ? "persona tiene" : "personas tienen"} {uiText("este rol. El recuento lo lleva el servidor.")}</p>
               ) : null}
 
               <PageSection
-                title="Permisos"
+                title={uiText("Permisos")}
                 description={`${draft.permissions.length} de ${PERMISSION_KEYS.length} activos.`}
               >
                 <div className="relative">
@@ -596,20 +588,19 @@ function RoleEditor({
                     aria-hidden="true"
                   />
                   <label htmlFor="permission-search" className="sr-only">
-                    Buscar permiso
-                  </label>
+                    {uiText("Buscar permiso")}</label>
                   <Input
                     id="permission-search"
                     type="search"
                     className="pl-9"
                     value={permissionSearch}
-                    placeholder="Buscar: contratar, inventario, publicar…"
+                    placeholder={uiText("Buscar: contratar, inventario, publicar…")}
                     onChange={(event) => setPermissionSearch(event.target.value)}
                   />
                 </div>
 
                 {visibleGroups.length === 0 ? (
-                  <p className="mt-4 text-sm text-ink-2">Ningún permiso coincide con «{permissionSearch}».</p>
+                  <p className="mt-4 text-sm text-ink-2">{uiText("Ningún permiso coincide con «")}{permissionSearch}».</p>
                 ) : null}
 
                 <div className="mt-4 space-y-2">
@@ -627,7 +618,7 @@ function RoleEditor({
                         >
                           <span className="min-w-0 font-medium text-ink-1">{group.label}</span>
                           <span className="shrink-0 font-mono text-2xs tabular-figures text-ink-3">
-                            {active} de {group.keys.length}
+                            {active} {uiText(" de ")}{group.keys.length}
                           </span>
                         </summary>
 
@@ -639,16 +630,14 @@ function RoleEditor({
                               variant="secondary"
                               onClick={() => setGroup(group.keys, true)}
                             >
-                              Marcar todo
-                            </Button>
+                              {uiText("Marcar todo")}</Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="ghost"
                               onClick={() => setGroup(group.keys, false)}
                             >
-                              Quitar todo
-                            </Button>
+                              {uiText("Quitar todo")}</Button>
                           </div>
 
                           <ul className="divide-y divide-line">
@@ -689,8 +678,7 @@ function RoleEditor({
         {!reviewing ? (
           <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={onClose}>
-              Cancelar
-            </Button>
+              {uiText("Cancelar")}</Button>
             <Button
               disabled={blockers.length > 0}
               onClick={() => {
@@ -698,8 +686,7 @@ function RoleEditor({
                 setReviewing(true);
               }}
             >
-              Revisar el impacto
-            </Button>
+              {uiText("Revisar el impacto")}</Button>
           </div>
         ) : null}
       </DialogContent>

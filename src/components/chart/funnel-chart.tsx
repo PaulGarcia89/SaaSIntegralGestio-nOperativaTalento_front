@@ -13,7 +13,7 @@ import {
   type ChartEmptyReason,
   type ChartTable,
 } from "./chart-frame";
-import { formatCompact, formatPercent } from "./scales";
+import { useUiText } from "@/components/ui-copy";
 
 /**
  * Embudo de conversión.
@@ -48,11 +48,14 @@ export function FunnelChart({
   stages,
   caption,
   stageLabel = "Etapa",
-  formatValue = formatCompact,
+  formatValue: suppliedFormatValue,
   emptyReason = "sin-registros",
   emptyAction,
   className,
 }: FunnelChartProps) {
+  const uiText = useUiText();
+  const formatValue = suppliedFormatValue ?? ((value: number) => new Intl.NumberFormat(uiText.locale, { notation: "compact", maximumFractionDigits: 1 }).format(value));
+  const formatPercent = (value: number, decimals: number) => new Intl.NumberFormat(uiText.locale, { style: "percent", minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value / 100);
   const { ref, width } = useChartWidth();
   const idBase = safeId(React.useId());
   const [indiceFoco, setIndiceFoco] = React.useState<number | null>(null);
@@ -96,8 +99,8 @@ export function FunnelChart({
   const hayDescalabro = peorIndice > 0 && peorCaida > 0;
 
   const tabla: ChartTable = {
-    caption: caption ?? "Etapas del embudo de conversión",
-    headers: [stageLabel, "Valor", "Conversión respecto a la etapa anterior", "Sobre el total"],
+    caption: caption ?? uiText("Etapas del embudo de conversión"),
+    headers: [uiText(stageLabel), uiText("Valor"), uiText("Conversión respecto a la etapa anterior"), uiText("Sobre el total")],
     rows: utiles.map((etapa, indice) => ({
       key: etapa.id,
       cells: [
@@ -111,16 +114,16 @@ export function FunnelChart({
 
   const resumen = [
     caption ? `${caption}.` : null,
-    `Embudo de ${utiles.length} etapas. Empieza en ${utiles[0].name} con ${formatValue(utiles[0].value)} y termina en ${utiles[utiles.length - 1].name} con ${formatValue(utiles[utiles.length - 1].value)}.`,
+    uiText("Embudo de {{count}} etapas. Empieza en {{first}} con {{start}} y termina en {{last}} con {{end}}.", { count: utiles.length, first: utiles[0].name, start: formatValue(utiles[0].value), last: utiles[utiles.length - 1].name, end: formatValue(utiles[utiles.length - 1].value) }),
     utiles[0].value > 0
-      ? `La conversión total es del ${formatPercent((utiles[utiles.length - 1].value / utiles[0].value) * 100, 1)}.`
+      ? uiText("La conversión total es del {{percent}}.", { percent: formatPercent((utiles[utiles.length - 1].value / utiles[0].value) * 100, 1) })
       : null,
     hayDescalabro
-      ? `La mayor caída ocurre entre ${utiles[peorIndice - 1].name} y ${utiles[peorIndice].name}: se pierde el ${formatPercent(peorCaida, 1)}.`
+      ? uiText("La mayor caída ocurre entre {{first}} y {{last}}: se pierde el {{percent}}.", { first: utiles[peorIndice - 1].name, last: utiles[peorIndice].name, percent: formatPercent(peorCaida, 1) })
       : null,
     ...utiles.map(
       (etapa, indice) =>
-        `${etapa.name}: ${formatValue(etapa.value)}${conversiones[indice] === null ? "" : `, ${formatPercent(conversiones[indice] as number, 1)} de la etapa anterior`}.`,
+        `${etapa.name}: ${formatValue(etapa.value)}${conversiones[indice] === null ? "" : `, ${formatPercent(conversiones[indice] as number, 1)} ${uiText("de la etapa anterior")}`}.`,
     ),
   ]
     .filter(Boolean)
@@ -166,8 +169,8 @@ export function FunnelChart({
               }}
               role="graphics-symbol"
               aria-label={`${etapa.name}: ${formatValue(etapa.value)}${
-                conversion === null ? "" : `, ${formatPercent(conversion, 1)} de la etapa anterior`
-              }${esPeorEntrada ? ". Es la mayor caída del embudo" : ""}`}
+                conversion === null ? "" : `, ${formatPercent(conversion, 1)} ${uiText("de la etapa anterior")}`
+              }${esPeorEntrada ? uiText(". Es la mayor caída del embudo") : ""}`}
               tabIndex={indice === (indiceFoco ?? 0) ? 0 : -1}
               onFocus={() => setIndiceFoco(indice)}
               onBlur={() => setIndiceFoco((previo) => (previo === indice ? null : previo))}
@@ -253,7 +256,7 @@ export function FunnelChart({
                     esPeorSalida ? "text-status-warning font-semibold" : "text-ink-2",
                   )}
                 >
-                  {`${formatPercent(conversionSiguiente, 1)} continúa${esPeorSalida ? " · mayor caída" : ""}`}
+                  {`${formatPercent(conversionSiguiente, 1)} ${uiText("continúa")}${esPeorSalida ? uiText(" · mayor caída") : ""}`}
                 </text>
               ) : null}
             </g>

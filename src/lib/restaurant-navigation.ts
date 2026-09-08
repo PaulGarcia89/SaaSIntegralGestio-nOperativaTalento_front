@@ -163,7 +163,7 @@ export const restaurantSections: ReadonlyArray<{ key: string; label: string; ite
   },
   {
     "key": "reports",
-    "label": "Reportes y costos",
+    "label": "Reportes",
     "items": [
       {
         "key": "reports",

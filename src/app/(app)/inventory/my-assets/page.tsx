@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useQuery } from "@tanstack/react-query";
 import { Laptop, MapPin } from "lucide-react";
 import Link from "next/link";
@@ -29,30 +31,31 @@ import { assetStatusLabel, assetStatusTone, conditionLabel } from "@/lib/invento
  *   que devuelve el equipo. Ahora hay un enlace a devoluciones.
  */
 export default function MyInventoryAssetsPage() {
+  const uiText = useUiText();
   const assets = useQuery({ queryKey: ["my-inventory-assets"], queryFn: fetchMyInventoryAssets });
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Autoservicio"
-        title="Mis activos"
-        description="Los equipos y recursos que están bajo tu custodia."
-        meta={assets.data?.length ? <span>{assets.data.length} en custodia</span> : null}
+        eyebrow={uiText("Autoservicio")}
+        title={uiText("Mis activos")}
+        description={uiText("Los equipos y recursos que están bajo tu custodia.")}
+        meta={assets.data?.length ? <span>{assets.data.length} {uiText(" en custodia")}</span> : null}
       />
 
       {assets.isLoading ? (
-        <SkeletonRows rows={3} label="Cargando tus activos" />
+        <SkeletonRows rows={3} label={uiText("Cargando tus activos")} />
       ) : assets.isError ? (
         <ErrorState
-          title="No fue posible cargar tus activos"
-          detail={getApiErrorMessage(assets.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar tus activos")}
+          detail={getApiErrorMessage(assets.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void assets.refetch()}
         />
       ) : !assets.data?.length ? (
         <EmptyState
           reason="no-records"
-          title="No tienes activos bajo tu custodia"
-          description="Cuando te entreguen un equipo aparecerá aquí, con su etiqueta y su número de serie."
+          title={uiText("No tienes activos bajo tu custodia")}
+          description={uiText("Cuando te entreguen un equipo aparecerá aquí, con su etiqueta y su número de serie.")}
         />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -82,12 +85,10 @@ export default function MyInventoryAssetsPage() {
 
       {assets.data?.length ? (
         <p className="text-sm text-ink-2">
-          ¿Vas a devolver alguno?{" "}
+          {uiText("¿Vas a devolver alguno?")}{" "}
           <Link className="underline underline-offset-2" href="/inventory/returns">
-            avisa desde devoluciones
-          </Link>{" "}
-          para que quien lleva el inventario lo reciba.
-        </p>
+            {uiText("avisa desde devoluciones")}</Link>{" "}
+          {uiText("para que quien lleva el inventario lo reciba.")}</p>
       ) : null}
     </div>
   );

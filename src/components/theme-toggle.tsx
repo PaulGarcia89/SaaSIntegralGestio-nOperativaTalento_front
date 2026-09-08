@@ -2,6 +2,7 @@
 
 import { Moon, Rows3, Rows4, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/components/locale-provider";
 import { useAppearance } from "@/components/appearance";
 
 /**
@@ -12,6 +13,7 @@ import { useAppearance } from "@/components/appearance";
  * preferencias al montar, que se repetía en cada pantalla.
  */
 export function ThemeToggle({ className }: { className?: string }) {
+  const { t } = useLocale();
   const { theme, setTheme, ready } = useAppearance();
   // Hasta que se conoce la preferencia real se pinta el valor por defecto, que
   // es el mismo que renderiza el servidor. Así el marcado que React hidrata
@@ -27,7 +29,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       onClick={() => setTheme(nextTheme)}
       className={className}
       disabled={!ready}
-      aria-label={shown === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      aria-label={shown === "dark" ? t("appearance.switchLight") : t("appearance.switchDark")}
     >
       {shown === "dark" ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
     </Button>
@@ -47,6 +49,7 @@ export function ThemeToggle({ className }: { className?: string }) {
  * está activo.
  */
 export function DensityToggle({ className }: { className?: string }) {
+  const { t } = useLocale();
   const { density, setDensity, ready } = useAppearance();
   // Mismo criterio que en el conmutador de tema: hasta conocer la preferencia
   // real se pinta la densidad por defecto, que es la que renderiza el servidor.
@@ -60,8 +63,8 @@ export function DensityToggle({ className }: { className?: string }) {
       className={className}
       disabled={!ready}
       aria-pressed={isCompact}
-      aria-label={isCompact ? "Cambiar a vista cómoda" : "Cambiar a vista compacta"}
-      title={isCompact ? "Vista compacta activa" : "Vista cómoda activa"}
+      aria-label={isCompact ? t("appearance.switchComfortable") : t("appearance.switchCompact")}
+      title={isCompact ? t("appearance.compactActive") : t("appearance.comfortableActive")}
     >
       {isCompact ? <Rows4 className="size-4" aria-hidden="true" /> : <Rows3 className="size-4" aria-hidden="true" />}
     </Button>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -29,4 +31,5 @@ function ResumeContent() {
   return <main className="mx-auto w-full max-w-3xl space-y-6 pb-12 pt-2"><CandidateNav /><Card className="overflow-hidden"><div className="h-2 bg-primary" /><CardHeader><div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-3 text-brand"><PauseCircle className="size-6" /></div><div><p className="text-sm font-medium text-brand">{t("resume.paused")}</p><CardTitle className="mt-1 text-2xl">{t("resume.ready")}</CardTitle></div></div></CardHeader><CardContent className="space-y-6"><div className="rounded-xl bg-secondary/50 p-4"><p className="font-semibold">{vacancy.data.title}</p><p className="mt-1 text-sm text-muted-foreground">{t("resume.returnToStep", { step: String(step + 1) })}</p></div><div className="grid gap-3 sm:grid-cols-2"><div className="flex gap-3 rounded-xl border p-4"><Clock3 className="size-5 shrink-0 text-brand" /><div><p className="font-medium">{t("resume.availableUntil")}</p><p className="text-sm text-muted-foreground">{expiry}</p></div></div><div className="flex gap-3 rounded-xl border p-4"><ShieldCheck className="size-5 shrink-0 text-brand" /><div><p className="font-medium">{t("resume.savedSecurely")}</p><p className="text-sm text-muted-foreground">{t("resume.persisted")}</p></div></div></div><div className="flex flex-wrap gap-3"><Button asChild><Link href={`/apply?vacancyId=${encodeURIComponent(vacancyId)}`}>{t("resume.continue")}<ArrowRight className="size-4" /></Link></Button><Button asChild variant="secondary"><Link href="/jobs">{t("resume.otherJobs")}</Link></Button></div><p className="text-xs text-muted-foreground">{t("resume.sameBrowser")}</p></CardContent></Card></main>;
 }
 
-export default function ApplicationResumePage() { return <Suspense fallback={<AsyncState state="loading" title="Preparando reanudación" />}><ResumeContent /></Suspense>; }
+export default function ApplicationResumePage() {
+  const uiText = useUiText(); return <Suspense fallback={<AsyncState state="loading" title={uiText("Preparando reanudación")} />}><ResumeContent /></Suspense>; }

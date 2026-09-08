@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import {
   Activity,
@@ -47,55 +49,56 @@ type Destination = {
 };
 
 export default function AdminPage() {
+  const uiText = useUiText();
   const { can, canAccessGlobalGovernance, currentTenant, impersonation } = useAppStore();
   const globalScope = canAccessGlobalGovernance && !impersonation?.active;
 
   const company: Destination[] = [
     {
       href: "/admin/company",
-      label: "Configuración de empresa",
+      label: uiText("Configuración de empresa"),
       description: "Marca, portal de empleo y desde qué dirección sale el correo.",
       icon: Building2,
       visible: can("admin.company"),
     },
     {
       href: "/admin/branches",
-      label: "Sucursales",
+      label: uiText("Sucursales"),
       description: "Dónde opera la empresa. Cada persona y cada movimiento pertenece a una.",
       icon: GitBranch,
       visible: can("branches.view"),
     },
     {
       href: "/admin/users",
-      label: "Usuarios",
-      description: "Quién puede entrar, con qué rol y en qué estado.",
+      label: uiText("Usuarios"),
+      description: uiText("Quién puede entrar, con qué rol y en qué estado."),
       icon: UsersRound,
       visible: can("users.view"),
     },
     {
       href: "/admin/roles",
-      label: "Roles y permisos",
+      label: uiText("Roles y permisos"),
       description: "Qué puede hacer cada rol. Cambiarlo afecta a todas las personas que lo tengan.",
       icon: ShieldCheck,
       visible: can("roles.view"),
     },
     {
       href: "/admin/automations",
-      label: "Automatizaciones",
+      label: uiText("Automatizaciones"),
       description: "Reglas que actúan solas sobre datos reales. Simúlalas antes de activarlas.",
       icon: Cable,
       visible: can("admin.view"),
     },
     {
       href: "/admin/company/subscription",
-      label: "Plan contratado",
+      label: uiText("Plan contratado"),
       description: "Qué está contratado, qué se paga y cuándo renueva.",
       icon: CreditCard,
       visible: can("admin.subscription"),
     },
     {
       href: "/admin/audit",
-      label: "Auditoría",
+      label: uiText("Auditoría"),
       description: "Qué se hizo, quién y cuándo. No se puede editar ni borrar: es su razón de ser.",
       icon: ClipboardList,
       visible: can("audit.view"),
@@ -105,35 +108,35 @@ export default function AdminPage() {
   const platform: Destination[] = [
     {
       href: "/admin/tenants",
-      label: "Empresas",
+      label: uiText("Empresas"),
       description: "Alta, edición y suspensión. Suspender corta el acceso de toda su gente.",
       icon: Layers,
       visible: globalScope && can("tenants.view"),
     },
     {
       href: "/admin/company-registrations",
-      label: "Solicitudes de empresa",
+      label: uiText("Solicitudes de empresa"),
       description: "Altas pendientes de revisar. Aprobar crea la empresa y su primer acceso.",
       icon: FileStack,
       visible: globalScope && can("tenants.view"),
     },
     {
       href: "/admin/plans",
-      label: "Planes",
+      label: uiText("Planes"),
       description: "El catálogo que se puede contratar, con sus topes y sus precios.",
       icon: Boxes,
       visible: globalScope && can("admin.subscription"),
     },
     {
       href: "/admin/subscription",
-      label: "Suscripciones",
+      label: uiText("Suscripciones"),
       description: "Qué plan tiene cada empresa, a qué precio y cuándo renueva.",
       icon: CreditCard,
       visible: globalScope && can("admin.subscription"),
     },
     {
       href: "/admin/billing",
-      label: "Facturación",
+      label: uiText("Facturación"),
       description: "Facturas emitidas y cuáles quedaron sin pagar.",
       icon: Receipt,
       visible: globalScope && can("admin.subscription"),
@@ -147,7 +150,7 @@ export default function AdminPage() {
     },
     {
       href: "/admin/integrations",
-      label: "Integraciones y colas",
+      label: uiText("Integraciones y colas"),
       description: "Procesamiento, reintentos y eventos descartados de toda la plataforma.",
       icon: Activity,
       visible: globalScope && can("platform.integrations.manage"),
@@ -157,28 +160,28 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Administración"
-        title="Centro administrativo"
+        eyebrow={uiText("Administración")}
+        title={uiText("Centro administrativo")}
         description={`Todo lo que puedes configurar en ${currentTenant.name} con tu rol actual.`}
         actions={
           can("admin.subscription") ? (
             <Button asChild>
-              <Link href="/admin/company/subscription">Ver el plan contratado</Link>
+              <Link href="/admin/company/subscription">{uiText("Ver el plan contratado")}</Link>
             </Button>
           ) : undefined
         }
       />
 
       {company.length > 0 ? (
-        <PageSection title="Tu empresa" description="Ajustes que afectan a las personas que trabajan dentro.">
+        <PageSection title={uiText("Tu empresa")} description={uiText("Ajustes que afectan a las personas que trabajan dentro.")}>
           <DestinationGrid items={company} />
         </PageSection>
       ) : null}
 
       {platform.length > 0 ? (
         <PageSection
-          title="Gobierno de la plataforma"
-          description="Alcanza a todas las empresas a la vez. Los cambios de aquí afectan a gente de fuera de la tuya."
+          title={uiText("Gobierno de la plataforma")}
+          description={uiText("Alcanza a todas las empresas a la vez. Los cambios de aquí afectan a gente de fuera de la tuya.")}
         >
           <DestinationGrid items={platform} />
         </PageSection>
@@ -186,9 +189,7 @@ export default function AdminPage() {
 
       {company.length === 0 && platform.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface-1 p-6 text-sm text-ink-2">
-          Tu rol no tiene ninguna pantalla de administración asignada. Si necesitas alguna, pídesela a quien administra
-          la empresa.
-        </p>
+          {uiText("Tu rol no tiene ninguna pantalla de administración asignada. Si necesitas alguna, pídesela a quien administra la empresa.")}</p>
       ) : null}
     </div>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import type { ReactNode } from "react";
 import { ErrorState, SkeletonRows, StatusBadge, type Tone } from "@/components/system";
 
@@ -23,12 +25,13 @@ export function RestaurantQueryState({
   children: ReactNode;
   label?: string;
 }) {
+  const uiText = useUiText();
   if (loading) return <SkeletonRows rows={5} label={label} />;
   if (error) {
     return (
       <ErrorState
-        title="No fue posible cargar la información"
-        detail="Conservamos tu contexto. Reintenta la consulta para continuar."
+        title={uiText("No fue posible cargar la información")}
+        detail={uiText("Conservamos tu contexto. Reintenta la consulta para continuar.")}
         onRetry={retry}
       />
     );

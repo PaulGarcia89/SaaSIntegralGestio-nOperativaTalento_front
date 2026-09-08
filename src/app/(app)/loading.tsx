@@ -1,3 +1,7 @@
+"use client";
+
+import { useUiText } from "@/components/ui-copy";
+
 import { SkeletonBlock, SkeletonRows } from "@/components/system";
 
 /**
@@ -10,10 +14,11 @@ import { SkeletonBlock, SkeletonRows } from "@/components/system";
  * contenido definitivo.
  */
 export default function AppLoading() {
+  const uiText = useUiText();
   return (
     <div className="space-y-6">
       <SkeletonBlock className="h-24" />
-      <SkeletonRows rows={6} label="Cargando la pantalla" />
+      <SkeletonRows rows={6} label={uiText("Cargando la pantalla")} />
     </div>
   );
 }

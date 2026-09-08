@@ -1,3 +1,7 @@
+"use client";
+
+import { useUiText } from "@/components/ui-copy";
+
 import { cn } from "@/lib/utils";
 import { buildAreaPath, buildLinePath, describeSeries, downsample, formatCompact, linearScale, type ChartPoint } from "./scales";
 
@@ -41,13 +45,14 @@ export function Sparkline({
   withArea = false,
   className,
 }: SparklineProps) {
+  const uiText = useUiText();
   const puntos: ChartPoint[] = values
     .map((valor, indice) => ({ x: indice, y: valor, label: pointLabels?.[indice] }))
     .filter((punto) => Number.isFinite(punto.y));
 
   if (puntos.length === 0) {
     return (
-      <span className={cn("font-mono text-2xs text-ink-3", className)}>Sin datos suficientes para la tendencia</span>
+      <span className={cn("font-mono text-2xs text-ink-3", className)}>{uiText("Sin datos suficientes para la tendencia")}</span>
     );
   }
 

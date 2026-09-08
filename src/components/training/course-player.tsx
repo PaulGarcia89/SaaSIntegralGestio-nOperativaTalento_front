@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -62,6 +64,7 @@ export function CoursePlayerView({
   course: LearnerTrainingCourseDto;
   onVideoProgress: (event: VideoProgressEvent) => Promise<unknown> | void;
 }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const lessons = useMemo(
     () => course.modules.flatMap((module) => module.lessons.map((lesson) => ({ lesson, moduleTitle: module.title }))),
@@ -118,7 +121,7 @@ export function CoursePlayerView({
   const dueAt = course.assignment?.dueAt;
 
   const outline = (
-            <nav aria-label="Lecciones del curso" className="border-t border-line p-2">
+            <nav aria-label={uiText("Lecciones del curso")} className="border-t border-line p-2">
               {course.modules.map((module) => (
                 <div key={module.id} className="py-1">
                   <p className="px-2 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.12em] text-ink-3">{module.title}</p>
@@ -156,7 +159,7 @@ export function CoursePlayerView({
               ))}
               {course.quizSummary?.length ? (
                 <div className="border-t border-line py-1">
-                  <p className="px-2 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.12em] text-ink-3">Para terminar</p>
+                  <p className="px-2 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.12em] text-ink-3">{uiText("Para terminar")}</p>
                   <button
                     type="button"
                     onClick={() => setSelected("quiz")}
@@ -168,8 +171,8 @@ export function CoursePlayerView({
                   >
                     <LessonMark completed={!pendingQuiz} current={step.kind === "quiz" || (allLessonsDone && Boolean(pendingQuiz))} />
                     <span className="min-w-0 flex-1">
-                      <span className={cn("block truncate", step.kind === "quiz" && "font-semibold")}>Evaluación</span>
-                      <span className="block text-2xs text-ink-3">{pendingQuiz ? `${pendingQuiz.questionsCount} preguntas` : "Aprobada"}</span>
+                      <span className={cn("block truncate", step.kind === "quiz" && "font-semibold")}>{uiText("Evaluación")}</span>
+                      <span className="block text-2xs text-ink-3">{pendingQuiz ? `${pendingQuiz.questionsCount} preguntas` : uiText("Aprobada")}</span>
                     </span>
                   </button>
                 </div>
@@ -202,7 +205,7 @@ export function CoursePlayerView({
                 {dueAt ? (
                   <span className="inline-flex items-center gap-1.5">
                     <CalendarDays className="size-4 text-ink-3" aria-hidden="true" />
-                    Vence el {formatDate(dueAt)}
+                    {uiText("Vence el")}{formatDate(dueAt)}
                   </span>
                 ) : null}
               </p>
@@ -210,13 +213,13 @@ export function CoursePlayerView({
           </div>
           <div className="shrink-0 self-start">
             {courseCompleted ? (
-              <StatusBadge tone="success" label="Completado" />
+              <StatusBadge tone="success" label={uiText("Completado")} />
             ) : assignmentStatus === "OVERDUE" ? (
-              <StatusBadge tone="danger" label="Vencido" />
+              <StatusBadge tone="danger" label={uiText("Vencido")} />
             ) : done > 0 ? (
-              <StatusBadge tone="progress" label="En progreso" />
+              <StatusBadge tone="progress" label={uiText("En progreso")} />
             ) : (
-              <StatusBadge tone="neutral" label="Sin empezar" />
+              <StatusBadge tone="neutral" label={uiText("Sin empezar")} />
             )}
           </div>
         </div>
@@ -256,8 +259,7 @@ export function CoursePlayerView({
             del curso», para que la lección ocupe la pantalla. */}
         <aside className="hidden rounded-lg border border-line bg-surface-1 lg:block">
           <p className="flex items-center justify-between gap-3 px-4 py-3 text-base font-semibold text-ink-1">
-            Contenido del curso
-            <span className="font-mono text-sm font-normal text-ink-2 tabular-figures">
+            {uiText("Contenido del curso")}<span className="font-mono text-sm font-normal text-ink-2 tabular-figures">
               {done}/{total}
             </span>
           </p>
@@ -265,8 +267,7 @@ export function CoursePlayerView({
         </aside>
         <details className="group rounded-lg border border-line bg-surface-1 lg:hidden">
           <summary className="flex min-h-[var(--control-h-touch)] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-base font-semibold text-ink-1 [&::-webkit-details-marker]:hidden">
-            Contenido del curso
-            <span className="font-mono text-sm font-normal text-ink-2 tabular-figures">
+            {uiText("Contenido del curso")}<span className="font-mono text-sm font-normal text-ink-2 tabular-figures">
               {done}/{total}
             </span>
           </summary>
@@ -292,23 +293,21 @@ export function CoursePlayerView({
             />
           ) : step.kind === "quiz" && pendingQuiz ? (
             <div className="space-y-5">
-              <StepEyebrow>Para terminar</StepEyebrow>
+              <StepEyebrow>{uiText("Para terminar")}</StepEyebrow>
               <h2 className="text-xl font-semibold text-ink-1">{pendingQuiz.title}</h2>
               {pendingQuiz.description ? <p className="text-base text-ink-2">{pendingQuiz.description}</p> : null}
               <dl className="grid gap-3 sm:grid-cols-3">
-                <Fact label="Preguntas" value={String(pendingQuiz.questionsCount)} />
-                <Fact label="Para aprobar" value={`${pendingQuiz.passingScore} %`} />
-                <Fact label="Tiempo" value={pendingQuiz.timeLimitMinutes ? `${pendingQuiz.timeLimitMinutes} min` : "Sin límite"} />
+                <Fact label={uiText("Preguntas")} value={String(pendingQuiz.questionsCount)} />
+                <Fact label={uiText("Para aprobar")} value={`${pendingQuiz.passingScore} %`} />
+                <Fact label={uiText("Tiempo")} value={pendingQuiz.timeLimitMinutes ? `${pendingQuiz.timeLimitMinutes} min` : "Sin límite"} />
               </dl>
               {!allLessonsDone ? (
-                <InlineNote tone="warning" title="Antes, termina las lecciones">
-                  Te faltan {total - done} {total - done === 1 ? "lección" : "lecciones"}. La evaluación se abre cuando el contenido esté completo.
-                </InlineNote>
+                <InlineNote tone="warning" title={uiText("Antes, termina las lecciones")}>
+                  {uiText("Te faltan")}{total - done} {total - done === 1 ? "lección" : uiText("lecciones")}{uiText(". La evaluación se abre cuando el contenido esté completo.")}</InlineNote>
               ) : null}
               {pendingQuiz.latestAttempt && pendingQuiz.latestAttempt.passed === false ? (
-                <InlineNote tone="info" title="Ya lo intentaste">
-                  Último resultado: {pendingQuiz.latestAttempt.score ?? 0} %. Puedes volver a intentarlo
-                  {pendingQuiz.maxAttempts ? ` (máximo ${pendingQuiz.maxAttempts} intentos)` : ""}.
+                <InlineNote tone="info" title={uiText("Ya lo intentaste")}>
+                  {uiText("Último resultado:")}{pendingQuiz.latestAttempt.score ?? 0} {uiText("%. Puedes volver a intentarlo")}{pendingQuiz.maxAttempts ? ` (máximo ${pendingQuiz.maxAttempts} intentos)` : ""}.
                 </InlineNote>
               ) : null}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -316,19 +315,16 @@ export function CoursePlayerView({
                   <Button asChild size="lg">
                     <Link href={`/training/evaluations?courseId=${encodeURIComponent(course.id)}`}>
                       <ClipboardCheck className="size-5" aria-hidden="true" />
-                      Comenzar evaluación
-                    </Link>
+                      {uiText("Comenzar evaluación")}</Link>
                   </Button>
                 ) : (
                   <Button size="lg" disabled>
                     <ClipboardCheck className="size-5" aria-hidden="true" />
-                    Comenzar evaluación
-                  </Button>
+                    {uiText("Comenzar evaluación")}</Button>
                 )}
                 <Button variant="ghost" onClick={goPrev}>
                   <ArrowLeft className="size-4" aria-hidden="true" />
-                  Volver a las lecciones
-                </Button>
+                  {uiText("Volver a las lecciones")}</Button>
               </div>
             </div>
           ) : (
@@ -338,7 +334,7 @@ export function CoursePlayerView({
                   <Check className="size-6" strokeWidth={2.5} />
                 </span>
                 <div>
-                  <h2 className="text-xl font-semibold text-ink-1">{courseCompleted ? "Curso completado" : "Contenido completado"}</h2>
+                  <h2 className="text-xl font-semibold text-ink-1">{courseCompleted ? "Curso completado" : uiText("Contenido completado")}</h2>
                   <p className="text-base text-ink-2">
                     {courseCompleted ? "Ya no queda nada pendiente en esta capacitación." : "El servidor está cerrando el curso; en unos segundos aparecerá como completado."}
                   </p>
@@ -348,11 +344,10 @@ export function CoursePlayerView({
                 <Button asChild size="lg" variant={courseCompleted ? "default" : "secondary"}>
                   <Link href="/training/certificates">
                     <Award className="size-5" aria-hidden="true" />
-                    Ver mi certificado
-                  </Link>
+                    {uiText("Ver mi certificado")}</Link>
                 </Button>
                 <Button asChild size="lg" variant="secondary">
-                  <Link href="/training">Volver a mis cursos</Link>
+                  <Link href="/training">{uiText("Volver a mis cursos")}</Link>
                 </Button>
               </div>
             </div>
@@ -392,6 +387,7 @@ function LessonView({
   onNext: () => void;
   nextLabel: string;
 }) {
+  const uiText = useUiText();
   const isVideo = lesson.type === "VIDEO" || Boolean(lesson.videoUrl);
   const assignmentId = course.assignment?.id ?? "";
   const videoBlocks = lesson.blocks.filter((block) => block.type === "VIDEO" && block.resourceUrl);
@@ -401,7 +397,7 @@ function LessonView({
     <div className="space-y-5">
       <div>
         <StepEyebrow>
-          Lección {index + 1} de {total} · {moduleTitle}
+          {uiText("Lección")}{index + 1} {uiText(" de ")}{total} · {moduleTitle}
         </StepEyebrow>
         <h2 className="mt-1 text-xl font-semibold text-ink-1 sm:text-2xl">{lesson.title}</h2>
         {lesson.description ? <p className="mt-1 text-base text-ink-2">{lesson.description}</p> : null}
@@ -419,8 +415,7 @@ function LessonView({
           {lesson.completed ? (
             <span className="inline-flex items-center gap-1.5 text-status-success">
               <Check className="size-4" aria-hidden="true" />
-              Completada
-            </span>
+              {uiText("Completada")}</span>
           ) : null}
         </p>
       </div>
@@ -441,12 +436,12 @@ function LessonView({
           <ContentBlock key={block.id} block={block} />
         ))}
         {!isVideo && lesson.blocks.length === 0 ? (
-          <EmptyState reason="no-records" title="Esta lección no tiene contenido todavía" description="Quien administra el curso puede añadirlo desde «Gestionar cursos»." />
+          <EmptyState reason="no-records" title={uiText("Esta lección no tiene contenido todavía")} description={uiText("Quien administra el curso puede añadirlo desde «Gestionar cursos».")} />
         ) : null}
       </div>
 
       {completeError ? (
-        <InlineNote tone="danger" title="No se pudo guardar el avance">
+        <InlineNote tone="danger" title={uiText("No se pudo guardar el avance")}>
           {getApiErrorMessage(completeError, "Reintenta en unos segundos.")}
         </InlineNote>
       ) : null}
@@ -455,13 +450,12 @@ function LessonView({
       <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {!lesson.completed && !isVideo ? (
-            <Button size="lg" onClick={onComplete} loading={completing} loadingLabel="Guardando…">
+            <Button size="lg" onClick={onComplete} loading={completing} loadingLabel={uiText("Guardando…")}>
               <Check className="size-5" aria-hidden="true" />
-              Marcar como completada
-            </Button>
+              {uiText("Marcar como completada")}</Button>
           ) : null}
           {!lesson.completed && isVideo ? (
-            <p className="text-sm text-ink-2">Se marca como completada al terminar de ver el video.</p>
+            <p className="text-sm text-ink-2">{uiText("Se marca como completada al terminar de ver el video.")}</p>
           ) : null}
           <Button size="lg" variant={lesson.completed ? "default" : "secondary"} onClick={onNext}>
             {nextLabel}
@@ -471,8 +465,7 @@ function LessonView({
         {onPrev ? (
           <Button variant="ghost" onClick={onPrev}>
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Anterior
-          </Button>
+            {uiText("Anterior")}</Button>
         ) : null}
       </div>
     </div>
@@ -480,6 +473,7 @@ function LessonView({
 }
 
 function ContentBlock({ block }: { block: Lesson["blocks"][number] }) {
+  const uiText = useUiText();
   const html = blockHtml(block.content);
   if (block.type === "RICH_TEXT" && html) {
     return (
@@ -506,7 +500,7 @@ function ContentBlock({ block }: { block: Lesson["blocks"][number] }) {
         {href ? (
           <Button asChild variant="secondary">
             <a href={href} target="_blank" rel="noreferrer noopener">
-              {block.type === "FILE" ? "Descargar" : "Abrir"}
+              {block.type === "FILE" ? uiText("Descargar") : uiText("Abrir")}
             </a>
           </Button>
         ) : null}
@@ -519,8 +513,7 @@ function ContentBlock({ block }: { block: Lesson["blocks"][number] }) {
       {html ? <div className="mt-2 text-base leading-7 text-ink-2" dangerouslySetInnerHTML={{ __html: html }} /> : null}
       {block.resourceUrl ? (
         <a className="mt-2 inline-flex min-h-[var(--control-h-base)] items-center text-sm font-medium text-ink-1 underline-offset-4 hover:underline" href={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl} target="_blank" rel="noreferrer noopener">
-          Abrir recurso
-        </a>
+          {uiText("Abrir recurso")}</a>
       ) : null}
     </div>
   );
@@ -588,6 +581,7 @@ function formatDate(value: string) {
  * externas se pasan tal cual.
  */
 function ProtectedVideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingLessonDto; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
+  const uiText = useUiText();
   const isProtected = url.startsWith("/api/");
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -618,10 +612,10 @@ function ProtectedVideoLesson({ lesson, assignmentId, url, onProgress }: { lesso
     return <VideoLesson lesson={lesson} assignmentId={assignmentId} url={resolveTrainingAssetUrl(url) ?? url} onProgress={onProgress} />;
   }
   if (error) {
-    return <InlineNote tone="danger" title="No fue posible cargar el video">{error}</InlineNote>;
+    return <InlineNote tone="danger" title={uiText("No fue posible cargar el video")}>{error}</InlineNote>;
   }
   if (!objectUrl) {
-    return <div className="aspect-video w-full animate-pulse rounded-xl bg-surface-3" role="status" aria-label="Cargando video" />;
+    return <div className="aspect-video w-full animate-pulse rounded-xl bg-surface-3" role="status" aria-label={uiText("Cargando video")} />;
   }
   return <VideoLesson lesson={lesson} assignmentId={assignmentId} url={objectUrl} onProgress={onProgress} />;
 }

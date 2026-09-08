@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2 } from "lucide-react";
@@ -49,6 +51,7 @@ const initialForm: CreateAtsCommunicationTemplateInput = {
 };
 
 export default function AtsCommunicationsPage() {
+  const uiText = useUiText();
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const [vacancyId, setVacancyId] = useState("");
@@ -79,7 +82,7 @@ export default function AtsCommunicationsPage() {
   ) => setForm((current) => ({ ...current, [key]: value }));
 
   return <div className="space-y-7">
-    <PageHeader eyebrow="Reclutamiento" title={t("comms.inbox")} description={t("comms.inboxDescription")} />
+    <PageHeader eyebrow={uiText("Reclutamiento")} title={t("comms.inbox")} description={t("comms.inboxDescription")} />
     <InlineFeedback tone="success" title={t("comms.twoWayConnected")}>{t("comms.twoWayBody")}</InlineFeedback>
     <CommunicationOperationsConsole />
     <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
@@ -89,7 +92,7 @@ export default function AtsCommunicationsPage() {
           <FieldLabel label={t("comms.vacancy")}>
             <Select value={vacancyId || "global"} onValueChange={(value) => { const nextVacancyId = value === "global" ? "" : value; setVacancyId(nextVacancyId); setForm((current) => ({ ...current, vacancyId: nextVacancyId || undefined, stageCode: undefined })); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="global">Plantilla global</SelectItem>{vacancyItems.map((vacancy) => <SelectItem key={vacancy.id} value={vacancy.id}>{vacancy.title}</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="global">{uiText("Plantilla global")}</SelectItem>{vacancyItems.map((vacancy) => <SelectItem key={vacancy.id} value={vacancy.id}>{vacancy.title}</SelectItem>)}</SelectContent>
             </Select>
           </FieldLabel>
           <FieldLabel label={t("comms.stage")}>
@@ -98,31 +101,31 @@ export default function AtsCommunicationsPage() {
               <SelectContent><SelectItem value="all">{t("comms.allStages")}</SelectItem>{setup.data?.stages.map((stage) => <SelectItem key={stage.code} value={stage.code}>{stage.name}</SelectItem>)}</SelectContent>
             </Select>
           </FieldLabel>
-          <FieldLabel label="Evento">
+          <FieldLabel label={uiText("Evento")}>
             <Select value={form.type} onValueChange={(value) => update("type", value as AtsCommunicationType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{types.map((type) => <SelectItem key={type.value} value={type.value}>{t(type.labelKey)}</SelectItem>)}</SelectContent>
             </Select>
           </FieldLabel>
-          <FieldLabel label="Audiencia">
+          <FieldLabel label={uiText("Audiencia")}>
             <Select value={form.audience} onValueChange={(value) => update("audience", value as AtsCommunicationAudience)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="CANDIDATE">{t("comms.audience.candidate")}</SelectItem><SelectItem value="RESPONSIBLE">{t("comms.audience.owners")}</SelectItem></SelectContent>
             </Select>
           </FieldLabel>
-          <label className="block space-y-2 text-sm font-medium">{t("comms.name")}<Input value={form.name} maxLength={120} onChange={(event) => update("name", event.target.value)} placeholder="Ej. Rechazo cordial" /></label>
-          <label className="block space-y-2 text-sm font-medium">Asunto<Input value={form.subject} maxLength={240} onChange={(event) => update("subject", event.target.value)} placeholder={t("comms.subjectPlaceholder")} /></label>
+          <label className="block space-y-2 text-sm font-medium">{t("comms.name")}<Input value={form.name} maxLength={120} onChange={(event) => update("name", event.target.value)} placeholder={uiText("Ej. Rechazo cordial")} /></label>
+          <label className="block space-y-2 text-sm font-medium">{uiText("Asunto")}<Input value={form.subject} maxLength={240} onChange={(event) => update("subject", event.target.value)} placeholder={t("comms.subjectPlaceholder")} /></label>
           <label className="block space-y-2 text-sm font-medium">{t("comms.message")}<textarea value={form.body} maxLength={12000} rows={9} onChange={(event) => update("body", event.target.value)} className="w-full rounded-xl border border-border-default bg-surface-elevated p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus" placeholder={t("comms.bodyPlaceholder")} /></label>
           <p className="text-xs text-text-secondary">Variables: {"{{candidateName}}"}, {"{{vacancyTitle}}"}, {"{{companyName}}"}, {"{{stageName}}"}, {"{{reason}}"}, {"{{interviewDate}}"}, {"{{interviewLocation}}"}.</p>
           {create.isError ? <InlineFeedback tone="danger" title={t("comms.saveFailed")}>{getApiErrorMessage(create.error, t("comms.checkFields"))}</InlineFeedback> : null}
           {create.isSuccess ? <InlineFeedback tone="success" title={t("comms.newVersionActive")}>{t("comms.previousKept")}</InlineFeedback> : null}
-          <Button className="w-full" onClick={() => create.mutate(form)} disabled={create.isPending || form.name.trim().length < 2 || form.subject.trim().length < 2 || form.body.trim().length < 2}><FilePlus2 className="size-4" />{create.isPending ? "Guardando…" : t("comms.createVersion")}</Button>
+          <Button className="w-full" onClick={() => create.mutate(form)} disabled={create.isPending || form.name.trim().length < 2 || form.subject.trim().length < 2 || form.body.trim().length < 2}><FilePlus2 className="size-4" />{create.isPending ? uiText("Guardando…") : t("comms.createVersion")}</Button>
         </CardContent>
       </Card>
       <Card level={2}>
-        <CardHeader><CardTitle>Plantillas activas</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{uiText("Plantillas activas")}</CardTitle></CardHeader>
         <CardContent>
-          {templates.isLoading ? <AsyncState state="loading" title="Cargando plantillas" /> : null}
+          {templates.isLoading ? <AsyncState state="loading" title={uiText("Cargando plantillas")} /> : null}
           {templates.isError ? <AsyncState state="error" title={t("comms.templatesError")} onRetry={() => void templates.refetch()} /> : null}
           {templates.isSuccess && !activeTemplates.length ? <p className="text-sm text-text-secondary">{t("comms.noTemplates")}</p> : null}
           <div className="space-y-3">{activeTemplates.map((template) => <article key={template.id} className="rounded-xl border border-border-default p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">{template.name}</h3><p className="text-sm text-text-secondary">{template.subject}</p></div><div className="flex gap-2"><Badge variant="secondary">v{template.version}</Badge><Badge>{template.audience === "CANDIDATE" ? t("comms.audience.candidate") : t("comms.audience.owners")}</Badge></div></div><p className="mt-3 line-clamp-4 whitespace-pre-wrap text-sm">{template.body}</p><p className="mt-3 text-xs text-text-secondary">{(() => { const found = types.find((type) => type.value === template.type); return found ? t(found.labelKey) : template.type; })()} · {template.stageCode || t("comms.allStages")}</p></article>)}</div>

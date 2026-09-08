@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ArrowRightLeft, Boxes, Plus, QrCode, RotateCcw, Wrench } from "lucide-react";
@@ -39,6 +41,7 @@ import { Button } from "@/components/ui/button";
 const RECIENTES = 6;
 
 export function AssetsModuleDashboard() {
+  const uiText = useUiText();
   const { can, currentBranch } = useAppStore();
   const canManage = can("asset_inventory.manage");
   const branchId = currentBranch?.id;
@@ -79,16 +82,15 @@ export function AssetsModuleDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Operaciones"
-        title="Dashboard de inventario de activos"
-        description="Cómo está el inventario de la sucursal, qué necesita atención y por dónde seguir."
+        eyebrow={uiText("Operaciones")}
+        title={uiText("Dashboard de inventario de activos")}
+        description={uiText("Cómo está el inventario de la sucursal, qué necesita atención y por dónde seguir.")}
         actions={
           canManage ? (
             <Button asChild>
               <Link href="/inventory/assets">
                 <Plus className="size-4" aria-hidden="true" />
-                Registrar activo
-              </Link>
+                {uiText("Registrar activo")}</Link>
             </Button>
           ) : undefined
         }
@@ -108,35 +110,35 @@ export function AssetsModuleDashboard() {
       ) : null}
 
       {analytics.isError ? (
-        <InlineNote tone="danger" title="No fue posible cargar las cifras del inventario">
-          {getApiErrorMessage(analytics.error, "Reintenta la consulta para continuar.")}
+        <InlineNote tone="danger" title={uiText("No fue posible cargar las cifras del inventario")}>
+          {getApiErrorMessage(analytics.error, uiText("Reintenta la consulta para continuar."))}
         </InlineNote>
       ) : null}
 
-      <StatusTileRow label="Estado del inventario de activos">
+      <StatusTileRow label={uiText("Estado del inventario de activos")}>
         <li className="min-w-0">
           <StatusTile
-            title="Disponibles"
+            title={uiText("Disponibles")}
             value={cifra(resumen?.assets.available)}
             context="Listos para entregar a alguien."
-            scope={currentBranch ? currentBranch.name : "Todas las sucursales"}
+            scope={currentBranch ? currentBranch.name : uiText("Todas las sucursales")}
             href="/inventory/assets?status=AVAILABLE"
-            actionLabel="Ver disponibles"
+            actionLabel={uiText("Ver disponibles")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="En custodia"
+            title={uiText("En custodia")}
             value={cifra(resumen?.assets.assigned)}
             context="Entregados y bajo la responsabilidad de una persona."
-            scope={currentBranch ? currentBranch.name : "Todas las sucursales"}
+            scope={currentBranch ? currentBranch.name : uiText("Todas las sucursales")}
             href="/inventory/assets?status=ASSIGNED"
-            actionLabel="Ver en custodia"
+            actionLabel={uiText("Ver en custodia")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Requieren atención"
+            title={uiText("Requieren atención")}
             value={cifra(porAtender)}
             context="Devoluciones pendientes y equipos en mantenimiento."
             status={
@@ -145,35 +147,35 @@ export function AssetsModuleDashboard() {
                 : undefined
             }
             href="/inventory/assets?status=RETURN_PENDING"
-            actionLabel="Ver devoluciones"
+            actionLabel={uiText("Ver devoluciones")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Existencias bajo mínimo"
+            title={uiText("Existencias bajo mínimo")}
             value={cifra(resumen?.stock.belowMinimum)}
             context="Referencias del almacén por debajo de su mínimo."
             status={
               resumen && resumen.stock.belowMinimum > 0 ? { label: "Reponer", tone: "danger" as const } : undefined
             }
             href="/inventory/assets/warehouse"
-            actionLabel="Ver almacén"
+            actionLabel={uiText("Ver almacén")}
           />
         </li>
       </StatusTileRow>
 
-      <PageSection title="Operaciones" description="Las cuatro tareas del día, con icono y texto.">
+      <PageSection title={uiText("Operaciones")} description={uiText("Las cuatro tareas del día, con icono y texto.")}>
         <ul className="grid gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
           <QuickAction
             href="/inventory/deliveries"
             icon={<ArrowRightLeft className="size-5" aria-hidden="true" />}
-            title="Entregar equipo"
+            title={uiText("Entregar equipo")}
             detail="Reservas esperando confirmación de entrega."
           />
           <QuickAction
             href="/inventory/returns"
             icon={<RotateCcw className="size-5" aria-hidden="true" />}
-            title="Recibir devolución"
+            title={uiText("Recibir devolución")}
             detail={
               resumen
                 ? `${resumen.assets.returnPending} ${resumen.assets.returnPending === 1 ? "devolución pendiente" : "devoluciones pendientes"}.`
@@ -183,7 +185,7 @@ export function AssetsModuleDashboard() {
           <QuickAction
             href="/inventory/assets/maintenance"
             icon={<Wrench className="size-5" aria-hidden="true" />}
-            title="Mantenimiento"
+            title={uiText("Mantenimiento")}
             detail={
               resumen
                 ? `${resumen.operations.openMaintenance} ${resumen.operations.openMaintenance === 1 ? "orden abierta" : "órdenes abiertas"}.`
@@ -193,7 +195,7 @@ export function AssetsModuleDashboard() {
           <QuickAction
             href="/inventory/scan"
             icon={<QrCode className="size-5" aria-hidden="true" />}
-            title="Escanear activo"
+            title={uiText("Escanear activo")}
             detail="Abre la ficha leyendo su etiqueta."
           />
         </ul>
@@ -201,27 +203,27 @@ export function AssetsModuleDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
         <PageSection
-          title="Cambió hace poco"
-          description="Los últimos activos que cambiaron de estado o de custodia en esta sucursal."
+          title={uiText("Cambió hace poco")}
+          description={uiText("Los últimos activos que cambiaron de estado o de custodia en esta sucursal.")}
           boxed
         >
           {recientes.isLoading ? (
             <SkeletonRows rows={4} />
           ) : recientes.isError ? (
             <ErrorState
-              title="No fue posible cargar los activos"
-              detail={getApiErrorMessage(recientes.error, "Reintenta la consulta para continuar.")}
+              title={uiText("No fue posible cargar los activos")}
+              detail={getApiErrorMessage(recientes.error, uiText("Reintenta la consulta para continuar."))}
               onRetry={() => void recientes.refetch()}
             />
           ) : cambiosRecientes.length === 0 ? (
             <EmptyState
               reason="no-records"
-              title="Todavía no hay activos en esta sucursal"
-              description="Registra el primero desde el listado de activos."
+              title={uiText("Todavía no hay activos en esta sucursal")}
+              description={uiText("Registra el primero desde el listado de activos.")}
               action={
                 canManage ? (
                   <Button asChild variant="outline">
-                    <Link href="/inventory/assets">Ir al listado</Link>
+                    <Link href="/inventory/assets">{uiText("Ir al listado")}</Link>
                   </Button>
                 ) : undefined
               }
@@ -252,24 +254,24 @@ export function AssetsModuleDashboard() {
         </PageSection>
 
         <PageSection
-          title="Mantenimiento atrasado"
-          description="Órdenes abiertas cuya fecha límite ya pasó."
+          title={uiText("Mantenimiento atrasado")}
+          description={uiText("Órdenes abiertas cuya fecha límite ya pasó.")}
           boxed
         >
           {!canManage ? (
-            <p className="text-sm text-ink-2">Solo quien gestiona el inventario ve las órdenes de mantenimiento.</p>
+            <p className="text-sm text-ink-2">{uiText("Solo quien gestiona el inventario ve las órdenes de mantenimiento.")}</p>
           ) : mantenimiento.isLoading ? (
             <SkeletonRows rows={3} />
           ) : mantenimiento.isError ? (
             <ErrorState
-              title="No fue posible cargar el mantenimiento"
-              detail={getApiErrorMessage(mantenimiento.error, "Reintenta la consulta para continuar.")}
+              title={uiText("No fue posible cargar el mantenimiento")}
+              detail={getApiErrorMessage(mantenimiento.error, uiText("Reintenta la consulta para continuar."))}
               onRetry={() => void mantenimiento.refetch()}
             />
           ) : ordenesVencidas.length === 0 ? (
             <EmptyState
               reason="no-records"
-              title="Nada atrasado"
+              title={uiText("Nada atrasado")}
               description={
                 ordenesAbiertas.length > 0
                   ? `${ordenesAbiertas.length} ${ordenesAbiertas.length === 1 ? "orden abierta" : "órdenes abiertas"}, todas dentro de plazo.`
@@ -277,7 +279,7 @@ export function AssetsModuleDashboard() {
               }
               action={
                 <Button asChild variant="outline">
-                  <Link href="/inventory/assets/maintenance">Ver mantenimiento</Link>
+                  <Link href="/inventory/assets/maintenance">{uiText("Ver mantenimiento")}</Link>
                 </Button>
               }
             />
@@ -290,9 +292,9 @@ export function AssetsModuleDashboard() {
                     <p className="truncate text-sm text-ink-2">
                       {orden.asset.item.name} · <span className="font-mono text-2xs text-ink-3">{orden.asset.assetTag}</span>
                     </p>
-                    <p className="font-mono text-2xs text-ink-3 tabular-figures">Vencía {formatDateTime(orden.dueAt)}</p>
+                    <p className="font-mono text-2xs text-ink-3 tabular-figures">{uiText("Vencía ")}{formatDateTime(orden.dueAt)}</p>
                   </div>
-                  <StatusBadge size="sm" tone="danger" label="Atrasada" />
+                  <StatusBadge size="sm" tone="danger" label={uiText("Atrasada")} />
                 </li>
               ))}
             </ul>
@@ -303,8 +305,7 @@ export function AssetsModuleDashboard() {
       <p className="text-sm text-ink-2">
         <Link href="/inventory/assets" className="inline-flex min-h-[var(--control-h-base)] items-center gap-1 font-medium text-ink-1 hover:underline">
           <Boxes className="size-4" aria-hidden="true" />
-          Abrir el listado completo de activos
-          <ArrowRight className="size-3.5" aria-hidden="true" />
+          {uiText("Abrir el listado completo de activos")}<ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </p>
     </div>

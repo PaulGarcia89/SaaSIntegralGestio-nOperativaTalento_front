@@ -1,4 +1,5 @@
 "use client";
+import { useUiText } from "@/components/ui-copy";
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -209,6 +210,7 @@ function shortDate(value?: string | null) {
  * nada que hacer.
  */
 function PackageCard({ item, now, canManage, sending, onSend, onRemind }: { item: ElectronicSignaturePackageDto; now: number; canManage: boolean; sending: boolean; onSend: () => void; onRemind: () => void }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const signed = item.participants.filter((participant) => participant.status === "SIGNED").length;
   const total = item.participants.length;
@@ -281,8 +283,8 @@ function PackageCard({ item, now, canManage, sending, onSend, onRemind }: { item
           <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
             <Fact label={t("signatures.template")} value={item.template ? `${item.template.name} v${item.template.version}` : t("signatures.noTemplate")} />
             <Fact label={t("signatures.provider")} value={item.externalProvider ?? t("signatures.internalProvider")} />
-            {item.sentAt ? <Fact label={t("signatures.sentAt")} value={new Date(item.sentAt).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })} /> : null}
-            {item.auditEvents[0] ? <Fact label={t("signatures.lastEvent")} value={`${item.auditEvents[0].action} · ${new Date(item.auditEvents[0].occurredAt).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}`} /> : null}
+            {item.sentAt ? <Fact label={t("signatures.sentAt")} value={new Date(item.sentAt).toLocaleString(uiText.locale, { dateStyle: "medium", timeStyle: "short" })} /> : null}
+            {item.auditEvents[0] ? <Fact label={t("signatures.lastEvent")} value={`${item.auditEvents[0].action} · ${new Date(item.auditEvents[0].occurredAt).toLocaleString(uiText.locale, { dateStyle: "medium", timeStyle: "short" })}`} /> : null}
           </dl>
         </details>
       </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect } from "react";
 import { ErrorState } from "@/components/system";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const uiText = useUiText();
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -27,14 +30,14 @@ export default function Error({
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-4 px-4 py-6">
       <ErrorState
-        title="Algo salió mal"
+        title={uiText("Algo salió mal")}
         detail="Ocurrió un error inesperado al cargar esta vista. Puedes reintentar o volver al panel."
         requestId={error.digest}
         onRetry={reset}
       />
       <div className="flex justify-center">
         <Button asChild variant="secondary">
-          <a href="/dashboard">Volver al panel</a>
+          <a href="/dashboard">{uiText("Volver al panel")}</a>
         </Button>
       </div>
     </main>

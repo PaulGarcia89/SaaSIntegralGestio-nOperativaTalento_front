@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -46,15 +48,16 @@ type Line = { ingredientId: string; unitId: string; quantity: string; wastePerce
 type Preview = Record<string, unknown> & { ingredients?: Array<Record<string, unknown>>; totalCost?: number };
 
 export function RestaurantOperations({ section, warehouseId, warehouseName }: { section: "recipes" | "consumption" | "waste" | "production"; warehouseId?: string; warehouseName?: string }) {
+  const uiText = useUiText();
   const { currentBranch, can } = useAppStore();
   const canManage = can("restaurant_inventory.manage");
   const ingredients = useQuery({ queryKey: ["restaurant-ops-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) });
   const units = useQuery({ queryKey: ["restaurant-ops-units"], queryFn: () => fetchRestaurantUnits({ status: "ACTIVE", pageSize: 200 }) });
   const recipes = useQuery({ queryKey: ["restaurant-ops-recipes"], queryFn: () => fetchRestaurantRecipes() });
-  if (!currentBranch) return <InlineFeedback tone="warning" title="Sucursal requerida">Selecciona una sucursal para operar el inventario de restaurante.</InlineFeedback>;
-  if (ingredients.isLoading || units.isLoading || recipes.isLoading) return <SkeletonRows rows={5} label={"Cargando información"} />;
+  if (!currentBranch) return <InlineFeedback tone="warning" title={uiText("Sucursal requerida")}>{uiText("Selecciona una sucursal para operar el inventario de restaurante.")}</InlineFeedback>;
+  if (ingredients.isLoading || units.isLoading || recipes.isLoading) return <SkeletonRows rows={5} label={uiText("Cargando información")} />;
   const catalogError = ingredients.error ?? units.error ?? recipes.error;
-  if (catalogError) return <ErrorState title="No fue posible cargar los catálogos" detail={getApiErrorMessage(catalogError, "Reintenta la consulta para continuar.")} onRetry={() => { void ingredients.refetch(); void units.refetch(); void recipes.refetch(); }} />;
+  if (catalogError) return <ErrorState title={uiText("No fue posible cargar los catálogos")} detail={getApiErrorMessage(catalogError, uiText("Reintenta la consulta para continuar."))} onRetry={() => { void ingredients.refetch(); void units.refetch(); void recipes.refetch(); }} />;
   const ingredientOptions = (ingredients.data?.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; return { id: item.id, label: `${item.sku} · ${item.name}`, unitId: String(record.inventoryUnitId ?? ""), purchaseUnitId: String(record.purchaseUnitId ?? "") }; });
   const unitOptions = (units.data?.data ?? []).map((item) => ({ id: item.id, label: `${item.name} (${item.abbreviation ?? ""})` }));
   const recipeOptions = (recipes.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; return { id: String(record.id), label: `${String(record.code ?? "")} · ${String(record.name ?? "")}` }; });
@@ -65,13 +68,14 @@ export function RestaurantOperations({ section, warehouseId, warehouseName }: { 
 }
 
 function RecipesView({ canManage, ingredientOptions, unitOptions }: { canManage: boolean; ingredientOptions: Option[]; unitOptions: Option[] }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient(); const recipes = useQuery({ queryKey: ["restaurant-ops-recipes"], queryFn: () => fetchRestaurantRecipes() });
   const [form, setForm] = useState({ code: "", name: "", description: "", yieldQuantity: "1", yieldUnitId: "", sellingPrice: "", requiredStockPolicy: "BLOCK" });
   const [lines, setLines] = useState<Line[]>([]); const [error, setError] = useState(""); const [showAdvanced, setShowAdvanced] = useState(false);
   const save = useMutation({ mutationFn: () => createRestaurantRecipe({ ...form, yieldQuantity: Number(form.yieldQuantity), sellingPrice: form.sellingPrice ? Number(form.sellingPrice) : undefined, requiredStockPolicy: form.requiredStockPolicy, items: lines.map((line, position) => ({ ingredientId: line.ingredientId, quantity: Number(line.quantity), unitId: line.unitId, wastePercentage: Number(line.wastePercentage || 0), position })) }), onSuccess: () => { setForm({ code: "", name: "", description: "", yieldQuantity: "1", yieldUnitId: "", sellingPrice: "", requiredStockPolicy: "BLOCK" }); setLines([]); void queryClient.invalidateQueries({ queryKey: ["restaurant-ops-recipes"] }); } });
   const action = useMutation({ mutationFn: ({ id, type }: { id: string; type: "activate" | "archive" }) => type === "activate" ? activateRestaurantRecipe(id) : archiveRestaurantRecipe(id), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["restaurant-ops-recipes"] }) });
   const submit = () => { const next = validateOperationDraft({ name: form.name, lines: lines.map((line) => ({ id: line.ingredientId, quantity: line.quantity })) }); setError(next); if (!next && canManage) save.mutate(); };
-  return <div className="space-y-5"><PageHeader eyebrow="Configuración" title="Recetas" description="Define ingredientes y rendimiento. El costo se calcula en el backend." />{save.error || action.error ? <InlineFeedback tone="danger" title="No se pudo guardar">{getApiErrorMessage(save.error ?? action.error, "Revisa los datos.")}</InlineFeedback> : null}<Card level={2}><CardContent className="space-y-4 p-5"><h2 className="font-semibold">Nueva receta</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field id="recipe-code" label="Código" value={form.code} onChange={(value) => setForm({ ...form, code: value })} /><Field id="recipe-name" label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} /><Field id="recipe-yield" label="Rendimiento" type="number" value={form.yieldQuantity} onChange={(value) => setForm({ ...form, yieldQuantity: value })} /><NativeSelect id="recipe-yield-unit" label="Unidad de rendimiento" value={form.yieldUnitId} options={unitOptions} onChange={(value) => setForm({ ...form, yieldUnitId: value })} /></div><Button type="button" size="sm" variant="ghost" onClick={() => setShowAdvanced((value) => !value)}>{showAdvanced ? "Ocultar opciones avanzadas" : "Mostrar opciones avanzadas"}</Button>{showAdvanced ? <div className="grid gap-3 rounded-xl border border-border-default bg-surface-interactive/30 p-3 sm:grid-cols-3"><Field id="recipe-price" label="Precio de venta" type="number" value={form.sellingPrice} onChange={(value) => setForm({ ...form, sellingPrice: value })} /><NativeSelect id="recipe-policy" label="Política de stock" value={form.requiredStockPolicy} options={[{ id: "BLOCK", label: "Bloquear" }, { id: "WARN", label: "Advertir" }, { id: "ALLOW_NEGATIVE", label: "Permitir negativo" }]} onChange={(value) => setForm({ ...form, requiredStockPolicy: value })} /><Field id="recipe-description" label="Descripción" value={form.description} onChange={(value) => setForm({ ...form, description: value })} /></div> : null}<div className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-medium">Ingredientes</h3><Button size="sm" variant="secondary" disabled={!canManage} onClick={() => setLines([...lines, { ingredientId: "", unitId: "", quantity: "", wastePercentage: "0" }])}><Plus className="size-4" />Agregar ingrediente</Button></div>{lines.map((line, index) => <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 sm:grid-cols-[2fr_1.2fr_1fr_1fr_auto]"><NativeSelect id={`recipe-ingredient-${index}`} label="Ingrediente" value={line.ingredientId} options={ingredientOptions} onChange={(value) => { const ingredient = ingredientOptions.find((item) => item.id === value); setLines(lines.map((current, i) => i === index ? { ...current, ingredientId: value, unitId: ingredient?.unitId ?? current.unitId } : current)); }} /><NativeSelect id={`recipe-unit-${index}`} label="Unidad de inventario" value={line.unitId} options={unitOptions} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, unitId: value } : current))} /><Field id={`recipe-quantity-${index}`} label="Cantidad" type="number" value={line.quantity} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, quantity: value } : current))} /><Field id={`recipe-waste-${index}`} label="Merma %" type="number" value={line.wastePercentage} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, wastePercentage: value } : current))} /><span className="flex items-end"><Button variant="ghost" size="sm" onClick={() => setLines(lines.filter((_, i) => i !== index))} aria-label="Eliminar ingrediente"><Trash2 className="size-4" /></Button></span></div>)}</div>{error ? <InlineFeedback tone="danger" title="Validación">{error}</InlineFeedback> : null}<div className="flex justify-end"><Button disabled={!canManage || save.isPending} onClick={submit}>{save.isPending ? "Guardando…" : "Guardar borrador"}</Button></div>{save.data ? <InlineFeedback tone="success" title="Borrador creado">El backend calculó el costo de la receta y guardó el documento.</InlineFeedback> : null}</CardContent></Card><Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Recetas registradas</h2><div className="mt-3 space-y-2">{(recipes.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; const status = String(record.status ?? "DRAFT"); return <div key={String(record.id)} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default py-3"><span><strong>{String(record.code ?? "-")}</strong> · {String(record.name ?? "-")} · costo ${Number(record.calculatedCost ?? 0).toFixed(2)}</span><span className="flex items-center gap-2"><Badge>{status}</Badge>{status === "DRAFT" && canManage ? <Button size="sm" onClick={() => action.mutate({ id: String(record.id), type: "activate" })}>Activar</Button> : null}{status !== "ARCHIVED" && canManage ? <Button size="sm" variant="secondary" onClick={() => { void confirmAction({ title: `¿Archivar «${String(record.name ?? "esta receta")}»?`, description: "Deja de poder usarse en consumos y producciones nuevas.", consequence: "Lo ya registrado con ella se conserva, y puedes volver a activarla cuando quieras.", confirmLabel: "Archivar" }).then((ok) => ok && action.mutate({ id: String(record.id), type: "archive" })); }}>Archivar</Button> : null}</span></div>; })}</div></CardContent></Card></div>;
+  return <div className="space-y-5"><PageHeader eyebrow={uiText("Configuración")} title={uiText("Recetas")} description={uiText("Define ingredientes y rendimiento. El costo se calcula en el backend.")} />{save.error || action.error ? <InlineFeedback tone="danger" title={uiText("No se pudo guardar")}>{getApiErrorMessage(save.error ?? action.error, "Revisa los datos.")}</InlineFeedback> : null}<Card level={2}><CardContent className="space-y-4 p-5"><h2 className="font-semibold">{uiText("Nueva receta")}</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field id="recipe-code" label={uiText("Código")} value={form.code} onChange={(value) => setForm({ ...form, code: value })} /><Field id="recipe-name" label={uiText("Nombre")} value={form.name} onChange={(value) => setForm({ ...form, name: value })} /><Field id="recipe-yield" label={uiText("Rendimiento")} type="number" value={form.yieldQuantity} onChange={(value) => setForm({ ...form, yieldQuantity: value })} /><NativeSelect id="recipe-yield-unit" label={uiText("Unidad de rendimiento")} value={form.yieldUnitId} options={unitOptions} onChange={(value) => setForm({ ...form, yieldUnitId: value })} /></div><Button type="button" size="sm" variant="ghost" onClick={() => setShowAdvanced((value) => !value)}>{showAdvanced ? "Ocultar opciones avanzadas" : "Mostrar opciones avanzadas"}</Button>{showAdvanced ? <div className="grid gap-3 rounded-xl border border-border-default bg-surface-interactive/30 p-3 sm:grid-cols-3"><Field id="recipe-price" label={uiText("Precio de venta")} type="number" value={form.sellingPrice} onChange={(value) => setForm({ ...form, sellingPrice: value })} /><NativeSelect id="recipe-policy" label={uiText("Política de stock")} value={form.requiredStockPolicy} options={[{ id: "BLOCK", label: uiText("Bloquear") }, { id: "WARN", label: "Advertir" }, { id: "ALLOW_NEGATIVE", label: "Permitir negativo" }]} onChange={(value) => setForm({ ...form, requiredStockPolicy: value })} /><Field id="recipe-description" label={uiText("Descripción")} value={form.description} onChange={(value) => setForm({ ...form, description: value })} /></div> : null}<div className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-medium">{uiText("Ingredientes")}</h3><Button size="sm" variant="secondary" disabled={!canManage} onClick={() => setLines([...lines, { ingredientId: "", unitId: "", quantity: "", wastePercentage: "0" }])}><Plus className="size-4" />{uiText("Agregar ingrediente")}</Button></div>{lines.map((line, index) => <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 sm:grid-cols-[2fr_1.2fr_1fr_1fr_auto]"><NativeSelect id={`recipe-ingredient-${index}`} label={uiText("Ingrediente")} value={line.ingredientId} options={ingredientOptions} onChange={(value) => { const ingredient = ingredientOptions.find((item) => item.id === value); setLines(lines.map((current, i) => i === index ? { ...current, ingredientId: value, unitId: ingredient?.unitId ?? current.unitId } : current)); }} /><NativeSelect id={`recipe-unit-${index}`} label={uiText("Unidad de inventario")} value={line.unitId} options={unitOptions} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, unitId: value } : current))} /><Field id={`recipe-quantity-${index}`} label={uiText("Cantidad")} type="number" value={line.quantity} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, quantity: value } : current))} /><Field id={`recipe-waste-${index}`} label={uiText("Merma %")} type="number" value={line.wastePercentage} onChange={(value) => setLines(lines.map((current, i) => i === index ? { ...current, wastePercentage: value } : current))} /><span className="flex items-end"><Button variant="ghost" size="sm" onClick={() => setLines(lines.filter((_, i) => i !== index))} aria-label={uiText("Eliminar ingrediente")}><Trash2 className="size-4" /></Button></span></div>)}</div>{error ? <InlineFeedback tone="danger" title={uiText("Validación")}>{error}</InlineFeedback> : null}<div className="flex justify-end"><Button disabled={!canManage || save.isPending} onClick={submit}>{save.isPending ? uiText("Guardando…") : uiText("Guardar borrador")}</Button></div>{save.data ? <InlineFeedback tone="success" title={uiText("Borrador creado")}>{uiText("El backend calculó el costo de la receta y guardó el documento.")}</InlineFeedback> : null}</CardContent></Card><Card level={2}><CardContent className="p-5"><h2 className="font-semibold">{uiText("Recetas registradas")}</h2><div className="mt-3 space-y-2">{(recipes.data ?? []).map((item) => { const record = item as unknown as Record<string, unknown>; const status = String(record.status ?? "DRAFT"); return <div key={String(record.id)} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default py-3"><span><strong>{String(record.code ?? "-")}</strong> · {String(record.name ?? "-")} {uiText(" · costo $")}{Number(record.calculatedCost ?? 0).toFixed(2)}</span><span className="flex items-center gap-2"><Badge>{status}</Badge>{status === "DRAFT" && canManage ? <Button size="sm" onClick={() => action.mutate({ id: String(record.id), type: "activate" })}>{uiText("Activar")}</Button> : null}{status !== "ARCHIVED" && canManage ? <Button size="sm" variant="secondary" onClick={() => { void confirmAction({ title: `¿Archivar «${String(record.name ?? "esta receta")}»?`, description: "Deja de poder usarse en consumos y producciones nuevas.", consequence: "Lo ya registrado con ella se conserva, y puedes volver a activarla cuando quieras.", confirmLabel: "Archivar" }).then((ok) => ok && action.mutate({ id: String(record.id), type: "archive" })); }}>{uiText("Archivar")}</Button> : null}</span></div>; })}</div></CardContent></Card></div>;
 }
 
 /**
@@ -113,6 +117,7 @@ const SHIFT_LABELS: Record<string, string> = {
 const JUSTIFICATION_MIN = 10;
 
 function DocumentOperationView({ section, canManage, branchId, warehouseId, warehouseName, ingredientOptions, unitOptions, recipeOptions }: { section: "consumption" | "waste" | "production"; canManage: boolean; branchId: string; warehouseId?: string; warehouseName?: string; ingredientOptions: Option[]; unitOptions: Option[]; recipeOptions: Option[] }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const { currentUser } = useAppStore();
   const [step, setStep] = useState<OperationStepId>("select");
@@ -274,22 +279,22 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Operación diaria"
+        eyebrow={uiText("Operación diaria")}
         title={title}
-        description="Registra, revisa cómo queda el almacén y confirma."
-        meta={warehouseName ? <span>Almacén: {warehouseName}</span> : null}
+        description={uiText("Registra, revisa cómo queda el almacén y confirma.")}
+        meta={warehouseName ? <span>{uiText("Almacén: ")}{warehouseName}</span> : null}
       />
 
       <OperationStepper state={operationState} onStepChange={setStep} />
 
       {!warehouseId ? (
-        <InlineNote tone="warning" title="Falta elegir el almacén">
-          Selecciona un almacén antes de registrar la {operationLabel}.
+        <InlineNote tone="warning" title={uiText("Falta elegir el almacén")}>
+          {uiText("Selecciona un almacén antes de registrar la")}{operationLabel}.
         </InlineNote>
       ) : null}
 
       {error || previewMutation.error || create.error || cancel.error ? (
-        <InlineNote tone="danger" title="No se pudo preparar la operación">
+        <InlineNote tone="danger" title={uiText("No se pudo preparar la operación")}>
           {error || getApiErrorMessage(previewMutation.error ?? create.error ?? cancel.error, "Revisa la información.")}
         </InlineNote>
       ) : null}
@@ -298,17 +303,17 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
         <PageSection title={`Datos de la ${operationLabel}`} boxed>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {section === "consumption" || section === "production"
-              ? <NativeSelect id={`${section}-recipe`} label="Receta" value={recipeId} options={recipeOptions} onChange={setRecipeId} />
+              ? <NativeSelect id={`${section}-recipe`} label={uiText("Receta")} value={recipeId} options={recipeOptions} onChange={setRecipeId} />
               : <>
-                  <NativeSelect id="waste-ingredient" label="Producto" value={ingredientId} options={ingredientOptions} onChange={setIngredientId} />
-                  <NativeSelect id="waste-unit" label="Unidad" value={unitId} options={unitOptions} onChange={setUnitId} />
+                  <NativeSelect id="waste-ingredient" label={uiText("Producto")} value={ingredientId} options={ingredientOptions} onChange={setIngredientId} />
+                  <NativeSelect id="waste-unit" label={uiText("Unidad")} value={unitId} options={unitOptions} onChange={setUnitId} />
                 </>}
             {section === "consumption" ? (
               <>
-                <Field id="consumption-quantity" label="Cantidad vendida" type="number" value={quantity} onChange={setQuantity} />
+                <Field id="consumption-quantity" label={uiText("Cantidad vendida")} type="number" value={quantity} onChange={setQuantity} />
                 <NativeSelect
                   id="consumption-shift"
-                  label="Turno"
+                  label={uiText("Turno")}
                   value={shift}
                   options={Object.entries(SHIFT_LABELS).map(([id, label]) => ({ id, label }))}
                   onChange={setShift}
@@ -316,13 +321,13 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
               </>
             ) : section === "production" ? (
               <>
-                <Field id="production-planned" label="Cantidad planificada" type="number" value={planned} onChange={setPlanned} />
-                <Field id="production-actual" label="Rendimiento real" type="number" value={actual} onChange={setActual} />
+                <Field id="production-planned" label={uiText("Cantidad planificada")} type="number" value={planned} onChange={setPlanned} />
+                <Field id="production-actual" label={uiText("Rendimiento real")} type="number" value={actual} onChange={setActual} />
               </>
             ) : (
               <>
-                <Field id="waste-quantity" label="Cantidad" type="number" value={quantity} onChange={setQuantity} />
-                <Field id="waste-reason" label="Motivo" value={reason} onChange={setReason} />
+                <Field id="waste-quantity" label={uiText("Cantidad")} type="number" value={quantity} onChange={setQuantity} />
+                <Field id="waste-reason" label={uiText("Motivo")} value={reason} onChange={setReason} />
               </>
             )}
           </div>
@@ -334,8 +339,7 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
             loadingLabel="Calculando…"
             onClick={calculate}
           >
-            Revisar impacto
-          </Button>
+            {uiText("Revisar impacto")}</Button>
         </PageSection>
       ) : null}
 
@@ -343,37 +347,34 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
         <div className="space-y-4">
           <ImpactReview impact={impact} />
           {shortages.length > 0 ? (
-            <PageSection title="Autorizar el faltante" boxed>
+            <PageSection title={uiText("Autorizar el faltante")} boxed>
               <p className="text-sm text-ink-2">
-                El servidor permite registrar la salida aunque no haya existencia suficiente, pero exige dejar por
-                escrito por qué. Queda en la auditoría a nombre de {currentUser.fullName}.
+                {uiText("El servidor permite registrar la salida aunque no haya existencia suficiente, pero exige dejar por escrito por qué. Queda en la auditoría a nombre de")}{currentUser.fullName}.
               </p>
               <div className="mt-3">
-                <Label htmlFor={`${section}-justification`}>Justificación</Label>
+                <Label htmlFor={`${section}-justification`}>{uiText("Justificación")}</Label>
                 <Input
                   id={`${section}-justification`}
                   value={justification}
                   onChange={(event) => setJustification(event.target.value)}
-                  placeholder="Explica por qué se autoriza el faltante"
+                  placeholder={uiText("Explica por qué se autoriza el faltante")}
                   aria-describedby={`${section}-justification-help`}
                 />
                 <p id={`${section}-justification-help`} className="mt-1 font-mono text-2xs text-ink-3 tabular-figures">
-                  {justification.trim().length} / {JUSTIFICATION_MIN} caracteres mínimos
-                </p>
+                  {justification.trim().length} / {JUSTIFICATION_MIN} {uiText("caracteres mínimos")}</p>
               </div>
             </PageSection>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setStep("record")}>Corregir el registro</Button>
+            <Button variant="secondary" onClick={() => setStep("record")}>{uiText("Corregir el registro")}</Button>
             <Button
               size="lg"
               disabled={!canManage || impact.blockers.length > 0}
               loading={create.isPending}
-              loadingLabel="Preparando…"
+              loadingLabel={uiText("Preparando…")}
               onClick={() => create.mutate()}
             >
-              Continuar
-            </Button>
+              {uiText("Continuar")}</Button>
           </div>
         </div>
       ) : null}
@@ -390,8 +391,7 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
           />
           <div className="flex justify-end">
             <Button variant="ghost" loading={cancel.isPending} loadingLabel="Descartando…" onClick={() => cancel.mutate()}>
-              Descartar el borrador
-            </Button>
+              {uiText("Descartar el borrador")}</Button>
           </div>
         </div>
       ) : null}
@@ -407,5 +407,6 @@ function DocumentOperationView({ section, canManage, branchId, warehouseId, ware
     </div>
   );
 }
-function NativeSelect({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Option[]; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><select id={id} className="field" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Seleccionar</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
+function NativeSelect({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Option[]; onChange: (value: string) => void }) {
+  const uiText = useUiText(); return <div><Label htmlFor={id}>{label}</Label><select id={id} className="field" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{uiText("Seleccionar")}</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
 function Field({ id, label, value, onChange, type = "text", placeholder }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) { return <div><Label htmlFor={id}>{label}</Label><Input id={id} type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></div>; }

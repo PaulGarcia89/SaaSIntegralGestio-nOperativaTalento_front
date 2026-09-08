@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -120,6 +122,7 @@ const DEFAULT_MODULES: ModuleKey[] = ["dashboard", "profile", "notifications"];
 const DEFAULT_ACCENT = "#0F766E";
 
 export default function TenantsPage() {
+  const uiText = useUiText();
   const { can, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
@@ -262,7 +265,7 @@ export default function TenantsPage() {
   if (!can("tenants.view")) {
     return (
       <BlockedState
-        title="Sin acceso a las empresas"
+        title={uiText("Sin acceso a las empresas")}
         cause="Gestionar empresas suscritas es una tarea de la administración de la plataforma."
         owner="Quien administra la plataforma"
         resolution="Si necesitas consultarlas, pide el permiso «Ver empresas»."
@@ -276,7 +279,7 @@ export default function TenantsPage() {
   const columns: DataColumn<TenantDto>[] = [
     {
       key: "name",
-      header: "Empresa",
+      header: uiText("Empresa"),
       priority: "identity",
       sortValue: (tenant) => tenant.name,
       render: (tenant) => (
@@ -288,7 +291,7 @@ export default function TenantsPage() {
     },
     {
       key: "status",
-      header: "Estado",
+      header: uiText("Estado"),
       priority: "primary",
       sortValue: (tenant) => tenantStatusInfo(tenant.status ?? "active").label,
       render: (tenant) => {
@@ -305,7 +308,7 @@ export default function TenantsPage() {
     },
     {
       key: "subscription",
-      header: "Suscripción",
+      header: uiText("Suscripción"),
       priority: "secondary",
       sortValue: (tenant) => {
         const subscription = subscriptions.find((item) => item.tenantId === tenant.id);
@@ -313,14 +316,14 @@ export default function TenantsPage() {
       },
       render: (tenant) => {
         const subscription = subscriptions.find((item) => item.tenantId === tenant.id);
-        if (!subscription) return <span className="text-ink-3">Sin registro</span>;
+        if (!subscription) return <span className="text-ink-3">{uiText("Sin registro")}</span>;
         const info = subscriptionStatusInfo(subscription.status);
         return <StatusBadge size="sm" tone={info.tone} label={info.label} />;
       },
     },
     {
       key: "branches",
-      header: "Sucursales",
+      header: uiText("Sucursales"),
       priority: "secondary",
       numeric: true,
       sortValue: (tenant) => tenant.branchCount ?? 0,
@@ -328,7 +331,7 @@ export default function TenantsPage() {
     },
     {
       key: "people",
-      header: "Personas",
+      header: uiText("Personas"),
       priority: "secondary",
       numeric: true,
       sortValue: (tenant) => tenant.employeeCount ?? 0,
@@ -349,9 +352,9 @@ export default function TenantsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno de la plataforma"
-        title="Empresas"
-        description="Alta, edición y control operativo de las empresas suscritas. Suspender o eliminar una afecta a todas las personas que trabajan dentro."
+        eyebrow={uiText("Gobierno de la plataforma")}
+        title={uiText("Empresas")}
+        description={uiText("Alta, edición y control operativo de las empresas suscritas. Suspender o eliminar una afecta a todas las personas que trabajan dentro.")}
         actions={
           <PermissionGate permission="tenants.create">
             <Button
@@ -361,20 +364,19 @@ export default function TenantsPage() {
                 setOpen(true);
               }}
             >
-              Nueva empresa
-            </Button>
+              {uiText("Nueva empresa")}</Button>
           </PermissionGate>
         }
       />
 
       {tenantsQuery.isLoading || subscriptionsQuery.isLoading ? (
-        <SkeletonRows rows={6} label="Cargando las empresas" />
+        <SkeletonRows rows={6} label={uiText("Cargando las empresas")} />
       ) : tenantsQuery.isError || subscriptionsQuery.isError ? (
         <ErrorState
-          title="No fue posible cargar las empresas"
+          title={uiText("No fue posible cargar las empresas")}
           detail={getApiErrorMessage(
             tenantsQuery.error ?? subscriptionsQuery.error,
-            "Reintenta la consulta para continuar.",
+            uiText("Reintenta la consulta para continuar."),
           )}
           onRetry={() => {
             void tenantsQuery.refetch();
@@ -384,21 +386,21 @@ export default function TenantsPage() {
       ) : (
         <>
           <MetricRow>
-            <Metric label="Empresas" value={String(tenants.length)} />
+            <Metric label={uiText("Empresas")} value={String(tenants.length)} />
             <Metric
-              label="Suspendidas"
+              label={uiText("Suspendidas")}
               value={String(tenants.filter((tenant) => tenant.status === "suspended").length)}
               detail="Su gente no puede entrar"
               tone={tenants.some((tenant) => tenant.status === "suspended") ? "warning" : undefined}
             />
             <Metric
-              label="Con pago vencido"
+              label={uiText("Con pago vencido")}
               value={String(subscriptions.filter((item) => item.status === "past_due").length)}
               detail="El acceso sigue abierto"
               tone={subscriptions.some((item) => item.status === "past_due") ? "danger" : undefined}
             />
             <Metric
-              label="Personas en total"
+              label={uiText("Personas en total")}
               value={String(tenants.reduce((total, tenant) => total + (tenant.employeeCount ?? 0), 0))}
             />
           </MetricRow>
@@ -420,24 +422,23 @@ export default function TenantsPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="tenant-name">Nombre de la empresa</Label>
+                    <Label htmlFor="tenant-name">{uiText("Nombre de la empresa")}</Label>
                     <Input id="tenant-name" {...form.register("name")} />
                     {form.formState.errors.name ? (
                       <p className="text-2xs text-status-danger">{form.formState.errors.name.message}</p>
                     ) : null}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="tenant-slug">Identificador en la dirección web</Label>
+                    <Label htmlFor="tenant-slug">{uiText("Identificador en la dirección web")}</Label>
                     <Input id="tenant-slug" placeholder="acme-retail" autoComplete="off" {...form.register("slug")} />
                     <p className="text-2xs text-ink-3">
-                      Es lo que aparece en el enlace del portal público. Cambiarlo rompe los enlaces ya compartidos.
-                    </p>
+                      {uiText("Es lo que aparece en el enlace del portal público. Cambiarlo rompe los enlaces ya compartidos.")}</p>
                     {form.formState.errors.slug ? (
                       <p className="text-2xs text-status-danger">{form.formState.errors.slug.message}</p>
                     ) : null}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Plan contratado</Label>
+                    <Label>{uiText("Plan contratado")}</Label>
                     <FormSelect
                       value={selectedPlan}
                       onValueChange={(value) => form.setValue("plan", value as PlanTier, { shouldDirty: true })}
@@ -446,7 +447,7 @@ export default function TenantsPage() {
                     <p className="text-2xs text-ink-3">{planTierInfo(selectedPlan).detail}</p>
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Estado</Label>
+                    <Label>{uiText("Estado")}</Label>
                     <FormSelect
                       value={selectedStatus}
                       onValueChange={(value) =>
@@ -457,18 +458,18 @@ export default function TenantsPage() {
                     <p className="text-2xs text-ink-3">{tenantStatusInfo(selectedStatus).detail}</p>
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="tenant-support">Correo de soporte</Label>
+                    <Label htmlFor="tenant-support">{uiText("Correo de soporte")}</Label>
                     <Input id="tenant-support" inputMode="email" autoComplete="off" {...form.register("supportEmail")} />
                     {form.formState.errors.supportEmail ? (
                       <p className="text-2xs text-status-danger">{form.formState.errors.supportEmail.message}</p>
                     ) : null}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="tenant-accent">Color de marca</Label>
+                    <Label htmlFor="tenant-accent">{uiText("Color de marca")}</Label>
                     <div className="flex min-w-0 items-center gap-2">
                       <input
                         type="color"
-                        aria-label="Elegir el color de marca"
+                        aria-label={uiText("Elegir el color de marca")}
                         value={/^#[0-9a-fA-F]{6}$/.test(selectedAccent ?? "") ? selectedAccent : DEFAULT_ACCENT}
                         onChange={(event) => form.setValue("accent", event.target.value, { shouldDirty: true })}
                         className="size-11 shrink-0 cursor-pointer rounded-md border border-line-control bg-surface-1 p-1"
@@ -482,11 +483,9 @@ export default function TenantsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Módulos habilitados</Label>
+                  <Label>{uiText("Módulos habilitados")}</Label>
                   <p className="text-2xs text-ink-3">
-                    Un módulo apagado desaparece del menú de todas las personas de la empresa. Los datos se conservan y
-                    vuelven a estar accesibles si se rehabilita.
-                  </p>
+                    {uiText("Un módulo apagado desaparece del menú de todas las personas de la empresa. Los datos se conservan y vuelven a estar accesibles si se rehabilita.")}</p>
                   <div className="flex flex-wrap gap-2">
                     {moduleOptions.map((module) => {
                       const enabled = selectedModules.includes(module);
@@ -528,8 +527,8 @@ export default function TenantsPage() {
                     {(editing.employeeCount ?? 0) > 0 ? (
                       <>
                         {" "}
-                        Afecta a {editing.employeeCount} {editing.employeeCount === 1 ? "persona" : "personas"} en{" "}
-                        {editing.branchCount ?? 0} {(editing.branchCount ?? 0) === 1 ? "sucursal" : "sucursales"}.
+                        {uiText("Afecta a")}{editing.employeeCount} {editing.employeeCount === 1 ? uiText("persona") : uiText("personas")} {uiText(" en")}{" "}
+                        {editing.branchCount ?? 0} {(editing.branchCount ?? 0) === 1 ? "sucursal" : uiText("sucursales")}.
                       </>
                     ) : null}
                   </InlineNote>
@@ -545,15 +544,14 @@ export default function TenantsPage() {
                       form.reset();
                     }}
                   >
-                    Cancelar
-                  </Button>
+                    {uiText("Cancelar")}</Button>
                   <Button
                     type="submit"
                     variant={suspending ? "destructive" : "default"}
                     loading={saveMutation.isPending}
-                    loadingLabel="Guardando…"
+                    loadingLabel={uiText("Guardando…")}
                   >
-                    {!editing ? "Crear empresa" : suspending ? "Guardar y suspender la empresa" : "Guardar cambios"}
+                    {!editing ? "Crear empresa" : suspending ? "Guardar y suspender la empresa" : uiText("Guardar cambios")}
                   </Button>
                 </div>
               </form>
@@ -567,10 +565,10 @@ export default function TenantsPage() {
             filterValue={activeFilter}
             onFilterChange={setActiveFilter}
             options={[
-              { label: "Todas", value: "" },
-              { label: "Activas", value: "active" },
+              { label: uiText("Todas"), value: "" },
+              { label: uiText("Activas"), value: "active" },
               { label: "En prueba", value: "trial" },
-              { label: "Suspendidas", value: "suspended" },
+              { label: uiText("Suspendidas"), value: "suspended" },
             ]}
           />
 
@@ -580,7 +578,7 @@ export default function TenantsPage() {
               title={hasFilters ? "Ninguna empresa coincide" : "Todavía no hay empresas"}
               description={
                 hasFilters
-                  ? "Prueba con otro texto o quita el filtro de estado."
+                  ? uiText("Prueba con otro texto o quita el filtro de estado.")
                   : "Crea la primera empresa o aprueba una solicitud de alta pendiente."
               }
               onClearFilters={
@@ -596,7 +594,7 @@ export default function TenantsPage() {
             <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.8fr)]">
               <div className="min-w-0">
                 <DataView
-                  caption="Empresas suscritas"
+                  caption={uiText("Empresas suscritas")}
                   rows={filtered}
                   getKey={(tenant) => tenant.id}
                   columns={columns}
@@ -606,13 +604,11 @@ export default function TenantsPage() {
                     <div className="flex flex-wrap gap-2">
                       <PermissionGate permission="tenants.update">
                         <Button size="sm" variant="secondary" onClick={() => startEditing(tenant)}>
-                          Editar
-                        </Button>
+                          {uiText("Editar")}</Button>
                       </PermissionGate>
                       <PermissionGate permission="tenants.update">
                         <Button size="sm" variant="destructive" onClick={() => setDeleting(tenant)}>
-                          Eliminar
-                        </Button>
+                          {uiText("Eliminar")}</Button>
                       </PermissionGate>
                     </div>
                   )}
@@ -638,24 +634,24 @@ export default function TenantsPage() {
 
                     <dl className="divide-y divide-line rounded-md border border-line">
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Suscripción</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Suscripción")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">
                           {selectedSubscription
                             ? subscriptionStatusInfo(selectedSubscription.status).label
-                            : "Sin registro"}
+                            : uiText("Sin registro")}
                         </dd>
                       </div>
                       {selectedSubscription ? (
                         <>
                           <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                            <dt className="text-sm text-ink-2">Cobro</dt>
+                            <dt className="text-sm text-ink-2">{uiText("Cobro")}</dt>
                             <dd className="text-right text-sm font-medium text-ink-1">
                               {formatPrice(selectedSubscription.price)} ·{" "}
                               {billingCycleLabel(selectedSubscription.billingCycle)}
                             </dd>
                           </div>
                           <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                            <dt className="text-sm text-ink-2">Próxima renovación</dt>
+                            <dt className="text-sm text-ink-2">{uiText("Próxima renovación")}</dt>
                             <dd className="text-right text-sm font-medium text-ink-1">
                               {formatDate(selectedSubscription.renewalDate)}
                             </dd>
@@ -663,11 +659,11 @@ export default function TenantsPage() {
                         </>
                       ) : null}
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Sucursales</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Sucursales")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">{selectedTenant.branchCount ?? 0}</dd>
                       </div>
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Personas</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Personas")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">
                           {selectedTenant.employeeCount ?? 0}
                         </dd>
@@ -676,8 +672,7 @@ export default function TenantsPage() {
 
                     <div>
                       <p className="mb-2 text-2xs text-ink-3">
-                        {selectedTenant.enabledModules.length} módulos habilitados
-                      </p>
+                        {selectedTenant.enabledModules.length} {uiText("módulos habilitados")}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedTenant.enabledModules.map((module) => (
                           <span
@@ -701,7 +696,7 @@ export default function TenantsPage() {
         open={Boolean(deleting)}
         onOpenChange={(next) => !next && setDeleting(null)}
         title={deleting ? `¿Eliminar ${deleting.name}?` : "Eliminar empresa"}
-        description="El borrado arrastra todo lo que cuelga de esta empresa. No hay papelera ni forma de recuperarlo."
+        description={uiText("El borrado arrastra todo lo que cuelga de esta empresa. No hay papelera ni forma de recuperarlo.")}
         confirmLabel="Eliminar la empresa y su contenido"
         pending={deleteMutation.isPending}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
@@ -709,14 +704,10 @@ export default function TenantsPage() {
           deleting ? (
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                {deleting.branchCount ?? 0} {(deleting.branchCount ?? 0) === 1 ? "sucursal" : "sucursales"} con su
-                configuración.
-              </li>
+                {deleting.branchCount ?? 0} {(deleting.branchCount ?? 0) === 1 ? "sucursal" : uiText("sucursales")} {uiText("con su configuración.")}</li>
               <li>
-                {deleting.employeeCount ?? 0} {(deleting.employeeCount ?? 0) === 1 ? "persona" : "personas"} y sus
-                accesos: dejarán de poder entrar de inmediato.
-              </li>
-              <li>{deleting.enabledModules.length} módulos asignados y los datos registrados dentro de ellos.</li>
+                {deleting.employeeCount ?? 0} {(deleting.employeeCount ?? 0) === 1 ? uiText("persona") : uiText("personas")} {uiText("y sus accesos: dejarán de poder entrar de inmediato.")}</li>
+              <li>{deleting.enabledModules.length} {uiText(" módulos asignados y los datos registrados dentro de ellos.")}</li>
               <li>
                 {deletingSubscription
                   ? `Su suscripción (${subscriptionStatusInfo(deletingSubscription.status).label}, ${formatPrice(

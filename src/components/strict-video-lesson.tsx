@@ -1,5 +1,9 @@
 "use client";
 
+import { createPlaybackSessionId } from "@/lib/playback-session-id";
+
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect, useRef, useState } from "react";
 import type { LearnerTrainingCourseDto } from "@/lib/contracts";
 import type { VideoProgressEvent } from "@/components/training-learning-hub";
@@ -8,6 +12,7 @@ export function StrictVideoLesson({ lesson, assignmentId, url, onProgress }: {
   lesson: LearnerTrainingCourseDto["modules"][number]["lessons"][number]; assignmentId: string; url: string;
   onProgress: (event: VideoProgressEvent) => Promise<unknown> | void;
 }) {
+  const uiText = useUiText();
   const videoRef = useRef<HTMLVideoElement>(null);
   const callback = useRef(onProgress);
   const initial = useRef(lesson.videoProgress);
@@ -18,7 +23,7 @@ export function StrictVideoLesson({ lesson, assignmentId, url, onProgress }: {
     const video = videoRef.current;
     const duration = lesson.durationSeconds;
     if (!video || !assignmentId || !duration) return;
-    const session = crypto.randomUUID();
+    const session = createPlaybackSessionId();
     let queue = Promise.resolve();
     let reached = initial.current?.watchedSeconds ?? 0;
     let done = initial.current?.completionPercentage === 100;
@@ -60,8 +65,8 @@ export function StrictVideoLesson({ lesson, assignmentId, url, onProgress }: {
   }, [assignmentId, lesson.id, lesson.durationSeconds]);
   return <div className="space-y-3 rounded-xl border p-3">
     <video ref={videoRef} src={url} controls playsInline preload="metadata" controlsList="nodownload noplaybackrate" className="aspect-video w-full rounded-lg bg-black" aria-label={lesson.title} onError={() => setMessage("No fue posible cargar el video. Actualiza la página para reintentar.")} />
-    <progress value={percent} max={100} className="h-3 w-full" aria-label="Porcentaje de video visto y validado" />
-    <p className="text-sm font-medium">{percent} % visto · Obligatorio: 100 %</p>
-    <p className="text-sm text-muted-foreground" aria-live="polite">{assignmentId ? message : "Necesitas una asignación para registrar tu avance."}</p>
+    <progress value={percent} max={100} className="h-3 w-full" aria-label={uiText("Porcentaje de video visto y validado")} />
+    <p className="text-sm font-medium">{percent} {uiText(" % visto · Obligatorio: 100 %")}</p>
+    <p className="text-sm text-muted-foreground" aria-live="polite">{uiText(assignmentId ? message : "Necesitas una asignación para registrar tu avance.")}</p>
   </div>;
 }

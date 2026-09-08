@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Award, CheckCircle2, ClipboardCheck, Library, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -79,6 +81,7 @@ export function TrainingEvaluations() {
 }
 
 function AssessmentBuilder() {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const courseId = useSearchParams().get("courseId") ?? undefined;
   const [createOpen, setCreateOpen] = useState(Boolean(courseId));
@@ -118,14 +121,14 @@ function AssessmentBuilder() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Aprendizaje"
-        title="Evaluaciones"
-        description="Diseña instrumentos de evaluación, configura intentos y controla el criterio de aprobación."
-        actions={<Button onClick={() => setCreateOpen(true)}><Plus />Nueva evaluación</Button>}
+        eyebrow={uiText("Aprendizaje")}
+        title={uiText("Evaluaciones")}
+        description={uiText("Diseña instrumentos de evaluación, configura intentos y controla el criterio de aprobación.")}
+        actions={<Button onClick={() => setCreateOpen(true)}><Plus />{uiText("Nueva evaluación")}</Button>}
       />
-      {query.isLoading ? <SkeletonRows rows={4} label="Cargando las evaluaciones" /> : null}
+      {query.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando las evaluaciones")} /> : null}
       {query.isError ? (
-        <ErrorState title="No fue posible cargar las evaluaciones" detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")} onRetry={() => void query.refetch()} />
+        <ErrorState title={uiText("No fue posible cargar las evaluaciones")} detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))} onRetry={() => void query.refetch()} />
       ) : null}
       {query.data ? <AssessmentBuilderSummary assessments={query.data.items} /> : null}
       {query.data?.items.length ? (
@@ -135,34 +138,33 @@ function AssessmentBuilder() {
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div><CardTitle>{quiz.title}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{quiz.course?.title}</p></div>
-                  <Badge>{quiz.passingScore}% mínimo</Badge>
+                  <Badge>{quiz.passingScore}{uiText("% mínimo")}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">{quiz.description || "Sin descripción"}</p>
                 <div className="flex flex-wrap gap-2 text-sm">
-                  <Badge variant="secondary">{quiz.questions.length} preguntas</Badge>
-                  <Badge variant="secondary">{quiz.maxAttempts ?? "∞"} intentos</Badge>
+                  <Badge variant="secondary">{quiz.questions.length} {uiText(" preguntas")}</Badge>
+                  <Badge variant="secondary">{quiz.maxAttempts ?? "∞"} {uiText(" intentos")}</Badge>
                   <Badge variant="secondary">{quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} min` : "Sin límite"}</Badge>
                   <StatusBadge size="sm" tone={quiz.readiness?.ready ? "success" : "warning"} label={quiz.readiness?.ready ? "Lista para usarse" : "Incompleta"} />
                 </div>
-                {!quiz.readiness?.ready && quiz.readiness?.errors.length ? <InlineNote tone="warning" title="Falta algo para poder usarla">{quiz.readiness.errors.join(" · ")}</InlineNote> : null}
+                {!quiz.readiness?.ready && quiz.readiness?.errors.length ? <InlineNote tone="warning" title={uiText("Falta algo para poder usarla")}>{quiz.readiness.errors.join(" · ")}</InlineNote> : null}
                 <div className="space-y-2">
                   {quiz.questions.map((question, index) => (
                     <div key={question.id} className="flex items-center gap-2 rounded-xl border border-border-default p-3">
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{index + 1}. {question.prompt}</p><p className="text-xs text-text-secondary">{question.points} pts · dificultad {questionDifficultyLabel(question.difficulty ?? "MEDIUM").toLocaleLowerCase("es")}{question.category ? ` · ${question.category}` : ""}</p></div>
-                      <Button size="icon" variant="ghost" aria-label="Subir pregunta" disabled={index === 0 || reorder.isPending} onClick={() => moveQuestion(quiz, index, -1)}><ArrowUp className="size-4" /></Button>
-                      <Button size="icon" variant="ghost" aria-label="Bajar pregunta" disabled={index === quiz.questions.length - 1 || reorder.isPending} onClick={() => moveQuestion(quiz, index, 1)}><ArrowDown className="size-4" /></Button>
-                      <Button size="icon" variant="ghost" aria-label="Eliminar pregunta" disabled={removeQuestion.isPending} onClick={() => removeQuestion.mutate(question.id)}><Trash2 className="size-4 text-status-danger" /></Button>
+                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{index + 1}. {question.prompt}</p><p className="text-xs text-text-secondary">{question.points} {uiText(" pts · dificultad ")}{questionDifficultyLabel(question.difficulty ?? "MEDIUM").toLocaleLowerCase("es")}{question.category ? ` · ${question.category}` : ""}</p></div>
+                      <Button size="icon" variant="ghost" aria-label={uiText("Subir pregunta")} disabled={index === 0 || reorder.isPending} onClick={() => moveQuestion(quiz, index, -1)}><ArrowUp className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label={uiText("Bajar pregunta")} disabled={index === quiz.questions.length - 1 || reorder.isPending} onClick={() => moveQuestion(quiz, index, 1)}><ArrowDown className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" aria-label={uiText("Eliminar pregunta")} disabled={removeQuestion.isPending} onClick={() => removeQuestion.mutate(question.id)}><Trash2 className="size-4 text-status-danger" /></Button>
                     </div>
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" onClick={() => setQuestionQuiz(quiz)}>
-                    <Plus />Agregar pregunta
-                  </Button>
-                  <Button variant="secondary" onClick={() => setBankQuiz(quiz)}><Library />Banco</Button>
-                  <Button variant="secondary" onClick={() => setConfigureQuiz(quiz)}><Settings2 />Reglas</Button>
+                    <Plus />{uiText("Agregar pregunta")}</Button>
+                  <Button variant="secondary" onClick={() => setBankQuiz(quiz)}><Library />{uiText("Banco")}</Button>
+                  <Button variant="secondary" onClick={() => setConfigureQuiz(quiz)}><Settings2 />{uiText("Reglas")}</Button>
                   <Button variant="destructive" size="icon" aria-label={`Eliminar ${quiz.title}`} onClick={() => setPendingDelete({ id: quiz.id, title: quiz.title, attempts: quiz._count?.attempts ?? 0 })}>
                     <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
@@ -171,7 +173,7 @@ function AssessmentBuilder() {
             </Card>
           ))}
         </div>
-      ) : query.isSuccess ? <EmptyState reason="no-records" title="Aún no hay evaluaciones" description="Una evaluación mide lo aprendido y decide si alguien aprueba el curso." action={<Button onClick={() => setCreateOpen(true)}>Crear la primera evaluación</Button>} /> : null}
+      ) : query.isSuccess ? <EmptyState reason="no-records" title={uiText("Aún no hay evaluaciones")} description={uiText("Una evaluación mide lo aprendido y decide si alguien aprueba el curso.")} action={<Button onClick={() => setCreateOpen(true)}>{uiText("Crear la primera evaluación")}</Button>} /> : null}
       <CreateAssessmentDialog open={createOpen} onOpenChange={setCreateOpen} initialCourseId={courseId} />
       <ConfigureAssessmentDialog quiz={configureQuiz} onClose={() => setConfigureQuiz(null)} />
       <CreateQuestionDialog quiz={questionQuiz} onClose={() => setQuestionQuiz(null)} />
@@ -180,23 +182,21 @@ function AssessmentBuilder() {
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Eliminar la evaluación «{pendingDelete?.title}»?</DialogTitle>
+            <DialogTitle>{uiText("¿Eliminar la evaluación «")}{pendingDelete?.title}»?</DialogTitle>
             <DialogDescription>
-              Se borran también sus preguntas y sus reglas. No se puede deshacer.
-            </DialogDescription>
+              {uiText("Se borran también sus preguntas y sus reglas. No se puede deshacer.")}</DialogDescription>
           </DialogHeader>
           {pendingDelete && pendingDelete.attempts > 0 ? (
-            <InlineNote tone="blocked" title="El servidor no permitirá borrarla">
-              Ya tiene {pendingDelete.attempts} {pendingDelete.attempts === 1 ? "intento registrado" : "intentos registrados"}, y borrarla dejaría esos resultados sin la evaluación que los explica. Retírala del curso en su lugar.
-            </InlineNote>
+            <InlineNote tone="blocked" title={uiText("El servidor no permitirá borrarla")}>
+              {uiText("Ya tiene")}{pendingDelete.attempts} {pendingDelete.attempts === 1 ? "intento registrado" : "intentos registrados"}{uiText(", y borrarla dejaría esos resultados sin la evaluación que los explica. Retírala del curso en su lugar.")}</InlineNote>
           ) : null}
           {remove.error ? (
-            <InlineNote tone="danger" title="No se pudo eliminar">
+            <InlineNote tone="danger" title={uiText("No se pudo eliminar")}>
               {getApiErrorMessage(remove.error, "El servidor rechazó la eliminación.")}
             </InlineNote>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setPendingDelete(null)}>Conservarla</Button>
+            <Button variant="secondary" onClick={() => setPendingDelete(null)}>{uiText("Conservarla")}</Button>
             <Button
               variant="destructive"
               disabled={Boolean(pendingDelete && pendingDelete.attempts > 0)}
@@ -204,8 +204,7 @@ function AssessmentBuilder() {
               loadingLabel="Eliminando…"
               onClick={() => pendingDelete && remove.mutate(pendingDelete.id)}
             >
-              Eliminar la evaluación
-            </Button>
+              {uiText("Eliminar la evaluación")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -214,6 +213,7 @@ function AssessmentBuilder() {
 }
 
 function AssessmentBuilderSummary({ assessments }: { assessments: TrainingQuizDto[] }) {
+  const uiText = useUiText();
   const ready = assessments.filter((assessment) => assessment.readiness?.ready).length;
   const questions = assessments.reduce((total, assessment) => total + assessment.questions.length, 0);
   const attempts = assessments.reduce((total, assessment) => total + (assessment._count?.attempts ?? 0), 0);
@@ -222,14 +222,14 @@ function AssessmentBuilderSummary({ assessments }: { assessments: TrainingQuizDt
   return (
     <section aria-labelledby="assessment-summary-title" className="space-y-3">
       <div>
-        <h2 id="assessment-summary-title" className="text-lg font-semibold">Estado de tus evaluaciones</h2>
-        <p className="text-sm text-muted-foreground">Revisa la preparación antes de abrir una evaluación individual.</p>
+        <h2 id="assessment-summary-title" className="text-lg font-semibold">{uiText("Estado de tus evaluaciones")}</h2>
+        <p className="text-sm text-muted-foreground">{uiText("Revisa la preparación antes de abrir una evaluación individual.")}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <AssessmentMetric label="Evaluaciones" value={assessments.length} icon={<ClipboardCheck className="size-4" />} />
-        <AssessmentMetric label="Listas para usar" value={ready} icon={<CheckCircle2 className="size-4" />} tone="success" />
-        <AssessmentMetric label="Requieren revisión" value={incomplete} icon={<Settings2 className="size-4" />} tone={incomplete ? "warning" : "normal"} />
-        <AssessmentMetric label="Preguntas" value={questions} detail={`${attempts} intentos registrados`} icon={<Library className="size-4" />} />
+        <AssessmentMetric label={uiText("Evaluaciones")} value={assessments.length} icon={<ClipboardCheck className="size-4" />} />
+        <AssessmentMetric label={uiText("Listas para usar")} value={ready} icon={<CheckCircle2 className="size-4" />} tone="success" />
+        <AssessmentMetric label={uiText("Requieren revisión")} value={incomplete} icon={<Settings2 className="size-4" />} tone={incomplete ? "warning" : "normal"} />
+        <AssessmentMetric label={uiText("Preguntas")} value={questions} detail={`${attempts} intentos registrados`} icon={<Library className="size-4" />} />
       </div>
     </section>
   );
@@ -263,6 +263,7 @@ function AssessmentMetric({
 }
 
 function CreateAssessmentDialog({ open, onOpenChange, initialCourseId }: { open: boolean; onOpenChange: (open: boolean) => void; initialCourseId?: string }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const courses = useQuery({ queryKey: ["training-courses-for-assessment"], queryFn: () => fetchTrainingCourses({ pageSize: 100 }) });
   const mutation = useMutation({
@@ -297,23 +298,23 @@ function CreateAssessmentDialog({ open, onOpenChange, initialCourseId }: { open:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="[&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
-        <DialogHeader><DialogTitle>Nueva evaluación</DialogTitle><DialogDescription>Define las reglas generales. Después podrás agregar preguntas.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{uiText("Nueva evaluación")}</DialogTitle><DialogDescription>{uiText("Define las reglas generales. Después podrás agregar preguntas.")}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
-          <div><Label htmlFor="assessment-course">Curso</Label><Select name="courseId" defaultValue={initialCourseId} required><SelectTrigger id="assessment-course"><SelectValue placeholder="Selecciona un curso" /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label htmlFor="assessment-title">Título</Label><Input id="assessment-title" name="title" required /></div>
-          <div><Label htmlFor="assessment-description">Descripción</Label><Input id="assessment-description" name="description" /></div>
+          <div><Label htmlFor="assessment-course">{uiText("Curso")}</Label><Select name="courseId" defaultValue={initialCourseId} required><SelectTrigger id="assessment-course"><SelectValue placeholder={uiText("Selecciona un curso")} /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label htmlFor="assessment-title">{uiText("Título")}</Label><Input id="assessment-title" name="title" required /></div>
+          <div><Label htmlFor="assessment-description">{uiText("Descripción")}</Label><Input id="assessment-description" name="description" /></div>
           <div className="grid grid-cols-3 gap-3">
-            <div><Label htmlFor="passingScore">Aprobación %</Label><Input id="passingScore" name="passingScore" type="number" min="1" max="100" defaultValue="80" required /></div>
-            <div><Label htmlFor="maxAttempts">Intentos</Label><Input id="maxAttempts" name="maxAttempts" type="number" min="1" defaultValue="3" /></div>
-            <div><Label htmlFor="timeLimitMinutes">Minutos</Label><Input id="timeLimitMinutes" name="timeLimitMinutes" type="number" min="1" /></div>
+            <div><Label htmlFor="passingScore">{uiText("Aprobación %")}</Label><Input id="passingScore" name="passingScore" type="number" min="1" max="100" defaultValue="80" required /></div>
+            <div><Label htmlFor="maxAttempts">{uiText("Intentos")}</Label><Input id="maxAttempts" name="maxAttempts" type="number" min="1" defaultValue="3" /></div>
+            <div><Label htmlFor="timeLimitMinutes">{uiText("Minutos")}</Label><Input id="timeLimitMinutes" name="timeLimitMinutes" type="number" min="1" /></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleQuestions" /> Mezclar preguntas</label>
-            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleOptions" /> Mezclar opciones</label>
-            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="requireAllQuestions" defaultChecked /> Exigir todas</label>
+            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleQuestions" /> {uiText(" Mezclar preguntas")}</label>
+            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="shuffleOptions" /> {uiText(" Mezclar opciones")}</label>
+            <label className="flex min-h-11 items-center gap-3"><input type="checkbox" name="requireAllQuestions" defaultChecked /> {uiText(" Exigir todas")}</label>
           </div>
-          <div><Label htmlFor="cooldownMinutes">Espera entre intentos (minutos)</Label><Input id="cooldownMinutes" name="cooldownMinutes" type="number" min="0" /></div>
-          <Button className="w-full" disabled={mutation.isPending}>{mutation.isPending ? "Creando…" : "Crear evaluación"}</Button>
+          <div><Label htmlFor="cooldownMinutes">{uiText("Espera entre intentos (minutos)")}</Label><Input id="cooldownMinutes" name="cooldownMinutes" type="number" min="0" /></div>
+          <Button className="w-full" disabled={mutation.isPending}>{mutation.isPending ? uiText("Creando…") : "Crear evaluación"}</Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -321,6 +322,7 @@ function CreateAssessmentDialog({ open, onOpenChange, initialCourseId }: { open:
 }
 
 function ConfigureAssessmentDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; onClose: () => void }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (input: Parameters<typeof updateTrainingAssessment>[1]) =>
@@ -358,29 +360,29 @@ function ConfigureAssessmentDialog({ quiz, onClose }: { quiz: TrainingQuizDto | 
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto [&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
-        <DialogHeader><DialogTitle>Reglas de evaluación</DialogTitle><DialogDescription>Controla disponibilidad, selección, intentos y retroalimentación.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{uiText("Reglas de evaluación")}</DialogTitle><DialogDescription>{uiText("Controla disponibilidad, selección, intentos y retroalimentación.")}</DialogDescription></DialogHeader>
         {quiz ? <form className="space-y-4" onSubmit={submit}>
-          <div><Label htmlFor="config-title">Título</Label><Input id="config-title" name="title" defaultValue={quiz.title} required /></div>
-          <div><Label htmlFor="config-description">Descripción</Label><Input id="config-description" name="description" defaultValue={quiz.description ?? ""} /></div>
+          <div><Label htmlFor="config-title">{uiText("Título")}</Label><Input id="config-title" name="title" defaultValue={quiz.title} required /></div>
+          <div><Label htmlFor="config-description">{uiText("Descripción")}</Label><Input id="config-description" name="description" defaultValue={quiz.description ?? ""} /></div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div><Label>Aprobación %</Label><Input name="passingScore" type="number" min="1" max="100" defaultValue={quiz.passingScore} /></div>
-            <div><Label>Intentos</Label><Input name="maxAttempts" type="number" min="1" defaultValue={quiz.maxAttempts ?? ""} /></div>
-            <div><Label>Tiempo (min)</Label><Input name="timeLimitMinutes" type="number" min="1" defaultValue={quiz.timeLimitMinutes ?? ""} /></div>
-            <div><Label>Preguntas aleatorias</Label><Input name="randomQuestionCount" type="number" min="1" max={quiz.questions.length} defaultValue={quiz.randomQuestionCount ?? ""} /></div>
-            <div><Label>Espera (min)</Label><Input name="cooldownMinutes" type="number" min="0" defaultValue={quiz.cooldownMinutes ?? ""} /></div>
-            <div><Label>Retroalimentación</Label><Select name="feedbackMode" defaultValue={quiz.feedbackMode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AFTER_SUBMISSION">Al enviar</SelectItem><SelectItem value="AFTER_PASSING">Al aprobar</SelectItem><SelectItem value="NEVER">Nunca</SelectItem></SelectContent></Select></div>
+            <div><Label>{uiText("Aprobación %")}</Label><Input name="passingScore" type="number" min="1" max="100" defaultValue={quiz.passingScore} /></div>
+            <div><Label>{uiText("Intentos")}</Label><Input name="maxAttempts" type="number" min="1" defaultValue={quiz.maxAttempts ?? ""} /></div>
+            <div><Label>{uiText("Tiempo (min)")}</Label><Input name="timeLimitMinutes" type="number" min="1" defaultValue={quiz.timeLimitMinutes ?? ""} /></div>
+            <div><Label>{uiText("Preguntas aleatorias")}</Label><Input name="randomQuestionCount" type="number" min="1" max={quiz.questions.length} defaultValue={quiz.randomQuestionCount ?? ""} /></div>
+            <div><Label>{uiText("Espera (min)")}</Label><Input name="cooldownMinutes" type="number" min="0" defaultValue={quiz.cooldownMinutes ?? ""} /></div>
+            <div><Label>{uiText("Retroalimentación")}</Label><Select name="feedbackMode" defaultValue={quiz.feedbackMode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="AFTER_SUBMISSION">{uiText("Al enviar")}</SelectItem><SelectItem value="AFTER_PASSING">{uiText("Al aprobar")}</SelectItem><SelectItem value="NEVER">{uiText("Nunca")}</SelectItem></SelectContent></Select></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div><Label>Disponible desde</Label><Input name="availableFrom" type="datetime-local" /></div>
-            <div><Label>Disponible hasta</Label><Input name="availableUntil" type="datetime-local" /></div>
+            <div><Label>{uiText("Disponible desde")}</Label><Input name="availableFrom" type="datetime-local" /></div>
+            <div><Label>{uiText("Disponible hasta")}</Label><Input name="availableUntil" type="datetime-local" /></div>
           </div>
-          <div><Label>Rúbrica general</Label><Input name="rubric" defaultValue={String(quiz.rubric?.criteria ?? "")} placeholder="Criterios generales de calidad" /></div>
+          <div><Label>{uiText("Rúbrica general")}</Label><Input name="rubric" defaultValue={String(quiz.rubric?.criteria ?? "")} placeholder={uiText("Criterios generales de calidad")} /></div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex items-center gap-2"><input type="checkbox" name="shuffleQuestions" defaultChecked={quiz.shuffleQuestions} />Mezclar preguntas</label>
-            <label className="flex items-center gap-2"><input type="checkbox" name="shuffleOptions" defaultChecked={quiz.shuffleOptions} />Mezclar opciones</label>
-            <label className="flex items-center gap-2"><input type="checkbox" name="requireAllQuestions" defaultChecked={quiz.requireAllQuestions} />Exigir todas</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="shuffleQuestions" defaultChecked={quiz.shuffleQuestions} />{uiText("Mezclar preguntas")}</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="shuffleOptions" defaultChecked={quiz.shuffleOptions} />{uiText("Mezclar opciones")}</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="requireAllQuestions" defaultChecked={quiz.requireAllQuestions} />{uiText("Exigir todas")}</label>
           </div>
-          <Button className="w-full" disabled={mutation.isPending}>Guardar reglas</Button>
+          <Button className="w-full" disabled={mutation.isPending}>{uiText("Guardar reglas")}</Button>
         </form> : null}
       </DialogContent>
     </Dialog>
@@ -388,6 +390,7 @@ function ConfigureAssessmentDialog({ quiz, onClose }: { quiz: TrainingQuizDto | 
 }
 
 function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; onClose: () => void }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const [type, setType] = useState<TrainingQuestionType>("SINGLE_CHOICE");
   const [difficulty, setDifficulty] = useState<TrainingQuestionDifficulty>("MEDIUM");
@@ -432,29 +435,29 @@ function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null;
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="[&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
-        <DialogHeader><DialogTitle>Agregar pregunta</DialogTitle><DialogDescription>{quiz?.title}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{uiText("Agregar pregunta")}</DialogTitle><DialogDescription>{quiz?.title}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
-          <div><Label htmlFor="question-prompt">Enunciado</Label><Input id="question-prompt" name="prompt" required /></div>
+          <div><Label htmlFor="question-prompt">{uiText("Enunciado")}</Label><Input id="question-prompt" name="prompt" required /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Tipo</Label><Select value={type} onValueChange={(value) => setType(value as TrainingQuestionType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SINGLE_CHOICE">Selección única</SelectItem><SelectItem value="MULTIPLE_CHOICE">Selección múltiple</SelectItem><SelectItem value="TRUE_FALSE">Verdadero/Falso</SelectItem><SelectItem value="TEXT">Respuesta corta</SelectItem></SelectContent></Select></div>
-            <div><Label htmlFor="question-points">Puntos</Label><Input id="question-points" name="points" type="number" min="1" defaultValue="1" required /></div>
+            <div><Label>{uiText("Tipo")}</Label><Select value={type} onValueChange={(value) => setType(value as TrainingQuestionType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SINGLE_CHOICE">{uiText("Selección única")}</SelectItem><SelectItem value="MULTIPLE_CHOICE">{uiText("Selección múltiple")}</SelectItem><SelectItem value="TRUE_FALSE">{uiText("Verdadero/Falso")}</SelectItem><SelectItem value="TEXT">{uiText("Respuesta corta")}</SelectItem></SelectContent></Select></div>
+            <div><Label htmlFor="question-points">{uiText("Puntos")}</Label><Input id="question-points" name="points" type="number" min="1" defaultValue="1" required /></div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div><Label>Categoría</Label><Input name="category" placeholder="Ej. Seguridad" /></div>
-            <div><Label>Dificultad</Label><Select value={difficulty} onValueChange={(value) => setDifficulty(value as TrainingQuestionDifficulty)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Básica</SelectItem><SelectItem value="MEDIUM">Intermedia</SelectItem><SelectItem value="HARD">Avanzada</SelectItem></SelectContent></Select></div>
+            <div><Label>{uiText("Categoría")}</Label><Input name="category" placeholder={uiText("Ej. Seguridad")} /></div>
+            <div><Label>{uiText("Dificultad")}</Label><Select value={difficulty} onValueChange={(value) => setDifficulty(value as TrainingQuestionDifficulty)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">{uiText("Básica")}</SelectItem><SelectItem value="MEDIUM">{uiText("Intermedia")}</SelectItem><SelectItem value="HARD">{uiText("Avanzada")}</SelectItem></SelectContent></Select></div>
           </div>
           {type !== "TEXT" && type !== "TRUE_FALSE" ? (
             <div className="space-y-2">
               {[0, 1, 2, 3].map((index) => <Input key={index} name={`option${index + 1}`} placeholder={`Opción ${index + 1}${index < 2 ? " (obligatoria)" : ""}`} required={index < 2} />)}
-              {type === "MULTIPLE_CHOICE" ? <div className="flex flex-wrap gap-4">{[0, 1, 2, 3].map((index) => <label key={index} className="flex items-center gap-2 text-sm"><input type="checkbox" name="correctMultiple" value={index} defaultChecked={index === 0} />Opción {index + 1}</label>)}</div> : <div><Label>Opción correcta</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[0, 1, 2, 3].map((index) => <SelectItem key={index} value={String(index)}>Opción {index + 1}</SelectItem>)}</SelectContent></Select></div>}
+              {type === "MULTIPLE_CHOICE" ? <div className="flex flex-wrap gap-4">{[0, 1, 2, 3].map((index) => <label key={index} className="flex items-center gap-2 text-sm"><input type="checkbox" name="correctMultiple" value={index} defaultChecked={index === 0} />{uiText("Opción ")}{index + 1}</label>)}</div> : <div><Label>{uiText("Opción correcta")}</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[0, 1, 2, 3].map((index) => <SelectItem key={index} value={String(index)}>{uiText("Opción ")}{index + 1}</SelectItem>)}</SelectContent></Select></div>}
             </div>
           ) : null}
-          {type === "TRUE_FALSE" ? <div><Label>Respuesta correcta</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="0">Verdadero</SelectItem><SelectItem value="1">Falso</SelectItem></SelectContent></Select></div> : null}
-          <div><Label htmlFor="question-explanation">Explicación posterior</Label><Input id="question-explanation" name="explanation" /></div>
-          <div><Label>Etiquetas</Label><Input name="tags" placeholder="procedimiento, prevención" /></div>
-          {type === "TEXT" ? <div><Label>Rúbrica de calificación</Label><Input name="rubric" required placeholder="Criterios observables y puntaje esperado" /></div> : null}
-          <label className="flex items-center gap-2 rounded-xl bg-surface-section p-3 text-sm"><input type="checkbox" name="saveToBank" />Guardar también en el banco de preguntas</label>
-          <Button className="w-full" disabled={mutation.isPending}>Guardar pregunta</Button>
+          {type === "TRUE_FALSE" ? <div><Label>{uiText("Respuesta correcta")}</Label><Select name="correct" defaultValue="0"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="0">{uiText("Verdadero")}</SelectItem><SelectItem value="1">{uiText("Falso")}</SelectItem></SelectContent></Select></div> : null}
+          <div><Label htmlFor="question-explanation">{uiText("Explicación posterior")}</Label><Input id="question-explanation" name="explanation" /></div>
+          <div><Label>{uiText("Etiquetas")}</Label><Input name="tags" placeholder={uiText("procedimiento, prevención")} /></div>
+          {type === "TEXT" ? <div><Label>{uiText("Rúbrica de calificación")}</Label><Input name="rubric" required placeholder={uiText("Criterios observables y puntaje esperado")} /></div> : null}
+          <label className="flex items-center gap-2 rounded-xl bg-surface-section p-3 text-sm"><input type="checkbox" name="saveToBank" />{uiText("Guardar también en el banco de preguntas")}</label>
+          <Button className="w-full" disabled={mutation.isPending}>{uiText("Guardar pregunta")}</Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -462,6 +465,7 @@ function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null;
 }
 
 function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; onClose: () => void }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const query = useQuery({
@@ -482,8 +486,8 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto [&>button:last-child]:sticky [&>button:last-child]:bottom-0 [&>button:last-child]:z-10 [&>button:last-child]:bg-card [&>button:last-child]:py-3">
-        <DialogHeader><DialogTitle>Banco de preguntas</DialogTitle><DialogDescription>Selecciona preguntas validadas para copiarlas a {quiz?.title}.</DialogDescription></DialogHeader>
-        {query.isLoading ? <SkeletonRows rows={4} label="Cargando el banco de preguntas" /> : null}
+        <DialogHeader><DialogTitle>{uiText("Banco de preguntas")}</DialogTitle><DialogDescription>{uiText("Selecciona preguntas validadas para copiarlas a ")}{quiz?.title}.</DialogDescription></DialogHeader>
+        {query.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando el banco de preguntas")} /> : null}
         {query.data?.items.length ? <div className="space-y-2">
           {query.data.items.map((item) => (
             <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-default p-3">
@@ -493,17 +497,18 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
                 checked={selected.includes(item.id)}
                 onChange={(event) => setSelected(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
               />
-              <span className="min-w-0"><span className="block font-medium">{item.prompt}</span><span className="text-xs text-text-secondary">{item.category || "Sin categoría"} · dificultad {questionDifficultyLabel(item.difficulty).toLocaleLowerCase("es")} · {item.points} pts</span></span>
+              <span className="min-w-0"><span className="block font-medium">{item.prompt}</span><span className="text-xs text-text-secondary">{item.category || "Sin categoría"} {uiText(" · dificultad ")}{questionDifficultyLabel(item.difficulty).toLocaleLowerCase("es")} · {item.points} pts</span></span>
             </label>
           ))}
-        </div> : query.isSuccess ? <EmptyState reason="no-records" title="El banco de preguntas está vacío" description="Al crear una pregunta, marca «Guardar también en el banco» para poder reutilizarla en otras evaluaciones." /> : null}
-        <Button disabled={!selected.length || mutation.isPending} onClick={() => mutation.mutate()}>Importar {selected.length || ""} preguntas</Button>
+        </div> : query.isSuccess ? <EmptyState reason="no-records" title={uiText("El banco de preguntas está vacío")} description={uiText("Al crear una pregunta, marca «Guardar también en el banco» para poder reutilizarla en otras evaluaciones.")} /> : null}
+        <Button disabled={!selected.length || mutation.isPending} onClick={() => mutation.mutate()}>{uiText("Importar ")}{selected.length || ""} {uiText(" preguntas")}</Button>
       </DialogContent>
     </Dialog>
   );
 }
 
 function LearnerAssessments() {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   // El reproductor del curso enlaza aquí con `?courseId=`: la evaluación de
   // ese curso va primero y resaltada, para no tener que buscarla en la lista.
@@ -539,16 +544,17 @@ function LearnerAssessments() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Aprendizaje" title="Mis evaluaciones" description="Completa tus evaluaciones pendientes y consulta claramente el resultado de cada intento." />
-      {query.isLoading ? <SkeletonRows rows={4} label="Cargando tus evaluaciones" /> : null}
+      <PageHeader eyebrow={uiText("Aprendizaje")} title={uiText("Mis evaluaciones")} description={uiText("Completa tus evaluaciones pendientes y consulta claramente el resultado de cada intento.")} />
+      {query.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando tus evaluaciones")} /> : null}
       {query.data?.length ? <LearnerAssessmentSummary quizzes={query.data} /> : null}
-      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; const focused = Boolean(focusCourseId) && quiz.courseId === focusCourseId; return <Card key={quiz.id} className={focused ? "border-accent-line ring-2 ring-accent-fill/30" : undefined}>{focused ? <p className="px-6 pt-4 text-2xs font-semibold uppercase tracking-[0.14em] text-accent-ink">Evaluación de {quiz.courseTitle}</p> : null}<CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}% para aprobar</Badge><Badge variant="secondary">{quiz.questionsCount} preguntas</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">Último resultado: <strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">Retroalimentación: {quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : "Comenzar evaluación"}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyState reason="no-records" title="No tienes evaluaciones pendientes" description="Cuando un curso asignado incluya una evaluación, aparecerá aquí." /> : null}
+      {query.data?.length ? <div className="grid gap-4 md:grid-cols-2">{query.data.map((quiz) => { const inProgress = quiz.latestAttempt?.status === "IN_PROGRESS"; const pending = start.isPending || resume.isPending; const focused = Boolean(focusCourseId) && quiz.courseId === focusCourseId; return <Card key={quiz.id} className={focused ? "border-accent-line ring-2 ring-accent-fill/30" : undefined}>{focused ? <p className="px-6 pt-4 text-2xs font-semibold uppercase tracking-[0.14em] text-accent-ink">{uiText("Evaluación de ")}{quiz.courseTitle}</p> : null}<CardHeader><div className="flex items-start justify-between gap-3"><CardTitle>{quiz.title}</CardTitle><LearnerAttemptBadge attempt={quiz.latestAttempt} /></div><p className="mt-1 text-sm text-muted-foreground">{quiz.description || "Completa esta evaluación para demostrar tu aprendizaje."}</p></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2"><Badge>{quiz.passingScore}{uiText("% para aprobar")}</Badge><Badge variant="secondary">{quiz.questionsCount} {uiText(" preguntas")}</Badge>{quiz.timeLimitMinutes ? <Badge variant="secondary">{quiz.timeLimitMinutes} min</Badge> : null}</div>{quiz.latestAttempt?.score != null ? <p className="rounded-xl bg-surface-section p-3 text-sm">{uiText("Último resultado: ")}<strong>{quiz.latestAttempt.score}%</strong>{quiz.latestAttempt.passed ? " · Aprobada" : " · No aprobada"}</p> : null}{quiz.latestAttempt?.feedback ? <p className="text-sm text-muted-foreground">{uiText("Retroalimentación: ")}{quiz.latestAttempt.feedback}</p> : null}<Button className="w-full" onClick={() => inProgress ? resume.mutate(quiz) : start.mutate(quiz.id)} disabled={pending}><ClipboardCheck />{inProgress ? "Continuar evaluación" : uiText("Comenzar evaluación")}</Button></CardContent></Card>; })}</div> : query.isSuccess ? <EmptyState reason="no-records" title={uiText("No tienes evaluaciones pendientes")} description={uiText("Cuando un curso asignado incluya una evaluación, aparecerá aquí.")} /> : null}
       <AssessmentPlayer key={attempt?.id ?? "no-attempt"} attempt={attempt} onClose={() => setAttempt(null)} onSubmitted={() => queryClient.invalidateQueries({ queryKey: ["learner-assessments"] })} />
     </div>
   );
 }
 
 function LearnerAssessmentSummary({ quizzes }: { quizzes: Array<{ latestAttempt?: TrainingQuizAttemptDto | null }> }) {
+  const uiText = useUiText();
   const completed = quizzes.filter((quiz) => quiz.latestAttempt?.status === "GRADED").length;
   const pending = quizzes.filter((quiz) => quiz.latestAttempt?.status === "PENDING_REVIEW" || quiz.latestAttempt?.status === "SUBMITTED").length;
   const passed = quizzes.filter((quiz) => quiz.latestAttempt?.passed).length;
@@ -557,13 +563,13 @@ function LearnerAssessmentSummary({ quizzes }: { quizzes: Array<{ latestAttempt?
     <section aria-labelledby="learner-assessment-summary" className="rounded-2xl border border-border-default bg-surface-section p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 id="learner-assessment-summary" className="font-semibold">Tu avance en evaluaciones</h2>
-          <p className="text-sm text-muted-foreground">Consulta tu último intento antes de volver a empezar.</p>
+          <h2 id="learner-assessment-summary" className="font-semibold">{uiText("Tu avance en evaluaciones")}</h2>
+          <p className="text-sm text-muted-foreground">{uiText("Consulta tu último intento antes de volver a empezar.")}</p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-sm">
-          <SummaryValue label="Aprobadas" value={passed} />
-          <SummaryValue label="Revisadas" value={completed} />
-          <SummaryValue label="En revisión" value={pending} />
+          <SummaryValue label={uiText("Aprobadas")} value={passed} />
+          <SummaryValue label={uiText("Revisadas")} value={completed} />
+          <SummaryValue label={uiText("En revisión")} value={pending} />
         </div>
       </div>
     </section>
@@ -638,6 +644,7 @@ function mapRecoveredAttempt(recovered: TrainingQuizAttemptRecoveryDto, quiz: Le
 }
 
 function AssessmentPlayer({ attempt, onClose, onSubmitted }: { attempt: AssessmentPlayerAttempt | null; onClose: () => void; onSubmitted?: () => void }) {
+  const uiText = useUiText();
   const [answers, setAnswers] = useState<Record<string, string | string[]>>(() => getInitialAnswers(attempt));
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const submitLock = useRef(false);
@@ -701,8 +708,8 @@ function AssessmentPlayer({ attempt, onClose, onSubmitted }: { attempt: Assessme
   return (
     <Dialog open={Boolean(attempt)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader><DialogTitle>{attempt?.quiz.title}</DialogTitle><DialogDescription>Responde todas las preguntas antes de enviar. El envío es definitivo.</DialogDescription></DialogHeader>
-        {remainingSeconds !== null ? <div className={`sticky top-0 z-10 rounded-xl border p-3 text-sm ${remainingSeconds <= 60 ? "border-status-danger/40 bg-status-danger/10 text-status-danger" : "bg-surface-section"}`} role="timer" aria-live="polite"><strong>Tiempo restante:</strong> {formatTrainingRemainingTime(remainingSeconds)}{remainingSeconds === 0 ? " · El intento expiró" : ""}</div> : null}
+        <DialogHeader><DialogTitle>{attempt?.quiz.title}</DialogTitle><DialogDescription>{uiText("Responde todas las preguntas antes de enviar. El envío es definitivo.")}</DialogDescription></DialogHeader>
+        {remainingSeconds !== null ? <div className={`sticky top-0 z-10 rounded-xl border p-3 text-sm ${remainingSeconds <= 60 ? "border-status-danger/40 bg-status-danger/10 text-status-danger" : "bg-surface-section"}`} role="timer" aria-live="polite"><strong>{uiText("Tiempo restante:")}</strong> {formatTrainingRemainingTime(remainingSeconds)}{remainingSeconds === 0 ? " · El intento expiró" : ""}</div> : null}
         <div className="space-y-5">
           {attempt?.quiz.questions.map((question, index) => (
             <fieldset key={question.id} className="rounded-xl border p-4">
@@ -712,7 +719,7 @@ function AssessmentPlayer({ attempt, onClose, onSubmitted }: { attempt: Assessme
               </div>
             </fieldset>
           ))}
-          <Button className="w-full" disabled={submit.isPending || saveAnswer.isPending || remainingSeconds === 0 || attempt?.quiz.questions.some((question) => !isAnswered(question.id))} onClick={handleSubmit}>{submit.isPending ? "Enviando…" : remainingSeconds === 0 ? "Intento expirado" : "Enviar evaluación"}</Button>
+          <Button className="w-full" disabled={submit.isPending || saveAnswer.isPending || remainingSeconds === 0 || attempt?.quiz.questions.some((question) => !isAnswered(question.id))} onClick={handleSubmit}>{submit.isPending ? uiText("Enviando…") : remainingSeconds === 0 ? "Intento expirado" : "Enviar evaluación"}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -728,6 +735,7 @@ function getInitialAnswers(attempt: AssessmentPlayerAttempt | null) {
 
 
 export function TrainingResults() {
+  const uiText = useUiText();
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["training-assessment-results", page], queryFn: () => fetchTrainingAssessmentResults(page) });
@@ -741,8 +749,8 @@ export function TrainingResults() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Aprendizaje" title="Resultados" description="Supervisa intentos, calificaciones y revisiones pendientes." />
-      {query.isLoading ? <SkeletonRows rows={5} label="Cargando los resultados" /> : null}
+      <PageHeader eyebrow={uiText("Aprendizaje")} title={uiText("Resultados")} description={uiText("Supervisa intentos, calificaciones y revisiones pendientes.")} />
+      {query.isLoading ? <SkeletonRows rows={5} label={uiText("Cargando los resultados")} /> : null}
       {query.data ? <ResultsSummary items={query.data.items} total={query.data.total} /> : null}
       {query.data?.items.length ? (
         <div className="grid gap-3">
@@ -752,38 +760,39 @@ export function TrainingResults() {
                 <div className="min-w-0">
                   <strong className="block truncate">{attempt.quiz?.title ?? "Evaluación"}</strong>
                   <p className="text-sm text-muted-foreground">
-                    {attempt.user ? `${attempt.user.firstName} ${attempt.user.lastName}` : "Participante"} · {new Date(attempt.startedAt).toLocaleDateString("es")}
+                    {attempt.user ? `${attempt.user.firstName} ${attempt.user.lastName}` : "Participante"} · {new Date(attempt.startedAt).toLocaleDateString(uiText.locale)}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <ResultStatusBadge attempt={attempt} />
-                  {attempt.status === "PENDING_REVIEW" ? <Button onClick={() => grade.mutate(attempt)} disabled={grade.isPending}>Revisar y publicar</Button> : null}
+                  {attempt.status === "PENDING_REVIEW" ? <Button onClick={() => grade.mutate(attempt)} disabled={grade.isPending}>{uiText("Revisar y publicar")}</Button> : null}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-      ) : query.isSuccess ? <EmptyState reason="no-records" title="Aún no hay intentos" description="Los resultados aparecerán aquí en cuanto alguien rinda una evaluación." /> : null}
+      ) : query.isSuccess ? <EmptyState reason="no-records" title={uiText("Aún no hay intentos")} description={uiText("Los resultados aparecerán aquí en cuanto alguien rinda una evaluación.")} /> : null}
       {query.data ? <Pagination page={query.data.page - 1} totalItems={query.data.total} pageSize={query.data.pageSize} onPageChange={(nextPage) => setPage(nextPage + 1)} /> : null}
     </div>
   );
 }
 
 function ResultsSummary({ items, total }: { items: TrainingQuizAttemptDto[]; total: number }) {
+  const uiText = useUiText();
   const pending = items.filter((attempt) => attempt.status === "PENDING_REVIEW").length;
   const graded = items.filter((attempt) => attempt.status === "GRADED").length;
   const passed = items.filter((attempt) => attempt.passed).length;
   return (
     <section aria-labelledby="results-summary-title" className="space-y-3">
       <div>
-        <h2 id="results-summary-title" className="text-lg font-semibold">Resumen de resultados</h2>
-        <p className="text-sm text-muted-foreground">{total} intentos en total · estados calculados para esta página.</p>
+        <h2 id="results-summary-title" className="text-lg font-semibold">{uiText("Resumen de resultados")}</h2>
+        <p className="text-sm text-muted-foreground">{total} {uiText(" intentos en total · estados calculados para esta página.")}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ResultMetric label="Intentos totales" value={total} />
-        <ResultMetric label="Revisión pendiente" value={pending} tone="warning" />
-        <ResultMetric label="Calificados" value={graded} />
-        <ResultMetric label="Aprobados" value={passed} tone="success" />
+        <ResultMetric label={uiText("Intentos totales")} value={total} />
+        <ResultMetric label={uiText("Revisión pendiente")} value={pending} tone="warning" />
+        <ResultMetric label={uiText("Calificados")} value={graded} />
+        <ResultMetric label={uiText("Aprobados")} value={passed} tone="success" />
       </div>
     </section>
   );
@@ -794,13 +803,15 @@ function ResultMetric({ label, value, tone = "normal" }: { label: string; value:
 }
 
 function ResultStatusBadge({ attempt }: { attempt: TrainingQuizAttemptDto }) {
-  if (attempt.status === "PENDING_REVIEW") return <Badge variant="secondary">Revisión pendiente</Badge>;
-  if (attempt.status === "GRADED") return <Badge variant={attempt.passed ? "success" : "destructive"}>{attempt.passed ? "Aprobado" : "No aprobado"} · {attempt.score ?? 0}%</Badge>;
-  if (attempt.status === "SUBMITTED") return <Badge variant="secondary">Enviado</Badge>;
-  return <Badge>En curso</Badge>;
+  const uiText = useUiText();
+  if (attempt.status === "PENDING_REVIEW") return <Badge variant="secondary">{uiText("Revisión pendiente")}</Badge>;
+  if (attempt.status === "GRADED") return <Badge variant={attempt.passed ? "success" : "destructive"}>{attempt.passed ? uiText("Aprobado") : "No aprobado"} · {attempt.score ?? 0}%</Badge>;
+  if (attempt.status === "SUBMITTED") return <Badge variant="secondary">{uiText("Enviado")}</Badge>;
+  return <Badge>{uiText("En curso")}</Badge>;
 }
 
 export function TrainingCertificates() {
+  const uiText = useUiText();
   const { can } = useAppStore();
   const admin = can("certificates.issue");
   const queryClient = useQueryClient();
@@ -817,8 +828,8 @@ export function TrainingCertificates() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Aprendizaje" title="Certificados" description="Consulta credenciales verificables, evidencia, vigencia y cadena de renovación." />
-      {query.isLoading ? <SkeletonRows rows={4} label="Cargando los certificados" /> : null}
+      <PageHeader eyebrow={uiText("Aprendizaje")} title={uiText("Certificados")} description={uiText("Consulta credenciales verificables, evidencia, vigencia y cadena de renovación.")} />
+      {query.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando los certificados")} /> : null}
       {query.data ? <CertificateSummary certificates={query.data.items} admin={admin} /> : null}
       {query.data?.items.length ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -835,28 +846,29 @@ export function TrainingCertificates() {
                   <CardTitle>{certificate.course?.title ?? certificate.curriculum?.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{certificate.user ? `${certificate.user.firstName} ${certificate.user.lastName}` : `Emitido ${new Date(certificate.issuedAt).toLocaleDateString("es")}`}</p>
+                  <p className="text-sm text-muted-foreground">{certificate.user ? `${certificate.user.firstName} ${certificate.user.lastName}` : `Emitido ${new Date(certificate.issuedAt).toLocaleDateString(uiText.locale)}`}</p>
                   <div className="grid gap-2 rounded-xl bg-surface-section p-3 text-sm">
-                    <span><strong>Número:</strong> {certificate.certificateNumber}</span>
-                    <span><strong>Emisión:</strong> {new Date(certificate.issuedAt).toLocaleDateString("es")}</span>
-                    <span><strong>Vigencia:</strong> {certificate.expiresAt ? new Date(certificate.expiresAt).toLocaleDateString("es") : "Sin vencimiento"}</span>
-                    {certificate.renewedFrom ? <span><strong>Renueva:</strong> {certificate.renewedFrom.certificateNumber}</span> : null}
+                    <span><strong>{uiText("Número:")}</strong> {certificate.certificateNumber}</span>
+                    <span><strong>{uiText("Emisión:")}</strong> {new Date(certificate.issuedAt).toLocaleDateString(uiText.locale)}</span>
+                    <span><strong>{uiText("Vigencia:")}</strong> {certificate.expiresAt ? new Date(certificate.expiresAt).toLocaleDateString(uiText.locale) : uiText("Sin vencimiento")}</span>
+                    {certificate.renewedFrom ? <span><strong>{uiText("Renueva:")}</strong> {certificate.renewedFrom.certificateNumber}</span> : null}
                   </div>
                   <div className="flex items-center gap-2 rounded-lg bg-muted p-3 font-mono text-sm"><ShieldCheck className="size-4" />{certificate.verificationCode}</div>
-                  {admin && certificate.renewalEligible ? <Button className="w-full" onClick={() => renew.mutate(certificate)} disabled={renew.isPending}><Award />Renovar certificado</Button> : null}
-                  <Button asChild variant="secondary" className="w-full"><Link href={`/certificates/verify/${encodeURIComponent(certificate.verificationCode)}`}><CheckCircle2 />Verificar credencial</Link></Button>
-                  {admin && status === "VALID" ? <Button variant="destructive" className="w-full" onClick={() => revoke.mutate(certificate)}>Revocar certificado</Button> : null}
+                  {admin && certificate.renewalEligible ? <Button className="w-full" onClick={() => renew.mutate(certificate)} disabled={renew.isPending}><Award />{uiText("Renovar certificado")}</Button> : null}
+                  <Button asChild variant="secondary" className="w-full"><Link href={`/certificates/verify/${encodeURIComponent(certificate.verificationCode)}`}><CheckCircle2 />{uiText("Verificar credencial")}</Link></Button>
+                  {admin && status === "VALID" ? <Button variant="destructive" className="w-full" onClick={() => revoke.mutate(certificate)}>{uiText("Revocar certificado")}</Button> : null}
                 </CardContent>
               </Card>
             );
           })}
         </div>
-      ) : query.isSuccess ? <EmptyState reason="no-records" title="Aún no hay certificados" description="Al aprobar un curso que los emite, el certificado aparecerá aquí." /> : null}
+      ) : query.isSuccess ? <EmptyState reason="no-records" title={uiText("Aún no hay certificados")} description={uiText("Al aprobar un curso que los emite, el certificado aparecerá aquí.")} /> : null}
     </div>
   );
 }
 
 function CertificateSummary({ certificates, admin }: { certificates: TrainingCertificateDto[]; admin: boolean }) {
+  const uiText = useUiText();
   const valid = certificates.filter((certificate) => (certificate.status ?? (certificate.revokedAt ? "REVOKED" : "VALID")) === "VALID").length;
   const expired = certificates.filter((certificate) => certificate.status === "EXPIRED").length;
   const revoked = certificates.filter((certificate) => certificate.status === "REVOKED" || certificate.revokedAt).length;
@@ -864,13 +876,13 @@ function CertificateSummary({ certificates, admin }: { certificates: TrainingCer
   return (
     <section aria-labelledby="certificate-summary-title" className="space-y-3">
       <div>
-        <h2 id="certificate-summary-title" className="text-lg font-semibold">Estado de credenciales</h2>
+        <h2 id="certificate-summary-title" className="text-lg font-semibold">{uiText("Estado de credenciales")}</h2>
         <p className="text-sm text-muted-foreground">{admin ? "Prioriza las credenciales que requieren gestión administrativa." : "Consulta rápidamente qué credenciales siguen vigentes."}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <CertificateMetric label="Vigentes" value={valid} tone="success" />
-        <CertificateMetric label="Vencidos" value={expired} tone={expired ? "warning" : "normal"} />
-        <CertificateMetric label="Revocados" value={revoked} tone={revoked ? "danger" : "normal"} />
+        <CertificateMetric label={uiText("Vigentes")} value={valid} tone="success" />
+        <CertificateMetric label={uiText("Vencidos")} value={expired} tone={expired ? "warning" : "normal"} />
+        <CertificateMetric label={uiText("Revocados")} value={revoked} tone={revoked ? "danger" : "normal"} />
         <CertificateMetric label={admin ? "Renovables" : "Para renovar"} value={renewable} />
       </div>
     </section>

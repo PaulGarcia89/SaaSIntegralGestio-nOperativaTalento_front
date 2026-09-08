@@ -1,5 +1,10 @@
+"use client";
+
+import { useUiText } from "@/components/ui-copy";
+
 import { InventoryWorkspace } from "@/components/inventory-workspace";
 
 export default function InventoryAssetsEntry() {
-  return <InventoryWorkspace title="Inventario de activos" />;
+  const uiText = useUiText();
+  return <InventoryWorkspace title={uiText("Inventario de activos")} />;
 }

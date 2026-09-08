@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Wrench } from "lucide-react";
@@ -64,6 +66,7 @@ type Ticket = Awaited<ReturnType<typeof fetchInventoryMaintenance>>[number];
  * El contrato del backend no cambia.
  */
 export default function InventoryMaintenancePage() {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const requestedAssetId = searchParams.get("assetId") ?? "";
@@ -162,61 +165,58 @@ export default function InventoryMaintenancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Ciclo de vida"
-        title="Mantenimiento de activos"
-        description="Trabajos preventivos y correctivos, con su coste y su fecha objetivo."
-        meta={openTickets.length ? <span>{openTickets.length} sin cerrar</span> : null}
+        eyebrow={uiText("Ciclo de vida")}
+        title={uiText("Mantenimiento de activos")}
+        description={uiText("Trabajos preventivos y correctivos, con su coste y su fecha objetivo.")}
+        meta={openTickets.length ? <span>{openTickets.length} {uiText(" sin cerrar")}</span> : null}
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="size-4" aria-hidden="true" />
-            Registrar mantenimiento
-          </Button>
+            {uiText("Registrar mantenimiento")}</Button>
         }
       />
 
       {resolve.error ? (
-        <InlineNote tone="danger" title="No se pudo cerrar el mantenimiento">
+        <InlineNote tone="danger" title={uiText("No se pudo cerrar el mantenimiento")}>
           {getApiErrorMessage(resolve.error, "El servidor rechazó la operación.")}
         </InlineNote>
       ) : null}
 
       {tickets.isLoading ? (
-        <SkeletonRows rows={4} label="Cargando los mantenimientos" />
+        <SkeletonRows rows={4} label={uiText("Cargando los mantenimientos")} />
       ) : tickets.isError ? (
         <ErrorState
-          title="No fue posible cargar los mantenimientos"
-          detail={getApiErrorMessage(tickets.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar los mantenimientos")}
+          detail={getApiErrorMessage(tickets.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void tickets.refetch()}
         />
       ) : !tickets.data?.length ? (
         <EmptyState
           reason="no-records"
-          title="No hay mantenimientos registrados"
-          description="Registra uno cuando un activo necesite revisión, reparación o calibración."
+          title={uiText("No hay mantenimientos registrados")}
+          description={uiText("Registra uno cuando un activo necesite revisión, reparación o calibración.")}
           action={
             <Button onClick={() => setOpen(true)}>
               <Plus className="size-4" aria-hidden="true" />
-              Registrar el primero
-            </Button>
+              {uiText("Registrar el primero")}</Button>
           }
         />
       ) : (
         <>
           <PageSection
-            title="Sin cerrar"
-            description="Trabajos que todavía mantienen un activo fuera de servicio."
+            title={uiText("Sin cerrar")}
+            description={uiText("Trabajos que todavía mantienen un activo fuera de servicio.")}
           >
             {openTickets.length ? (
               <TicketList tickets={openTickets} onResolve={openResolve} />
             ) : (
-              <InlineNote tone="success" title="Nada pendiente">
-                Todos los mantenimientos registrados están cerrados.
-              </InlineNote>
+              <InlineNote tone="success" title={uiText("Nada pendiente")}>
+                {uiText("Todos los mantenimientos registrados están cerrados.")}</InlineNote>
             )}
           </PageSection>
 
           {closedTickets.length ? (
-            <PageSection title="Cerrados" description="Historial de los trabajos ya resueltos.">
+            <PageSection title={uiText("Cerrados")} description={uiText("Historial de los trabajos ya resueltos.")}>
               <TicketList tickets={closedTickets} />
             </PageSection>
           ) : null}
@@ -237,15 +237,14 @@ export default function InventoryMaintenancePage() {
       <Dialog open={Boolean(resolving)} onOpenChange={(next) => !next && closeResolve()}>
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Cerrar el mantenimiento</DialogTitle>
+            <DialogTitle>{uiText("Cerrar el mantenimiento")}</DialogTitle>
             <DialogDescription>
-              Registra cómo terminó el trabajo antes de darlo por resuelto.
-            </DialogDescription>
+              {uiText("Registra cómo terminó el trabajo antes de darlo por resuelto.")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="maintenance-cost">Coste real</Label>
+              <Label htmlFor="maintenance-cost">{uiText("Coste real")}</Label>
               <Input
                 id="maintenance-cost"
                 type="number"
@@ -253,16 +252,16 @@ export default function InventoryMaintenancePage() {
                 step="0.01"
                 inputMode="decimal"
                 value={cost}
-                placeholder="Opcional"
+                placeholder={uiText("Opcional")}
                 onChange={(event) => setCost(event.target.value)}
               />
             </div>
             <div>
-              <Label htmlFor="maintenance-notes">Qué se hizo</Label>
+              <Label htmlFor="maintenance-notes">{uiText("Qué se hizo")}</Label>
               <Input
                 id="maintenance-notes"
                 value={notes}
-                placeholder="Opcional"
+                placeholder={uiText("Opcional")}
                 onChange={(event) => setNotes(event.target.value)}
               />
             </div>
@@ -285,6 +284,7 @@ export default function InventoryMaintenancePage() {
 }
 
 function TicketList({ tickets, onResolve }: { tickets: Ticket[]; onResolve?: (ticket: Ticket) => void }) {
+  const uiText = useUiText();
   return (
     <ul className="divide-y divide-line">
       {tickets.map((ticket) => (
@@ -310,8 +310,7 @@ function TicketList({ tickets, onResolve }: { tickets: Ticket[]; onResolve?: (ti
             />
             {onResolve ? (
               <Button size="sm" variant="secondary" onClick={() => onResolve(ticket)}>
-                Cerrar
-              </Button>
+                {uiText("Cerrar")}</Button>
             ) : null}
           </div>
         </li>
@@ -333,6 +332,7 @@ function MaintenanceDialog({
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }) {
+  const uiText = useUiText();
   const [values, setValues] = useState<Record<string, string>>({
     type: "CORRECTIVE",
     assetId: initialAssetId ?? "",
@@ -363,7 +363,7 @@ function MaintenanceDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Registrar un mantenimiento</DialogTitle>
+          <DialogTitle>{uiText("Registrar un mantenimiento")}</DialogTitle>
           <DialogDescription>
             {asset
               ? `Sobre ${asset.item.name} (${asset.assetTag}). El activo quedará marcado como en mantenimiento.`
@@ -373,10 +373,10 @@ function MaintenanceDialog({
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="maintenance-asset">Activo</Label>
+            <Label htmlFor="maintenance-asset">{uiText("Activo")}</Label>
             <Select value={values.assetId} onValueChange={(value) => set("assetId", value)}>
               <SelectTrigger id="maintenance-asset">
-                <SelectValue placeholder="Seleccionar" />
+                <SelectValue placeholder={uiText("Seleccionar")} />
               </SelectTrigger>
               <SelectContent>
                 {assets.map((item) => (
@@ -389,11 +389,11 @@ function MaintenanceDialog({
           </div>
 
           <div>
-            <Label htmlFor="maintenance-title">Título del trabajo</Label>
+            <Label htmlFor="maintenance-title">{uiText("Título del trabajo")}</Label>
             <Input
               id="maintenance-title"
               value={values.title ?? ""}
-              placeholder="Cambio de batería"
+              placeholder={uiText("Cambio de batería")}
               onChange={(event) => set("title", event.target.value)}
             />
           </div>
@@ -401,7 +401,7 @@ function MaintenanceDialog({
           {/* Lista cerrada: el campo era texto libre y guardaba «CORRECTIVO»
               donde el backend espera «CORRECTIVE». */}
           <div>
-            <Label htmlFor="maintenance-type">Tipo</Label>
+            <Label htmlFor="maintenance-type">{uiText("Tipo")}</Label>
             <Select value={values.type} onValueChange={(value) => set("type", value)}>
               <SelectTrigger id="maintenance-type">
                 <SelectValue />
@@ -418,7 +418,7 @@ function MaintenanceDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="maintenance-due">Fecha objetivo</Label>
+              <Label htmlFor="maintenance-due">{uiText("Fecha objetivo")}</Label>
               <Input
                 id="maintenance-due"
                 type="date"
@@ -427,7 +427,7 @@ function MaintenanceDialog({
               />
             </div>
             <div>
-              <Label htmlFor="maintenance-estimate">Coste estimado</Label>
+              <Label htmlFor="maintenance-estimate">{uiText("Coste estimado")}</Label>
               <Input
                 id="maintenance-estimate"
                 type="number"
@@ -441,34 +441,34 @@ function MaintenanceDialog({
           </div>
 
           <div>
-            <Label htmlFor="maintenance-vendor">Proveedor</Label>
+            <Label htmlFor="maintenance-vendor">{uiText("Proveedor")}</Label>
             <Input
               id="maintenance-vendor"
               value={values.vendor ?? ""}
-              placeholder="Opcional"
+              placeholder={uiText("Opcional")}
               onChange={(event) => set("vendor", event.target.value)}
             />
           </div>
 
           <div>
-            <Label htmlFor="maintenance-description">Descripción</Label>
+            <Label htmlFor="maintenance-description">{uiText("Descripción")}</Label>
             <Input
               id="maintenance-description"
               value={values.description ?? ""}
-              placeholder="Opcional"
+              placeholder={uiText("Opcional")}
               onChange={(event) => set("description", event.target.value)}
             />
           </div>
 
           {mutation.isError ? (
-            <InlineNote tone="danger" title="No se pudo registrar">
+            <InlineNote tone="danger" title={uiText("No se pudo registrar")}>
               {getApiErrorMessage(mutation.error, "El servidor rechazó el mantenimiento.")}
             </InlineNote>
           ) : null}
 
           {missing.length ? (
             <p className="text-sm text-ink-2">
-              Falta {missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
+              {uiText("Falta")}{missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
             </p>
           ) : null}
 
@@ -476,12 +476,11 @@ function MaintenanceDialog({
             className="w-full"
             disabled={missing.length > 0}
             loading={mutation.isPending}
-            loadingLabel="Registrando…"
+            loadingLabel={uiText("Registrando…")}
             onClick={() => mutation.mutate()}
           >
             <Wrench className="size-4" aria-hidden="true" />
-            Registrar mantenimiento
-          </Button>
+            {uiText("Registrar mantenimiento")}</Button>
         </div>
       </DialogContent>
     </Dialog>

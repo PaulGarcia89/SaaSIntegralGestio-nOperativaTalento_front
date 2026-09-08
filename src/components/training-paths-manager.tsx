@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +60,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  */
 
 export function TrainingPathsManager() {
+  const uiText = useUiText();
   const searchParams = useSearchParams();
   const requestedFlowId = searchParams.get("flowId") ?? "";
   const requestedTemplateId = searchParams.get("templateId") ?? "";
@@ -123,19 +126,18 @@ export function TrainingPathsManager() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Aprendizaje"
-        title="Rutas y automatización"
-        description="Ordena cursos con prerrequisitos y asigna formación automáticamente desde la incorporación."
+        eyebrow={uiText("Aprendizaje")}
+        title={uiText("Rutas y automatización")}
+        description={uiText("Ordena cursos con prerrequisitos y asigna formación automáticamente desde la incorporación.")}
         actions={
           <Button onClick={() => setDialog("path")}>
             <Plus className="size-4" aria-hidden="true" />
-            Nueva ruta
-          </Button>
+            {uiText("Nueva ruta")}</Button>
         }
       />
 
       {requestedFlowId ? (
-        <InlineNote tone="info" title="Incorporación preseleccionada">
+        <InlineNote tone="info" title={uiText("Incorporación preseleccionada")}>
           {preselectedTemplate
             ? `La regla que crees quedará ligada a la plantilla «${preselectedTemplate.name}» (versión ${preselectedTemplate.version}).`
             : "La regla que crees quedará ligada a la plantilla de incorporación desde la que llegaste."}
@@ -143,24 +145,23 @@ export function TrainingPathsManager() {
       ) : null}
 
       {paths.isLoading ? (
-        <SkeletonRows rows={5} label="Cargando las rutas formativas" />
+        <SkeletonRows rows={5} label={uiText("Cargando las rutas formativas")} />
       ) : paths.isError ? (
         <ErrorState
-          title="No fue posible cargar las rutas"
-          detail={getApiErrorMessage(paths.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar las rutas")}
+          detail={getApiErrorMessage(paths.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void paths.refetch()}
         />
       ) : !paths.data?.length ? (
         <>
           <EmptyState
             reason="no-records"
-            title="Todavía no hay rutas de aprendizaje"
-            description="Una ruta ordena varios cursos publicados con sus prerrequisitos, para que cada persona los haga en el orden correcto."
+            title={uiText("Todavía no hay rutas de aprendizaje")}
+            description={uiText("Una ruta ordena varios cursos publicados con sus prerrequisitos, para que cada persona los haga en el orden correcto.")}
             action={
               <Button onClick={() => setDialog("path")}>
                 <Plus className="size-4" aria-hidden="true" />
-                Crear la primera ruta
-              </Button>
+                {uiText("Crear la primera ruta")}</Button>
             }
           />
           {rulesPanel}
@@ -171,7 +172,7 @@ export function TrainingPathsManager() {
 
           {selected ? (
             <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-              <PageSection title="Rutas disponibles">
+              <PageSection title={uiText("Rutas disponibles")}>
                 <ul className="space-y-2">
                   {paths.data.map((path) => {
                     const active = path.id === selected.id;
@@ -192,7 +193,7 @@ export function TrainingPathsManager() {
                               <p className="truncate font-medium text-ink-1">{path.title}</p>
                               <p className="font-mono text-2xs text-ink-3 tabular-figures">
                                 {path.pathCourses.length}{" "}
-                                {path.pathCourses.length === 1 ? "curso" : "cursos"} ·{" "}
+                                {path.pathCourses.length === 1 ? "curso" : uiText("cursos")} ·{" "}
                                 {path._count.assignments}{" "}
                                 {path._count.assignments === 1 ? "asignación" : "asignaciones"}
                               </p>
@@ -200,7 +201,7 @@ export function TrainingPathsManager() {
                             <StatusBadge
                               size="sm"
                               tone={path.isPublished ? "success" : "neutral"}
-                              label={path.isPublished ? "Publicada" : "Borrador"}
+                              label={path.isPublished ? "Publicada" : uiText("Borrador")}
                             />
                           </div>
                         </button>
@@ -218,12 +219,11 @@ export function TrainingPathsManager() {
                   actions={
                     <Button size="sm" onClick={() => setDialog("course")}>
                       <Plus className="size-4" aria-hidden="true" />
-                      Agregar curso
-                    </Button>
+                      {uiText("Agregar curso")}</Button>
                   }
                 >
                   {removeCourse.error ? (
-                    <InlineNote tone="danger" title="No se pudo quitar el curso">
+                    <InlineNote tone="danger" title={uiText("No se pudo quitar el curso")}>
                       {getApiErrorMessage(removeCourse.error, "El servidor rechazó la operación.")}
                     </InlineNote>
                   ) : null}
@@ -231,12 +231,11 @@ export function TrainingPathsManager() {
                   {!selected.pathCourses.length ? (
                     <EmptyState
                       reason="no-records"
-                      title="Esta ruta todavía está vacía"
-                      description="Agrega el primer curso publicado para definir por dónde empieza."
+                      title={uiText("Esta ruta todavía está vacía")}
+                      description={uiText("Agrega el primer curso publicado para definir por dónde empieza.")}
                       action={
                         <Button variant="secondary" onClick={() => setDialog("course")}>
-                          Agregar el primer curso
-                        </Button>
+                          {uiText("Agregar el primer curso")}</Button>
                       }
                     />
                   ) : (
@@ -252,7 +251,7 @@ export function TrainingPathsManager() {
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-medium text-ink-1">{entry.course.title}</p>
-                              {entry.isRequired ? <StatusBadge size="sm" tone="info" label="Obligatorio" /> : null}
+                              {entry.isRequired ? <StatusBadge size="sm" tone="info" label={uiText("Obligatorio")} /> : null}
                             </div>
                             <p className="mt-1 text-sm text-ink-2">
                               {entry.prerequisiteCourse
@@ -307,24 +306,20 @@ export function TrainingPathsManager() {
       <Dialog open={Boolean(pendingRemoval)} onOpenChange={(open) => !open && setPendingRemoval(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Quitar «{pendingRemoval?.title}» de la ruta?</DialogTitle>
+            <DialogTitle>{uiText("¿Quitar «")}{pendingRemoval?.title}{uiText("» de la ruta?")}</DialogTitle>
             <DialogDescription>
-              Deja de formar parte de la secuencia. Las personas que ya lo completaron conservan su avance; a las que
-              no lo hayan empezado dejará de exigírseles dentro de esta ruta.
-            </DialogDescription>
+              {uiText("Deja de formar parte de la secuencia. Las personas que ya lo completaron conservan su avance; a las que no lo hayan empezado dejará de exigírseles dentro de esta ruta.")}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setPendingRemoval(null)}>
-              Conservarlo
-            </Button>
+              {uiText("Conservarlo")}</Button>
             <Button
               variant="destructive"
               loading={removeCourse.isPending}
               loadingLabel="Quitando…"
               onClick={() => pendingRemoval && removeCourse.mutate(pendingRemoval.courseId)}
             >
-              Quitar de la ruta
-            </Button>
+              {uiText("Quitar de la ruta")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -332,29 +327,25 @@ export function TrainingPathsManager() {
       <Dialog open={Boolean(pendingRuleRemoval)} onOpenChange={(open) => !open && setPendingRuleRemoval(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Eliminar la regla «{pendingRuleRemoval?.name}»?</DialogTitle>
+            <DialogTitle>{uiText("¿Eliminar la regla «")}{pendingRuleRemoval?.name}»?</DialogTitle>
             <DialogDescription>
-              Las próximas incorporaciones dejarán de recibir esta formación automáticamente. Las asignaciones que la
-              regla ya creó se conservan.
-            </DialogDescription>
+              {uiText("Las próximas incorporaciones dejarán de recibir esta formación automáticamente. Las asignaciones que la regla ya creó se conservan.")}</DialogDescription>
           </DialogHeader>
           {removeRule.error ? (
-            <InlineNote tone="danger" title="No se pudo eliminar la regla">
+            <InlineNote tone="danger" title={uiText("No se pudo eliminar la regla")}>
               {getApiErrorMessage(removeRule.error, "El servidor rechazó la operación.")}
             </InlineNote>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setPendingRuleRemoval(null)}>
-              Conservarla
-            </Button>
+              {uiText("Conservarla")}</Button>
             <Button
               variant="destructive"
               loading={removeRule.isPending}
               loadingLabel="Eliminando…"
               onClick={() => pendingRuleRemoval && removeRule.mutate(pendingRuleRemoval.id)}
             >
-              Eliminar la regla
-            </Button>
+              {uiText("Eliminar la regla")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -363,17 +354,18 @@ export function TrainingPathsManager() {
 }
 
 function PathSummary({ paths, rules }: { paths: TrainingLearningPathDto[]; rules: number }) {
+  const uiText = useUiText();
   const published = paths.filter((path) => path.isPublished).length;
   const courses = paths.reduce((total, path) => total + path.pathCourses.length, 0);
   const assignments = paths.reduce((total, path) => total + path._count.assignments, 0);
 
   return (
     <MetricRow>
-      <Metric label="Rutas" value={String(paths.length)} />
-      <Metric label="Publicadas" value={String(published)} detail={`de ${paths.length}`} />
-      <Metric label="Cursos incluidos" value={String(courses)} />
+      <Metric label={uiText("Rutas")} value={String(paths.length)} />
+      <Metric label={uiText("Publicadas")} value={String(published)} detail={`de ${paths.length}`} />
+      <Metric label={uiText("Cursos incluidos")} value={String(courses)} />
       <Metric
-        label="Asignaciones"
+        label={uiText("Asignaciones")}
         value={String(assignments)}
         detail={`${rules} ${rules === 1 ? "regla automática" : "reglas automáticas"}`}
       />
@@ -408,35 +400,34 @@ function Rules({
   onDelete: (id: string, name: string) => void;
   deleting?: string;
 }) {
+  const uiText = useUiText();
   return (
     <PageSection
-      title="Asignación automática desde la incorporación"
-      description="Cada regla conecta una plantilla de incorporación con un curso o una ruta."
+      title={uiText("Asignación automática desde la incorporación")}
+      description={uiText("Cada regla conecta una plantilla de incorporación con un curso o una ruta.")}
       boxed
       actions={
         <Button size="sm" variant="secondary" onClick={onCreate}>
           <Link2 className="size-4" aria-hidden="true" />
-          Nueva regla
-        </Button>
+          {uiText("Nueva regla")}</Button>
       }
     >
       {loading ? (
-        <SkeletonRows rows={3} label="Cargando las reglas de incorporación" />
+        <SkeletonRows rows={3} label={uiText("Cargando las reglas de incorporación")} />
       ) : error ? (
         <ErrorState
-          title="No fue posible cargar las reglas"
-          detail={getApiErrorMessage(error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar las reglas")}
+          detail={getApiErrorMessage(error, uiText("Reintenta la consulta para continuar."))}
           onRetry={onRetry}
         />
       ) : !rules.length ? (
         <EmptyState
           reason="no-records"
-          title="Sin reglas automáticas"
-          description="Con una regla, cada persona que se incorpora recibe su formación sin que nadie tenga que asignarla a mano."
+          title={uiText("Sin reglas automáticas")}
+          description={uiText("Con una regla, cada persona que se incorpora recibe su formación sin que nadie tenga que asignarla a mano.")}
           action={
             <Button variant="secondary" onClick={onCreate}>
-              Crear la primera regla
-            </Button>
+              {uiText("Crear la primera regla")}</Button>
           }
         />
       ) : (
@@ -447,8 +438,8 @@ function Rules({
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-ink-1">{rule.name}</p>
                 <p className="text-sm text-ink-2">
-                  {rule.curriculum?.title || rule.course?.title || "Sin destino definido"} · vence a los{" "}
-                  {rule.dueDays} días ·{" "}
+                  {rule.curriculum?.title || rule.course?.title || "Sin destino definido"} {uiText(" · vence a los")}{" "}
+                  {rule.dueDays} {uiText(" días ·")}{" "}
                   {rule.onboardingTemplate
                     ? `plantilla ${rule.onboardingTemplate.name} v${rule.onboardingTemplate.version}`
                     : "cualquier plantilla"}
@@ -494,6 +485,7 @@ function PathDialog({
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }) {
+  const uiText = useUiText();
   const [values, setValues] = useState<Record<string, string>>({});
   const set = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
 
@@ -559,17 +551,16 @@ function PathDialog({
                 : "Nueva regla de incorporación"}
           </DialogTitle>
           <DialogDescription>
-            La configuración se aplica respetando permisos, trazabilidad y fechas límite reales.
-          </DialogDescription>
+            {uiText("La configuración se aplica respetando permisos, trazabilidad y fechas límite reales.")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {kind === "path" ? (
             <>
-              <Field label="Título" value={values.title} onChange={(value) => set("title", value)} />
-              <Field label="Descripción" value={values.description} onChange={(value) => set("description", value)} />
-              <Field label="Objetivo" value={values.objective} onChange={(value) => set("objective", value)} />
+              <Field label={uiText("Título")} value={values.title} onChange={(value) => set("title", value)} />
+              <Field label={uiText("Descripción")} value={values.description} onChange={(value) => set("description", value)} />
+              <Field label={uiText("Objetivo")} value={values.objective} onChange={(value) => set("objective", value)} />
               <Field
-                label="Audiencia objetivo"
+                label={uiText("Audiencia objetivo")}
                 value={values.targetAudience}
                 onChange={(value) => set("targetAudience", value)}
               />
@@ -579,13 +570,13 @@ function PathDialog({
           {kind === "course" ? (
             <>
               <Choice
-                label="Curso publicado"
+                label={uiText("Curso publicado")}
                 value={values.courseId}
                 onChange={(value) => set("courseId", value)}
                 options={courses.map((course) => ({ value: course.id, label: course.title }))}
               />
               <Choice
-                label="Prerrequisito"
+                label={uiText("Prerrequisito")}
                 value={values.prerequisiteCourseId}
                 onChange={(value) => set("prerequisiteCourseId", value)}
                 options={[
@@ -597,7 +588,7 @@ function PathDialog({
                 ]}
               />
               <Field
-                label="Habilitar después de días"
+                label={uiText("Habilitar después de días")}
                 value={values.unlockAfterDays}
                 onChange={(value) => set("unlockAfterDays", value)}
                 type="number"
@@ -607,9 +598,9 @@ function PathDialog({
 
           {kind === "rule" ? (
             <>
-              <Field label="Nombre de la regla" value={values.name} onChange={(value) => set("name", value)} />
+              <Field label={uiText("Nombre de la regla")} value={values.name} onChange={(value) => set("name", value)} />
               <Choice
-                label="Plantilla de incorporación"
+                label={uiText("Plantilla de incorporación")}
                 value={values.templateId || initialTemplateId || "ANY"}
                 onChange={(value) => set("templateId", value)}
                 options={[
@@ -622,7 +613,7 @@ function PathDialog({
               />
               {branchId ? (
                 <Choice
-                  label="Alcance de sucursal"
+                  label={uiText("Alcance de sucursal")}
                   value={values.branchScope || "ANY"}
                   onChange={(value) => set("branchScope", value)}
                   options={[
@@ -632,7 +623,7 @@ function PathDialog({
                 />
               ) : null}
               <Choice
-                label="Asignar"
+                label={uiText("Asignar")}
                 value={values.targetType || "PATH"}
                 onChange={(value) => set("targetType", value)}
                 options={[
@@ -642,31 +633,31 @@ function PathDialog({
               />
               {values.targetType === "COURSE" ? (
                 <Choice
-                  label="Curso"
+                  label={uiText("Curso")}
                   value={values.courseId}
                   onChange={(value) => set("courseId", value)}
                   options={courses.map((course) => ({ value: course.id, label: course.title }))}
                 />
               ) : (
                 <Choice
-                  label="Ruta"
+                  label={uiText("Ruta")}
                   value={values.pathId}
                   onChange={(value) => set("pathId", value)}
                   options={paths.map((path) => ({ value: path.id, label: path.title }))}
                 />
               )}
               <Field
-                label="Puesto contiene (opcional)"
+                label={uiText("Puesto contiene (opcional)")}
                 value={values.jobTitlePattern}
                 onChange={(value) => set("jobTitlePattern", value)}
               />
               <Field
-                label="Código de rol (opcional)"
+                label={uiText("Código de rol (opcional)")}
                 value={values.roleCode}
                 onChange={(value) => set("roleCode", value)}
               />
               <Field
-                label="Días para completar"
+                label={uiText("Días para completar")}
                 value={values.dueDays || "30"}
                 onChange={(value) => set("dueDays", value)}
                 type="number"
@@ -675,14 +666,14 @@ function PathDialog({
           ) : null}
 
           {mutation.isError ? (
-            <InlineNote tone="danger" title="No se pudo guardar la configuración">
+            <InlineNote tone="danger" title={uiText("No se pudo guardar la configuración")}>
               {getApiErrorMessage(mutation.error, "El servidor rechazó la configuración.")}
             </InlineNote>
           ) : null}
 
           {missing.length ? (
             <p className="text-sm text-ink-2">
-              Falta {missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
+              {uiText("Falta")}{missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
             </p>
           ) : null}
 
@@ -690,11 +681,10 @@ function PathDialog({
             className="w-full"
             disabled={missing.length > 0}
             loading={mutation.isPending}
-            loadingLabel="Guardando…"
+            loadingLabel={uiText("Guardando…")}
             onClick={() => mutation.mutate()}
           >
-            Guardar configuración
-          </Button>
+            {uiText("Guardar configuración")}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -732,13 +722,14 @@ function Choice({
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
+  const uiText = useUiText();
   const id = label.toLowerCase().replaceAll(" ", "-");
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id={id}>
-          <SelectValue placeholder="Seleccionar" />
+          <SelectValue placeholder={uiText("Seleccionar")} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BlockedState, SkeletonRows } from "@/components/system";
@@ -18,9 +20,10 @@ import { Button } from "@/components/ui/button";
  */
 
 export function AccessLoading() {
+  const uiText = useUiText();
   return (
     <main className="mx-auto w-full max-w-3xl p-6" aria-busy="true">
-      <SkeletonRows rows={4} label="Verificando tu sesión y tu espacio de trabajo" />
+      <SkeletonRows rows={4} label={uiText("Verificando tu sesión y tu espacio de trabajo")} />
     </main>
   );
 }
@@ -111,6 +114,7 @@ const CASES: Record<
 };
 
 export function AccessDenied({ reason, code, requestId }: { reason: string; code: AccessCode; requestId?: string }) {
+  const uiText = useUiText();
   const router = useRouter();
   const detail = CASES[code];
 
@@ -135,7 +139,7 @@ export function AccessDenied({ reason, code, requestId }: { reason: string; code
       />
       {requestId ? (
         <p className="text-center text-2xs text-ink-3">
-          Código de soporte: <code className="font-mono">{requestId}</code>
+          {uiText("Código de soporte:")}<code className="font-mono">{requestId}</code>
         </p>
       ) : null}
     </main>

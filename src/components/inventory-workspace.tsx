@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -119,6 +121,7 @@ export function InventoryWorkspace({
   title?: string;
   intent?: InventoryIntent;
 }) {
+  const uiText = useUiText();
   const searchParams = useSearchParams();
   const requestedEmployeeId = searchParams.get("employeeId") ?? "";
   const requestedFlowId = searchParams.get("flowId") ?? "";
@@ -183,7 +186,7 @@ export function InventoryWorkspace({
   const columns: Array<DataColumn<InventoryAssetDto>> = [
     {
       key: "asset",
-      header: "Activo",
+      header: uiText("Activo"),
       priority: "identity",
       render: (asset) => (
         <div className="min-w-0">
@@ -197,7 +200,7 @@ export function InventoryWorkspace({
     },
     {
       key: "status",
-      header: "Estado",
+      header: uiText("Estado"),
       priority: "primary",
       render: (asset) => (
         <StatusBadge size="sm" tone={assetStatusTone(asset.status)} label={assetStatusLabel(asset.status)} />
@@ -206,21 +209,21 @@ export function InventoryWorkspace({
     },
     {
       key: "custody",
-      header: "Custodia",
+      header: uiText("Custodia"),
       priority: "primary",
       render: (asset) => asset.employee?.name || "Sin asignar",
       sortValue: (asset) => asset.employee?.name ?? "",
     },
     {
       key: "branch",
-      header: "Sucursal",
+      header: uiText("Sucursal"),
       priority: "secondary",
       render: (asset) => asset.branch.name,
       sortValue: (asset) => asset.branch.name,
     },
     {
       key: "condition",
-      header: "Condición",
+      header: uiText("Condición"),
       priority: "secondary",
       render: (asset) => conditionLabel(asset.condition),
       sortValue: (asset) => asset.condition,
@@ -230,15 +233,14 @@ export function InventoryWorkspace({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Operaciones"
+        eyebrow={uiText("Operaciones")}
         title={title}
         description={INTENT_DESCRIPTION[intent]}
         actions={
           canManage ? (
             <Button onClick={() => setDialog("asset")}>
               <Plus className="size-4" aria-hidden="true" />
-              Registrar activo
-            </Button>
+              {uiText("Registrar activo")}</Button>
           ) : undefined
         }
       />
@@ -247,14 +249,12 @@ export function InventoryWorkspace({
 
       {requestedEmployee ? (
         <InlineNote tone="info" title={`Incorporación de ${requestedEmployee.name}`}>
-          Elige un activo disponible y usa «Asignar». La entrega quedará ligada a su expediente de incorporación
-          {requestedFlowId ? "" : ""}.
+          {uiText("Elige un activo disponible y usa «Asignar». La entrega quedará ligada a su expediente de incorporación")}{requestedFlowId ? "" : ""}.
         </InlineNote>
       ) : null}
       {requestedEmployeeId && context.isSuccess && !requestedEmployee ? (
-        <InlineNote tone="warning" title="La persona no está en esta sucursal">
-          Cambia de sucursal arriba para poder asignarle un activo.
-        </InlineNote>
+        <InlineNote tone="warning" title={uiText("La persona no está en esta sucursal")}>
+          {uiText("Cambia de sucursal arriba para poder asignarle un activo.")}</InlineNote>
       ) : null}
 
       {/* Una sola acción recomendada, y distinta en cada ruta: antes las tres
@@ -277,19 +277,19 @@ export function InventoryWorkspace({
       {/* Las cifras del módulo y las operaciones frecuentes viven en
           `/inventory/assets/dashboard`, la primera pantalla del módulo. Aquí
           queda la operación: filtrar, abrir fichas y ejecutar movimientos. */}
-      <PageSection title="Filtros" boxed>
+      <PageSection title={uiText("Filtros")} boxed>
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_240px]">
           <div>
-            <Label htmlFor="asset-search">Buscar</Label>
+            <Label htmlFor="asset-search">{uiText("Buscar")}</Label>
             <Input
               id="asset-search"
               value={search}
-              placeholder="Etiqueta, número de serie o tipo de activo"
+              placeholder={uiText("Etiqueta, número de serie o tipo de activo")}
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
           <div>
-            <Label htmlFor="asset-status">Estado</Label>
+            <Label htmlFor="asset-status">{uiText("Estado")}</Label>
             <Select
               value={status || "ALL"}
               onValueChange={(value) => setStatus(value === "ALL" ? "" : value)}
@@ -298,7 +298,7 @@ export function InventoryWorkspace({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Todos los estados</SelectItem>
+                <SelectItem value="ALL">{uiText("Todos los estados")}</SelectItem>
                 {ASSET_STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -312,8 +312,8 @@ export function InventoryWorkspace({
 
       {assets.isError ? (
         <ErrorState
-          title="No fue posible cargar el inventario"
-          detail={getApiErrorMessage(assets.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar el inventario")}
+          detail={getApiErrorMessage(assets.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void assets.refetch()}
         />
       ) : (
@@ -324,7 +324,7 @@ export function InventoryWorkspace({
               loading={assets.isLoading}
               columns={columns}
               getKey={(asset) => asset.id}
-              caption="Activos del inventario"
+              caption={uiText("Activos del inventario")}
               onRowAction={(asset) => setSelectedId(asset.id)}
               rowActionLabel={(asset) => `Ver el detalle de ${asset.item.name} (${asset.assetTag})`}
               emptyReason={hasFilters ? "no-matches" : "no-records"}
@@ -332,8 +332,7 @@ export function InventoryWorkspace({
                 !hasFilters && canManage ? (
                   <Button onClick={() => setDialog("asset")}>
                     <Plus className="size-4" aria-hidden="true" />
-                    Registrar el primer activo
-                  </Button>
+                    {uiText("Registrar el primer activo")}</Button>
                 ) : undefined
               }
               onClearFilters={
@@ -361,15 +360,13 @@ export function InventoryWorkspace({
       {!assets.isLoading && !assets.isError && catalog.isSuccess && !catalog.data.length && canManage ? (
         <InlineNote
           tone="info"
-          title="Todavía no hay tipos de activo"
+          title={uiText("Todavía no hay tipos de activo")}
           action={
             <Button size="sm" variant="secondary" onClick={() => setDialog("catalog")}>
-              Crear un tipo de activo
-            </Button>
+              {uiText("Crear un tipo de activo")}</Button>
           }
         >
-          Cada activo pertenece a un tipo (portátil, monitor, taladro). Crea el primero para poder registrar activos.
-        </InlineNote>
+          {uiText("Cada activo pertenece a un tipo (portátil, monitor, taladro). Crea el primero para poder registrar activos.")}</InlineNote>
       ) : null}
 
       <InventoryDialog
@@ -460,6 +457,7 @@ function AssetDetail({
   canManage: boolean;
   onAction: (action: DialogKind) => void;
 }) {
+  const uiText = useUiText();
   const moves = asset.movements ?? [];
 
   return (
@@ -472,7 +470,7 @@ function AssetDetail({
 
         {asset.employee ? (
           <div className="mt-4 rounded-md border border-line bg-surface-2 p-3">
-            <p className="text-2xs text-ink-3">En custodia de</p>
+            <p className="text-2xs text-ink-3">{uiText("En custodia de")}</p>
             <p className="font-medium text-ink-1">{asset.employee.name}</p>
             <p className="text-sm text-ink-2">{asset.employee.jobTitle || asset.employee.email}</p>
           </div>
@@ -486,54 +484,47 @@ function AssetDetail({
             {asset.status === "AVAILABLE" ? (
               <>
                 <Button size="sm" onClick={() => onAction("assign")}>
-                  Asignar a una persona
-                </Button>
+                  {uiText("Asignar a una persona")}</Button>
                 <Button size="sm" variant="secondary" onClick={() => onAction("transfer")}>
                   <ArrowRightLeft className="size-4" aria-hidden="true" />
-                  Transferir
-                </Button>
+                  {uiText("Transferir")}</Button>
               </>
             ) : null}
             {asset.status === "RESERVED" ? (
               <Button size="sm" onClick={() => onAction("deliver")}>
-                Registrar la entrega
-              </Button>
+                {uiText("Registrar la entrega")}</Button>
             ) : null}
             {asset.status === "ASSIGNED" ? (
               <Button size="sm" variant="secondary" onClick={() => onAction("requestReturn")}>
                 <RotateCcw className="size-4" aria-hidden="true" />
-                Solicitar devolución
-              </Button>
+                {uiText("Solicitar devolución")}</Button>
             ) : null}
             {asset.status === "RETURN_PENDING" && !asset.returnedAt ? (
               <Button size="sm" onClick={() => onAction("receiveReturn")}>
-                Recibir el activo
-              </Button>
+                {uiText("Recibir el activo")}</Button>
             ) : null}
             {asset.status === "RETURN_PENDING" && asset.returnedAt ? (
               <Button size="sm" onClick={() => onAction("validate")}>
-                Validar en qué estado llegó
-              </Button>
+                {uiText("Validar en qué estado llegó")}</Button>
             ) : null}
             <Button asChild size="sm" variant="secondary">
-              <Link href={`/inventory/maintenance?assetId=${encodeURIComponent(asset.id)}`}>Mantenimiento</Link>
+              <Link href={`/inventory/maintenance?assetId=${encodeURIComponent(asset.id)}`}>{uiText("Mantenimiento")}</Link>
             </Button>
             {asset.status !== "RETIRED" ? (
               <Button size="sm" variant="ghost" onClick={() => onAction("retire")}>
-                Dar de baja
-              </Button>
+                {uiText("Dar de baja")}</Button>
             ) : null}
           </div>
         ) : null}
       </PageSection>
 
       <PageSection
-        title="Historial del activo"
-        description={loading ? "Actualizando…" : undefined}
+        title={uiText("Historial del activo")}
+        description={loading ? uiText("Actualizando…") : undefined}
         boxed
       >
         {!moves.length ? (
-          <p className="text-sm text-ink-2">Todavía no hay movimientos registrados para este activo.</p>
+          <p className="text-sm text-ink-2">{uiText("Todavía no hay movimientos registrados para este activo.")}</p>
         ) : (
           <ol className="space-y-4">
             {moves.map((move) => (
@@ -560,8 +551,7 @@ function AssetDetail({
         {moves.length ? (
           <p className="mt-4 flex items-center gap-2 text-2xs text-ink-3">
             <History className="size-3.5" aria-hidden="true" />
-            Cada movimiento queda en la auditoría y no se puede borrar.
-          </p>
+            {uiText("Cada movimiento queda en la auditoría y no se puede borrar.")}</p>
         ) : null}
       </PageSection>
     </aside>
@@ -646,6 +636,7 @@ function InventoryDialog({
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }) {
+  const uiText = useUiText();
   const { currentUser } = useAppStore();
   const [values, setValues] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File>();
@@ -755,7 +746,7 @@ function InventoryDialog({
               <Field id="catalog-sku" label="SKU" value={values.sku} onChange={(value) => set("sku", value)} />
               <Field
                 id="catalog-name"
-                label="Nombre del tipo de activo"
+                label={uiText("Nombre del tipo de activo")}
                 value={values.name}
                 onChange={(value) => set("name", value)}
               />
@@ -766,27 +757,27 @@ function InventoryDialog({
             <>
               <Choice
                 id="asset-item"
-                label="Tipo de activo"
+                label={uiText("Tipo de activo")}
                 value={values.itemId}
                 onChange={(value) => set("itemId", value)}
                 options={catalog.map((item) => ({ value: item.id, label: `${item.name} · ${item.sku}` }))}
               />
               <Choice
                 id="asset-branch"
-                label="Sucursal"
+                label={uiText("Sucursal")}
                 value={values.branchId}
                 onChange={(value) => set("branchId", value)}
                 options={(context?.branches ?? []).map((branch) => ({ value: branch.id, label: branch.name }))}
               />
               <Field
                 id="asset-tag"
-                label="Etiqueta única"
+                label={uiText("Etiqueta única")}
                 value={values.assetTag}
                 onChange={(value) => set("assetTag", value)}
               />
               <Field
                 id="asset-serial"
-                label="Número de serie"
+                label={uiText("Número de serie")}
                 value={values.serialNumber}
                 onChange={(value) => set("serialNumber", value)}
               />
@@ -797,7 +788,7 @@ function InventoryDialog({
           {kind === "assign" ? (
             <Choice
               id="assign-employee"
-              label="Persona"
+              label={uiText("Persona")}
               value={values.employeeId || initialEmployeeId}
               onChange={(value) => set("employeeId", value)}
               options={employees.map((item) => ({
@@ -810,7 +801,7 @@ function InventoryDialog({
           {kind === "transfer" ? (
             <Choice
               id="transfer-branch"
-              label="Sucursal de destino"
+              label={uiText("Sucursal de destino")}
               value={values.toBranchId}
               onChange={(value) => set("toBranchId", value)}
               options={(context?.branches ?? [])
@@ -829,7 +820,7 @@ function InventoryDialog({
           {kind === "validate" ? (
             <Choice
               id="validate-result"
-              label="¿En qué estado queda?"
+              label={uiText("¿En qué estado queda?")}
               value={values.status || "AVAILABLE"}
               onChange={(value) => set("status", value)}
               options={[
@@ -842,16 +833,16 @@ function InventoryDialog({
           {!["catalog", "asset"].includes(kind ?? "") ? (
             <Field
               id="operation-notes"
-              label="Notas"
+              label={uiText("Notas")}
               value={values.notes}
-              placeholder="Opcional"
+              placeholder={uiText("Opcional")}
               onChange={(value) => set("notes", value)}
             />
           ) : null}
 
           {needsFile ? (
             <div>
-              <Label htmlFor="inventory-evidence">Evidencia (PDF, JPG o PNG)</Label>
+              <Label htmlFor="inventory-evidence">{uiText("Evidencia (PDF, JPG o PNG)")}</Label>
               <Input
                 id="inventory-evidence"
                 type="file"
@@ -859,20 +850,19 @@ function InventoryDialog({
                 onChange={(event) => setFile(event.target.files?.[0])}
               />
               <p className="mt-1 text-2xs text-ink-3">
-                Queda adjunta al movimiento del activo y no se puede sustituir después.
-              </p>
+                {uiText("Queda adjunta al movimiento del activo y no se puede sustituir después.")}</p>
             </div>
           ) : null}
 
           {mutation.isError ? (
-            <InlineNote tone="danger" title="No se pudo completar la operación">
+            <InlineNote tone="danger" title={uiText("No se pudo completar la operación")}>
               {getApiErrorMessage(mutation.error, "El servidor rechazó la operación.")}
             </InlineNote>
           ) : null}
 
           {missing.length ? (
             <p className="text-sm text-ink-2">
-              Falta {missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
+              {uiText("Falta")}{missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
             </p>
           ) : null}
 
@@ -892,7 +882,7 @@ function InventoryDialog({
               className="w-full"
               disabled={missing.length > 0}
               loading={mutation.isPending}
-              loadingLabel="Guardando…"
+              loadingLabel={uiText("Guardando…")}
               onClick={() => mutation.mutate()}
             >
               {copy?.confirmLabel ?? "Confirmar"}
@@ -1061,12 +1051,13 @@ function Choice({
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
+  const uiText = useUiText();
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id={id}>
-          <SelectValue placeholder="Seleccionar" />
+          <SelectValue placeholder={uiText("Seleccionar")} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
@@ -1082,10 +1073,11 @@ function Choice({
 
 /** El desplegable ofrecía «NEW», «GOOD», «FAIR» y «DAMAGED» sin traducir. */
 function ConditionChoice({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
+  const uiText = useUiText();
   return (
     <Choice
       id="asset-condition"
-      label="Condición"
+      label={uiText("Condición")}
       value={value}
       onChange={onChange}
       options={CONDITION_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}

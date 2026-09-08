@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +48,7 @@ function formatTime(iso?: string | null) {
 }
 
 function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
+  const uiText = useUiText();
   const summary = summarizeDemoSession(session);
   const activeEvent = summary.latestEvent;
 
@@ -54,8 +57,8 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
       <CardContent className="space-y-4 p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-brand">Demo en vivo</p>
-            <h2 className="text-xl font-semibold">Grabación simulada de cámaras</h2>
+            <p className="text-sm font-medium text-brand">{uiText("Demo en vivo")}</p>
+            <h2 className="text-xl font-semibold">{uiText("Grabación simulada de cámaras")}</h2>
           </div>
           <Badge variant={session.running ? "success" : "secondary"}>{session.running ? "Simulación activa" : "Pausada"}</Badge>
         </div>
@@ -66,33 +69,32 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
             <div className="h-[78%] w-[82%] rounded-[2rem] border border-surface-dark-ink/10 bg-[linear-gradient(135deg,hsl(213_38%_12%_/_0.8),hsl(213_34%_15%_/_0.58))] shadow-2xl backdrop-blur-sm">
               <div className="flex h-full flex-col justify-between p-5 text-surface-dark-ink">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="rounded-full bg-black/45 px-3 py-1 text-xs uppercase tracking-[0.32em] text-surface-dark-ink/80">Cámara {session.cameras[0]?.name ?? "demo"}</div>
+                  <div className="rounded-full bg-black/45 px-3 py-1 text-xs uppercase tracking-[0.32em] text-surface-dark-ink/80">{uiText("Cámara ")}{session.cameras[0]?.name ?? "demo"}</div>
                   <div className="flex items-center gap-2 rounded-full border border-status-success/40 bg-status-success/15 px-3 py-1 text-xs font-medium text-status-success">
                     <span className="size-2 rounded-full bg-status-success" />
-                    En grabación
-                  </div>
+                    {uiText("En grabación")}</div>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr]">
                   <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
-                    <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">Zona activa</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">{uiText("Zona activa")}</p>
                     <p className="mt-2 text-2xl font-semibold">{activeEvent?.zoneName ?? "Sin eventos registrados"}</p>
-                    <p className="mt-2 text-sm text-surface-dark-ink/80">La cámara está registrando ocupación, flujo y tiempos de permanencia para generar productividad demo.</p>
+                    <p className="mt-2 text-sm text-surface-dark-ink/80">{uiText("La cámara está registrando ocupación, flujo y tiempos de permanencia para generar productividad demo.")}</p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">Personas {activeEvent?.peopleDetected ?? 0}</Badge>
-                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">Productividad {activeEvent?.productivityScore ?? 0}%</Badge>
-                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">Eventos {summary.totalEvents}</Badge>
+                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">{uiText("Personas ")}{activeEvent?.peopleDetected ?? 0}</Badge>
+                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">{uiText("Productividad ")}{activeEvent?.productivityScore ?? 0}%</Badge>
+                      <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">{uiText("Eventos ")}{summary.totalEvents}</Badge>
                     </div>
                   </div>
                   <div className="grid gap-3">
                     <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
-                      <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">Estado</p>
-                      <p className="mt-2 text-lg font-semibold">Flujo operativo controlado</p>
+                      <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">{uiText("Estado")}</p>
+                      <p className="mt-2 text-lg font-semibold">{uiText("Flujo operativo controlado")}</p>
                       <p className="text-sm text-surface-dark-ink/80">{activeEvent?.note ?? "El demo simula capturas continuas con zonas activas."}</p>
                     </div>
                     <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
-                      <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">Última marca</p>
+                      <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">{uiText("Última marca")}</p>
                       <p className="mt-2 text-lg font-semibold">{formatTime(summary.latestEvent?.occurredAt)}</p>
-                      <p className="text-sm text-surface-dark-ink/80">La simulación avanza automáticamente mientras esté activa.</p>
+                      <p className="text-sm text-surface-dark-ink/80">{uiText("La simulación avanza automáticamente mientras esté activa.")}</p>
                     </div>
                   </div>
                 </div>
@@ -106,6 +108,7 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
 }
 
 export default function ProductivityPage() {
+  const uiText = useUiText();
   const { currentBranch } = useAppStore();
   const branchId = currentBranch?.id;
   const queryClient = useQueryClient();
@@ -209,14 +212,14 @@ export default function ProductivityPage() {
   const sessionSummary = useMemo(() => summarizeDemoSession(session), [session]);
 
   if (!branchId) {
-    return <AsyncState state="error" title="Selecciona una sucursal para revisar productividad" />;
+    return <AsyncState state="error" title={uiText("Selecciona una sucursal para revisar productividad")} />;
   }
   if (overview.isLoading || cameras.isLoading || zones.isLoading || events.isLoading) {
-    return <AsyncState state="loading" title="Cargando demo de productividad" />;
+    return <AsyncState state="loading" title={uiText("Cargando demo de productividad")} />;
   }
   if (overview.isError || cameras.isError || zones.isError || events.isError) {
     const error = overview.error ?? cameras.error ?? zones.error ?? events.error;
-    return <AsyncState state="error" title="No pudimos cargar Productividad" description={error instanceof Error ? error.message : undefined} onRetry={() => void Promise.all([overview.refetch(), cameras.refetch(), zones.refetch(), events.refetch()])} />;
+    return <AsyncState state="error" title={uiText("No pudimos cargar Productividad")} description={error instanceof Error ? error.message : undefined} onRetry={() => void Promise.all([overview.refetch(), cameras.refetch(), zones.refetch(), events.refetch()])} />;
   }
   const overviewData = overview.data!;
 
@@ -236,9 +239,9 @@ export default function ProductivityPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Productividad"
-        title="Dashboard de productividad"
-        description="Ocupación y flujo por zona, medidos con las cámaras registradas en esta sucursal. No evalúa a personas ni sustituye una decisión laboral."
+        eyebrow={uiText("Productividad")}
+        title={uiText("Dashboard de productividad")}
+        description={uiText("Ocupación y flujo por zona, medidos con las cámaras registradas en esta sucursal. No evalúa a personas ni sustituye una decisión laboral.")}
       />
 
       <ActiveContext />
@@ -248,8 +251,8 @@ export default function ProductivityPage() {
           acción. Si las hay, van antes que cualquier cifra. */}
       {visibleAlerts.length > 0 ? (
         <PageSection
-          title="Alertas abiertas"
-          description="Situaciones que el sistema marcó para que alguien las mire."
+          title={uiText("Alertas abiertas")}
+          description={uiText("Situaciones que el sistema marcó para que alguien las mire.")}
           id="alertas"
         >
           <ul className="grid gap-3 md:grid-cols-2">
@@ -273,10 +276,10 @@ export default function ProductivityPage() {
           Cifras del backend, no de la simulación. Cuatro, no seis: «Eventos»
           y «Sin actividad» son detalle del periodo y viven en el desglose por
           zona, que es donde se pueden interpretar. */}
-      <StatusTileRow label="Estado de la operación">
+      <StatusTileRow label={uiText("Estado de la operación")}>
         <li className="min-w-0">
           <StatusTile
-            title="Cámaras en línea"
+            title={uiText("Cámaras en línea")}
             value={overviewData.camerasOnline}
             context="Registrando ahora mismo en esta sucursal."
             status={
@@ -285,33 +288,33 @@ export default function ProductivityPage() {
                 : undefined
             }
             href="/productivity/cameras"
-            actionLabel="Ver cámaras"
+            actionLabel={uiText("Ver cámaras")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Zonas con actividad"
+            title={uiText("Zonas con actividad")}
             value={overviewData.zonesActive}
             context="Zonas que registraron movimiento en el periodo."
             href="/productivity/cameras"
-            actionLabel="Ver zonas"
+            actionLabel={uiText("Ver zonas")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Alertas abiertas"
+            title={uiText("Alertas abiertas")}
             value={overviewData.alertsOpen}
             context="Sin revisar o sin resolver."
             status={
               overviewData.alertsOpen > 0
-                ? { label: "Requieren revisión", tone: "warning" as const }
+                ? { label: uiText("Requieren revisión"), tone: "warning" as const }
                 : undefined
             }
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Tiempo activo"
+            title={uiText("Tiempo activo")}
             value={formatMinutes(overviewData.activeSeconds)}
             context={`Frente a ${formatMinutes(overviewData.idleSeconds)} sin actividad.`}
             scope={insights.data ? `Del ${insights.data.period.from} al ${insights.data.period.to}` : undefined}
@@ -322,8 +325,8 @@ export default function ProductivityPage() {
       {/* ---- 3. Reparto por zona ---------------------------------------- */}
       {visibleZones.length > 0 ? (
         <PageSection
-          title="Actividad por zona"
-          description="Cuánto tiempo estuvo activa cada zona y con qué confianza lo midió la cámara."
+          title={uiText("Actividad por zona")}
+          description={uiText("Cuánto tiempo estuvo activa cada zona y con qué confianza lo midió la cámara.")}
           id="zonas"
         >
           <ul className="space-y-1">
@@ -335,8 +338,7 @@ export default function ProductivityPage() {
                 <span className="min-w-0 flex-1 basis-40">
                   <span className="block break-words text-sm font-medium text-ink-1">{item.zone.name}</span>
                   <span className="block truncate text-xs text-ink-3">
-                    {item.events} eventos · {formatMinutes(item.activeSeconds)} activos · {formatMinutes(item.idleSeconds)} inactivos
-                  </span>
+                    {item.events} {uiText(" eventos · ")}{formatMinutes(item.activeSeconds)} {uiText(" activos · ")}{formatMinutes(item.idleSeconds)} {uiText("inactivos")}</span>
                 </span>
                 {/* La confianza acompaña siempre a la medida: sin ella, un
                     porcentaje de una cámara mal calibrada se lee igual que
@@ -355,8 +357,8 @@ export default function ProductivityPage() {
       {/* ---- 4. Recomendaciones ----------------------------------------- */}
       {insights.data?.recommendations.length ? (
         <PageSection
-          title="Para revisión humana"
-          description="Sugerencias derivadas de la medición. Ninguna se aplica sola."
+          title={uiText("Para revisión humana")}
+          description={uiText("Sugerencias derivadas de la medición. Ninguna se aplica sola.")}
           id="recomendaciones"
         >
           <ul className="grid gap-3 md:grid-cols-2">
@@ -366,7 +368,7 @@ export default function ProductivityPage() {
                   <h3 className="text-sm font-semibold text-ink-1">{item.title}</h3>
                   <p className="text-sm text-ink-2">{item.explanation}</p>
                   <p className="mt-auto text-sm font-medium text-accent-ink">
-                    Siguiente paso: {item.suggestedAction}
+                    {uiText("Siguiente paso:")}{item.suggestedAction}
                   </p>
                 </article>
               </li>
@@ -380,8 +382,8 @@ export default function ProductivityPage() {
           cifras del backend; esto de aquí escribe eventos inventados en la
           misma base de datos, y el aviso lo dice ANTES de que nadie pulse. */}
       <PageSection
-        title="Simulación de demostración"
-        description="Genera eventos de ejemplo para enseñar cómo se ve el módulo cuando hay actividad."
+        title={uiText("Simulación de demostración")}
+        description={uiText("Genera eventos de ejemplo para enseñar cómo se ve el módulo cuando hay actividad.")}
         id="simulacion"
         actions={
           <div className="flex flex-wrap gap-2">
@@ -398,32 +400,30 @@ export default function ProductivityPage() {
               disabled={sinCamaras || createEvent.isPending}
             >
               <Sparkles className="size-4" aria-hidden="true" />
-              {createEvent.isPending ? "Guardando…" : "Generar un evento"}
+              {createEvent.isPending ? uiText("Guardando…") : "Generar un evento"}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
-          <InlineNote tone="warning" title="Los eventos que genere se guardan en la base de datos">
-            Quedan marcados con origen «DEMO» y suman a los contadores de arriba. Úsalo para demostraciones, no
-            sobre datos de operación real.
-          </InlineNote>
+          <InlineNote tone="warning" title={uiText("Los eventos que genere se guardan en la base de datos")}>
+            {uiText("Quedan marcados con origen «DEMO» y suman a los contadores de arriba. Úsalo para demostraciones, no sobre datos de operación real.")}</InlineNote>
 
           {sinCamaras ? (
             <EmptyState
               reason="no-records"
-              title="No hay cámaras activas en esta sucursal"
-              description="Registra y activa una cámara antes de simular. No se generan datos sin una cámara real detrás."
+              title={uiText("No hay cámaras activas en esta sucursal")}
+              description={uiText("Registra y activa una cámara antes de simular. No se generan datos sin una cámara real detrás.")}
               action={
                 <Button asChild variant="secondary">
-                  <Link href="/productivity/cameras">Ir a Cámaras y zonas</Link>
+                  <Link href="/productivity/cameras">{uiText("Ir a Cámaras y zonas")}</Link>
                 </Button>
               }
             />
           ) : null}
 
           {createEvent.isError ? (
-            <InlineNote tone="danger" title="El evento no pudo almacenarse">
+            <InlineNote tone="danger" title={uiText("El evento no pudo almacenarse")}>
               {createEvent.error instanceof Error ? createEvent.error.message : "El backend rechazó el registro."}
             </InlineNote>
           ) : null}
@@ -433,10 +433,10 @@ export default function ProductivityPage() {
               <DemoCameraPreview session={session} />
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <DemoFigure label="Productividad media" value={`${Math.round(sessionSummary.averageProductivity)} %`} />
-                <DemoFigure label="Eventos generados" value={String(sessionSummary.totalEvents)} />
-                <DemoFigure label="Tiempo activo simulado" value={formatMinutes(sessionSummary.activeSeconds)} />
-                <DemoFigure label="Cámaras en la simulación" value={String(sessionSummary.activeCameras)} />
+                <DemoFigure label={uiText("Productividad media")} value={`${Math.round(sessionSummary.averageProductivity)} %`} />
+                <DemoFigure label={uiText("Eventos generados")} value={String(sessionSummary.totalEvents)} />
+                <DemoFigure label={uiText("Tiempo activo simulado")} value={formatMinutes(sessionSummary.activeSeconds)} />
+                <DemoFigure label={uiText("Cámaras en la simulación")} value={String(sessionSummary.activeCameras)} />
               </div>
 
               {session.events.length > 0 ? (
@@ -450,8 +450,7 @@ export default function ProductivityPage() {
                 />
               ) : (
                 <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-2">
-                  Todavía no hay eventos de demostración para esta sucursal.
-                </p>
+                  {uiText("Todavía no hay eventos de demostración para esta sucursal.")}</p>
               )}
             </>
           ) : null}

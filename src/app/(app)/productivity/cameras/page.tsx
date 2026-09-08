@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, MapPinned, Plus, Radio, RefreshCw } from "lucide-react";
@@ -33,6 +35,7 @@ function formatTime(iso?: string | null) {
 }
 
 export default function CamerasPage() {
+  const uiText = useUiText();
   const { can, currentBranch } = useAppStore();
   const queryClient = useQueryClient();
   const branchId = currentBranch?.id;
@@ -96,8 +99,8 @@ export default function CamerasPage() {
     return (
       <Card level={2}>
         <CardContent className="p-6">
-          <h1 className="font-semibold">Sin permiso para administrar cámaras</h1>
-          <p className="mt-2 text-sm text-text-secondary">Solicita a un administrador el permiso de gestión de productividad.</p>
+          <h1 className="font-semibold">{uiText("Sin permiso para administrar cámaras")}</h1>
+          <p className="mt-2 text-sm text-text-secondary">{uiText("Solicita a un administrador el permiso de gestión de productividad.")}</p>
         </CardContent>
       </Card>
     );
@@ -107,18 +110,18 @@ export default function CamerasPage() {
     return (
       <Card level={2}>
         <CardContent className="p-6">
-          <h1 className="font-semibold">Selecciona una sucursal</h1>
-          <p className="mt-2 text-sm text-text-secondary">Las cámaras y zonas siempre se configuran dentro de una sucursal autorizada.</p>
+          <h1 className="font-semibold">{uiText("Selecciona una sucursal")}</h1>
+          <p className="mt-2 text-sm text-text-secondary">{uiText("Las cámaras y zonas siempre se configuran dentro de una sucursal autorizada.")}</p>
         </CardContent>
       </Card>
     );
   }
 
   if (cameras.isLoading || zones.isLoading) {
-    return <AsyncState state="loading" title="Cargando cámaras y zonas" />;
+    return <AsyncState state="loading" title={uiText("Cargando cámaras y zonas")} />;
   }
   if (cameras.isError || zones.isError) {
-    return <AsyncState state="error" title="No fue posible cargar la configuración" onRetry={() => void refresh()} />;
+    return <AsyncState state="error" title={uiText("No fue posible cargar la configuración")} onRetry={() => void refresh()} />;
   }
 
   const currentZones = zones.data ?? [];
@@ -127,14 +130,13 @@ export default function CamerasPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Configuración operativa"
-        title="Cámaras y zonas"
-        description="Registra fuentes por sucursal y define las zonas que se analizarán en Productividad."
+        eyebrow={uiText("Configuración operativa")}
+        title={uiText("Cámaras y zonas")}
+        description={uiText("Registra fuentes por sucursal y define las zonas que se analizarán en Productividad.")}
         actions={
           <Button onClick={() => void refresh()}>
             <RefreshCw className="size-4" />
-            Actualizar
-          </Button>
+            {uiText("Actualizar")}</Button>
         }
       />
 
@@ -142,7 +144,7 @@ export default function CamerasPage() {
           se abre sola cuando todavía no hay ninguna cámara. */}
       <details className="group rounded-lg border border-line bg-surface-1" open={currentCameras.length === 0}>
         <summary className="flex min-h-[var(--control-h-touch)] cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-base font-semibold text-ink-1 [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-2"><Plus className="size-4" aria-hidden="true" />Agregar cámara o zona</span>
+          <span className="flex items-center gap-2"><Plus className="size-4" aria-hidden="true" />{uiText("Agregar cámara o zona")}</span>
           <span className="text-sm font-normal text-ink-2 group-open:hidden">{currentCameras.length} {currentCameras.length === 1 ? "cámara" : "cámaras"} · {currentZones.length} {currentZones.length === 1 ? "zona" : "zonas"}</span>
         </summary>
       <div className="grid gap-5 border-t border-line p-4 lg:grid-cols-2">
@@ -151,21 +153,21 @@ export default function CamerasPage() {
             <div className="flex items-start gap-3">
               <Camera className="size-5 text-brand" aria-hidden="true" />
               <div>
-                <h2 className="font-semibold">Registrar cámara</h2>
-                <p className="mt-1 text-sm text-text-secondary">Conecta una fuente ya autorizada por el equipo de infraestructura.</p>
+                <h2 className="font-semibold">{uiText("Registrar cámara")}</h2>
+                <p className="mt-1 text-sm text-text-secondary">{uiText("Conecta una fuente ya autorizada por el equipo de infraestructura.")}</p>
               </div>
             </div>
             <label className="space-y-2">
-              <Label htmlFor="camera-name">Nombre</Label>
+              <Label htmlFor="camera-name">{uiText("Nombre")}</Label>
               <Input
                 id="camera-name"
-                placeholder="Ej. Recepción principal"
+                placeholder={uiText("Ej. Recepción principal")}
                 value={cameraForm.name}
                 onChange={(event) => setCameraForm({ ...cameraForm, name: event.target.value })}
               />
             </label>
             <label className="space-y-2">
-              <Label>Tipo de fuente</Label>
+              <Label>{uiText("Tipo de fuente")}</Label>
               <Select value={cameraForm.sourceType} onValueChange={(sourceType) => setCameraForm({ ...cameraForm, sourceType })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -178,7 +180,7 @@ export default function CamerasPage() {
               </Select>
             </label>
             <label className="space-y-2">
-              <Label htmlFor="stream-url">URL de stream</Label>
+              <Label htmlFor="stream-url">{uiText("URL de stream")}</Label>
               <Input
                 id="stream-url"
                 placeholder="rtsp://…"
@@ -187,14 +189,14 @@ export default function CamerasPage() {
                 value={cameraForm.streamUrl}
                 onChange={(event) => setCameraForm({ ...cameraForm, streamUrl: event.target.value })}
               />
-              <p className="text-xs text-text-secondary">Opcional cuando el procesador de video administra la fuente por separado.</p>
+              <p className="text-xs text-text-secondary">{uiText("Opcional cuando el procesador de video administra la fuente por separado.")}</p>
             </label>
             <Button
               disabled={!cameraForm.name.trim() || cameraMutation.isPending}
               onClick={() => cameraMutation.mutate()}
             >
               <Plus className="size-4" />
-              {cameraMutation.isPending ? "Guardando…" : "Guardar cámara"}
+              {cameraMutation.isPending ? uiText("Guardando…") : "Guardar cámara"}
             </Button>
           </CardContent>
         </Card>
@@ -204,15 +206,15 @@ export default function CamerasPage() {
             <div className="flex items-start gap-3">
               <MapPinned className="size-5 text-brand" aria-hidden="true" />
               <div>
-                <h2 className="font-semibold">Definir zona</h2>
-                <p className="mt-1 text-sm text-text-secondary">La primera zona usa un contorno base; podrás ajustarlo al conectar el editor visual.</p>
+                <h2 className="font-semibold">{uiText("Definir zona")}</h2>
+                <p className="mt-1 text-sm text-text-secondary">{uiText("La primera zona usa un contorno base; podrás ajustarlo al conectar el editor visual.")}</p>
               </div>
             </div>
             <label className="space-y-2">
-              <Label>Cámara</Label>
+              <Label>{uiText("Cámara")}</Label>
               <Select value={zoneForm.cameraId} onValueChange={(cameraId) => setZoneForm({ ...zoneForm, cameraId })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una cámara" />
+                  <SelectValue placeholder={uiText("Selecciona una cámara")} />
                 </SelectTrigger>
                 <SelectContent>
                   {currentCameras.map((camera) => (
@@ -224,16 +226,16 @@ export default function CamerasPage() {
               </Select>
             </label>
             <label className="space-y-2">
-              <Label htmlFor="zone-name">Nombre de zona</Label>
+              <Label htmlFor="zone-name">{uiText("Nombre de zona")}</Label>
               <Input
                 id="zone-name"
-                placeholder="Ej. Mostrador A"
+                placeholder={uiText("Ej. Mostrador A")}
                 value={zoneForm.name}
                 onChange={(event) => setZoneForm({ ...zoneForm, name: event.target.value })}
               />
             </label>
             <label className="space-y-2">
-              <Label>Tipo de zona</Label>
+              <Label>{uiText("Tipo de zona")}</Label>
               <Select value={zoneForm.zoneType} onValueChange={(zoneType) => setZoneForm({ ...zoneForm, zoneType })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -252,7 +254,7 @@ export default function CamerasPage() {
               onClick={() => zoneMutation.mutate()}
             >
               <Plus className="size-4" />
-              {zoneMutation.isPending ? "Guardando…" : "Guardar zona"}
+              {zoneMutation.isPending ? uiText("Guardando…") : "Guardar zona"}
             </Button>
           </CardContent>
         </Card>
@@ -262,7 +264,7 @@ export default function CamerasPage() {
       <section aria-labelledby="registered-cameras" className="space-y-4">
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-brand" aria-hidden="true" />
-          <h2 id="registered-cameras" className="font-semibold">Fuentes registradas</h2>
+          <h2 id="registered-cameras" className="font-semibold">{uiText("Fuentes registradas")}</h2>
         </div>
         {currentCameras.length ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -274,10 +276,10 @@ export default function CamerasPage() {
                       <p className="font-semibold">{camera.name}</p>
                       <p className="mt-1 text-sm text-text-secondary">{camera.sourceType}</p>
                     </div>
-                    <Badge variant={camera.status === "ACTIVE" ? "success" : "secondary"}>{camera.status === "ACTIVE" ? "Activa" : camera.status}</Badge>
+                    <Badge variant={camera.status === "ACTIVE" ? "success" : "secondary"}>{camera.status === "ACTIVE" ? uiText("Activa") : camera.status}</Badge>
                   </div>
                   <div className="rounded-2xl bg-surface-section p-3">
-                    <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">Última señal</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-text-secondary">{uiText("Última señal")}</p>
                     <p className="mt-1 text-sm font-medium">{formatTime(camera.lastHeartbeatAt)}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -295,7 +297,7 @@ export default function CamerasPage() {
           </div>
         ) : (
           <Card level={3}>
-            <CardContent className="p-5 text-sm text-text-secondary">Aún no hay cámaras configuradas en {currentBranch.name}.</CardContent>
+            <CardContent className="p-5 text-sm text-text-secondary">{uiText("Aún no hay cámaras configuradas en ")}{currentBranch.name}.</CardContent>
           </Card>
         )}
       </section>
@@ -303,7 +305,7 @@ export default function CamerasPage() {
       <section aria-labelledby="zones-registered" className="space-y-4">
         <div className="flex items-center gap-2">
           <MapPinned className="size-4 text-brand" aria-hidden="true" />
-          <h2 id="zones-registered" className="font-semibold">Zonas configuradas</h2>
+          <h2 id="zones-registered" className="font-semibold">{uiText("Zonas configuradas")}</h2>
         </div>
         {currentZones.length ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -315,16 +317,15 @@ export default function CamerasPage() {
                     <Badge variant="secondary">{zone.zoneType}</Badge>
                   </div>
                   <p className="text-sm text-text-secondary">
-                    Cámara: {currentCameras.find((camera) => camera.id === zone.cameraId)?.name ?? zone.cameraId}
+                    {uiText("Cámara:")}{currentCameras.find((camera) => camera.id === zone.cameraId)?.name ?? zone.cameraId}
                   </p>
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : (
-          <InlineFeedback tone="info" title="Sin zonas todavía">
-            Define al menos una zona para que la simulación empiece a generar productividad por área.
-          </InlineFeedback>
+          <InlineFeedback tone="info" title={uiText("Sin zonas todavía")}>
+            {uiText("Define al menos una zona para que la simulación empiece a generar productividad por área.")}</InlineFeedback>
         )}
       </section>
 

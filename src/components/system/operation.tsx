@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
@@ -41,6 +43,7 @@ export function OperationStepper({
   state: OperationState;
   onStepChange?: (step: OperationStepId) => void;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const current = stepIndex(state.step);
 
@@ -65,7 +68,7 @@ export function OperationStepper({
       {/* Redundancia textual: el estado del paso no puede depender solo del
           color del círculo. */}
       <p className="sr-only" aria-live="polite">
-        Paso {current + 1} de {OPERATION_STEPS.length}: {OPERATION_STEP_LABELS[state.step]}
+        {uiText("Paso")}{current + 1} {uiText(" de ")}{OPERATION_STEPS.length}: {OPERATION_STEP_LABELS[state.step]}
       </p>
     </div>
   );
@@ -80,6 +83,7 @@ export function OperationStepper({
    ========================================================================== */
 
 export function ImpactReview({ impact }: { impact: OperationImpact }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const adverse = adverseCount(impact);
 
@@ -90,7 +94,7 @@ export function ImpactReview({ impact }: { impact: OperationImpact }) {
           <div className="min-w-0 space-y-1">
             <h2 className="text-base font-semibold text-ink-1">{impact.headline}</h2>
             <p className="text-sm text-ink-2">
-              Afecta a{" "}
+              {uiText("Afecta a")}{" "}
               <span className="font-mono font-semibold text-ink-1 tabular-figures">{impact.affectedCount}</span>{" "}
               {impact.affectedLabel}
             </p>
@@ -134,7 +138,7 @@ export function ImpactReview({ impact }: { impact: OperationImpact }) {
                   >
                     {line.after}
                     {/* El color no basta: se dice con palabras. */}
-                    {line.adverse ? <span className="sr-only"> (desfavorable)</span> : null}
+                    {line.adverse ? <span className="sr-only"> {uiText(" (desfavorable)")}</span> : null}
                   </td>
                 </tr>
               ))}
@@ -202,6 +206,7 @@ export function ConfirmPanel({
   acknowledged?: boolean;
   onAcknowledgedChange?: (value: boolean) => void;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const impact = state.impact;
   if (!impact) return null;
@@ -238,7 +243,7 @@ export function ConfirmPanel({
               className="mt-0.5 size-5 shrink-0 rounded-xs border-line-control accent-[hsl(var(--status-danger))]"
             />
             <span className="text-sm text-ink-1">
-              Entiendo que esta operación es definitiva y que afectará a {impact.affectedCount}{" "}
+              {uiText("Entiendo que esta operación es definitiva y que afectará a")}{impact.affectedCount}{" "}
               {impact.affectedLabel}.
             </span>
           </label>
@@ -293,6 +298,7 @@ export function OperationResultView({
   onStartAnother?: () => void;
   startAnotherLabel?: string;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -355,8 +361,7 @@ export function OperationResultView({
         ) : null}
         {outcome.status === "error" && outcome.retryable && onRetry ? (
           <Button type="button" onClick={onRetry}>
-            Reintentar
-          </Button>
+            {uiText("Reintentar")}</Button>
         ) : null}
         {onStartAnother ? (
           <Button type="button" variant="secondary" onClick={onStartAnother}>

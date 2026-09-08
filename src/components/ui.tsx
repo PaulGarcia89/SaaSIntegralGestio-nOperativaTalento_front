@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { DomainTable } from "@/components/domain";
@@ -194,9 +196,10 @@ export function SplitPanel({ left, right }: SplitPanelProps) {
  * encabezado, fila de cifras y una lista.
  */
 export function LoadingPanel() {
+  const uiText = useUiText();
   return (
     <div aria-busy="true" aria-live="polite" className="space-y-6">
-      <span className="sr-only">Cargando la pantalla</span>
+      <span className="sr-only">{uiText("Cargando la pantalla")}</span>
       <div className="space-y-3">
         <SkeletonBlock className="h-4 w-24" />
         <SkeletonBlock className="h-8 w-72 max-w-full" />
@@ -210,7 +213,7 @@ export function LoadingPanel() {
           </div>
         ))}
       </div>
-      <SkeletonRows rows={5} label="Cargando los registros" />
+      <SkeletonRows rows={5} label={uiText("Cargando los registros")} />
     </div>
   );
 }

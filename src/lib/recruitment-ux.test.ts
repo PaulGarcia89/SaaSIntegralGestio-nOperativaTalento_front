@@ -201,3 +201,16 @@ describe("mover a una persona de fase", () => {
     expect(grupos.DECIDIDO).toHaveLength(0);
   });
 });
+
+ describe("operational task language", () => {
+  it("switches known task titles without changing candidate or vacancy data", () => {
+    for (const locale of ["es", "en", "es"] as const) {
+      const result = toTodayItems([item()], AHORA, locale)[0];
+      expect(result.title).toBe(locale === "en" ? "Review new application" : "Revisar nueva postulación");
+      expect(result.who).toBe("Ana Martínez");
+      expect(result.detail).toBe("Cajera");
+    }
+    expect(toTodayItems([item({ title: "Preparar entrevista" })], AHORA, "en")[0].title).toBe("Prepare interview");
+    expect(toTodayItems([item({ title: "Tarea particular de DATALINK" })], AHORA, "en")[0].title).toBe("Tarea particular de DATALINK");
+  });
+});

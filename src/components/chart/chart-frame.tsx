@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import * as React from "react";
 import { ChartColumn, FilterX, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -434,9 +436,10 @@ export function ChartFrame({
 
 /** Tabla de respaldo: la vía de escape para el dato exacto. */
 export function ChartDataTable({ table }: { table: ChartTable }) {
+  const uiText = useUiText();
   return (
     <details className="rounded-md border border-line bg-surface-2">
-      <summary className="cursor-pointer px-3 py-2 text-2xs font-medium text-ink-2">Ver los datos</summary>
+      <summary className="cursor-pointer px-3 py-2 text-2xs font-medium text-ink-2">{uiText("Ver los datos")}</summary>
       <div className="max-h-80 overflow-auto px-3 pb-3">
         <table className="w-full border-collapse text-left text-2xs">
           <caption className="sr-only">{table.caption}</caption>

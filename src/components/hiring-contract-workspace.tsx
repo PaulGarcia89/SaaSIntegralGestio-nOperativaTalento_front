@@ -256,7 +256,7 @@ function HiringModuleDashboard({ mode }: { mode: HiringViewMode }) {
           title={t("hiring.panel.openFor", { name: siguiente.candidate.fullName })}
           detail={[
             resolveHiringCase(siguiente, undefined, locale).primaryAction.label,
-            longDate(siguiente.deadlineAt) ?? undefined,
+            longDate(siguiente.deadlineAt, locale) ?? undefined,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -498,8 +498,8 @@ function HiringCaseCard({ item }: { item: HiringContractDto }) {
         {
           label: t("hiring.list.deadline"),
           value: plazo === "OVERDUE"
-            ? `${longDate(item.deadlineAt)} · ${t("hiring.metrics.overdue")}`
-            : (longDate(item.deadlineAt) ?? t("hiring.header.noDeadline")),
+            ? `${longDate(item.deadlineAt, locale)} · ${t("hiring.metrics.overdue")}`
+            : (longDate(item.deadlineAt, locale) ?? t("hiring.header.noDeadline")),
         },
       ]}
       progress={{

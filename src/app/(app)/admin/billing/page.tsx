@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useQuery } from "@tanstack/react-query";
 import { fetchBillingOverview, getApiErrorMessage } from "@/lib/backend";
 import { formatDate, formatPrice, humanizeCode, shortId } from "@/lib/platform-labels";
@@ -69,14 +71,15 @@ function describe(table: Record<string, { label: string; tone: Tone }>, code: un
 }
 
 export default function BillingPage() {
+  const uiText = useUiText();
   const billing = useQuery({ queryKey: ["billing-overview"], queryFn: fetchBillingOverview });
 
-  if (billing.isLoading) return <SkeletonRows rows={5} label="Cargando la facturación" />;
+  if (billing.isLoading) return <SkeletonRows rows={5} label={uiText("Cargando la facturación")} />;
   if (billing.isError) {
     return (
       <ErrorState
-        title="No fue posible cargar la facturación"
-        detail={getApiErrorMessage(billing.error, "Reintenta la consulta para continuar.")}
+        title={uiText("No fue posible cargar la facturación")}
+        detail={getApiErrorMessage(billing.error, uiText("Reintenta la consulta para continuar."))}
         onRetry={() => void billing.refetch()}
       />
     );
@@ -93,48 +96,45 @@ export default function BillingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno de la plataforma"
-        title="Facturación"
-        description="Plan contratado, quién figura como cliente de facturación y las últimas facturas emitidas."
+        eyebrow={uiText("Gobierno de la plataforma")}
+        title={uiText("Facturación")}
+        description={uiText("Plan contratado, quién figura como cliente de facturación y las últimas facturas emitidas.")}
       />
 
       <MetricRow>
         <Metric label="Plan" value={data?.plan?.name ?? (data?.plan?.code ? humanizeCode(data.plan.code) : "Sin plan")} />
-        <Metric label="Estado del cobro" value={subscription.label} tone={subscription.tone === "danger" ? "danger" : undefined} />
+        <Metric label={uiText("Estado del cobro")} value={subscription.label} tone={subscription.tone === "danger" ? "danger" : undefined} />
         <Metric
-          label="Pasarela de cobro"
+          label={uiText("Pasarela de cobro")}
           value={data?.billingCustomer?.provider ? humanizeCode(data.billingCustomer.provider) : "No configurada"}
           detail={data?.billingCustomer?.email ?? undefined}
         />
         <Metric
-          label="Facturas sin pagar"
+          label={uiText("Facturas sin pagar")}
           value={String(unpaid.length)}
           tone={unpaid.length > 0 ? "warning" : undefined}
         />
       </MetricRow>
 
       {!data?.billingCustomer ? (
-        <InlineNote tone="warning" title="No hay cliente de facturación configurado">
-          Sin cliente configurado en la pasarela no se pueden emitir facturas ni cobrar renovaciones. Habla con quien
-          administra la plataforma antes de que venza el periodo en curso.
-        </InlineNote>
+        <InlineNote tone="warning" title={uiText("No hay cliente de facturación configurado")}>
+          {uiText("Sin cliente configurado en la pasarela no se pueden emitir facturas ni cobrar renovaciones. Habla con quien administra la plataforma antes de que venza el periodo en curso.")}</InlineNote>
       ) : null}
 
       {data?.subscription?.endsAt ? (
-        <InlineNote tone="info" title="La suscripción tiene fecha de fin">
-          Termina el {formatDate(data.subscription.endsAt)}. A partir de esa fecha deja de renovarse sola.
-        </InlineNote>
+        <InlineNote tone="info" title={uiText("La suscripción tiene fecha de fin")}>
+          {uiText("Termina el")}{formatDate(data.subscription.endsAt)}{uiText(". A partir de esa fecha deja de renovarse sola.")}</InlineNote>
       ) : null}
 
       <PageSection
-        title="Facturas recientes"
-        description="Lo que se emitió y en qué estado quedó cada documento."
+        title={uiText("Facturas recientes")}
+        description={uiText("Lo que se emitió y en qué estado quedó cada documento.")}
       >
         {invoices.length === 0 ? (
           <EmptyState
             reason="no-records"
-            title="Todavía no hay facturas"
-            description="Las facturas aparecerán aquí en cuanto la pasarela emita la primera."
+            title={uiText("Todavía no hay facturas")}
+            description={uiText("Las facturas aparecerán aquí en cuanto la pasarela emita la primera.")}
           />
         ) : (
           <ul className="space-y-2">
@@ -149,10 +149,10 @@ export default function BillingPage() {
                         {numbered ? `Factura ${invoice.number}` : "Factura sin número asignado"}
                       </p>
                       {!numbered ? (
-                        <p className="text-2xs text-ink-3">Referencia interna {shortId(invoice.id)}</p>
+                        <p className="text-2xs text-ink-3">{uiText("Referencia interna ")}{shortId(invoice.id)}</p>
                       ) : null}
                       <p className="mt-1 text-sm text-ink-2">
-                        Emitida el {formatDate(invoice.issuedAt)}
+                        {uiText("Emitida el")}{formatDate(invoice.issuedAt)}
                         {invoice.dueAt ? ` · vence el ${formatDate(invoice.dueAt)}` : ""}
                       </p>
                     </div>
@@ -171,7 +171,7 @@ export default function BillingPage() {
       </PageSection>
 
       {(data?.enabledModules ?? []).length > 0 ? (
-        <PageSection title="Qué cubre el plan" description="Módulos incluidos en lo que se está pagando.">
+        <PageSection title={uiText("Qué cubre el plan")} description={uiText("Módulos incluidos en lo que se está pagando.")}>
           <div className="flex flex-wrap gap-1.5">
             {(data?.enabledModules ?? []).map((module) => (
               <span key={module} className="rounded-md border border-line bg-surface-2 px-2 py-1 text-2xs text-ink-2">

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp, Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -121,6 +123,7 @@ export function DataView<T>({
   onClearFilters,
   className,
 }: DataViewProps<T>) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const [internalSort, setInternalSort] = useState<SortState>(null);
   const controlled = controlledSort !== undefined;
@@ -178,7 +181,7 @@ export function DataView<T>({
                       onChange={selection.onToggleAll}
                       className="field size-4"
                     />
-                    <span className="sr-only">Seleccionar todo lo visible</span>
+                    <span className="sr-only">{uiText("Seleccionar todo lo visible")}</span>
                   </label>
                 </th>
               ) : null}
@@ -370,6 +373,7 @@ export function FilterBar({
   onClear?: () => void;
   children?: ReactNode;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const searchId = useId();
@@ -408,8 +412,7 @@ export function FilterBar({
             className="shrink-0 lg:hidden"
           >
             <SlidersHorizontal className="size-4" aria-hidden="true" />
-            Filtros
-            {activeCount > 0 ? (
+            {uiText("Filtros")}{activeCount > 0 ? (
               <span className="ml-1 rounded-full bg-accent-fill px-1.5 font-mono text-2xs text-on-accent-fill tabular-figures">
                 {activeCount}
               </span>
@@ -436,7 +439,7 @@ export function FilterBar({
       {/* Recuento en voz alta: quien navega con lector necesita saber que el
           filtro tuvo efecto sin recorrer la lista entera. */}
       <p className="sr-only" aria-live="polite">
-        {activeCount === 0 ? "Sin filtros aplicados" : `${activeCount} filtros aplicados`}
+        {activeCount === 0 ? uiText("Sin filtros aplicados") : `${activeCount} filtros aplicados`}
       </p>
     </div>
   );
@@ -458,6 +461,7 @@ export function Pagination({
   totalItems: number;
   onPageChange: (page: number) => void;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const start = totalItems === 0 ? 0 : page * pageSize + 1;
@@ -468,7 +472,7 @@ export function Pagination({
   return (
     <nav aria-label={t("sys.pagination")} className="flex flex-wrap items-center justify-between gap-3 pt-2">
       <p className="font-mono text-xs text-ink-2 tabular-figures">
-        {start}–{end} de {totalItems}
+        {start}–{end} {uiText(" de ")}{totalItems}
       </p>
       <div className="flex items-center gap-2">
         <Button

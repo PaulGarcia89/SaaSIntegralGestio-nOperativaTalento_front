@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchInventoryAuditTrail, getApiErrorMessage } from "@/lib/backend";
@@ -38,6 +40,7 @@ import type { RoleKey } from "@/lib/contracts";
  * «HTTP 201», indistinguibles). Ahora un fallo se ve como fallo.
  */
 export default function InventoryAuditPage() {
+  const uiText = useUiText();
   const { currentBranch } = useAppStore();
   const [page, setPage] = useState(1);
   const audit = useQuery({
@@ -48,29 +51,29 @@ export default function InventoryAuditPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno"
-        title="Auditoría de inventario"
-        description="Quién hizo cada operación crítica, cuándo y con qué resultado."
+        eyebrow={uiText("Gobierno")}
+        title={uiText("Auditoría de inventario")}
+        description={uiText("Quién hizo cada operación crítica, cuándo y con qué resultado.")}
         meta={<span>{currentBranch?.name ?? "Todas las sucursales"}</span>}
       />
 
       {audit.isLoading ? (
-        <SkeletonRows rows={6} label="Cargando la auditoría" />
+        <SkeletonRows rows={6} label={uiText("Cargando la auditoría")} />
       ) : audit.isError ? (
         <ErrorState
-          title="No fue posible cargar la auditoría"
-          detail={getApiErrorMessage(audit.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar la auditoría")}
+          detail={getApiErrorMessage(audit.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void audit.refetch()}
         />
       ) : !audit.data?.items.length ? (
         <EmptyState
           reason="no-records"
-          title="No hay operaciones registradas"
-          description="Aquí quedará constancia de cada entrega, devolución, ajuste y recepción del inventario."
+          title={uiText("No hay operaciones registradas")}
+          description={uiText("Aquí quedará constancia de cada entrega, devolución, ajuste y recepción del inventario.")}
         />
       ) : (
         <>
-          <PageSection title="Operaciones registradas">
+          <PageSection title={uiText("Operaciones registradas")}>
             <ul className="divide-y divide-line">
               {audit.data.items.map((item) => {
                 const failed = item.statusCode >= 400;
@@ -90,7 +93,7 @@ export default function InventoryAuditPage() {
                       <StatusBadge
                         size="sm"
                         tone={failed ? "danger" : "success"}
-                        label={failed ? "No se completó" : "Completada"}
+                        label={failed ? "No se completó" : uiText("Completada")}
                       />
                     </div>
 
@@ -99,16 +102,15 @@ export default function InventoryAuditPage() {
                         para quien revisa la operación del día. */}
                     <details className="mt-2">
                       <summary className="cursor-pointer text-2xs text-ink-3 hover:text-ink-2">
-                        Detalle técnico
-                      </summary>
+                        {uiText("Detalle técnico")}</summary>
                       <dl className="mt-2 grid gap-1 font-mono text-2xs text-ink-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-x-3">
-                        <dt>Ruta</dt>
+                        <dt>{uiText("Ruta")}</dt>
                         <dd className="break-all">{item.route ?? "no registrada"}</dd>
-                        <dt>Respuesta</dt>
+                        <dt>{uiText("Respuesta")}</dt>
                         <dd>{item.statusCode}</dd>
                         {item.correlationId ? (
                           <>
-                            <dt>Correlación</dt>
+                            <dt>{uiText("Correlación")}</dt>
                             <dd className="break-all">{item.correlationId}</dd>
                           </>
                         ) : null}

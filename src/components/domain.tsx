@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { Download } from "lucide-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -95,6 +97,7 @@ export function FilterToolbar({
   filterValue: string;
   onFilterChange: (value: string) => void;
 }) {
+  const uiText = useUiText();
   // El primer valor de la lista es el «todos» de cada pantalla: solo cuenta
   // como filtro activo lo que se aparta de él.
   const defaultValue = options[0]?.value ?? "";
@@ -104,11 +107,11 @@ export function FilterToolbar({
     <FilterBar
       search={searchValue}
       onSearchChange={onSearchChange}
-      searchLabel={searchPlaceholder}
+      searchLabel={uiText(searchPlaceholder)}
       activeCount={active}
       onClear={() => onFilterChange(defaultValue)}
     >
-      <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="Filtros">
+      <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label={uiText("Filtros")}>
         {options.map((option) => (
           <Button
             key={option.value}
@@ -118,7 +121,7 @@ export function FilterToolbar({
             onClick={() => onFilterChange(option.value)}
             aria-pressed={filterValue === option.value}
           >
-            {option.label}
+            {uiText(option.label)}
           </Button>
         ))}
       </div>
@@ -272,6 +275,7 @@ export function DomainTable<T>({
   /** Si se pasa, el vacío se lee como «ningún resultado con estos filtros». */
   onClearFilters?: () => void;
 }) {
+  const uiText = useUiText();
   void mobileRender;
 
   const pageSizeId = useId();
@@ -334,9 +338,9 @@ export function DomainTable<T>({
       const left = sortableValue(column, a);
       const right = sortableValue(column, b);
       if (typeof left === "number" && typeof right === "number") return factor * (left - right);
-      return factor * String(left).localeCompare(String(right), "es", { numeric: true });
+      return factor * String(left).localeCompare(String(right), uiText.locale, { numeric: true });
     });
-  }, [data, sort, columns]);
+  }, [data, sort, columns, uiText.locale]);
 
   const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize));
   const effectivePage = Math.min(page, totalPages - 1);
@@ -347,7 +351,7 @@ export function DomainTable<T>({
 
   const systemColumns: Array<SystemColumn<T>> = visibleColumns.map((column) => ({
     key: column.key,
-    header: column.header,
+    header: uiText(column.header),
     priority: derivePriority(column, visibleColumns),
     render: column.render,
     numeric: column.numeric,
@@ -362,14 +366,14 @@ export function DomainTable<T>({
         rows={paginatedData}
         columns={systemColumns}
         getKey={getKey}
-        caption={caption}
+        caption={uiText(caption)}
         sort={sort}
         onSortChange={(next) => {
           setSort(next);
           persist({ sortKey: next?.key ?? null, sortDir: next?.direction ?? "asc" });
         }}
         onRowAction={onSelect}
-        rowActionLabel={() => "Ver detalle"}
+        rowActionLabel={() => uiText("Ver detalle")}
         emptyReason={onClearFilters ? "no-matches" : "no-records"}
         emptyAction={emptyAction}
         onClearFilters={onClearFilters}
@@ -380,7 +384,7 @@ export function DomainTable<T>({
       {sortedData.length > pageSize || exportable ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-2xs text-ink-2">
-            <label htmlFor={pageSizeId}>Mostrar</label>
+            <label htmlFor={pageSizeId}>{uiText("Mostrar")}</label>
             <Select
               value={String(pageSize)}
               onValueChange={(value) => {
@@ -403,10 +407,9 @@ export function DomainTable<T>({
 
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {exportable ? (
-              <Button variant="secondary" size="sm" onClick={() => exportCsv(columns, sortedData)}>
+              <Button variant="secondary" size="sm" onClick={() => exportCsv(columns.map(column => ({ ...column, header: uiText(column.header) })), sortedData)}>
                 <Download className="size-4" aria-hidden="true" />
-                Exportar CSV
-              </Button>
+                {uiText("Exportar CSV")}</Button>
             ) : null}
             {sortedData.length > pageSize ? (
               <Pagination
@@ -423,8 +426,7 @@ export function DomainTable<T>({
       {preferencesKey ? (
         <details className="rounded-md border border-line bg-surface-1 px-3 py-2 text-sm">
           <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-ink-1">
-            Columnas visibles
-          </summary>
+            {uiText("Columnas visibles")}</summary>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-3">
             {columns
               .filter((column) => column.key !== "actions")
@@ -450,7 +452,7 @@ export function DomainTable<T>({
                         persist({ visibleColumnKeys: next });
                       }}
                     />
-                    {column.mobileLabel ?? column.header}
+                    {uiText(column.mobileLabel ?? column.header)}
                   </label>
                 );
               })}

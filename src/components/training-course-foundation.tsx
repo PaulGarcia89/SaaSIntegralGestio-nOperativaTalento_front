@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { Info, Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -69,6 +71,7 @@ export function TrainingCourseFoundation({
   onChanged: () => Promise<void>;
   onSaved?: () => void;
 }) {
+  const uiText = useUiText();
   const design = useQuery({
     queryKey: ["training-course-design", courseId],
     queryFn: () => fetchTrainingCourseDesign(courseId),
@@ -81,12 +84,12 @@ export function TrainingCourseFoundation({
 
   // Antes esto reemplazaba el paso entero del asistente —el estepper incluido—
   // por un aro girando, y quien lo miraba perdía de vista en qué punto estaba.
-  if (design.isLoading || competencies.isLoading) return <SkeletonRows rows={5} label="Cargando el diseño pedagógico" />;
+  if (design.isLoading || competencies.isLoading) return <SkeletonRows rows={5} label={uiText("Cargando el diseño pedagógico")} />;
   if (design.isError || competencies.isError) {
     return (
       <ErrorState
-        title="No fue posible cargar el diseño pedagógico"
-        detail={getApiErrorMessage(design.error ?? competencies.error, "Reintenta la consulta para continuar.")}
+        title={uiText("No fue posible cargar el diseño pedagógico")}
+        detail={getApiErrorMessage(design.error ?? competencies.error, uiText("Reintenta la consulta para continuar."))}
         onRetry={() => {
           void design.refetch();
           void competencies.refetch();
@@ -132,6 +135,7 @@ function FoundationForm({
   onChanged: () => Promise<void>;
   onSaved?: () => void;
 }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState<TrainingCourseDesignInput["brief"]>({ ...emptyBrief, ...stripBrief(initial.brief) });
   const [selected, setSelected] = useState<TrainingCourseDesignInput["competencies"]>(
@@ -178,8 +182,8 @@ function FoundationForm({
     <section className="space-y-4" aria-labelledby="foundation-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="foundation-title" className="text-xl font-semibold">Fundación pedagógica</h2>
-          <p className="text-sm text-text-secondary">Define por qué existe el curso, a quién sirve y qué desempeño debe producir.</p>
+          <h2 id="foundation-title" className="text-xl font-semibold">{uiText("Fundación pedagógica")}</h2>
+          <p className="text-sm text-text-secondary">{uiText("Define por qué existe el curso, a quién sirve y qué desempeño debe producir.")}</p>
         </div>
         <Badge variant={localErrors.length ? "warning" : "success"}>
           {localErrors.length ? `${localErrors.length} requisitos pendientes` : "Listo para revisión"}
@@ -187,30 +191,30 @@ function FoundationForm({
       </div>
 
       {localErrors.length ? (
-        <InlineFeedback tone="warning" title="Antes de enviar a revisión">
+        <InlineFeedback tone="warning" title={uiText("Antes de enviar a revisión")}>
           <ul className="list-disc space-y-1 pl-5">{localErrors.map((error) => <li key={error}>{error}</li>)}</ul>
         </InlineFeedback>
       ) : null}
 
       <Card level={2}>
         <CardHeader>
-          <CardTitle>Lo esencial del curso</CardTitle>
-          <p className="text-sm text-text-secondary">Describe el problema, el cambio esperado, cómo medirlo y para quién es. Lo demás es opcional.</p>
+          <CardTitle>{uiText("Lo esencial del curso")}</CardTitle>
+          <p className="text-sm text-text-secondary">{uiText("Describe el problema, el cambio esperado, cómo medirlo y para quién es. Lo demás es opcional.")}</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <TextArea label="¿Qué necesidad resuelve este curso?" value={brief.businessNeed} disabled={!editable} onChange={(businessNeed) => setBrief({ ...brief, businessNeed })} />
-          <TextArea label="¿Qué podrá hacer la persona al terminar?" value={brief.targetOutcome} disabled={!editable} onChange={(targetOutcome) => setBrief({ ...brief, targetOutcome })} />
-          <Field label="¿Cómo sabrás que funcionó?" hint="Ej.: 30% menos errores de registro" value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
-          <Field label="¿Para quién es?" hint="Ej.: Supervisores de tienda nuevos" value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
+          <TextArea label={uiText("¿Qué necesidad resuelve este curso?")} value={brief.businessNeed} disabled={!editable} onChange={(businessNeed) => setBrief({ ...brief, businessNeed })} />
+          <TextArea label={uiText("¿Qué podrá hacer la persona al terminar?")} value={brief.targetOutcome} disabled={!editable} onChange={(targetOutcome) => setBrief({ ...brief, targetOutcome })} />
+          <Field label={uiText("¿Cómo sabrás que funcionó?")} hint="Ej.: 30% menos errores de registro" value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
+          <Field label={uiText("¿Para quién es?")} hint="Ej.: Supervisores de tienda nuevos" value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
           <details className="md:col-span-2">
-            <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">Añadir contexto opcional</summary>
+            <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">{uiText("Añadir contexto opcional")}</summary>
             <div className="mt-4 grid gap-4 border-t border-border-default pt-4 md:grid-cols-2">
-              <Field label="Línea base" hint="Valor actual antes de capacitar" value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
-              <Field label="Meta" hint="Valor que deseas alcanzar" value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
-              <UserChoice label="Responsable del contenido" value={brief.contentOwnerId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, contentOwnerId: value === "NONE" ? undefined : value })} />
-              <UserChoice label="Experto de negocio" value={brief.subjectMatterExpertId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, subjectMatterExpertId: value === "NONE" ? undefined : value })} />
-              <Field label="Fecha objetivo" type="date" value={brief.targetDate?.slice(0, 10) ?? ""} disabled={!editable} onChange={(targetDate) => setBrief({ ...brief, targetDate: targetDate ? new Date(`${targetDate}T12:00:00`).toISOString() : undefined })} />
-              <TextArea label="Riesgo de no completar" value={brief.riskIfNotCompleted ?? ""} disabled={!editable} onChange={(riskIfNotCompleted) => setBrief({ ...brief, riskIfNotCompleted })} />
+              <Field label={uiText("Línea base")} hint="Valor actual antes de capacitar" value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
+              <Field label={uiText("Meta")} hint="Valor que deseas alcanzar" value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
+              <UserChoice label={uiText("Responsable del contenido")} value={brief.contentOwnerId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, contentOwnerId: value === "NONE" ? undefined : value })} />
+              <UserChoice label={uiText("Experto de negocio")} value={brief.subjectMatterExpertId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, subjectMatterExpertId: value === "NONE" ? undefined : value })} />
+              <Field label={uiText("Fecha objetivo")} type="date" value={brief.targetDate?.slice(0, 10) ?? ""} disabled={!editable} onChange={(targetDate) => setBrief({ ...brief, targetDate: targetDate ? new Date(`${targetDate}T12:00:00`).toISOString() : undefined })} />
+              <TextArea label={uiText("Riesgo de no completar")} value={brief.riskIfNotCompleted ?? ""} disabled={!editable} onChange={(riskIfNotCompleted) => setBrief({ ...brief, riskIfNotCompleted })} />
             </div>
           </details>
         </CardContent>
@@ -218,13 +222,13 @@ function FoundationForm({
 
       <Card level={2}>
         <CardHeader>
-          <CardTitle>Competencias que desarrolla</CardTitle>
-          <p className="text-sm text-text-secondary">Selecciona la habilidad observable que este curso ayuda a desarrollar. Se requiere al menos una para publicarlo.</p>
+          <CardTitle>{uiText("Competencias que desarrolla")}</CardTitle>
+          <p className="text-sm text-text-secondary">{uiText("Selecciona la habilidad observable que este curso ayuda a desarrollar. Se requiere al menos una para publicarlo.")}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-3 rounded-2xl border border-status-info/20 bg-status-info/5 p-4 text-sm leading-6 text-text-secondary">
             <Info className="mt-0.5 size-5 shrink-0 text-status-info" aria-hidden="true" />
-            <p><strong className="text-text-primary">Competencia:</strong> una capacidad que puede observarse o evaluarse, como “Atención al cliente” o “Manejo seguro de alimentos”. <strong className="text-text-primary">Código:</strong> su identificador único para buscarla y reutilizarla en rutas y reportes, por ejemplo <code className="rounded bg-card px-1.5 py-0.5 text-xs">OPS-SEG-01</code>. No es necesario crear una nueva si ya existe una adecuada.</p>
+            <p><strong className="text-text-primary">{uiText("Competencia:")}</strong> {uiText(" una capacidad que puede observarse o evaluarse, como “Atención al cliente” o “Manejo seguro de alimentos”. ")}<strong className="text-text-primary">{uiText("Código:")}</strong> {uiText(" su identificador único para buscarla y reutilizarla en rutas y reportes, por ejemplo ")}<code className="rounded bg-card px-1.5 py-0.5 text-xs">{uiText("OPS-SEG-01")}</code>{uiText(". No es necesario crear una nueva si ya existe una adecuada.")}</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {availableCompetencies.filter((item) => item.isActive).map((competency) => {
@@ -249,12 +253,12 @@ function FoundationForm({
           </div>
           {editable ? (
             <details className="rounded-2xl border border-dashed border-border-strong p-4">
-              <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">Crear una competencia nueva</summary>
-              <p className="mt-2 text-sm text-text-secondary">Úsalo solo si no existe una competencia reutilizable. El código debe ser corto y único, por ejemplo <code className="rounded bg-surface-section px-1.5 py-0.5 text-xs">VENTA-CIERRE-01</code>.</p>
+              <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">{uiText("Crear una competencia nueva")}</summary>
+              <p className="mt-2 text-sm text-text-secondary">{uiText("Úsalo solo si no existe una competencia reutilizable. El código debe ser corto y único, por ejemplo ")}<code className="rounded bg-surface-section px-1.5 py-0.5 text-xs">{uiText("VENTA-CIERRE-01")}</code>.</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-[160px_1fr_auto]">
-                <Input aria-label="Código de competencia" placeholder="Ej.: VENTA-CIERRE-01" value={newCode} onChange={(event) => setNewCode(event.target.value)} />
-                <Input aria-label="Nombre de competencia" placeholder="Ej.: Cierre de venta consultivo" value={newName} onChange={(event) => setNewName(event.target.value)} />
-                <Button type="button" variant="secondary" disabled={!newCode.trim() || !newName.trim() || createCompetency.isPending} onClick={() => createCompetency.mutate()}><Plus className="size-4" />Crear</Button>
+                <Input aria-label={uiText("Código de competencia")} placeholder={uiText("Ej.: VENTA-CIERRE-01")} value={newCode} onChange={(event) => setNewCode(event.target.value)} />
+                <Input aria-label={uiText("Nombre de competencia")} placeholder={uiText("Ej.: Cierre de venta consultivo")} value={newName} onChange={(event) => setNewName(event.target.value)} />
+                <Button type="button" variant="secondary" disabled={!newCode.trim() || !newName.trim() || createCompetency.isPending} onClick={() => createCompetency.mutate()}><Plus className="size-4" />{uiText("Crear")}</Button>
               </div>
             </details>
           ) : null}
@@ -262,40 +266,40 @@ function FoundationForm({
       </Card>
 
       <Card level={2}>
-        <CardHeader><CardTitle>Objetivos de aprendizaje</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{uiText("Objetivos de aprendizaje")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {objectives.map((objective, index) => (
             <div key={index} className="grid gap-3 rounded-xl border border-border-default p-4 lg:grid-cols-2">
-              <TextArea label="Al finalizar, la persona podrá…" value={objective.statement} disabled={!editable} onChange={(statement) => updateObjective(index, { statement }, objectives, setObjectives)} />
-              <TextArea label="Criterio de éxito" value={objective.successCriteria} disabled={!editable} onChange={(successCriteria) => updateObjective(index, { successCriteria }, objectives, setObjectives)} />
-              <Field label="Método de evaluación" value={objective.assessmentMethod} disabled={!editable} onChange={(assessmentMethod) => updateObjective(index, { assessmentMethod }, objectives, setObjectives)} />
+              <TextArea label={uiText("Al finalizar, la persona podrá…")} value={objective.statement} disabled={!editable} onChange={(statement) => updateObjective(index, { statement }, objectives, setObjectives)} />
+              <TextArea label={uiText("Criterio de éxito")} value={objective.successCriteria} disabled={!editable} onChange={(successCriteria) => updateObjective(index, { successCriteria }, objectives, setObjectives)} />
+              <Field label={uiText("Método de evaluación")} value={objective.assessmentMethod} disabled={!editable} onChange={(assessmentMethod) => updateObjective(index, { assessmentMethod }, objectives, setObjectives)} />
               <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                <Select value={objective.competencyId ?? "NONE"} disabled={!editable} onValueChange={(competencyId) => updateObjective(index, { competencyId: competencyId === "NONE" ? undefined : competencyId }, objectives, setObjectives)}><SelectTrigger><SelectValue placeholder="Competencia" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin competencia</SelectItem>{selected.map((item) => { const competency = availableCompetencies.find((candidate) => candidate.id === item.competencyId); return competency ? <SelectItem key={competency.id} value={competency.id}>{competency.name}</SelectItem> : null; })}</SelectContent></Select>
+                <Select value={objective.competencyId ?? "NONE"} disabled={!editable} onValueChange={(competencyId) => updateObjective(index, { competencyId: competencyId === "NONE" ? undefined : competencyId }, objectives, setObjectives)}><SelectTrigger><SelectValue placeholder={uiText("Competencia")} /></SelectTrigger><SelectContent><SelectItem value="NONE">{uiText("Sin competencia")}</SelectItem>{selected.map((item) => { const competency = availableCompetencies.find((candidate) => candidate.id === item.competencyId); return competency ? <SelectItem key={competency.id} value={competency.id}>{competency.name}</SelectItem> : null; })}</SelectContent></Select>
                 <LevelChoice value={objective.targetLevel} disabled={!editable} onChange={(targetLevel) => updateObjective(index, { targetLevel }, objectives, setObjectives)} />
-                {editable ? <Button type="button" size="icon" variant="ghost" aria-label="Eliminar objetivo" onClick={() => setObjectives(objectives.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4 text-status-danger" /></Button> : null}
+                {editable ? <Button type="button" size="icon" variant="ghost" aria-label={uiText("Eliminar objetivo")} onClick={() => setObjectives(objectives.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4 text-status-danger" /></Button> : null}
               </div>
             </div>
           ))}
-          {editable ? <Button type="button" variant="secondary" onClick={() => setObjectives([...objectives, { statement: "", successCriteria: "", assessmentMethod: "", targetLevel: "WORKING", isRequired: true, sortOrder: objectives.length }])}><Plus className="size-4" />Objetivo</Button> : null}
+          {editable ? <Button type="button" variant="secondary" onClick={() => setObjectives([...objectives, { statement: "", successCriteria: "", assessmentMethod: "", targetLevel: "WORKING", isRequired: true, sortOrder: objectives.length }])}><Plus className="size-4" />{uiText("Objetivo")}</Button> : null}
         </CardContent>
       </Card>
 
       <Card level={2}>
-        <CardHeader><CardTitle>Segmentación avanzada</CardTitle><p className="text-sm text-text-secondary">Opcional. Úsala si necesitas asignar el curso automáticamente por rol, puesto, sucursal o grupo.</p></CardHeader>
+        <CardHeader><CardTitle>{uiText("Segmentación avanzada")}</CardTitle><p className="text-sm text-text-secondary">{uiText("Opcional. Úsala si necesitas asignar el curso automáticamente por rol, puesto, sucursal o grupo.")}</p></CardHeader>
         <CardContent className="space-y-3">
           {audienceRules.map((rule, index) => (
             <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 md:grid-cols-[180px_160px_1fr_auto]">
               <Select value={rule.ruleType} disabled={!editable} onValueChange={(ruleType) => updateRule(index, { ruleType: ruleType as TrainingAudienceRuleType }, audienceRules, setAudienceRules)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ruleTypes.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
-              <Select value={rule.operator} disabled={!editable} onValueChange={(operator) => updateRule(index, { operator: operator as TrainingAudienceOperator }, audienceRules, setAudienceRules)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EQUALS">Es igual a</SelectItem><SelectItem value="CONTAINS">Contiene</SelectItem></SelectContent></Select>
-              <Input aria-label="Valor de audiencia" value={rule.value} disabled={!editable} onChange={(event) => updateRule(index, { value: event.target.value }, audienceRules, setAudienceRules)} />
-              {editable ? <Button type="button" size="icon" variant="ghost" aria-label="Eliminar regla" onClick={() => setAudienceRules(audienceRules.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4 text-status-danger" /></Button> : null}
+              <Select value={rule.operator} disabled={!editable} onValueChange={(operator) => updateRule(index, { operator: operator as TrainingAudienceOperator }, audienceRules, setAudienceRules)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EQUALS">{uiText("Es igual a")}</SelectItem><SelectItem value="CONTAINS">{uiText("Contiene")}</SelectItem></SelectContent></Select>
+              <Input aria-label={uiText("Valor de audiencia")} value={rule.value} disabled={!editable} onChange={(event) => updateRule(index, { value: event.target.value }, audienceRules, setAudienceRules)} />
+              {editable ? <Button type="button" size="icon" variant="ghost" aria-label={uiText("Eliminar regla")} onClick={() => setAudienceRules(audienceRules.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4 text-status-danger" /></Button> : null}
             </div>
           ))}
-          {editable ? <Button type="button" variant="secondary" onClick={() => setAudienceRules([...audienceRules, { ruleType: "JOB_TITLE", operator: "CONTAINS", value: "", sortOrder: audienceRules.length }])}><Plus className="size-4" />Regla</Button> : null}
+          {editable ? <Button type="button" variant="secondary" onClick={() => setAudienceRules([...audienceRules, { ruleType: "JOB_TITLE", operator: "CONTAINS", value: "", sortOrder: audienceRules.length }])}><Plus className="size-4" />{uiText("Regla")}</Button> : null}
         </CardContent>
       </Card>
 
-      {editable ? <div className="flex justify-end"><Button type="button" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Guardando…" : "Guardar fundación pedagógica"}</Button></div> : null}
+      {editable ? <div className="flex justify-end"><Button type="button" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? uiText("Guardando…") : "Guardar fundación pedagógica"}</Button></div> : null}
     </section>
   );
 }
@@ -340,9 +344,11 @@ function TextArea({ label, value, onChange, disabled }: { label: string; value: 
 }
 
 function LevelChoice({ value, onChange, disabled }: { value: TrainingCompetencyLevel; onChange: (value: TrainingCompetencyLevel) => void; disabled: boolean }) {
-  return <Select value={value} disabled={disabled} onValueChange={(next) => onChange(next as TrainingCompetencyLevel)}><SelectTrigger aria-label="Nivel objetivo"><SelectValue /></SelectTrigger><SelectContent>{levels.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>;
+  const uiText = useUiText();
+  return <Select value={value} disabled={disabled} onValueChange={(next) => onChange(next as TrainingCompetencyLevel)}><SelectTrigger aria-label={uiText("Nivel objetivo")}><SelectValue /></SelectTrigger><SelectContent>{levels.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>;
 }
 
 function UserChoice({ label, value, users, onChange, disabled }: { label: string; value: string; users: UserDto[]; onChange: (value: string) => void; disabled: boolean }) {
-  return <label className="space-y-2 text-sm font-medium">{label}<Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin asignar</SelectItem>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select></label>;
+  const uiText = useUiText();
+  return <label className="space-y-2 text-sm font-medium">{label}<Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">{uiText("Sin asignar")}</SelectItem>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select></label>;
 }

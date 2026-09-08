@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { restaurantSectionForPath } from "@/lib/restaurant-navigation";
 
 import Link from "next/link";
@@ -490,6 +492,7 @@ const MOBILE_NAV_SPACE_STYLE = {
    -------------------------------------------------------------------------- */
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const uiText = useUiText();
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useLocale();
@@ -532,7 +535,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       branchAvailable: Boolean(currentBranch),
     });
     if (decision.code !== "SUBSCRIPTION_BLOCKED" || !subscriptionGraceEndsAt) return decision;
-    const graceDate = new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(subscriptionGraceEndsAt));
+    const graceDate = new Intl.DateTimeFormat(uiText.locale, { dateStyle: "medium" }).format(new Date(subscriptionGraceEndsAt));
     return { ...decision, reason: `${decision.reason} El periodo de gracia finaliza el ${graceDate}.` };
   }, [accessContextVerified, allowedTenantIds, can, canAccessGlobalGovernance, currentBranch, currentRole, currentSubscriptionStatus, currentTenant.id, hasFeature, hasModule, impersonation?.active, routePolicy, subscriptionGraceEndsAt]);
 
@@ -665,7 +668,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-svh items-center justify-center p-6">
         <div className="w-full max-w-md rounded-xl border border-line bg-surface-1 p-8 text-center shadow-e2">
-          <p className="text-sm text-ink-2">Cerrando sesión y redirigiendo al acceso principal…</p>
+          <p className="text-sm text-ink-2">{uiText("Cerrando sesión y redirigiendo al acceso principal…")}</p>
         </div>
       </div>
     );
@@ -720,7 +723,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Franja de contexto. NO titula: aporta ubicación y accesos
               globales en una sola línea de 3rem. El `h1` es de la página. */}
-          <header className="sticky top-0 z-[var(--z-sticky)] -mx-3 mb-4 border-b border-line bg-canvas/85 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4 xl:-mx-5 xl:px-5">
+          <header className="sticky top-0 z-[var(--z-sticky)] -mx-3 mb-4 border-b border-line bg-canvas/85 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4 xl:mx-0 xl:px-5">
             <div className="flex items-center gap-2">
               <Button
                 ref={mobileMenuButtonRef}
@@ -776,7 +779,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Button variant="ghost" size="icon" className="relative shrink-0" asChild>
                 <Link
                   href="/notifications"
-                  aria-label={`${t("workspace.notifications")}${unreadNotifications ? `, ${unreadNotifications} sin leer` : ""}`}
+                  aria-label={`${t("workspace.notifications")}${unreadNotifications ? `, ${t("workspace.unreadCount", { count: unreadNotifications })}` : ""}`}
                 >
                   <Bell className="size-4" aria-hidden="true" />
                   {unreadNotifications > 0 ? (
@@ -857,17 +860,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                 <dl className="mt-3 space-y-1 rounded-lg bg-surface-2 p-3 text-sm">
                   <div className="flex items-baseline justify-between gap-2">
-                    <dt className="text-ink-2">Empresa</dt>
+                    <dt className="text-ink-2">{uiText("Empresa")}</dt>
                     <dd className="min-w-0 truncate text-right font-medium text-ink-1">{workspaceName}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
-                    <dt className="text-ink-2">Sucursal</dt>
+                    <dt className="text-ink-2">{uiText("Sucursal")}</dt>
                     <dd className="min-w-0 truncate text-right font-medium text-ink-1">
-                      {isGlobalView ? "No aplica" : currentBranch ? currentBranch.name : "Sin sucursal"}
+                      {isGlobalView ? "No aplica" : currentBranch ? currentBranch.name : uiText("Sin sucursal")}
                     </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-2">
-                    <dt className="text-ink-2">Módulos activos</dt>
+                    <dt className="text-ink-2">{uiText("Módulos activos")}</dt>
                     <dd className="font-mono text-right font-medium text-ink-1 tabular-figures">
                       {currentTenant.enabledModules.length}
                     </dd>
@@ -882,8 +885,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-ink-1 transition-colors hover:bg-surface-2"
                 >
                   <UserRound className="size-4 text-ink-3" aria-hidden="true" />
-                  Mi perfil
-                </Link>
+                  {uiText("Mi perfil")}</Link>
                 {can("admin.company") && hasModule("admin") ? (
                   <Link
                     href="/admin/company"
@@ -891,8 +893,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-ink-1 transition-colors hover:bg-surface-2"
                   >
                     <Settings className="size-4 text-ink-3" aria-hidden="true" />
-                    Configuración
-                  </Link>
+                    {uiText("Configuración")}</Link>
                 ) : null}
                 {/* En móvil estos tres salen de la cabecera para dejarle ancho
                     al contexto de empresa, así que tienen que estar aquí: no
@@ -907,16 +908,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {currentRole === "admin_saas" ? (
                   <div className="rounded-lg border border-line bg-surface-2 p-3">
-                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">Vista global</p>
+                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">{uiText("Vista global")}</p>
                     <p className="mt-1.5 text-sm text-ink-2">
-                      Acceso general a la plataforma sin selección de empresa o sucursal.
-                    </p>
+                      {uiText("Acceso general a la plataforma sin selección de empresa o sucursal.")}</p>
                   </div>
                 ) : accessContextVerified && currentRole === "admin_plataforma" && can("platform.tenant.switch") && allowedTenantIds.length > 1 ? (
                   <div className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
-                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">Contexto de plataforma</p>
+                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">{uiText("Contexto de plataforma")}</p>
                     <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-ink-2">Empresa</span>
+                      <span className="text-xs font-medium text-ink-2">{uiText("Empresa")}</span>
                       <Select
                         value={currentTenant.id}
                         onValueChange={(value) => {
@@ -939,7 +939,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </Select>
                     </label>
                     <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-ink-2">Sucursal</span>
+                      <span className="text-xs font-medium text-ink-2">{uiText("Sucursal")}</span>
                       <Select
                         value={currentBranch?.id ?? ""}
                         onValueChange={(value) => {
@@ -949,7 +949,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         disabled={tenantBranches.length === 0}
                       >
                         <SelectTrigger disabled={tenantBranches.length === 0}>
-                          <SelectValue placeholder="Sin sucursales" />
+                          <SelectValue placeholder={uiText("Sin sucursales")} />
                         </SelectTrigger>
                         <SelectContent>
                           {tenantBranches.map((branch) => (
@@ -963,10 +963,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : currentRole === "admin_empresa" ? (
                   <div className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
-                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">Contexto de empresa</p>
+                    <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">{uiText("Contexto de empresa")}</p>
                     <p className="text-sm text-ink-2">{currentTenant.name}</p>
                     <label className="block space-y-1.5">
-                      <span className="text-xs font-medium text-ink-2">Sucursal</span>
+                      <span className="text-xs font-medium text-ink-2">{uiText("Sucursal")}</span>
                       <Select
                         value={currentBranch?.id ?? ""}
                         onValueChange={(value) => {
@@ -976,7 +976,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         disabled={tenantBranches.length === 0}
                       >
                         <SelectTrigger disabled={tenantBranches.length === 0}>
-                          <SelectValue placeholder="Sin sucursales" />
+                          <SelectValue placeholder={uiText("Sin sucursales")} />
                         </SelectTrigger>
                         <SelectContent>
                           {tenantBranches.map((branch) => (
@@ -990,8 +990,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-ink-2">
-                    El contexto de empresa y sucursal está determinado por tus asignaciones.
-                  </p>
+                    {uiText("El contexto de empresa y sucursal está determinado por tus asignaciones.")}</p>
                 )}
 
                 <Button variant="destructive" className="mt-3 w-full" onClick={signOut}>
@@ -1023,7 +1022,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-current={active ? "page" : undefined}
               aria-label={
                 isNotifications && unreadNotifications
-                  ? `${item.label}, ${unreadNotifications} sin leer`
+                  ? `${item.label}, ${t("workspace.unreadCount", { count: unreadNotifications })}`
                   : item.label
               }
               className={cn(

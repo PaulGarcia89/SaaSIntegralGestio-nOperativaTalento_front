@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -164,6 +166,7 @@ type TaskUpdate = {
 };
 
 export default function OnboardingDocumentsPage() {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -468,9 +471,9 @@ export default function OnboardingDocumentsPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Personas"
-        title="Incorporaciones"
-        description="Cada persona que entra, con sus tareas, responsables y evidencias hasta el primer día."
+        eyebrow={uiText("Personas")}
+        title={uiText("Incorporaciones")}
+        description={uiText("Cada persona que entra, con sus tareas, responsables y evidencias hasta el primer día.")}
         actions={
           can("onboarding.manage") ? (
             <>
@@ -482,11 +485,10 @@ export default function OnboardingDocumentsPage() {
               */}
               {/* Automatización, analítica y cumplimiento viven en el
                   dashboard del módulo; aquí solo lo que se hace en esta pantalla. */}
-              <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>Plantillas</Button>
+              <Button variant="secondary" onClick={() => setTemplateLibraryOpen(true)}>{uiText("Plantillas")}</Button>
               <Button onClick={() => { setRevisionSourceId(null); setTemplateOpen(true); }}>
                 <Plus className="size-4" aria-hidden="true" />
-                Nueva plantilla
-              </Button>
+                {uiText("Nueva plantilla")}</Button>
             </>
           ) : undefined
         }
@@ -500,25 +502,25 @@ export default function OnboardingDocumentsPage() {
         onClear={() => { setSearch(""); setFlowStatus(""); setFlowPage(1); }}
       >
         <label className="min-w-0 flex-1 space-y-1.5 sm:max-w-56">
-          <span className="block text-xs font-medium text-ink-2">Estado</span>
+          <span className="block text-xs font-medium text-ink-2">{uiText("Estado")}</span>
           <Select value={flowStatus || "ALL"} onValueChange={(value) => { setFlowStatus(value === "ALL" ? "" : value); setFlowPage(1); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Todos</SelectItem>
-              <SelectItem value="PENDING">Pendiente</SelectItem>
-              <SelectItem value="IN_PROGRESS">En incorporación</SelectItem>
-              <SelectItem value="BLOCKED">Bloqueado</SelectItem>
-              <SelectItem value="COMPLETED">Completado</SelectItem>
-              <SelectItem value="CANCELLED">Cancelado</SelectItem>
+              <SelectItem value="ALL">{uiText("Todos")}</SelectItem>
+              <SelectItem value="PENDING">{uiText("Pendiente")}</SelectItem>
+              <SelectItem value="IN_PROGRESS">{uiText("En incorporación")}</SelectItem>
+              <SelectItem value="BLOCKED">{uiText("Bloqueado")}</SelectItem>
+              <SelectItem value="COMPLETED">{uiText("Completado")}</SelectItem>
+              <SelectItem value="CANCELLED">{uiText("Cancelado")}</SelectItem>
             </SelectContent>
           </Select>
         </label>
       </FilterBar>
 
-      {flows.isLoading ? <SkeletonRows rows={4} label="Cargando incorporaciones" /> : null}
+      {flows.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando incorporaciones")} /> : null}
       {flows.isError ? (
         <ErrorState
-          title="No pudimos cargar las incorporaciones"
+          title={uiText("No pudimos cargar las incorporaciones")}
           detail={getApiErrorMessage(flows.error, "Conservamos tu contexto. Vuelve a intentarlo.")}
           onRetry={() => void flows.refetch()}
         />
@@ -572,12 +574,12 @@ export default function OnboardingDocumentsPage() {
             <div className="relative overflow-hidden rounded-lg border border-accent-line/40 bg-surface-2 p-4">
               <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-accent-fill" />
               <div className="pl-3">
-                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-ink">Lo siguiente</p>
+                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-accent-ink">{uiText("Lo siguiente")}</p>
                 <p className="mt-0.5 font-medium text-ink-1">{selected.nextAction.title}</p>
                 <p className="text-sm text-ink-2">
-                  Responsable: {blockerOwner(selected.nextAction)}
+                  {uiText("Responsable:")}{blockerOwner(selected.nextAction)}
                   {selected.nextAction.dueDate
-                    ? ` · Vence el ${new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(selected.nextAction.dueDate))}`
+                    ? ` · Vence el ${new Intl.DateTimeFormat(uiText.locale, { dateStyle: "medium" }).format(new Date(selected.nextAction.dueDate))}`
                     : ""}
                 </p>
               </div>
@@ -606,22 +608,19 @@ export default function OnboardingDocumentsPage() {
             </InlineNote>
           ) : null}
 
-          <ActionBar label="Continuar la incorporación en otro módulo">
+          <ActionBar label={uiText("Continuar la incorporación en otro módulo")}>
             <Button asChild variant="secondary">
               <Link href={`/onboarding/signatures?flowId=${encodeURIComponent(selected.id)}&action=create`}>
                 <FileSignature className="size-4" aria-hidden="true" />
-                Firmas
-              </Link>
+                {uiText("Firmas")}</Link>
             </Button>
             <Button asChild variant="secondary">
               <Link href={`/inventory?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}`}>
-                Inventario
-              </Link>
+                {uiText("Inventario")}</Link>
             </Button>
             <Button asChild variant="secondary">
               <Link href={`/training/paths?flowId=${encodeURIComponent(selected.id)}&employeeId=${encodeURIComponent(selected.employee.id)}&templateId=${encodeURIComponent(selected.template?.id ?? "")}`}>
-                Capacitación
-              </Link>
+                {uiText("Capacitación")}</Link>
             </Button>
           </ActionBar>
         </section>
@@ -629,8 +628,8 @@ export default function OnboardingDocumentsPage() {
 
       {selected ? (
         <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="min-w-0" aria-label="Empleados en incorporación">
-            <EntityCardList label="Empleados en incorporación" columns={1} className="sm:grid-cols-2 xl:grid-cols-1">
+          <aside className="min-w-0" aria-label={uiText("Empleados en incorporación")}>
+            <EntityCardList label={uiText("Empleados en incorporación")} columns={1} className="sm:grid-cols-2 xl:grid-cols-1">
               {flows.data?.items.map((flow) => {
                 const avance = onboardingProgress(flow);
                 return (
@@ -642,11 +641,11 @@ export default function OnboardingDocumentsPage() {
                       status={estadoDeIncorporacion(flow)}
                       facts={
                         avance.total === 0
-                          ? [{ label: "Tareas", value: "Sin tareas" }]
+                          ? [{ label: uiText("Tareas"), value: "Sin tareas" }]
                           : [
-                              { label: "Pendientes", value: avance.pending },
+                              { label: uiText("Pendientes"), value: avance.pending },
                               ...(avance.overdue > 0
-                                ? [{ label: "Vencidas", value: avance.overdue }]
+                                ? [{ label: uiText("Vencidas"), value: avance.overdue }]
                                 : []),
                             ]
                       }
@@ -673,9 +672,9 @@ export default function OnboardingDocumentsPage() {
             </EntityCardList>
             {flows.data && flows.data.totalPages > 1 ? (
               <div className="flex items-center justify-between gap-2 pt-3">
-                <Button size="sm" variant="secondary" disabled={flowPage <= 1} onClick={() => setFlowPage((page) => page - 1)}>Anterior</Button>
-                <span className="text-xs text-text-secondary">{flowPage} de {flows.data.totalPages}</span>
-                <Button size="sm" variant="secondary" disabled={flowPage >= flows.data.totalPages} onClick={() => setFlowPage((page) => page + 1)}>Siguiente</Button>
+                <Button size="sm" variant="secondary" disabled={flowPage <= 1} onClick={() => setFlowPage((page) => page - 1)}>{uiText("Anterior")}</Button>
+                <span className="text-xs text-text-secondary">{flowPage} {uiText(" de ")}{flows.data.totalPages}</span>
+                <Button size="sm" variant="secondary" disabled={flowPage >= flows.data.totalPages} onClick={() => setFlowPage((page) => page + 1)}>{uiText("Siguiente")}</Button>
               </div>
             ) : null}
           </aside>
@@ -685,13 +684,13 @@ export default function OnboardingDocumentsPage() {
             {!selected.template ? (
               <InlineFeedback
                 tone="warning"
-                title="Esta incorporación no tiene plantilla"
+                title={uiText("Esta incorporación no tiene plantilla")}
                 action={
                   can("onboarding.manage") ? (
                     <div className="flex flex-wrap gap-2">
                       <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
                         <SelectTrigger className="min-w-52">
-                          <SelectValue placeholder="Seleccionar plantilla" />
+                          <SelectValue placeholder={uiText("Seleccionar plantilla")} />
                         </SelectTrigger>
                         <SelectContent>
                           {templates.data?.map((template) => (
@@ -705,14 +704,12 @@ export default function OnboardingDocumentsPage() {
                         disabled={!selectedTemplateId || applyTemplate.isPending}
                         onClick={() => applyTemplate.mutate()}
                       >
-                        Aplicar
-                      </Button>
+                        {uiText("Aplicar")}</Button>
                     </div>
                   ) : undefined
                 }
               >
-                Aplica una plantilla para estandarizar responsables, fechas y dependencias.
-              </InlineFeedback>
+                {uiText("Aplica una plantilla para estandarizar responsables, fechas y dependencias.")}</InlineFeedback>
             ) : null}
 
             {/* Las alertas ya están arriba, con causa, responsable y salida
@@ -720,16 +717,14 @@ export default function OnboardingDocumentsPage() {
             <section className="space-y-3" aria-labelledby="onboarding-checklist">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="onboarding-checklist" className="text-lg font-semibold text-ink-1">
-                  Tareas
-                  <span className="ml-2 font-mono text-sm font-normal text-ink-2 tabular-figures">
+                  {uiText("Tareas")}<span className="ml-2 font-mono text-sm font-normal text-ink-2 tabular-figures">
                     {selected.tasks.filter((task) => task.status === "COMPLETED").length}/{selected.tasks.length}
                   </span>
                 </h2>
                 {can("onboarding.manage") ? (
                   <Button size="sm" variant="secondary" onClick={() => openTaskEditor()}>
                     <Plus className="size-4" />
-                    Agregar tarea
-                  </Button>
+                    {uiText("Agregar tarea")}</Button>
                 ) : null}
               </div>
               <ol className="space-y-3">
@@ -764,13 +759,11 @@ export default function OnboardingDocumentsPage() {
             <section className="space-y-3" aria-labelledby="onboarding-signatures">
               <div className="flex items-center justify-between gap-3">
                 <h2 id="onboarding-signatures" className="text-lg font-semibold">
-                  Firmas de incorporación
-                </h2>
+                  {uiText("Firmas de incorporación")}</h2>
                 <Button asChild size="sm" variant="secondary">
                   <Link href={`/onboarding/signatures?flowId=${encodeURIComponent(selected.id)}&action=create`}>
                     <FileSignature className="size-4" />
-                    Gestionar firmas
-                  </Link>
+                    {uiText("Gestionar firmas")}</Link>
                 </Button>
               </div>
               {selected.signaturePackages?.length ? (
@@ -782,7 +775,7 @@ export default function OnboardingDocumentsPage() {
                         <p className="font-medium">{item.title}</p>
                         <p className="text-xs text-text-secondary">
                           {item.participants.filter((participant) => participant.status === "SIGNED").length}/
-                          {item.participants.length} firmantes ·{" "}
+                          {item.participants.length} {uiText(" firmantes ·")}{" "}
                           {item.dueDate
                             ? `vence ${new Date(item.dueDate).toLocaleDateString()}`
                             : "sin fecha límite"}
@@ -793,10 +786,8 @@ export default function OnboardingDocumentsPage() {
                   </Card>
                 ))
               ) : (
-                <InlineFeedback tone="info" title="Sin paquetes de firma">
-                  Crea el paquete desde Firma electrónica; al completarse actualizará automáticamente este
-                  onboarding.
-                </InlineFeedback>
+                <InlineFeedback tone="info" title={uiText("Sin paquetes de firma")}>
+                  {uiText("Crea el paquete desde Firma electrónica; al completarse actualizará automáticamente este onboarding.")}</InlineFeedback>
               )}
             </section>
 
@@ -823,7 +814,7 @@ export default function OnboardingDocumentsPage() {
               <Card level={1}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
                   <div>
-                    <p className="font-semibold">Cierre del expediente</p>
+                    <p className="font-semibold">{uiText("Cierre del expediente")}</p>
                     <p className="text-sm text-text-secondary">
                       {selected.readinessStatus === "READY"
                         ? "El expediente está cerrado y listo para operación."
@@ -845,8 +836,8 @@ export default function OnboardingDocumentsPage() {
       <Dialog open={templateLibraryOpen} onOpenChange={setTemplateLibraryOpen}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Versiones de plantillas</DialogTitle>
-            <DialogDescription>Crea nuevas versiones sin modificar los expedientes que ya utilizan una versión anterior.</DialogDescription>
+            <DialogTitle>{uiText("Versiones de plantillas")}</DialogTitle>
+            <DialogDescription>{uiText("Crea nuevas versiones sin modificar los expedientes que ya utilizan una versión anterior.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {templates.data?.map((template) => (
@@ -854,12 +845,12 @@ export default function OnboardingDocumentsPage() {
                 <CardContent className="flex flex-wrap items-center gap-3 p-4">
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{template.name} v{template.version}</p>
-                    <p className="text-xs text-text-secondary">{template.tasks.length} tareas · {template.status === "DRAFT" ? "Borrador pendiente de aprobación" : "Publicada"} · {template.isActive === false ? "Inactiva" : "Activa"}{template.isDefault ? " · predeterminada" : ""}</p>
+                    <p className="text-xs text-text-secondary">{template.tasks.length} {uiText(" tareas · ")}{template.status === "DRAFT" ? "Borrador pendiente de aprobación" : "Publicada"} · {template.isActive === false ? uiText("Inactiva") : uiText("Activa")}{template.isDefault ? " · predeterminada" : ""}</p>
                   </div>
-                  <Button size="sm" variant="secondary" onClick={() => createTemplateVersion(template)}>Nueva versión</Button>
-                  {template.status === "DRAFT" ? <Button size="sm" onClick={() => approveTemplate.mutate(template.id)} disabled={approveTemplate.isPending}>Aprobar</Button> : null}
-                  {!template.isDefault && template.isActive !== false ? <Button size="sm" variant="ghost" onClick={() => templateStatus.mutate({ id: template.id, input: { isDefault: true } })}>Predeterminada</Button> : null}
-                  <Button size="sm" variant="ghost" onClick={() => templateStatus.mutate({ id: template.id, input: { isActive: template.isActive === false } })}>{template.isActive === false ? "Activar" : "Desactivar"}</Button>
+                  <Button size="sm" variant="secondary" onClick={() => createTemplateVersion(template)}>{uiText("Nueva versión")}</Button>
+                  {template.status === "DRAFT" ? <Button size="sm" onClick={() => approveTemplate.mutate(template.id)} disabled={approveTemplate.isPending}>{uiText("Aprobar")}</Button> : null}
+                  {!template.isDefault && template.isActive !== false ? <Button size="sm" variant="ghost" onClick={() => templateStatus.mutate({ id: template.id, input: { isDefault: true } })}>{uiText("Predeterminada")}</Button> : null}
+                  <Button size="sm" variant="ghost" onClick={() => templateStatus.mutate({ id: template.id, input: { isActive: template.isActive === false } })}>{template.isActive === false ? uiText("Activar") : uiText("Desactivar")}</Button>
                 </CardContent>
               </Card>
             ))}
@@ -880,41 +871,40 @@ export default function OnboardingDocumentsPage() {
 
       <Dialog open={Boolean(reviewDocument)} onOpenChange={(open) => !open && setReviewDocument(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Rechazar documento</DialogTitle><DialogDescription>{reviewDocument?.originalName}. La observación quedará visible y auditada.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{uiText("Rechazar documento")}</DialogTitle><DialogDescription>{reviewDocument?.originalName}{uiText(". La observación quedará visible y auditada.")}</DialogDescription></DialogHeader>
           <div className="space-y-4">
-            <div><Label htmlFor="document-rejection-reason">Motivo y observaciones</Label><textarea id="document-rejection-reason" rows={5} maxLength={1000} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-base sm:text-sm" /></div>
-            <Button variant="destructive" className="w-full" disabled={!reviewReason.trim() || review.isPending} onClick={() => reviewDocument && review.mutate({ id: reviewDocument.id, status: "REJECTED", reason: reviewReason.trim() })}>Confirmar rechazo</Button>
+            <div><Label htmlFor="document-rejection-reason">{uiText("Motivo y observaciones")}</Label><textarea id="document-rejection-reason" rows={5} maxLength={1000} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-base sm:text-sm" /></div>
+            <Button variant="destructive" className="w-full" disabled={!reviewReason.trim() || review.isPending} onClick={() => reviewDocument && review.mutate({ id: reviewDocument.id, status: "REJECTED", reason: reviewReason.trim() })}>{uiText("Confirmar rechazo")}</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(lifecycleDocument)} onOpenChange={(open) => !open && setLifecycleDocument(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Vigencia documental</DialogTitle><DialogDescription>Define la caducidad de {lifecycleDocument?.originalName} o déjala vacía si no expira.</DialogDescription></DialogHeader>
-          <div className="space-y-4"><div><Label htmlFor="document-expiry">Fecha de caducidad</Label><Input id="document-expiry" type="date" value={documentExpiresAt} onChange={(event) => setDocumentExpiresAt(event.target.value)} /></div><Button className="w-full" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate()}>Guardar vigencia</Button></div>
+          <DialogHeader><DialogTitle>{uiText("Vigencia documental")}</DialogTitle><DialogDescription>{uiText("Define la caducidad de ")}{lifecycleDocument?.originalName} {uiText(" o déjala vacía si no expira.")}</DialogDescription></DialogHeader>
+          <div className="space-y-4"><div><Label htmlFor="document-expiry">{uiText("Fecha de caducidad")}</Label><Input id="document-expiry" type="date" value={documentExpiresAt} onChange={(event) => setDocumentExpiresAt(event.target.value)} /></div><Button className="w-full" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate()}>{uiText("Guardar vigencia")}</Button></div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(replacementDocument)} onOpenChange={(open) => { if (!open) { setReplacementDocument(null); setReplacementFiles([]); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Renovar documento</DialogTitle><DialogDescription>La nueva carga será la versión {(replacementDocument?.version ?? 1) + 1}; la anterior conservará su trazabilidad.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{uiText("Renovar documento")}</DialogTitle><DialogDescription>{uiText("La nueva carga será la versión ")}{(replacementDocument?.version ?? 1) + 1}{uiText("; la anterior conservará su trazabilidad.")}</DialogDescription></DialogHeader>
           <FileUpload accept={ONBOARDING_DOCUMENT_MIME_TYPES.join(",")} maxFiles={1} maxSizeBytes={MAX_ONBOARDING_DOCUMENT_SIZE_BYTES} validateFile={validateOnboardingDocumentFile} onFiles={setReplacementFiles} />
-          <Button className="w-full" disabled={!replacementFiles[0] || replaceDocument.isPending} onClick={() => replaceDocument.mutate()}>Cargar nueva versión</Button>
+          <Button className="w-full" disabled={!replacementFiles[0] || replaceDocument.isPending} onClick={() => replaceDocument.mutate()}>{uiText("Cargar nueva versión")}</Button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{revisionSourceId ? "Nueva versión de plantilla" : "Nueva plantilla de incorporación"}</DialogTitle>
+            <DialogTitle>{revisionSourceId ? uiText("Nueva versión de plantilla") : "Nueva plantilla de incorporación"}</DialogTitle>
             <DialogDescription>
-              Diseña un checklist reutilizable. El orden determina qué tareas pueden configurarse como dependencias.
-            </DialogDescription>
+              {uiText("Diseña un checklist reutilizable. El orden determina qué tareas pueden configurarse como dependencias.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
               <div className="space-y-2">
-                <Label htmlFor="template-name">Nombre</Label>
+                <Label htmlFor="template-name">{uiText("Nombre")}</Label>
                 <Input
                   id="template-name"
                   value={templateName}
@@ -922,7 +912,7 @@ export default function OnboardingDocumentsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="template-description">Descripción</Label>
+                <Label htmlFor="template-description">{uiText("Descripción")}</Label>
                 <Input
                   id="template-description"
                   value={templateDescription}
@@ -939,19 +929,17 @@ export default function OnboardingDocumentsPage() {
                 className="size-4 accent-primary"
               />
               <span>
-                <strong className="block font-medium">Plantilla predeterminada</strong>
+                <strong className="block font-medium">{uiText("Plantilla predeterminada")}</strong>
                 <span className="text-xs text-text-secondary">
-                  Se propondrá automáticamente durante nuevas contrataciones.
-                </span>
+                  {uiText("Se propondrá automáticamente durante nuevas contrataciones.")}</span>
               </span>
             </label>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-semibold">Tareas de la lista de verificación</h3>
+                <h3 className="font-semibold">{uiText("Tareas de la lista de verificación")}</h3>
                 <p className="text-sm text-text-secondary">
-                  Configura responsables, vencimientos y dependencias antes de guardar.
-                </p>
+                  {uiText("Configura responsables, vencimientos y dependencias antes de guardar.")}</p>
               </div>
               <Button
                 type="button"
@@ -964,8 +952,7 @@ export default function OnboardingDocumentsPage() {
                 }
               >
                 <Plus className="size-4" />
-                Agregar tarea
-              </Button>
+                {uiText("Agregar tarea")}</Button>
             </div>
 
             {templateTasks.length ? (
@@ -998,9 +985,8 @@ export default function OnboardingDocumentsPage() {
                 ))}
               </ol>
             ) : (
-              <InlineFeedback tone="warning" title="La plantilla está vacía">
-                Agrega una tarea para poder crear el checklist.
-              </InlineFeedback>
+              <InlineFeedback tone="warning" title={uiText("La plantilla está vacía")}>
+                {uiText("Agrega una tarea para poder crear el checklist.")}</InlineFeedback>
             )}
 
             {templateErrors.length ? (
@@ -1008,7 +994,7 @@ export default function OnboardingDocumentsPage() {
                 role="alert"
                 className="rounded-xl border border-status-warning/35 bg-status-warning/10 p-4 text-sm"
               >
-                <p className="font-medium">Revisa la configuración</p>
+                <p className="font-medium">{uiText("Revisa la configuración")}</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-text-secondary">
                   {templateErrors.map((error) => (
                     <li key={error}>{error}</li>
@@ -1029,7 +1015,7 @@ export default function OnboardingDocumentsPage() {
                 }
                 onClick={() => createTemplate.mutate()}
               >
-                {createTemplate.isPending ? "Creando…" : "Crear plantilla"}
+                {createTemplate.isPending ? uiText("Creando…") : uiText("Crear plantilla")}
               </Button>
             </div>
           </div>
@@ -1039,14 +1025,13 @@ export default function OnboardingDocumentsPage() {
       <Dialog open={Boolean(assignmentTask)} onOpenChange={(open) => !open && setAssignmentTask(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Responsable y fecha límite</DialogTitle>
+            <DialogTitle>{uiText("Responsable y fecha límite")}</DialogTitle>
             <DialogDescription>
-              {assignmentTask?.title}. Asigna una persona concreta o deriva la tarea al equipo operativo correspondiente.
-            </DialogDescription>
+              {assignmentTask?.title}{uiText(". Asigna una persona concreta o deriva la tarea al equipo operativo correspondiente.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="task-owner-type">Tipo de responsable</Label>
+              <Label htmlFor="task-owner-type">{uiText("Tipo de responsable")}</Label>
               <Select
                 value={assignmentOwnerType}
                 onValueChange={(ownerType) => {
@@ -1072,10 +1057,10 @@ export default function OnboardingDocumentsPage() {
 
             {assignmentOwnerType === "USER" ? (
               <div className="space-y-2">
-                <Label htmlFor="task-owner-user">Persona responsable</Label>
+                <Label htmlFor="task-owner-user">{uiText("Persona responsable")}</Label>
                 <Select value={assignmentOwnerId} onValueChange={setAssignmentOwnerId}>
                   <SelectTrigger id="task-owner-user">
-                    <SelectValue placeholder="Selecciona una persona" />
+                    <SelectValue placeholder={uiText("Selecciona una persona")} />
                   </SelectTrigger>
                   <SelectContent>
                     {context.data?.assignableUsers.map((user) => (
@@ -1086,12 +1071,11 @@ export default function OnboardingDocumentsPage() {
                   </SelectContent>
                 </Select>
                 {context.isLoading ? (
-                  <p className="text-xs text-text-secondary">Cargando personas de la sucursal…</p>
+                  <p className="text-xs text-text-secondary">{uiText("Cargando personas de la sucursal…")}</p>
                 ) : null}
                 {context.isSuccess && !context.data.assignableUsers.length ? (
                   <p className="text-xs text-status-warning">
-                    No hay personas activas disponibles en esta sucursal.
-                  </p>
+                    {uiText("No hay personas activas disponibles en esta sucursal.")}</p>
                 ) : null}
                 {context.isError ? (
                   <p role="alert" className="text-sm text-status-danger">
@@ -1103,12 +1087,11 @@ export default function OnboardingDocumentsPage() {
               <div className="rounded-xl border border-border-default bg-surface-section p-3 text-sm">
                 <p className="font-medium">{ownerTypeLabel(assignmentOwnerType)}</p>
                 <p className="mt-1 text-xs text-text-secondary">
-                  La tarea aparecerá en la cola funcional de este responsable sin vincularse a una persona concreta.
-                </p>
+                  {uiText("La tarea aparecerá en la cola funcional de este responsable sin vincularse a una persona concreta.")}</p>
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="task-due-date">Fecha límite</Label>
+              <Label htmlFor="task-due-date">{uiText("Fecha límite")}</Label>
               <Input
                 id="task-due-date"
                 type="date"
@@ -1134,7 +1117,7 @@ export default function OnboardingDocumentsPage() {
                 })
               }
             >
-              {updateTask.isPending ? "Guardando…" : "Guardar asignación"}
+              {updateTask.isPending ? uiText("Guardando…") : uiText("Guardar asignación")}
             </Button>
           </div>
         </DialogContent>
@@ -1152,14 +1135,13 @@ export default function OnboardingDocumentsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Bloquear tarea</DialogTitle>
+            <DialogTitle>{uiText("Bloquear tarea")}</DialogTitle>
             <DialogDescription>
-              {blockingTask?.title}. Registra la causa y el contexto necesario para que el responsable pueda resolverla.
-            </DialogDescription>
+              {blockingTask?.title}{uiText(". Registra la causa y el contexto necesario para que el responsable pueda resolverla.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Motivo del bloqueo</Label>
+              <Label>{uiText("Motivo del bloqueo")}</Label>
               <Select
                 value={blockingReasonCode}
                 onValueChange={(value) =>
@@ -1167,7 +1149,7 @@ export default function OnboardingDocumentsPage() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un motivo" />
+                  <SelectValue placeholder={uiText("Selecciona un motivo")} />
                 </SelectTrigger>
                 <SelectContent>
                   {ONBOARDING_BLOCK_REASONS.map((reason) => (
@@ -1181,7 +1163,7 @@ export default function OnboardingDocumentsPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="task-blocking-observations">Observaciones</Label>
+                <Label htmlFor="task-blocking-observations">{uiText("Observaciones")}</Label>
                 <span className="text-xs text-text-secondary">
                   {blockingObservations.length}/1000
                 </span>
@@ -1191,13 +1173,12 @@ export default function OnboardingDocumentsPage() {
                 rows={5}
                 maxLength={1000}
                 value={blockingObservations}
-                placeholder="Describe qué falta, quién debe intervenir y cualquier dato útil para resolver el bloqueo."
+                placeholder={uiText("Describe qué falta, quién debe intervenir y cualquier dato útil para resolver el bloqueo.")}
                 onChange={(event) => setBlockingObservations(event.target.value)}
                 className="w-full rounded-2xl border border-border-default bg-surface-elevated px-4 py-3 text-base sm:text-sm outline-none transition focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus/30"
               />
               <p className="text-xs text-text-secondary">
-                Esta observación quedará visible en el checklist y registrada en el timeline.
-              </p>
+                {uiText("Esta observación quedará visible en el checklist y registrada en el timeline.")}</p>
             </div>
 
             <Button
@@ -1232,11 +1213,9 @@ export default function OnboardingDocumentsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cargar documento seguro</DialogTitle>
+            <DialogTitle>{uiText("Cargar documento seguro")}</DialogTitle>
             <DialogDescription>
-              PDF, JPEG o PNG, máximo 15 MB. El archivo se analiza, almacena de forma privada y queda pendiente de
-              revisión.
-            </DialogDescription>
+              {uiText("PDF, JPEG o PNG, máximo 15 MB. El archivo se analiza, almacena de forma privada y queda pendiente de revisión.")}</DialogDescription>
           </DialogHeader>
           <FileUpload
             accept={ONBOARDING_DOCUMENT_MIME_TYPES.join(",")}
@@ -1247,14 +1226,12 @@ export default function OnboardingDocumentsPage() {
             onFiles={setFiles}
           />
           {uploadValidationError ? (
-            <InlineFeedback tone="danger" title="Archivo no permitido">
+            <InlineFeedback tone="danger" title={uiText("Archivo no permitido")}>
               {uploadValidationError}
             </InlineFeedback>
           ) : null}
-          <InlineFeedback tone="info" title="Validación en dos etapas">
-            El navegador valida formato y tamaño antes del envío. La revisión y descarga solo se habilitan cuando el
-            servidor confirma escaneo seguro y almacenamiento privado.
-          </InlineFeedback>
+          <InlineFeedback tone="info" title={uiText("Validación en dos etapas")}>
+            {uiText("El navegador valida formato y tamaño antes del envío. La revisión y descarga solo se habilitan cuando el servidor confirma escaneo seguro y almacenamiento privado.")}</InlineFeedback>
           <Button
             disabled={!files[0] || Boolean(uploadValidationError) || upload.isPending}
             onClick={() => upload.mutate()}
@@ -1284,6 +1261,7 @@ function TemplateTaskEditor({
   onMove: (direction: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  const uiText = useUiText();
   const availableDependencies = tasks.slice(0, index);
   const dependencies = task.dependsOnKeys ?? [];
 
@@ -1342,7 +1320,7 @@ function TemplateTaskEditor({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor={`template-task-title-${task.taskKey}`}>Título</Label>
+          <Label htmlFor={`template-task-title-${task.taskKey}`}>{uiText("Título")}</Label>
           <Input
             id={`template-task-title-${task.taskKey}`}
             value={task.title}
@@ -1350,7 +1328,7 @@ function TemplateTaskEditor({
           />
         </div>
         <div className="space-y-2">
-          <Label>Tipo de tarea</Label>
+          <Label>{uiText("Tipo de tarea")}</Label>
           <Select
             value={task.taskType}
             onValueChange={(taskType) =>
@@ -1373,7 +1351,7 @@ function TemplateTaskEditor({
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor={`template-task-description-${task.taskKey}`}>Descripción</Label>
+          <Label htmlFor={`template-task-description-${task.taskKey}`}>{uiText("Descripción")}</Label>
           <textarea
             id={`template-task-description-${task.taskKey}`}
             rows={2}
@@ -1384,7 +1362,7 @@ function TemplateTaskEditor({
         </div>
 
         <div className="space-y-2">
-          <Label>Responsable</Label>
+          <Label>{uiText("Responsable")}</Label>
           <Select
             value={task.ownerType ?? "SYSTEM"}
             onValueChange={(ownerType) =>
@@ -1410,7 +1388,7 @@ function TemplateTaskEditor({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`template-task-due-${task.taskKey}`}>Vence después de</Label>
+          <Label htmlFor={`template-task-due-${task.taskKey}`}>{uiText("Vence después de")}</Label>
           <div className="relative">
             <Input
               id={`template-task-due-${task.taskKey}`}
@@ -1425,17 +1403,16 @@ function TemplateTaskEditor({
               className="pr-14"
             />
             <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-text-secondary">
-              días
-            </span>
+              {uiText("días")}</span>
           </div>
         </div>
 
         {task.ownerType === "USER" ? (
           <div className="space-y-2 md:col-span-2">
-            <Label>Persona responsable</Label>
+            <Label>{uiText("Persona responsable")}</Label>
             <Select value={task.ownerId ?? ""} onValueChange={(ownerId) => onChange({ ownerId })}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona una persona" />
+                <SelectValue placeholder={uiText("Selecciona una persona")} />
               </SelectTrigger>
               <SelectContent>
                 {assignableUsers.map((user) => (
@@ -1447,14 +1424,13 @@ function TemplateTaskEditor({
             </Select>
             {!assignableUsers.length ? (
               <p className="text-xs text-status-warning">
-                No hay personas asignables disponibles en esta sucursal.
-              </p>
+                {uiText("No hay personas asignables disponibles en esta sucursal.")}</p>
             ) : null}
           </div>
         ) : null}
 
         <fieldset className="space-y-2 md:col-span-2">
-          <legend className="text-sm font-medium">Dependencias</legend>
+          <legend className="text-sm font-medium">{uiText("Dependencias")}</legend>
           {availableDependencies.length ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {availableDependencies.map((dependency) => (
@@ -1476,8 +1452,7 @@ function TemplateTaskEditor({
             </div>
           ) : (
             <p className="text-xs text-text-secondary">
-              Es la primera tarea y puede comenzar sin dependencias.
-            </p>
+              {uiText("Es la primera tarea y puede comenzar sin dependencias.")}</p>
           )}
         </fieldset>
 
@@ -1489,8 +1464,7 @@ function TemplateTaskEditor({
             className="size-4 accent-primary"
           />
           <span className="text-sm">
-            Tarea obligatoria para completar la incorporación
-          </span>
+            {uiText("Tarea obligatoria para completar la incorporación")}</span>
         </label>
       </div>
     </li>
@@ -1516,6 +1490,7 @@ function RuntimeTaskDialog({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const uiText = useUiText();
   if (!task) return null;
   const dependencies = task.dependsOnKeys ?? [];
   const valid = Boolean(task.title.trim() && (task.ownerType !== "USER" || task.ownerId));
@@ -1526,17 +1501,17 @@ function RuntimeTaskDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar tarea" : "Nueva tarea"}</DialogTitle>
-          <DialogDescription>Configura el trabajo individual sin modificar la plantilla de origen.</DialogDescription>
+          <DialogDescription>{uiText("Configura el trabajo individual sin modificar la plantilla de origen.")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div><Label htmlFor="runtime-task-title">Título</Label><Input id="runtime-task-title" value={task.title} onChange={(event) => update({ title: event.target.value })} /></div>
-          <div><Label htmlFor="runtime-task-description">Descripción</Label><textarea id="runtime-task-description" rows={3} value={task.description ?? ""} onChange={(event) => update({ description: event.target.value })} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-base sm:text-sm" /></div>
-          <div><Label>Tipo</Label><Select value={task.taskType} onValueChange={(value) => update({ taskType: value as OnboardingTemplateTaskConfigDto["taskType"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{taskTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label>Responsable</Label><Select value={task.ownerType ?? "SYSTEM"} onValueChange={(value) => update({ ownerType: value as OnboardingOwnerType, ownerId: undefined })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ownerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
-          {task.ownerType === "USER" ? <div><Label>Persona</Label><Select value={task.ownerId ?? ""} onValueChange={(ownerId) => update({ ownerId })}><SelectTrigger><SelectValue placeholder="Selecciona una persona" /></SelectTrigger><SelectContent>{assignableUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.name} · {user.email}</SelectItem>)}</SelectContent></Select></div> : null}
-          <fieldset className="space-y-2"><legend className="text-sm font-medium">Dependencias</legend>{existingTasks.filter((item) => item.taskKey !== task.taskKey).map((item) => <label key={item.id} className="flex items-center gap-2 rounded-xl border p-3 text-sm"><input type="checkbox" checked={dependencies.includes(item.taskKey)} onChange={(event) => update({ dependsOnKeys: event.target.checked ? [...dependencies, item.taskKey] : dependencies.filter((key) => key !== item.taskKey) })} className="size-4 accent-primary" />{item.title}</label>)}</fieldset>
-          <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={task.required ?? true} onChange={(event) => update({ required: event.target.checked })} className="size-4 accent-primary" />Obligatoria para cerrar el expediente</label>
-          <Button className="w-full" disabled={!valid || pending} onClick={onSave}>{pending ? "Guardando…" : editing ? "Guardar cambios" : "Crear tarea"}</Button>
+          <div><Label htmlFor="runtime-task-title">{uiText("Título")}</Label><Input id="runtime-task-title" value={task.title} onChange={(event) => update({ title: event.target.value })} /></div>
+          <div><Label htmlFor="runtime-task-description">{uiText("Descripción")}</Label><textarea id="runtime-task-description" rows={3} value={task.description ?? ""} onChange={(event) => update({ description: event.target.value })} className="w-full rounded-2xl border border-border-default bg-surface-elevated p-3 text-base sm:text-sm" /></div>
+          <div><Label>{uiText("Tipo")}</Label><Select value={task.taskType} onValueChange={(value) => update({ taskType: value as OnboardingTemplateTaskConfigDto["taskType"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{taskTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label>{uiText("Responsable")}</Label><Select value={task.ownerType ?? "SYSTEM"} onValueChange={(value) => update({ ownerType: value as OnboardingOwnerType, ownerId: undefined })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ownerTypeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
+          {task.ownerType === "USER" ? <div><Label>{uiText("Persona")}</Label><Select value={task.ownerId ?? ""} onValueChange={(ownerId) => update({ ownerId })}><SelectTrigger><SelectValue placeholder={uiText("Selecciona una persona")} /></SelectTrigger><SelectContent>{assignableUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.name} · {user.email}</SelectItem>)}</SelectContent></Select></div> : null}
+          <fieldset className="space-y-2"><legend className="text-sm font-medium">{uiText("Dependencias")}</legend>{existingTasks.filter((item) => item.taskKey !== task.taskKey).map((item) => <label key={item.id} className="flex items-center gap-2 rounded-xl border p-3 text-sm"><input type="checkbox" checked={dependencies.includes(item.taskKey)} onChange={(event) => update({ dependsOnKeys: event.target.checked ? [...dependencies, item.taskKey] : dependencies.filter((key) => key !== item.taskKey) })} className="size-4 accent-primary" />{item.title}</label>)}</fieldset>
+          <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={task.required ?? true} onChange={(event) => update({ required: event.target.checked })} className="size-4 accent-primary" />{uiText("Obligatoria para cerrar el expediente")}</label>
+          <Button className="w-full" disabled={!valid || pending} onClick={onSave}>{pending ? uiText("Guardando…") : editing ? uiText("Guardar cambios") : "Crear tarea"}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -1578,9 +1553,10 @@ function TaskRow({
   first: boolean;
   last: boolean;
 }) {
+  const uiText = useUiText();
   const done = task.status === "COMPLETED";
   const cancelled = task.status === "CANCELLED";
-  const due = task.dueDate ? new Intl.DateTimeFormat("es", { dateStyle: "medium" }).format(new Date(task.dueDate)) : null;
+  const due = task.dueDate ? new Intl.DateTimeFormat(uiText.locale, { dateStyle: "medium" }).format(new Date(task.dueDate)) : null;
   return (
     <li
       className={`flex min-w-0 items-start gap-3 rounded-lg border bg-surface-1 p-4 ${
@@ -1610,7 +1586,7 @@ function TaskRow({
             <StatusBadge
               size="sm"
               tone={cancelled ? "neutral" : task.overdue ? "danger" : task.blocked ? "warning" : task.status === "IN_PROGRESS" ? "progress" : "neutral"}
-              label={task.overdue && !cancelled ? "Vencida" : taskStatusLabel(task.status)}
+              label={task.overdue && !cancelled ? uiText("Vencida") : taskStatusLabel(task.status)}
             />
           )}
         </div>
@@ -1618,7 +1594,7 @@ function TaskRow({
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2">
           <span>{task.owner?.name ?? ownerTypeLabel(task.ownerType)}</span>
           {due ? <span>{done ? "" : "Vence "}{due}</span> : null}
-          {task.waitingForLabels.length ? <span className="text-ink-3">Espera a: {task.waitingForLabels.join(", ")}</span> : null}
+          {task.waitingForLabels.length ? <span className="text-ink-3">{uiText("Espera a: ")}{task.waitingForLabels.join(", ")}</span> : null}
         </p>
         {task.blockingReason && !done ? <p className="mt-2 text-sm text-status-warning">{task.blockingReason}</p> : null}
 
@@ -1627,32 +1603,29 @@ function TaskRow({
         {canManage && !done && !cancelled ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {task.status === "BLOCKED" ? (
-              <Button size="sm" onClick={onUnblock} disabled={pending}>Desbloquear</Button>
+              <Button size="sm" onClick={onUnblock} disabled={pending}>{uiText("Desbloquear")}</Button>
             ) : (
               <Button size="sm" onClick={onComplete} disabled={task.blocked || pending}>
                 <Check className="size-4" aria-hidden="true" />
-                Completar
-              </Button>
+                {uiText("Completar")}</Button>
             )}
             <Button size="sm" variant="secondary" onClick={onUpload}>
               <Upload className="size-4" aria-hidden="true" />
-              Evidencia
-            </Button>
+              {uiText("Evidencia")}</Button>
             <details className="group relative">
               <summary className="inline-flex min-h-[var(--control-h-base)] cursor-pointer list-none items-center gap-1 rounded-md px-3 text-sm font-medium text-ink-2 hover:bg-surface-2 hover:text-ink-1 [&::-webkit-details-marker]:hidden">
-                Más
-                <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+                {uiText("Más")}<ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="absolute left-0 top-full z-[var(--z-popover)] mt-1 flex min-w-44 flex-col rounded-md border border-line bg-surface-1 p-1 shadow-e3">
-                <Button size="sm" variant="ghost" className="justify-start" onClick={onAssign}>Asignar responsable</Button>
-                <Button size="sm" variant="ghost" className="justify-start" onClick={onEdit}>Editar</Button>
-                <Button size="sm" variant="ghost" className="justify-start" disabled={first || pending} onClick={onMoveUp}>Subir</Button>
-                <Button size="sm" variant="ghost" className="justify-start" disabled={last || pending} onClick={onMoveDown}>Bajar</Button>
+                <Button size="sm" variant="ghost" className="justify-start" onClick={onAssign}>{uiText("Asignar responsable")}</Button>
+                <Button size="sm" variant="ghost" className="justify-start" onClick={onEdit}>{uiText("Editar")}</Button>
+                <Button size="sm" variant="ghost" className="justify-start" disabled={first || pending} onClick={onMoveUp}>{uiText("Subir")}</Button>
+                <Button size="sm" variant="ghost" className="justify-start" disabled={last || pending} onClick={onMoveDown}>{uiText("Bajar")}</Button>
                 {task.status !== "BLOCKED" ? (
-                  <Button size="sm" variant="ghost" className="justify-start" onClick={onBlock} disabled={pending}>Bloquear</Button>
+                  <Button size="sm" variant="ghost" className="justify-start" onClick={onBlock} disabled={pending}>{uiText("Bloquear")}</Button>
                 ) : null}
-                <Button size="sm" variant="ghost" className="justify-start" onClick={onCancel} disabled={pending}>Cancelar tarea</Button>
-                <Button size="sm" variant="ghost" className="justify-start text-status-danger" onClick={onDelete} disabled={pending}>Eliminar</Button>
+                <Button size="sm" variant="ghost" className="justify-start" onClick={onCancel} disabled={pending}>{uiText("Cancelar tarea")}</Button>
+                <Button size="sm" variant="ghost" className="justify-start text-status-danger" onClick={onDelete} disabled={pending}>{uiText("Eliminar")}</Button>
               </div>
             </details>
           </div>
@@ -1664,13 +1637,14 @@ function TaskRow({
 
 /** Un tramo por tarea. Se lee de un vistazo cuántas faltan y cuáles están mal. */
 function TaskProgress({ flow }: { flow: EmployeeOnboardingFlowDto }) {
+  const uiText = useUiText();
   const tasks = flow.tasks.filter((task) => task.status !== "CANCELLED");
   const done = tasks.filter((task) => task.status === "COMPLETED").length;
-  if (tasks.length === 0) return <p className="text-sm text-ink-2">Esta incorporación todavía no tiene tareas.</p>;
+  if (tasks.length === 0) return <p className="text-sm text-ink-2">{uiText("Esta incorporación todavía no tiene tareas.")}</p>;
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <p className="font-medium text-ink-1">{done} de {tasks.length} tareas completadas</p>
+        <p className="font-medium text-ink-1">{done} {uiText(" de ")}{tasks.length} {uiText(" tareas completadas")}</p>
         <p className="font-mono text-ink-2 tabular-figures">{flow.progressPercent} %</p>
       </div>
       <ol
@@ -1692,10 +1666,10 @@ function TaskProgress({ flow }: { flow: EmployeeOnboardingFlowDto }) {
         ))}
       </ol>
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
-        <Legend className="bg-status-success" label="Completada" />
-        <Legend className="bg-status-warning" label="Bloqueada" />
-        <Legend className="bg-status-danger" label="Vencida" />
-        <Legend className="bg-surface-3" label="Pendiente" />
+        <Legend className="bg-status-success" label={uiText("Completada")} />
+        <Legend className="bg-status-warning" label={uiText("Bloqueada")} />
+        <Legend className="bg-status-danger" label={uiText("Vencida")} />
+        <Legend className="bg-surface-3" label={uiText("Pendiente")} />
       </p>
     </div>
   );
@@ -1711,6 +1685,7 @@ function Legend({ className, label }: { className: string; label: string }) {
 }
 
 function Timeline({ flow }: { flow: EmployeeOnboardingFlowDto }) {
+  const uiText = useUiText();
   return (
     <section className="space-y-3" aria-labelledby="onboarding-timeline">
       <div className="flex items-center gap-2">
@@ -1735,7 +1710,7 @@ function Timeline({ flow }: { flow: EmployeeOnboardingFlowDto }) {
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-text-secondary">
                       <UserRoundCheck className="size-3.5" aria-hidden="true" />
                       <span>
-                        Responsable: <strong className="font-medium text-foreground">{actor.name}</strong>
+                        {uiText("Responsable:")}<strong className="font-medium text-foreground">{actor.name}</strong>
                         {actor.detail ? ` · ${actor.detail}` : ""}
                       </span>
                     </p>
@@ -1749,9 +1724,8 @@ function Timeline({ flow }: { flow: EmployeeOnboardingFlowDto }) {
           })}
         </ol>
       ) : (
-        <InlineFeedback tone="info" title="Sin actividad registrada">
-          Las actualizaciones de tareas y documentos aparecerán aquí con fecha y responsable.
-        </InlineFeedback>
+        <InlineFeedback tone="info" title={uiText("Sin actividad registrada")}>
+          {uiText("Las actualizaciones de tareas y documentos aparecerán aquí con fecha y responsable.")}</InlineFeedback>
       )}
     </section>
   );
@@ -1776,15 +1750,14 @@ function Documents({
   onLifecycle: (document: EmployeeOnboardingDocumentDto) => void;
   onDelete: (document: EmployeeOnboardingDocumentDto) => void;
 }) {
+  const uiText = useUiText();
   return (
     <section className="space-y-3" aria-labelledby="employee-documents">
       <h2 id="employee-documents" className="text-lg font-semibold">
-        Expediente documental
-      </h2>
+        {uiText("Expediente documental")}</h2>
       {!flow.documents.length ? (
-        <InlineFeedback tone="info" title="Sin documentos cargados">
-          Usa “Evidencia” en una tarea para incorporar archivos al expediente privado.
-        </InlineFeedback>
+        <InlineFeedback tone="info" title={uiText("Sin documentos cargados")}>
+          {uiText("Usa “Evidencia” en una tarea para incorporar archivos al expediente privado.")}</InlineFeedback>
       ) : (
         flow.documents.map((document) => {
           const security = getOnboardingDocumentSecurity(document);
@@ -1798,7 +1771,7 @@ function Documents({
                     {document.category} · v{document.version ?? 1} · {(document.sizeBytes / 1024).toFixed(0)} KB
                     {document.expiresAt ? ` · vence ${new Date(document.expiresAt).toLocaleDateString()}` : ""}
                   </p>
-                  {document.rejectionReason ? <p className="mt-1 text-xs text-status-danger">Rechazo: {document.rejectionReason}</p> : null}
+                  {document.rejectionReason ? <p className="mt-1 text-xs text-status-danger">{uiText("Rechazo: ")}{document.rejectionReason}</p> : null}
                   <p className={`mt-1 text-xs ${security.ready ? "text-status-success" : "text-status-warning"}`}>
                     {security.label} · {security.detail}
                   </p>
@@ -1812,7 +1785,7 @@ function Documents({
                   onClick={() => onDownload(document)}
                 >
                   <Download className="size-4" />
-                  {downloadingId === document.id ? "Descargando…" : "Descargar"}
+                  {downloadingId === document.id ? "Descargando…" : uiText("Descargar")}
                 </Button>
                 {canManage && document.status === "PENDING_REVIEW" ? (
                   <div className="flex gap-2">
@@ -1822,21 +1795,19 @@ function Documents({
                       disabled={!security.ready}
                       onClick={() => onReview(document, "REJECTED")}
                     >
-                      Rechazar
-                    </Button>
+                      {uiText("Rechazar")}</Button>
                     <Button
                       size="sm"
                       disabled={!security.ready}
                       onClick={() => onReview(document, "APPROVED")}
                     >
-                      Aprobar
-                    </Button>
+                      {uiText("Aprobar")}</Button>
                   </div>
                 ) : null}
                 {canManage && document.status !== "SUPERSEDED" ? (
                   <div className="flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => onReplace(document)}>Renovar</Button>
-                    <Button size="sm" variant="ghost" onClick={() => onLifecycle(document)}>Vigencia</Button>
+                    <Button size="sm" variant="secondary" onClick={() => onReplace(document)}>{uiText("Renovar")}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onLifecycle(document)}>{uiText("Vigencia")}</Button>
                     <Button size="icon" variant="ghost" onClick={() => onDelete(document)} aria-label={`Eliminar ${document.originalName}`}><Trash2 className="size-4 text-status-danger" /></Button>
                   </div>
                 ) : null}

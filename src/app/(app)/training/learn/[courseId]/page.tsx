@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { ArrowLeft } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -12,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { fetchLearnerTrainingCourse, getApiErrorMessage, heartbeatTrainingVideo, recordTrainingVideoEvent, startTrainingVideo, updateTrainingLessonProgress } from "@/lib/backend";
 
 export default function TrainingCourseLearnPage() {
+  const uiText = useUiText();
   const { courseId } = useParams<{ courseId: string }>();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["learner-course", courseId], queryFn: () => fetchLearnerTrainingCourse(courseId) });
@@ -47,18 +50,17 @@ export default function TrainingCourseLearnPage() {
       <Button asChild variant="ghost" className="-ml-3">
         <Link href="/training">
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a mis cursos
-        </Link>
+          {uiText("Volver a mis cursos")}</Link>
       </Button>
 
       {/* La cabecera (título, categoría, duración, avance) la pinta el
           reproductor guiado, que es quien conoce el curso. */}
       {query.isLoading ? (
-        <SkeletonRows rows={5} label="Cargando el contenido de la capacitación" />
+        <SkeletonRows rows={5} label={uiText("Cargando el contenido de la capacitación")} />
       ) : query.isError ? (
         <ErrorState
-          title="No fue posible cargar la capacitación"
-          detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar la capacitación")}
+          detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void query.refetch()}
         />
       ) : query.data ? (

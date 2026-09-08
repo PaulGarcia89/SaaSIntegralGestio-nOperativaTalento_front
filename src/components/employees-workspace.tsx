@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,6 +40,7 @@ const statusChips: Array<{ value: EmployeeStatusFilter; label: string }> = [
 ];
 
 export function EmployeesDirectoryPage() {
+  const uiText = useUiText();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { can, currentTenant, currentBranch, tenantBranches } = useAppStore();
@@ -181,7 +184,7 @@ export function EmployeesDirectoryPage() {
     void updateMyPreference("employees-directory", { search, status, branchFilter, pageSize, viewMode, sortField, sortDirection }).catch(() => undefined);
   }, [savedFiltersReady, search, status, branchFilter, pageSize, viewMode, sortField, sortDirection]);
 
-  if (employees.isLoading && page === 1) return <AsyncState state="loading" title="Cargando empleados" />;
+  if (employees.isLoading && page === 1) return <AsyncState state="loading" title={uiText("Cargando empleados")} />;
   if (employees.isError) {
     const apiError = employees.error instanceof ApiError ? employees.error : null;
     const fallback = "No fue posible cargar el directorio";
@@ -192,7 +195,7 @@ export function EmployeesDirectoryPage() {
     return (
       <AsyncState
         state="error"
-        title="No fue posible cargar el directorio"
+        title={uiText("No fue posible cargar el directorio")}
         description={description}
         onRetry={() => void employees.refetch()}
       />
@@ -257,16 +260,16 @@ export function EmployeesDirectoryPage() {
         no métricas: viven en el subtítulo y en la paginación.
       */}
       <PageHeader
-        eyebrow="Personas"
-        title="Empleados"
-        description="Busca, filtra y entra al expediente sin cargar información innecesaria."
+        eyebrow={uiText("Personas")}
+        title={uiText("Empleados")}
+        description={uiText("Busca, filtra y entra al expediente sin cargar información innecesaria.")}
         meta={
           <>
             <span>{currentTenant.name}</span>
             <span>{currentBranch?.name ?? "Sucursal activa"}</span>
-            <span className="font-mono tabular-figures">{totalItems} expedientes</span>
+            <span className="font-mono tabular-figures">{totalItems} {uiText(" expedientes")}</span>
             {selectionCount ? (
-              <span className="font-mono tabular-figures text-accent-ink">{selectionCount} seleccionados</span>
+              <span className="font-mono tabular-figures text-accent-ink">{selectionCount} {uiText(" seleccionados")}</span>
             ) : null}
           </>
         }
@@ -276,14 +279,12 @@ export function EmployeesDirectoryPage() {
               <Button asChild type="button" variant="secondary">
                 <Link href="/employees/import">
                   <FileSpreadsheet className="size-4" aria-hidden="true" />
-                  Carga masiva
-                </Link>
+                  {uiText("Carga masiva")}</Link>
               </Button>
               <Button asChild type="button">
                 <Link href="/employees/new">
                   <UserPlus className="size-4" aria-hidden="true" />
-                  Registrar empleado
-                </Link>
+                  {uiText("Registrar empleado")}</Link>
               </Button>
             </>
           ) : null
@@ -295,11 +296,10 @@ export function EmployeesDirectoryPage() {
           <div className="min-w-0 flex justify-end sm:hidden">
             <Button type="button" variant="secondary" onClick={() => setMobileFiltersOpen(true)}>
               <Filter className="size-4" />
-              Filtros
-            </Button>
+              {uiText("Filtros")}</Button>
           </div>
           <div className="min-w-0 sticky top-4 z-20 hidden flex-nowrap items-center gap-2 overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80 sm:flex sm:flex-wrap sm:p-3">
-            <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-secondary sm:text-xs sm:tracking-wide">Estado</span>
+            <span className="mr-1 shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-secondary sm:text-xs sm:tracking-wide">{uiText("Estado")}</span>
             {statusChips.map((chip) => (
               <button
                 key={chip.value}
@@ -319,9 +319,8 @@ export function EmployeesDirectoryPage() {
             <label className="space-y-2">
               <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 <Search className="size-4" />
-                Buscar
-              </span>
-              <Input placeholder="Nombre o correo" value={search} onChange={(event) => updateSearch(event.target.value)} />
+                {uiText("Buscar")}</span>
+              <Input placeholder={uiText("Nombre o correo")} value={search} onChange={(event) => updateSearch(event.target.value)} />
             </label>
             {/*
               El desplegable de «Estado» se retiró: los chips de arriba hacen
@@ -332,20 +331,19 @@ export function EmployeesDirectoryPage() {
             <label className="space-y-2">
               <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                 <LayoutList className="size-4" />
-                Sucursal
-              </span>
+                {uiText("Sucursal")}</span>
               <Select value={branchFilter || "all"} onValueChange={(value) => updateBranchFilter(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
+                  <SelectValue placeholder={uiText("Todas")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  <SelectItem value="all">{uiText("Todas las sucursales")}</SelectItem>
                   {tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </label>
               <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Por página</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{uiText("Por página")}</span>
               <Select value={String(pageSize)} onValueChange={(value) => updatePageSize(Number(value))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -362,62 +360,51 @@ export function EmployeesDirectoryPage() {
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant={viewMode === "table" ? "default" : "secondary"} onClick={() => updateViewMode("table")}>
                   <LayoutList className="size-4" />
-                  Tabla
-                </Button>
+                  {uiText("Tabla")}</Button>
               <Button type="button" variant={viewMode === "cards" ? "default" : "secondary"} onClick={() => updateViewMode("cards")}>
                 <UsersRound className="size-4" />
-                Tarjetas
-              </Button>
+                {uiText("Tarjetas")}</Button>
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-default pt-4 text-sm">
             <p className="text-text-secondary">
               {meta ? `${meta.total} empleados encontrados` : `${data.length} empleados encontrados`}
             </p>
-            <p className="text-text-secondary">La vista muestra resultados paginados para mantener la pantalla rápida.</p>
+            <p className="text-text-secondary">{uiText("La vista muestra resultados paginados para mantener la pantalla rápida.")}</p>
           </div>
           {selectionCount ? (
             <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-text-secondary">
-                {selectionCount} empleados seleccionados para acciones masivas.
-              </p>
+                {selectionCount} {uiText("empleados seleccionados para acciones masivas.")}</p>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(selectionData, `${exportName}-seleccion`)}>
-                  Exportar selección
-                </Button>
+                  {uiText("Exportar selección")}</Button>
                 <Button type="button" variant="secondary" onClick={() => setSelectedIds([])}>
-                  Limpiar selección
-                </Button>
+                  {uiText("Limpiar selección")}</Button>
                 <Button type="button" variant="secondary" onClick={() => void copySelectedEmails(sortedData, selectedIds)}>
-                  Copiar correos
-                </Button>
+                  {uiText("Copiar correos")}</Button>
                 <Button type="button" variant="secondary" disabled={bulkStatus.isPending} onClick={() => bulkStatus.mutate("ACTIVE")}>
-                  Marcar activos
-                </Button>
+                  {uiText("Marcar activos")}</Button>
                 <Button type="button" variant="secondary" disabled={bulkStatus.isPending} onClick={() => bulkStatus.mutate("INACTIVE")}>
-                  Marcar inactivos
-                </Button>
+                  {uiText("Marcar inactivos")}</Button>
                 <Button type="button" variant="secondary" disabled={bulkStatus.isPending} onClick={() => bulkStatus.mutate("TERMINATED")}>
-                  Marcar finalizados
-                </Button>
+                  {uiText("Marcar finalizados")}</Button>
               </div>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" onClick={() => void exportEmployeesCsv(sortedData, exportName)}>
-              Exportar resultado
-            </Button>
+              {uiText("Exportar resultado")}</Button>
             <Button type="button" variant="secondary" onClick={() => setSelectedIds(sortedData.map((employee) => employee.id))}>
-              Seleccionar visibles
-            </Button>
+              {uiText("Seleccionar visibles")}</Button>
           </div>
         </CardContent>
       </Card>
       <MobileFilterSheet
         open={mobileFiltersOpen}
         onOpenChange={setMobileFiltersOpen}
-        title="Filtros de empleados"
-        description="Selecciona un estado, sucursal o búsqueda para reducir resultados."
+        title={uiText("Filtros de empleados")}
+        description={uiText("Selecciona un estado, sucursal o búsqueda para reducir resultados.")}
         onClear={() => {
           setStatus("all");
           setBranchFilter("");
@@ -428,7 +415,7 @@ export function EmployeesDirectoryPage() {
       >
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Estado</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{uiText("Estado")}</p>
             <div className="flex flex-wrap gap-2">
               {statusChips.map((chip) => (
                 <Button
@@ -445,21 +432,19 @@ export function EmployeesDirectoryPage() {
           <label className="space-y-2 text-sm font-medium">
             <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
               <Search className="size-4" />
-              Buscar
-            </span>
-            <Input placeholder="Nombre o correo" value={search} onChange={(event) => updateSearch(event.target.value)} />
+              {uiText("Buscar")}</span>
+            <Input placeholder={uiText("Nombre o correo")} value={search} onChange={(event) => updateSearch(event.target.value)} />
           </label>
           <label className="space-y-2 text-sm font-medium">
             <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
               <LayoutList className="size-4" />
-              Sucursal
-            </span>
+              {uiText("Sucursal")}</span>
             <Select value={branchFilter || "all"} onValueChange={(value) => updateBranchFilter(value === "all" ? "" : value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Todas" />
+                <SelectValue placeholder={uiText("Todas")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas las sucursales</SelectItem>
+                <SelectItem value="all">{uiText("Todas las sucursales")}</SelectItem>
                 {tenantBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -485,7 +470,7 @@ export function EmployeesDirectoryPage() {
           getKey={(employee) => employee.id}
           desktop={<div className="grid gap-3 lg:grid-cols-2">{sortedData.map((employee) => <EmployeeCard key={employee.id} employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => router.push(`/employees/${employee.id}/edit`)} />)}</div>}
           mobile={(employee) => <EmployeeCard employee={employee} selected={selectedIds.includes(employee.id)} onToggleSelect={() => toggleSelection(employee.id)} onEdit={() => router.push(`/employees/${employee.id}/edit`)} />}
-          empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">No hay empleados que coincidan con los filtros actuales.</CardContent></Card>}
+          empty={<Card level={3}><CardContent className="p-6 text-sm text-text-secondary">{uiText("No hay empleados que coincidan con los filtros actuales.")}</CardContent></Card>}
         />
       )}
       <div className="flex items-center justify-center py-2">
@@ -494,33 +479,33 @@ export function EmployeesDirectoryPage() {
             {employees.isFetching && page > 1 ? "Cargando más..." : "Cargar más empleados"}
           </Button>
         ) : (
-          <p className="text-sm text-text-secondary">No hay más empleados para cargar.</p>
+          <p className="text-sm text-text-secondary">{uiText("No hay más empleados para cargar.")}</p>
         )}
       </div>
       <Dialog open={Boolean(detailEmployee)} onOpenChange={(open) => !open && setDetailEmployee(null)}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Detalle del empleado</DialogTitle>
-            <DialogDescription>Historial, documentos y contexto operativo del expediente.</DialogDescription>
+            <DialogTitle>{uiText("Detalle del empleado")}</DialogTitle>
+            <DialogDescription>{uiText("Historial, documentos y contexto operativo del expediente.")}</DialogDescription>
           </DialogHeader>
-          {detailQuery.isLoading ? <AsyncState state="loading" title="Cargando detalle del expediente" /> : null}
+          {detailQuery.isLoading ? <AsyncState state="loading" title={uiText("Cargando detalle del expediente")} /> : null}
           {detailQuery.data ? (
             <div className="grid gap-4">
               <div className="grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 md:grid-cols-2">
-                <Summary label="Empleado" value={detailQuery.data.employee.name} />
-                <Summary label="Correo" value={detailQuery.data.employee.email} />
-                <Summary label="Estado" value={(detailQuery.data.employee as EmployeeWithSoftDelete).deletedAt ? "Eliminado" : detailQuery.data.employee.status} />
-                <Summary label="Sucursal" value={primaryAssignmentOf(detailQuery.data.employee)?.branch?.name ?? "Sin nombre"} />
-                <Summary label="Cargo" value={primaryAssignmentOf(detailQuery.data.employee)?.role ?? "Sin asignación"} />
-                <Summary label="Asignaciones" value={String(branchAssignmentsOf(detailQuery.data.employee).length)} />
+                <Summary label={uiText("Empleado")} value={detailQuery.data.employee.name} />
+                <Summary label={uiText("Correo")} value={detailQuery.data.employee.email} />
+                <Summary label={uiText("Estado")} value={(detailQuery.data.employee as EmployeeWithSoftDelete).deletedAt ? "Eliminado" : detailQuery.data.employee.status} />
+                <Summary label={uiText("Sucursal")} value={primaryAssignmentOf(detailQuery.data.employee)?.branch?.name ?? "Sin nombre"} />
+                <Summary label={uiText("Cargo")} value={primaryAssignmentOf(detailQuery.data.employee)?.role ?? "Sin asignación"} />
+                <Summary label={uiText("Asignaciones")} value={String(branchAssignmentsOf(detailQuery.data.employee).length)} />
               </div>
               <div className="flex flex-wrap gap-2">
-              <Button type="button" variant={detailTab === "activity" ? "default" : "secondary"} onClick={() => setDetailTab("activity")}>Actividad</Button>
-              <Button type="button" variant={detailTab === "documents" ? "default" : "secondary"} onClick={() => setDetailTab("documents")}>Documentos</Button>
+              <Button type="button" variant={detailTab === "activity" ? "default" : "secondary"} onClick={() => setDetailTab("activity")}>{uiText("Actividad")}</Button>
+              <Button type="button" variant={detailTab === "documents" ? "default" : "secondary"} onClick={() => setDetailTab("documents")}>{uiText("Documentos")}</Button>
               </div>
               {detailTab === "activity" ? (
                 <section className="rounded-2xl border border-border-default p-4">
-                  <h3 className="font-semibold">Actividad real</h3>
+                  <h3 className="font-semibold">{uiText("Actividad real")}</h3>
                   <div className="mt-4 space-y-4">
                     {(Array.isArray(detailQuery.data.history) ? detailQuery.data.history : []).map((item, index) => {
                       const isFirst = index === 0;
@@ -549,13 +534,13 @@ export function EmployeesDirectoryPage() {
               ) : null}
               {detailTab === "documents" ? (
                 <section className="rounded-2xl border border-border-default p-4">
-                  <h3 className="font-semibold">Documentos</h3>
+                  <h3 className="font-semibold">{uiText("Documentos")}</h3>
                   <div className="mt-3 space-y-2">
                     {(Array.isArray(detailQuery.data.documents) ? detailQuery.data.documents : []).map((doc) => (
                       <div key={doc.id} className="flex items-center justify-between rounded-xl bg-surface-elevated px-3 py-2 text-sm">
                         <div>
                           <p className="font-medium">{doc.title}</p>
-                          <p className="text-xs text-text-secondary">Actualizado {doc.updatedAt}</p>
+                          <p className="text-xs text-text-secondary">{uiText("Actualizado ")}{doc.updatedAt}</p>
                         </div>
                         <Badge variant={doc.status === "Completado" ? "success" : "secondary"}>{doc.status}</Badge>
                       </div>
@@ -570,22 +555,22 @@ export function EmployeesDirectoryPage() {
       <Dialog open={Boolean(deletingEmployee)} onOpenChange={(open) => !open && setDeletingEmployee(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Eliminar empleado</DialogTitle>
-            <DialogDescription>Se eliminará lógicamente el expediente del directorio y podrás restaurarlo luego.</DialogDescription>
+            <DialogTitle>{uiText("Eliminar empleado")}</DialogTitle>
+            <DialogDescription>{uiText("Se eliminará lógicamente el expediente del directorio y podrás restaurarlo luego.")}</DialogDescription>
           </DialogHeader>
           <div className="rounded-2xl border border-border-default bg-surface-elevated p-4 text-sm">
             <p className="font-medium">{deletingEmployee?.name}</p>
             <p className="mt-1 text-text-secondary">{deletingEmployee?.email}</p>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setDeletingEmployee(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setDeletingEmployee(null)}>{uiText("Cancelar")}</Button>
             {(deletingEmployee as EmployeeWithSoftDelete | null)?.deletedAt ? (
               <Button onClick={() => deletingEmployee && restoreEmployeeAction.mutate(deletingEmployee.id)} disabled={!deletingEmployee || restoreEmployeeAction.isPending}>
                 <RotateCcw className="size-4" />
-                {restoreEmployeeAction.isPending ? "Restaurando..." : "Restaurar"}
+                {restoreEmployeeAction.isPending ? "Restaurando..." : uiText("Restaurar")}
               </Button>
             ) : (
-              <Button variant="destructive" onClick={() => deletingEmployee && removeEmployee.mutate(deletingEmployee.id)} disabled={!deletingEmployee || removeEmployee.isPending}>{removeEmployee.isPending ? "Eliminando..." : "Eliminar"}</Button>
+              <Button variant="destructive" onClick={() => deletingEmployee && removeEmployee.mutate(deletingEmployee.id)} disabled={!deletingEmployee || removeEmployee.isPending}>{removeEmployee.isPending ? uiText("Eliminando...") : uiText("Eliminar")}</Button>
             )}
           </div>
         </DialogContent>
@@ -595,6 +580,7 @@ export function EmployeesDirectoryPage() {
 }
 
 export function EmployeeCreatePage() {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const router = useRouter();
   const { can, tenantUsers } = useAppStore();
@@ -686,11 +672,11 @@ export function EmployeeCreatePage() {
                 {step === 0 ? <div className="grid gap-4 sm:grid-cols-2"><CreateField label={t("employees.fields.legalFirstName")} required value={form.personal.legalFirstName} onChange={(value) => updateSection("personal", { legalFirstName: value })} /><CreateField label={t("employees.fields.middleName")} value={form.personal.middleName ?? ""} onChange={(value) => updateSection("personal", { middleName: value })} /><CreateField label={t("employees.fields.legalLastName")} required value={form.personal.legalLastName} onChange={(value) => updateSection("personal", { legalLastName: value })} /><CreateField label={t("employees.fields.preferredName")} value={form.personal.preferredName ?? ""} onChange={(value) => updateSection("personal", { preferredName: value })} /><CreateField label={t("employees.fields.dateOfBirth")} type="date" value={form.personal.dateOfBirth ?? ""} onChange={(value) => updateSection("personal", { dateOfBirth: value })} /><InlineFeedback tone="info" title={t("employees.create.protectedIdTitle")}>{t("employees.create.protectedIdDescription")}</InlineFeedback></div> : null}
                 {step === 1 ? <div className="grid gap-4 sm:grid-cols-2"><CreateField label={tx("Email laboral", "Work email")} type="email" required value={form.contact.workEmail} onChange={(value) => updateSection("contact", { workEmail: value })} /><CreateField label={tx("Email personal", "Personal email")} type="email" value={form.contact.personalEmail ?? ""} onChange={(value) => updateSection("contact", { personalEmail: value })} /><CreateField label={tx("Teléfono", "Phone")} type="tel" value={form.contact.phone ?? ""} onChange={(value) => updateSection("contact", { phone: value })} /><CreateField label={tx("Dirección", "Address")} value={form.contact.addressLine1 ?? ""} onChange={(value) => updateSection("contact", { addressLine1: value })} /><CreateField label={tx("Ciudad", "City")} value={form.contact.city ?? ""} onChange={(value) => updateSection("contact", { city: value })} /><CreateField label={tx("Estado", "State")} value={form.contact.state ?? "FL"} onChange={(value) => updateSection("contact", { state: value })} /><CreateField label="ZIP" value={form.contact.postalCode ?? ""} onChange={(value) => updateSection("contact", { postalCode: value })} /><CreateField label={tx("País", "Country")} value={form.contact.country ?? "US"} onChange={(value) => updateSection("contact", { country: value })} /></div> : null}
                 {step === 2 ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="employee-branch" label={tx("Sucursal principal", "Primary branch")} required>{(field) => <Select value={form.employment.primaryBranchId} onValueChange={(primaryBranchId) => updateSection("employment", { primaryBranchId })}><SelectTrigger {...field}><SelectValue placeholder={tx("Selecciona una sucursal", "Select a branch")} /></SelectTrigger><SelectContent>{activeBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}</FormField><CreateField label={tx("Cargo", "Job title")} required value={form.employment.jobTitle} onChange={(value) => updateSection("employment", { jobTitle: value })} /><CreateField label={tx("Departamento", "Department")} value={form.employment.department ?? ""} onChange={(value) => updateSection("employment", { department: value })} /><FormField id="employee-supervisor" label={tx("Supervisor", "Supervisor")}>{(field) => <Select value={form.employment.supervisorUserId ?? "none"} onValueChange={(value) => updateSection("employment", { supervisorUserId: value === "none" ? undefined : value })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{tx("Sin supervisor", "No supervisor")}</SelectItem>{tenantUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select>}</FormField><CreateField label={tx("Fecha de contratación", "Hire date")} type="date" value={form.employment.hireDate ?? ""} onChange={(value) => updateSection("employment", { hireDate: value })} /><CreateField label={tx("Fecha de inicio", "Start date")} type="date" value={form.employment.startDate ?? ""} onChange={(value) => updateSection("employment", { startDate: value })} /><FormField id="employee-status" label={tx("Estado de empleo", "Employment status")}>{(field) => <Select value={form.employment.status ?? "ACTIVE"} onValueChange={(status) => updateSection("employment", { status: status as EmployeeStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ACTIVE">{tx("Activo", "Active")}</SelectItem><SelectItem value="INACTIVE">{tx("Inactivo", "Inactive")}</SelectItem><SelectItem value="TERMINATED">{tx("Finalizado", "Terminated")}</SelectItem></SelectContent></Select>}</FormField></div> : null}
-                {step === 3 ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="pay-type" label="Tipo de pago">{(field) => <Select value={form.payroll?.payType ?? "SALARY"} onValueChange={(payType) => updateSection("payroll", { payType })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SALARY">Salario</SelectItem><SelectItem value="HOURLY">Por hora</SelectItem><SelectItem value="COMMISSION">Comisión</SelectItem><SelectItem value="TIP_BASED">Propinas</SelectItem></SelectContent></Select>}</FormField><CreateField label="Salario o tarifa" type="number" value={form.payroll?.payRate ?? ""} onChange={(value) => updateSection("payroll", { payRate: value })} /><FormField id="pay-frequency" label="Frecuencia de pago">{(field) => <Select value={form.payroll?.payFrequency ?? "BIWEEKLY"} onValueChange={(payFrequency) => updateSection("payroll", { payFrequency })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="WEEKLY">Semanal</SelectItem><SelectItem value="BIWEEKLY">Quincenal</SelectItem><SelectItem value="SEMIMONTHLY">Dos veces al mes</SelectItem><SelectItem value="MONTHLY">Mensual</SelectItem></SelectContent></Select>}</FormField><FormField id="payment-method" label="Método de pago">{(field) => <Select value={form.payroll?.paymentMethod ?? "DIRECT_DEPOSIT"} onValueChange={(paymentMethod) => updateSection("payroll", { paymentMethod })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="DIRECT_DEPOSIT">Direct deposit</SelectItem><SelectItem value="CHECK">Cheque</SelectItem><SelectItem value="PAY_CARD">Tarjeta de pago</SelectItem></SelectContent></Select>}</FormField><CreateField label="Proveedor de nómina" value={form.payroll?.payrollProvider ?? ""} onChange={(value) => updateSection("payroll", { payrollProvider: value })} /><CreateField label="Payroll Employee ID" value={form.payroll?.payrollEmployeeId ?? ""} onChange={(value) => updateSection("payroll", { payrollEmployeeId: value })} /><label className="flex min-h-11 items-center gap-3 text-sm font-medium sm:col-span-2"><input type="checkbox" checked={Boolean(form.payroll?.overtimeEligible)} onChange={(event) => updateSection("payroll", { overtimeEligible: event.target.checked })} />Elegible para overtime</label></div> : null}
-                {step === 4 ? <div className="space-y-5"><InlineFeedback tone="warning" title="Información fiscal protegida">El SSN se cifra en el servidor y nunca vuelve a mostrarse completo. No lo incluyas en notas o archivos no protegidos.</InlineFeedback><div className="grid gap-4 sm:grid-cols-2"><CreateField label="SSN" type="password" value={form.tax?.ssn ?? ""} onChange={(value) => updateSection("tax", { ssn: value })} /><FormField id="w4-status" label="Form W-4">{(field) => <Select value={form.tax?.w4Status ?? "PENDING"} onValueChange={(w4Status) => updateSection("tax", { w4Status })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="COMPLETE">Completado</SelectItem><SelectItem value="NOT_REQUIRED">No requerido</SelectItem></SelectContent></Select>}</FormField><FormField id="i9-status" label="Form I-9">{(field) => <Select value={form.eligibility?.i9Status ?? "PENDING"} onValueChange={(i9Status) => updateSection("eligibility", { i9Status })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="VERIFIED">Verificado</SelectItem><SelectItem value="NOT_REQUIRED">No requerido</SelectItem></SelectContent></Select>}</FormField><FormField id="everify-status" label="E-Verify">{(field) => <Select value={form.eligibility?.eVerifyStatus ?? "NOT_REQUIRED"} onValueChange={(eVerifyStatus) => updateSection("eligibility", { eVerifyStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NOT_REQUIRED">No requerido</SelectItem><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="AUTHORIZED">Autorizado</SelectItem></SelectContent></Select>}</FormField><FormField id="florida-new-hire" label="Florida New Hire">{(field) => <Select value={form.floridaNewHire?.status ?? "PENDING"} onValueChange={(status) => updateSection("floridaNewHire", { status, required: status !== "NOT_REQUIRED" })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">Pendiente</SelectItem><SelectItem value="SUBMITTED">Reportado</SelectItem><SelectItem value="CONFIRMED">Confirmado</SelectItem><SelectItem value="NOT_REQUIRED">No requerido</SelectItem></SelectContent></Select>}</FormField><div className="sm:col-span-2 rounded-2xl border border-dashed border-border-default bg-surface-elevated p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-medium">Documentos del expediente</p><p className="mt-1 text-sm text-text-secondary">Adjunta fotos o PDF para SSN, W-4, I-9 o Florida New Hire. Se subirán al expediente cuando guardes.</p></div><Badge variant="outline">{evidenceFiles.length} archivo{evidenceFiles.length === 1 ? "" : "s"}</Badge></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{[{ section: "tax" as const, label: "SSN / W-4" }, { section: "eligibility" as const, label: "I-9 / E-Verify" }, { section: "floridaNewHire" as const, label: "Florida New Hire" }].map((item) => <label key={item.label} className="rounded-xl border border-border-default bg-card p-3 text-sm font-medium"><span>{item.label}</span><Input className="mt-2" type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => void addEvidenceFile(item.section, item.label, event.target.files?.[0] ?? null)} /></label>)}</div>{evidenceFiles.length ? <ul className="mt-4 space-y-2">{evidenceFiles.map((item) => <li key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-card px-3 py-2 text-sm"><span>{item.label}: {item.file.name}</span><span className="text-text-secondary">{Math.round(item.file.size / 1024)} KB</span></li>)}</ul> : null}</div></div></div> : null}
-                {step === 5 ? <div className="space-y-5"><InitialChecklist /><section className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">Enviar documentos a firma con DocuSeal</h3><p className="mt-1 text-sm text-text-secondary">Selecciona los documentos que deben salir al correo del empleado al terminar el alta. El estado y el PDF firmado volverán al expediente automáticamente.</p></div><Badge variant="outline">Opcional</Badge></div>{docuSealTemplates.isLoading ? <p className="mt-4 text-sm text-text-secondary">Cargando plantillas...</p> : docuSealTemplates.data?.templates?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-2">{docuSealTemplates.data.templates.map((template) => { const selected = docuSealTemplateKeys.includes(template.key); return <label key={template.key} className={cn("flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm", selected ? "border-primary bg-card" : "border-border-default bg-surface-elevated")}><input type="checkbox" checked={selected} onChange={(event) => setDocuSealTemplateKeys((current) => event.target.checked ? [...current, template.key] : current.filter((key) => key !== template.key))} /><span><span className="font-medium">{template.label}</span><span className="mt-1 block text-xs text-text-secondary">Se enviará a {form.contact.workEmail || "el correo laboral"}</span></span></label>; })}</div> : <p className="mt-4 text-sm text-text-secondary">DocuSeal no está configurado todavía. Define la API key y los IDs de las plantillas en el backend.</p>}</section></div> : null}
-                {step === 6 ? <div className="grid gap-5 sm:grid-cols-2"><div className="space-y-4"><h3 className="font-semibold">Capacitación, licencias y activos</h3><p className="text-sm text-text-secondary">Al crear el expediente, el checklist deja pendientes las capacitaciones obligatorias, licencias profesionales y activos requeridos. Se asignan desde sus módulos especializados.</p><InlineFeedback tone="info" title="Documentos laborales">Offer letter, agreement, NDA, handbook y documentos de seguridad se cargan después desde la pestaña Documentos del expediente.</InlineFeedback></div><div className="space-y-4"><h3 className="font-semibold">Contacto de emergencia</h3><CreateField label="Nombre" value={form.emergencyContact?.name ?? ""} onChange={(value) => updateSection("emergencyContact", { name: value })} /><CreateField label="Relación" value={form.emergencyContact?.relationship ?? ""} onChange={(value) => updateSection("emergencyContact", { relationship: value })} /><CreateField label="Teléfono" type="tel" value={form.emergencyContact?.phone ?? ""} onChange={(value) => updateSection("emergencyContact", { phone: value })} /></div></div> : null}
-                {step === 7 ? <div className="space-y-4"><InlineFeedback tone="success" title="Revisa antes de crear">El backend generará un Employee ID, los perfiles protegidos y el checklist inicial auditable.</InlineFeedback><dl className="grid gap-4 rounded-2xl border border-border-default p-4 sm:grid-cols-2"><ReviewDatum label="Empleado" value={`${form.personal.legalFirstName} ${form.personal.legalLastName}`} /><ReviewDatum label="Email laboral" value={form.contact.workEmail} /><ReviewDatum label="Sucursal" value={activeBranches.find((branch) => branch.id === form.employment.primaryBranchId)?.name ?? "Sin seleccionar"} /><ReviewDatum label="Cargo" value={form.employment.jobTitle} /><ReviewDatum label="Nómina" value={`${form.payroll?.payType ?? "Sin definir"} · ${form.payroll?.payFrequency ?? "Sin definir"}`} /><ReviewDatum label="Elegibilidad" value={`I-9 ${form.eligibility?.i9Status ?? "PENDING"} · W-4 ${form.tax?.w4Status ?? "PENDING"}`} /><ReviewDatum label="Firma DocuSeal" value={docuSealTemplateKeys.length ? `${docuSealTemplateKeys.length} documento(s) seleccionado(s)` : "No seleccionada"} /></dl></div> : null}
+                {step === 3 ? <div className="grid gap-4 sm:grid-cols-2"><FormField id="pay-type" label={uiText("Tipo de pago")}>{(field) => <Select value={form.payroll?.payType ?? "SALARY"} onValueChange={(payType) => updateSection("payroll", { payType })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SALARY">{uiText("Salario")}</SelectItem><SelectItem value="HOURLY">{uiText("Por hora")}</SelectItem><SelectItem value="COMMISSION">{uiText("Comisión")}</SelectItem><SelectItem value="TIP_BASED">{uiText("Propinas")}</SelectItem></SelectContent></Select>}</FormField><CreateField label={uiText("Salario o tarifa")} type="number" value={form.payroll?.payRate ?? ""} onChange={(value) => updateSection("payroll", { payRate: value })} /><FormField id="pay-frequency" label={uiText("Frecuencia de pago")}>{(field) => <Select value={form.payroll?.payFrequency ?? "BIWEEKLY"} onValueChange={(payFrequency) => updateSection("payroll", { payFrequency })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="WEEKLY">{uiText("Semanal")}</SelectItem><SelectItem value="BIWEEKLY">{uiText("Quincenal")}</SelectItem><SelectItem value="SEMIMONTHLY">{uiText("Dos veces al mes")}</SelectItem><SelectItem value="MONTHLY">{uiText("Mensual")}</SelectItem></SelectContent></Select>}</FormField><FormField id="payment-method" label={uiText("Método de pago")}>{(field) => <Select value={form.payroll?.paymentMethod ?? "DIRECT_DEPOSIT"} onValueChange={(paymentMethod) => updateSection("payroll", { paymentMethod })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="DIRECT_DEPOSIT">Direct deposit</SelectItem><SelectItem value="CHECK">{uiText("Cheque")}</SelectItem><SelectItem value="PAY_CARD">{uiText("Tarjeta de pago")}</SelectItem></SelectContent></Select>}</FormField><CreateField label={uiText("Proveedor de nómina")} value={form.payroll?.payrollProvider ?? ""} onChange={(value) => updateSection("payroll", { payrollProvider: value })} /><CreateField label="Payroll Employee ID" value={form.payroll?.payrollEmployeeId ?? ""} onChange={(value) => updateSection("payroll", { payrollEmployeeId: value })} /><label className="flex min-h-11 items-center gap-3 text-sm font-medium sm:col-span-2"><input type="checkbox" checked={Boolean(form.payroll?.overtimeEligible)} onChange={(event) => updateSection("payroll", { overtimeEligible: event.target.checked })} />{uiText("Elegible para overtime")}</label></div> : null}
+                {step === 4 ? <div className="space-y-5"><InlineFeedback tone="warning" title={uiText("Información fiscal protegida")}>{uiText("El SSN se cifra en el servidor y nunca vuelve a mostrarse completo. No lo incluyas en notas o archivos no protegidos.")}</InlineFeedback><div className="grid gap-4 sm:grid-cols-2"><CreateField label="SSN" type="password" value={form.tax?.ssn ?? ""} onChange={(value) => updateSection("tax", { ssn: value })} /><FormField id="w4-status" label="Form W-4">{(field) => <Select value={form.tax?.w4Status ?? "PENDING"} onValueChange={(w4Status) => updateSection("tax", { w4Status })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">{uiText("Pendiente")}</SelectItem><SelectItem value="COMPLETE">{uiText("Completado")}</SelectItem><SelectItem value="NOT_REQUIRED">{uiText("No requerido")}</SelectItem></SelectContent></Select>}</FormField><FormField id="i9-status" label="Form I-9">{(field) => <Select value={form.eligibility?.i9Status ?? "PENDING"} onValueChange={(i9Status) => updateSection("eligibility", { i9Status })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">{uiText("Pendiente")}</SelectItem><SelectItem value="VERIFIED">{uiText("Verificado")}</SelectItem><SelectItem value="NOT_REQUIRED">{uiText("No requerido")}</SelectItem></SelectContent></Select>}</FormField><FormField id="everify-status" label="E-Verify">{(field) => <Select value={form.eligibility?.eVerifyStatus ?? "NOT_REQUIRED"} onValueChange={(eVerifyStatus) => updateSection("eligibility", { eVerifyStatus })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NOT_REQUIRED">{uiText("No requerido")}</SelectItem><SelectItem value="PENDING">{uiText("Pendiente")}</SelectItem><SelectItem value="AUTHORIZED">{uiText("Autorizado")}</SelectItem></SelectContent></Select>}</FormField><FormField id="florida-new-hire" label="Florida New Hire">{(field) => <Select value={form.floridaNewHire?.status ?? "PENDING"} onValueChange={(status) => updateSection("floridaNewHire", { status, required: status !== "NOT_REQUIRED" })}><SelectTrigger {...field}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PENDING">{uiText("Pendiente")}</SelectItem><SelectItem value="SUBMITTED">{uiText("Reportado")}</SelectItem><SelectItem value="CONFIRMED">{uiText("Confirmado")}</SelectItem><SelectItem value="NOT_REQUIRED">{uiText("No requerido")}</SelectItem></SelectContent></Select>}</FormField><div className="sm:col-span-2 rounded-2xl border border-dashed border-border-default bg-surface-elevated p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-medium">{uiText("Documentos del expediente")}</p><p className="mt-1 text-sm text-text-secondary">{uiText("Adjunta fotos o PDF para SSN, W-4, I-9 o Florida New Hire. Se subirán al expediente cuando guardes.")}</p></div><Badge variant="outline">{evidenceFiles.length} {uiText(" archivo")}{evidenceFiles.length === 1 ? "" : "s"}</Badge></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{[{ section: "tax" as const, label: "SSN / W-4" }, { section: "eligibility" as const, label: "I-9 / E-Verify" }, { section: "floridaNewHire" as const, label: "Florida New Hire" }].map((item) => <label key={item.label} className="rounded-xl border border-border-default bg-card p-3 text-sm font-medium"><span>{item.label}</span><Input className="mt-2" type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => void addEvidenceFile(item.section, item.label, event.target.files?.[0] ?? null)} /></label>)}</div>{evidenceFiles.length ? <ul className="mt-4 space-y-2">{evidenceFiles.map((item) => <li key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-card px-3 py-2 text-sm"><span>{item.label}: {item.file.name}</span><span className="text-text-secondary">{Math.round(item.file.size / 1024)} KB</span></li>)}</ul> : null}</div></div></div> : null}
+                {step === 5 ? <div className="space-y-5"><InitialChecklist /><section className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{uiText("Enviar documentos a firma con DocuSeal")}</h3><p className="mt-1 text-sm text-text-secondary">{uiText("Selecciona los documentos que deben salir al correo del empleado al terminar el alta. El estado y el PDF firmado volverán al expediente automáticamente.")}</p></div><Badge variant="outline">{uiText("Opcional")}</Badge></div>{docuSealTemplates.isLoading ? <p className="mt-4 text-sm text-text-secondary">{uiText("Cargando plantillas...")}</p> : docuSealTemplates.data?.templates?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-2">{docuSealTemplates.data.templates.map((template) => { const selected = docuSealTemplateKeys.includes(template.key); return <label key={template.key} className={cn("flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm", selected ? "border-primary bg-card" : "border-border-default bg-surface-elevated")}><input type="checkbox" checked={selected} onChange={(event) => setDocuSealTemplateKeys((current) => event.target.checked ? [...current, template.key] : current.filter((key) => key !== template.key))} /><span><span className="font-medium">{template.label}</span><span className="mt-1 block text-xs text-text-secondary">{uiText("Se enviará a ")}{form.contact.workEmail || "el correo laboral"}</span></span></label>; })}</div> : <p className="mt-4 text-sm text-text-secondary">{uiText("DocuSeal no está configurado todavía. Define la API key y los IDs de las plantillas en el backend.")}</p>}</section></div> : null}
+                {step === 6 ? <div className="grid gap-5 sm:grid-cols-2"><div className="space-y-4"><h3 className="font-semibold">{uiText("Capacitación, licencias y activos")}</h3><p className="text-sm text-text-secondary">{uiText("Al crear el expediente, el checklist deja pendientes las capacitaciones obligatorias, licencias profesionales y activos requeridos. Se asignan desde sus módulos especializados.")}</p><InlineFeedback tone="info" title={uiText("Documentos laborales")}>{uiText("Offer letter, agreement, NDA, handbook y documentos de seguridad se cargan después desde la pestaña Documentos del expediente.")}</InlineFeedback></div><div className="space-y-4"><h3 className="font-semibold">{uiText("Contacto de emergencia")}</h3><CreateField label={uiText("Nombre")} value={form.emergencyContact?.name ?? ""} onChange={(value) => updateSection("emergencyContact", { name: value })} /><CreateField label={uiText("Relación")} value={form.emergencyContact?.relationship ?? ""} onChange={(value) => updateSection("emergencyContact", { relationship: value })} /><CreateField label={uiText("Teléfono")} type="tel" value={form.emergencyContact?.phone ?? ""} onChange={(value) => updateSection("emergencyContact", { phone: value })} /></div></div> : null}
+                {step === 7 ? <div className="space-y-4"><InlineFeedback tone="success" title={uiText("Revisa antes de crear")}>{uiText("El backend generará un Employee ID, los perfiles protegidos y el checklist inicial auditable.")}</InlineFeedback><dl className="grid gap-4 rounded-2xl border border-border-default p-4 sm:grid-cols-2"><ReviewDatum label={uiText("Empleado")} value={`${form.personal.legalFirstName} ${form.personal.legalLastName}`} /><ReviewDatum label={uiText("Email laboral")} value={form.contact.workEmail} /><ReviewDatum label={uiText("Sucursal")} value={activeBranches.find((branch) => branch.id === form.employment.primaryBranchId)?.name ?? "Sin seleccionar"} /><ReviewDatum label={uiText("Cargo")} value={form.employment.jobTitle} /><ReviewDatum label={uiText("Nómina")} value={`${form.payroll?.payType ?? "Sin definir"} · ${form.payroll?.payFrequency ?? "Sin definir"}`} /><ReviewDatum label={uiText("Elegibilidad")} value={`I-9 ${form.eligibility?.i9Status ?? "PENDING"} · W-4 ${form.tax?.w4Status ?? "PENDING"}`} /><ReviewDatum label={uiText("Firma DocuSeal")} value={docuSealTemplateKeys.length ? `${docuSealTemplateKeys.length} documento(s) seleccionado(s)` : "No seleccionada"} /></dl></div> : null}
               </Wizard>
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 {step === 0 ? <Button asChild type="button" variant="secondary"><Link href="/employees">{tx("Cancelar", "Cancel")}</Link></Button> : <Button type="button" variant="secondary" onClick={() => setStep((current) => current - 1)}>{tx("Anterior", "Previous")}</Button>}
@@ -724,8 +710,9 @@ function CreateField({ label, onChange, required = false, type = "text", value }
 }
 
 function InitialChecklist() {
+  const uiText = useUiText();
   const requirements = ["I-9", "W-4", "Identidad de nómina / SSN", "Florida New Hire", "E-Verify", "Employment Agreement", "Capacitación obligatoria", "Licencia profesional"];
-  return <div className="space-y-4"><InlineFeedback tone="info" title="Checklist generado automáticamente">La creación del empleado registra estos requisitos como pendientes o no requeridos según las opciones elegidas. La evidencia se administra desde el expediente.</InlineFeedback><div className="grid gap-3 sm:grid-cols-2">{requirements.map((requirement) => <div key={requirement} className="flex items-center justify-between rounded-xl border border-border-default bg-surface-elevated p-4"><span className="font-medium">{requirement}</span><Badge variant="secondary">Pendiente</Badge></div>)}</div></div>;
+  return <div className="space-y-4"><InlineFeedback tone="info" title={uiText("Checklist generado automáticamente")}>{uiText("La creación del empleado registra estos requisitos como pendientes o no requeridos según las opciones elegidas. La evidencia se administra desde el expediente.")}</InlineFeedback><div className="grid gap-3 sm:grid-cols-2">{requirements.map((requirement) => <div key={requirement} className="flex items-center justify-between rounded-xl border border-border-default bg-surface-elevated p-4"><span className="font-medium">{requirement}</span><Badge variant="secondary">{uiText("Pendiente")}</Badge></div>)}</div></div>;
 }
 
 function ReviewDatum({ label, value }: { label: string; value: string }) {
@@ -897,6 +884,7 @@ export function EmployeeImportPage() {
 }
 
 function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { employee: EmployeeDirectoryItem; selected?: boolean; onToggleSelect?: () => void; onEdit?: () => void }) {
+  const uiText = useUiText();
   const assignments = Array.isArray(employee.branchAssignments) ? employee.branchAssignments : [];
   const primary = assignments.find((assignment) => assignment.isPrimary) ?? assignments[0];
   const activeAssignments = assignments.filter((assignment) => assignment.branch?.name);
@@ -913,7 +901,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
                   className="rounded-full border border-border-default bg-surface-section px-2 py-1 text-[11px] font-semibold text-text-secondary"
                   onClick={onToggleSelect}
                 >
-                  {selected ? "Seleccionada" : "Seleccionar"}
+                  {selected ? "Seleccionada" : uiText("Seleccionar")}
                 </button>
               ) : null}
               <UsersRound className="size-4 text-brand" />
@@ -921,13 +909,13 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
             </div>
             <p className="mt-1 truncate text-sm text-text-secondary">{employee.email}</p>
           </div>
-          <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? "Activo" : employee.status}</Badge>
+          <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{employee.status === "ACTIVE" ? uiText("Activo", undefined, "status") : employee.status}</Badge>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <StatusPill label="Sucursal" value={primary?.branch?.name ?? "Sin nombre"} />
-          <StatusPill label="Rol" value={primary?.role ?? "Sin asignación"} />
-          <StatusPill label="Asignaciones" value={String(activeAssignments.length)} />
-          {documentSummary ? <StatusPill label="Documentos" value={`${documentSummary.totalDocuments} documentos`} /> : null}
+          <StatusPill label={uiText("Sucursal")} value={primary?.branch?.name ?? "Sin nombre"} />
+          <StatusPill label={uiText("Rol")} value={primary?.role ?? "Sin asignación"} />
+          <StatusPill label={uiText("Asignaciones")} value={String(activeAssignments.length)} />
+          {documentSummary ? <StatusPill label={uiText("Documentos")} value={`${documentSummary.totalDocuments} documentos`} /> : null}
         </div>
         <div className="mt-4 grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 text-sm">
           <div className="flex items-center gap-2 text-text-secondary">
@@ -944,7 +932,7 @@ function EmployeeCard({ employee, selected = false, onToggleSelect, onEdit }: { 
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}><FilePenLine className="size-4" />Editar registro</Button> : null}
+          {onEdit ? <Button type="button" size="sm" variant="secondary" onClick={onEdit}><FilePenLine className="size-4" />{uiText("Editar registro")}</Button> : null}
         </div>
       </CardContent>
     </Card>
@@ -1178,10 +1166,11 @@ function EmployeeDirectoryTable({
   hasFilters: boolean;
   onClearFilters: () => void;
 }) {
+  const uiText = useUiText();
   const columns: DataColumn<EmployeeDirectoryItem>[] = [
     {
       key: "name",
-      header: "Empleado",
+      header: uiText("Empleado"),
       priority: "identity",
       sortValue: (employee) => employee.name,
       render: (employee) => (
@@ -1195,13 +1184,13 @@ function EmployeeDirectoryTable({
     },
     {
       key: "status",
-      header: "Estado",
+      header: uiText("Estado"),
       priority: "primary",
       sortValue: (employee) => employee.status,
       render: (employee) => (
         <StatusBadge
           size="sm"
-          label={employee.status === "ACTIVE" ? "Activo" : technicalLabel(employee.status)}
+          label={employee.status === "ACTIVE" ? uiText("Activo", undefined, "status") : technicalLabel(employee.status)}
           tone={
             employee.status === "ACTIVE"
               ? "success"
@@ -1214,7 +1203,7 @@ function EmployeeDirectoryTable({
     },
     {
       key: "assignments",
-      header: "Sucursal",
+      header: uiText("Sucursal"),
       priority: "secondary",
       sortValue: (employee) => primaryAssignmentOf(employee)?.branch?.name ?? "",
       render: (employee) => (
@@ -1223,7 +1212,7 @@ function EmployeeDirectoryTable({
     },
     {
       key: "role",
-      header: "Cargo",
+      header: uiText("Cargo"),
       priority: "secondary",
       render: (employee) => (
         <span className="truncate">{primaryAssignmentOf(employee)?.role ?? "Sin asignación"}</span>
@@ -1239,7 +1228,7 @@ function EmployeeDirectoryTable({
     },
     {
       key: "email",
-      header: "Correo",
+      header: uiText("Correo"),
       priority: "detail",
       sortValue: (employee) => employee.email,
       render: (employee) => <span className="truncate text-ink-2">{employee.email}</span>,
@@ -1251,7 +1240,7 @@ function EmployeeDirectoryTable({
       rows={rows}
       columns={columns}
       getKey={(employee) => employee.id}
-      caption="Directorio de empleados"
+      caption={uiText("Directorio de empleados")}
       sort={{ key: sortField, direction: sortDirection }}
       onSortChange={(next) => {
         // `null` significa "sin orden"; esta pantalla siempre tiene uno, así
@@ -1269,10 +1258,9 @@ function EmployeeDirectoryTable({
       rowActions={(employee) => (
         <span className="flex gap-1.5">
           <Button type="button" size="sm" variant="secondary" onClick={() => onEdit(employee)}>
-            Editar
-          </Button>
+            {uiText("Editar")}</Button>
           <Button type="button" size="sm" variant="ghost" asChild>
-            <Link href={`/employees/${employee.id}`}>Ver expediente</Link>
+            <Link href={`/employees/${employee.id}`}>{uiText("Ver expediente")}</Link>
           </Button>
         </span>
       )}

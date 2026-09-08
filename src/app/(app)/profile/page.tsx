@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ModuleHeader, SectionCard, InfoList, SplitPanel } from "@/components/ui";
@@ -8,16 +10,17 @@ import { LanguageSelector } from "@/components/language-selector";
 import { useLocale } from "@/components/locale-provider";
 
 export default function ProfilePage() {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   return (
     <>
       <ModuleHeader
-        eyebrow="Perfil del usuario"
-        title="Preferencias, seguridad y sesiones activas."
-        description="Control personal de acceso y preferencias."
+        eyebrow={uiText("Perfil del usuario")}
+        title={uiText("Preferencias, seguridad y sesiones activas.")}
+        description={uiText("Control personal de acceso y preferencias.")}
         actions={
           <Button asChild>
-            <Link href="/notifications">Ver notificaciones</Link>
+            <Link href="/notifications">{uiText("Ver notificaciones")}</Link>
           </Button>
         }
         metrics={[
@@ -26,11 +29,11 @@ export default function ProfilePage() {
           { label: "Nivel de seguridad", value: "Alto", detail: "Politica activa" },
         ]}
       />
-      <SectionCard title="Idioma y región" subtitle="Preferencia de interfaz">
+      <SectionCard title={uiText("Idioma y región")} subtitle="Preferencia de interfaz">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="font-medium">Idioma de la interfaz</p>
-            <p className="mt-1 text-sm text-muted-foreground">El cambio se aplica inmediatamente y se conserva en este dispositivo.</p>
+            <p className="font-medium">{uiText("Idioma de la interfaz")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{uiText("El cambio se aplica inmediatamente y se conserva en este dispositivo.")}</p>
           </div>
           <LanguageSelector />
         </div>
@@ -38,7 +41,7 @@ export default function ProfilePage() {
       </SectionCard>
       <SplitPanel
         left={
-          <SectionCard title="Cuenta personal" subtitle="Identidad y acceso">
+          <SectionCard title={uiText("Cuenta personal")} subtitle="Identidad y acceso">
             <div className="space-y-5">
               <div className="flex items-start gap-4 rounded-3xl border border-border/70 bg-secondary/35 p-5">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-fill to-accent-line text-lg font-semibold text-surface-dark-ink">
@@ -47,16 +50,16 @@ export default function ProfilePage() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-semibold">Ava Thompson</h3>
-                    <Badge variant="secondary" className="rounded-full">Conectada</Badge>
+                    <Badge variant="secondary" className="rounded-full">{uiText("Conectada")}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">Superadministrador · TalentOS Cloud USA</p>
+                  <p className="text-sm text-muted-foreground">{uiText("Superadministrador · TalentOS Cloud USA")}</p>
                   <p className="text-sm text-muted-foreground">ava.thompson@talentoscloud.com</p>
                 </div>
               </div>
               <InfoList
                 items={[
                   { title: "Autenticacion multifactor", description: "Mejora planificada", badge: "Ruta" },
-                  { title: "Zona horaria", description: "America/New_York" },
+                  { title: uiText("Zona horaria"), description: "America/New_York" },
                   { title: "Preferencias de notificacion", description: "Email y centro de alertas" },
                 ]}
               />
@@ -64,7 +67,7 @@ export default function ProfilePage() {
           </SectionCard>
         }
         right={
-          <SectionCard title="Seguridad reciente" subtitle="Actividad">
+          <SectionCard title={uiText("Seguridad reciente")} subtitle="Actividad">
             <InfoList
               items={[
                 { title: "MacBook Pro", description: "Sesión principal en Miami", badge: "Actual" },

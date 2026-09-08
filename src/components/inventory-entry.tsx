@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -25,6 +27,7 @@ import { BlockedState, PageHeader, SkeletonRows } from "@/components/system";
  *   independientes, no dos variantes de uno.
  */
 export function InventoryEntry() {
+  const uiText = useUiText();
   const router = useRouter();
   const { hasModule, isBootstrapping, accessContextVerified, currentTenant } = useAppStore();
   const assetEnabled = hasModule("asset_inventory");
@@ -42,25 +45,25 @@ export function InventoryEntry() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Operaciones"
-        title="Inventario"
-        description="Elige con qué inventario vas a trabajar."
+        eyebrow={uiText("Operaciones")}
+        title={uiText("Inventario")}
+        description={uiText("Elige con qué inventario vas a trabajar.")}
       />
 
       {isBootstrapping || !accessContextVerified || only ? (
-        <SkeletonRows rows={2} label="Cargando los módulos de inventario" />
+        <SkeletonRows rows={2} label={uiText("Cargando los módulos de inventario")} />
       ) : !currentTenant.id ? (
         <BlockedState
-          title="Falta elegir la empresa"
+          title={uiText("Falta elegir la empresa")}
           cause="Los módulos de inventario dependen de la empresa activa, y ahora mismo no hay ninguna seleccionada."
           owner="Tú, desde el selector de empresa"
           resolution="Elige una empresa en el selector de la barra superior."
         />
       ) : enabledCount === 0 ? (
         <BlockedState
-          title="Esta empresa no tiene inventario activo"
+          title={uiText("Esta empresa no tiene inventario activo")}
           cause="Ni el inventario de activos ni el de restaurante están habilitados para esta empresa."
-          owner="Quien administra la empresa"
+          owner={uiText("Quien administra la empresa")}
           resolution="Se habilitan desde Administración › Módulos."
         />
       ) : (
@@ -68,16 +71,16 @@ export function InventoryEntry() {
           {assetEnabled ? (
             <EntryCard
               icon={Boxes}
-              title="Inventario de activos"
-              description="Equipos, mobiliario y herramientas: custodia, entregas, devoluciones y mantenimiento."
+              title={uiText("Inventario de activos")}
+              description={uiText("Equipos, mobiliario y herramientas: custodia, entregas, devoluciones y mantenimiento.")}
               href="/inventory/assets/dashboard"
             />
           ) : null}
           {restaurantEnabled ? (
             <EntryCard
               icon={ChefHat}
-              title="Inventario de restaurante"
-              description="Ingredientes y recetas: entradas, consumo, producción, mermas y conteos."
+              title={uiText("Inventario de restaurante")}
+              description={uiText("Ingredientes y recetas: entradas, consumo, producción, mermas y conteos.")}
               href="/inventory/restaurant/dashboard"
             />
           ) : null}
@@ -98,6 +101,7 @@ function EntryCard({
   description: string;
   href: string;
 }) {
+  const uiText = useUiText();
   return (
     <Link
       href={href}
@@ -109,8 +113,7 @@ function EntryCard({
         <p className="mt-2 text-sm text-ink-2">{description}</p>
       </div>
       <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-ink-1">
-        Abrir
-        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+        {uiText("Abrir")}<ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
       </span>
     </Link>
   );

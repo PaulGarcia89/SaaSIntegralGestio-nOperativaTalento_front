@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSubscriptions, getApiErrorMessage } from "@/lib/backend";
@@ -46,6 +48,7 @@ import { Button } from "@/components/ui/button";
  */
 
 export default function CompanySubscriptionPage() {
+  const uiText = useUiText();
   const { can, currentTenant } = useAppStore();
   const subscriptionQuery = useQuery({
     queryKey: ["subscriptions"],
@@ -56,20 +59,20 @@ export default function CompanySubscriptionPage() {
   if (!can("admin.subscription")) {
     return (
       <BlockedState
-        title="Sin acceso al plan contratado"
+        title={uiText("Sin acceso al plan contratado")}
         cause="El plan y sus condiciones económicas son información de administración."
-        owner="Quien administra la empresa"
+        owner={uiText("Quien administra la empresa")}
         resolution="Si necesitas consultarlo, pide el permiso «Administrar suscripción»."
       />
     );
   }
 
-  if (subscriptionQuery.isLoading) return <SkeletonRows rows={4} label="Cargando el plan contratado" />;
+  if (subscriptionQuery.isLoading) return <SkeletonRows rows={4} label={uiText("Cargando el plan contratado")} />;
   if (subscriptionQuery.isError) {
     return (
       <ErrorState
-        title="No fue posible cargar el plan contratado"
-        detail={getApiErrorMessage(subscriptionQuery.error, "Reintenta la consulta para continuar.")}
+        title={uiText("No fue posible cargar el plan contratado")}
+        detail={getApiErrorMessage(subscriptionQuery.error, uiText("Reintenta la consulta para continuar."))}
         onRetry={() => void subscriptionQuery.refetch()}
       />
     );
@@ -83,33 +86,33 @@ export default function CompanySubscriptionPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow={currentTenant.name}
-        title="Plan contratado"
-        description="Qué está contratado, qué se paga, cuándo renueva y qué módulos cubre."
+        title={uiText("Plan contratado")}
+        description={uiText("Qué está contratado, qué se paga, cuándo renueva y qué módulos cubre.")}
       />
 
       {!subscription ? (
         <EmptyState
           reason="no-records"
-          title="Esta empresa no tiene ningún plan asignado"
-          description="Sin plan no hay renovación ni cobro registrados. Quien administra la plataforma puede asignar uno."
+          title={uiText("Esta empresa no tiene ningún plan asignado")}
+          description={uiText("Sin plan no hay renovación ni cobro registrados. Quien administra la plataforma puede asignar uno.")}
         />
       ) : (
         <>
           <MetricRow>
             <Metric label="Plan" value={planTierLabel(subscription.plan)} />
             <Metric
-              label="Estado del cobro"
+              label={uiText("Estado del cobro")}
               value={status!.label}
               detail={status!.detail}
               tone={status!.tone === "danger" ? "danger" : undefined}
             />
             <Metric
-              label="Importe"
+              label={uiText("Importe")}
               value={formatPrice(subscription.price)}
               detail={billingCycleLabel(subscription.billingCycle)}
             />
             <Metric
-              label="Próxima renovación"
+              label={uiText("Próxima renovación")}
               value={formatDate(subscription.renewalDate)}
               detail={
                 daysToRenewal === null
@@ -125,30 +128,25 @@ export default function CompanySubscriptionPage() {
           </MetricRow>
 
           {subscription.status === "past_due" ? (
-            <InlineNote tone="danger" title="El último cobro no se completó">
-              El acceso de tu gente sigue abierto por ahora, pero la empresa puede quedar suspendida si el pago no se
-              regulariza. Desde aquí no se puede pagar: avisa a quien administra la plataforma.
-            </InlineNote>
+            <InlineNote tone="danger" title={uiText("El último cobro no se completó")}>
+              {uiText("El acceso de tu gente sigue abierto por ahora, pero la empresa puede quedar suspendida si el pago no se regulariza. Desde aquí no se puede pagar: avisa a quien administra la plataforma.")}</InlineNote>
           ) : subscription.status === "trial" ? (
-            <InlineNote tone="info" title="La empresa está en periodo de prueba">
-              El acceso termina cuando venza la prueba, el {formatDate(subscription.renewalDate)}. Para continuar hay
-              que contratar un plan con quien administra la plataforma.
-            </InlineNote>
+            <InlineNote tone="info" title={uiText("La empresa está en periodo de prueba")}>
+              {uiText("El acceso termina cuando venza la prueba, el")}{formatDate(subscription.renewalDate)}{uiText(". Para continuar hay que contratar un plan con quien administra la plataforma.")}</InlineNote>
           ) : null}
 
           <PageSection
-            title="Qué cubre el plan"
-            description="Los módulos habilitados son los que aparecen en el menú de las personas de la empresa."
+            title={uiText("Qué cubre el plan")}
+            description={uiText("Los módulos habilitados son los que aparecen en el menú de las personas de la empresa.")}
             actions={
               <Button asChild variant="secondary">
-                <Link href="/admin/company">Configuración de empresa</Link>
+                <Link href="/admin/company">{uiText("Configuración de empresa")}</Link>
               </Button>
             }
           >
             {currentTenant.enabledModules.length === 0 ? (
               <p className="text-sm text-ink-2">
-                No hay ningún módulo habilitado. Quien administra la plataforma puede activarlos.
-              </p>
+                {uiText("No hay ningún módulo habilitado. Quien administra la plataforma puede activarlos.")}</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {currentTenant.enabledModules.map((module) => (
@@ -165,8 +163,7 @@ export default function CompanySubscriptionPage() {
             <div className="mt-5 flex flex-wrap items-center gap-2">
               <StatusBadge size="sm" tone={status!.tone} label={status!.label} />
               <span className="text-2xs text-ink-3">
-                {currentTenant.branchCount ?? 0} sucursales · {currentTenant.employeeCount ?? 0} personas cubiertas
-              </span>
+                {currentTenant.branchCount ?? 0} {uiText(" sucursales · ")}{currentTenant.employeeCount ?? 0} {uiText("personas cubiertas")}</span>
             </div>
           </PageSection>
         </>

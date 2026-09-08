@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -92,6 +94,7 @@ export function RestaurantWasteWorkflow({
   units: Option[];
   canManage: boolean;
 }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const { currentUser } = useAppStore();
 
@@ -230,10 +233,10 @@ export function RestaurantWasteWorkflow({
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Operación diaria"
-        title="Registrar merma"
-        description="Anota lo que se perdió, revisa cómo queda el almacén y confirma."
-        meta={warehouseName ? <span>Almacén: {warehouseName}</span> : null}
+        eyebrow={uiText("Operación diaria")}
+        title={uiText("Registrar merma")}
+        description={uiText("Anota lo que se perdió, revisa cómo queda el almacén y confirma.")}
+        meta={warehouseName ? <span>{uiText("Almacén: ")}{warehouseName}</span> : null}
       />
 
       <OperationStepper
@@ -246,30 +249,29 @@ export function RestaurantWasteWorkflow({
       />
 
       {!warehouseId ? (
-        <InlineNote tone="warning" title="Falta elegir el almacén">
-          Selecciona un almacén antes de registrar la merma: sin él no se sabe de dónde sale el producto.
-        </InlineNote>
+        <InlineNote tone="warning" title={uiText("Falta elegir el almacén")}>
+          {uiText("Selecciona un almacén antes de registrar la merma: sin él no se sabe de dónde sale el producto.")}</InlineNote>
       ) : null}
 
       {errorDeRegistro ? (
-        <InlineNote tone="danger" title="No se pudo preparar la merma">
+        <InlineNote tone="danger" title={uiText("No se pudo preparar la merma")}>
           {getApiErrorMessage(errorDeRegistro, "Revisa las líneas y vuelve a intentarlo.")}
         </InlineNote>
       ) : null}
 
       {/* ---- Registrar --------------------------------------------------- */}
       {step === "record" ? (
-        <PageSection title="Qué se perdió" boxed>
+        <PageSection title={uiText("Qué se perdió")} boxed>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="waste-reason">Motivo</Label>
+              <Label htmlFor="waste-reason">{uiText("Motivo")}</Label>
               <select
                 id="waste-reason"
                 className={SELECT_CLASS}
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
               >
-                <option value="">Seleccionar motivo</option>
+                <option value="">{uiText("Seleccionar motivo")}</option>
                 {reasons.map((item) => (
                   <option key={item} value={item}>
                     {item}
@@ -278,27 +280,26 @@ export function RestaurantWasteWorkflow({
               </select>
             </div>
             <div>
-              <Label htmlFor="waste-notes">Observaciones</Label>
+              <Label htmlFor="waste-notes">{uiText("Observaciones")}</Label>
               <Input
                 id="waste-notes"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Detalle opcional de la merma"
+                placeholder={uiText("Detalle opcional de la merma")}
               />
             </div>
           </div>
 
           <div className="mt-5 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-ink-1">Productos</h3>
+              <h3 className="text-sm font-semibold text-ink-1">{uiText("Productos")}</h3>
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={() => setLines([...lines, { ingredientId: "", unitId: "", quantity: "" }])}
               >
                 <Plus className="size-4" aria-hidden="true" />
-                Agregar
-              </Button>
+                {uiText("Agregar")}</Button>
             </div>
 
             {lines.map((line, index) => (
@@ -308,20 +309,20 @@ export function RestaurantWasteWorkflow({
               >
                 <NativeSelect
                   id={`waste-ingredient-${index}`}
-                  label="Producto"
+                  label={uiText("Producto")}
                   value={line.ingredientId}
                   options={ingredients}
                   onChange={(value) => selectIngredient(index, value)}
                 />
                 <NativeSelect
                   id={`waste-unit-${index}`}
-                  label="Unidad"
+                  label={uiText("Unidad")}
                   value={line.unitId}
                   options={units}
                   onChange={(value) => updateLine(index, "unitId", value)}
                 />
                 <div>
-                  <Label htmlFor={`waste-quantity-${index}`}>Cantidad</Label>
+                  <Label htmlFor={`waste-quantity-${index}`}>{uiText("Cantidad")}</Label>
                   <Input
                     id={`waste-quantity-${index}`}
                     type="number"
@@ -353,8 +354,7 @@ export function RestaurantWasteWorkflow({
             loadingLabel="Calculando…"
             onClick={() => calculate.mutate()}
           >
-            Revisar impacto
-          </Button>
+            {uiText("Revisar impacto")}</Button>
         </PageSection>
       ) : null}
 
@@ -364,17 +364,15 @@ export function RestaurantWasteWorkflow({
           <ImpactReview impact={impact} />
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setStep("record")}>
-              Corregir el registro
-            </Button>
+              {uiText("Corregir el registro")}</Button>
             <Button
               size="lg"
               disabled={!canManage || impact.blockers.length > 0}
               loading={prepare.isPending}
-              loadingLabel="Preparando…"
+              loadingLabel={uiText("Preparando…")}
               onClick={() => prepare.mutate()}
             >
-              Continuar
-            </Button>
+              {uiText("Continuar")}</Button>
           </div>
         </div>
       ) : null}
@@ -419,13 +417,14 @@ function NativeSelect({
   options: Option[];
   onChange: (value: string) => void;
 }) {
+  const uiText = useUiText();
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
       {/* `<select>` nativo a propósito: en un teléfono abre el selector del
           sistema operativo, que es más usable que cualquier lista a medida. */}
       <select id={id} className={SELECT_CLASS} value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Seleccionar</option>
+        <option value="">{uiText("Seleccionar")}</option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
@@ -444,11 +443,12 @@ function NativeSelect({
  * no registrar dos veces la misma pérdida.
  */
 function PendingWasteInbox({ query }: { query: ReturnType<typeof useQuery<Record<string, unknown>[]>> }) {
+  const uiText = useUiText();
   if (query.isLoading || query.error || !query.data?.length) return null;
   return (
     <PageSection
-      title="Mermas sin confirmar"
-      description="Quedaron preparadas pero todavía no salieron del almacén."
+      title={uiText("Mermas sin confirmar")}
+      description={uiText("Quedaron preparadas pero todavía no salieron del almacén.")}
       boxed
     >
       <ul className="divide-y divide-line">

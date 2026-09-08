@@ -11,7 +11,7 @@ describe('restaurant navigation consolidation', () => {
     }
     expect(itemsBySection(appNavigation, 'restaurant_inventory')[0].items.map(item => item.label)).toEqual([
       'Resumen', 'Inventario', 'Compras y recepción', 'Recetas y producción',
-      'Salidas y pérdidas', 'Conteos y ajustes', 'Reportes y costos', 'Configuración',
+      'Salidas y pérdidas', 'Conteos y ajustes', 'Reportes', 'Configuración',
     ]);
   });
   it('chooses an allowed destination rather than exposing the purchase editor to read-only users', () => {

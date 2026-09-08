@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { ArrowRight, CircleCheck, RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -120,6 +122,7 @@ function OperationalItem({
 }
 
 export default function DashboardPage() {
+  const uiText = useUiText();
   const { allowedNav, currentBranch, currentRole, currentTenant } = useAppStore();
   const { t } = useLocale();
 
@@ -142,7 +145,7 @@ export default function DashboardPage() {
     <PageHeader
       eyebrow={`${t("dashboard.home")} · ${t(`role.${currentRole}`)}`}
       title={t(roleTitles[currentRole] ?? "dashboard.operational")}
-      description="Tareas, alertas y próximos pasos calculados desde registros reales dentro de tu alcance."
+      description={uiText("Tareas, alertas y próximos pasos calculados desde registros reales dentro de tu alcance.")}
       meta={
         dashboard.data ? (
           <>
@@ -157,7 +160,7 @@ export default function DashboardPage() {
             </span>
             <span className="font-mono tabular-figures">
               {t("dashboard.updated")}:{" "}
-              {new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" }).format(
+              {new Intl.DateTimeFormat(uiText.locale, { hour: "2-digit", minute: "2-digit" }).format(
                 new Date(dashboard.data.generatedAt),
               )}
             </span>
@@ -250,7 +253,7 @@ export default function DashboardPage() {
       <PageSection title={t("dashboard.indicators")} id="indicadores">
         <MetricRow>
           <Metric
-            label="Salud operativa"
+            label={uiText("Salud operativa")}
             value={`${health.score}%`}
             detail={health.summary}
             tone={health.tone === "info" ? undefined : health.tone === "danger" ? "danger" : health.tone === "warning" ? "warning" : "success"}
@@ -276,7 +279,7 @@ export default function DashboardPage() {
       {/* ---- 3. Tendencias --------------------------------------------- */}
       <div className="grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title="Pendientes por vencimiento"
+          title={uiText("Pendientes por vencimiento")}
           subtitle="Reparto de los pendientes que tienes a la vista"
           source={data.source}
           period={data.period.label}
@@ -285,7 +288,7 @@ export default function DashboardPage() {
             <BarChart
               categories={dueBuckets.map((entry) => entry.label)}
               series={[{ id: "pendientes", name: "Pendientes", values: dueBuckets.map((entry) => entry.count) }]}
-              caption="Pendientes agrupados por su fecha límite"
+              caption={uiText("Pendientes agrupados por su fecha límite")}
               categoryLabel="Tramo"
               formatValue={(value) => String(value)}
             />
@@ -295,7 +298,7 @@ export default function DashboardPage() {
         </ChartCard>
 
         <ChartCard
-          title="Actividad de los últimos 7 días"
+          title={uiText("Actividad de los últimos 7 días")}
           subtitle="Tareas y alertas registradas cada día"
           source={data.source}
           period={data.period.label}
@@ -304,7 +307,7 @@ export default function DashboardPage() {
             <BarChart
               categories={activity.map((entry) => entry.label)}
               series={[{ id: "actividad", name: "Registros", values: activity.map((entry) => entry.count) }]}
-              caption="Tareas y alertas registradas por día"
+              caption={uiText("Tareas y alertas registradas por día")}
               categoryLabel="Día"
               formatValue={(value) => String(value)}
             />

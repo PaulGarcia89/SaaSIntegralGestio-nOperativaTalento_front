@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -76,6 +78,7 @@ export function confirmAction(request: ConfirmRequest): Promise<boolean> {
 
 /** Se monta una sola vez, junto a los proveedores de la aplicación. */
 export function ConfirmActionHost() {
+  const uiText = useUiText();
   const [request, setRequest] = useState<PendingRequest | null>(null);
 
   useEffect(() => {
@@ -101,15 +104,14 @@ export function ConfirmActionHost() {
         </DialogHeader>
 
         {request?.consequence ? (
-          <InlineNote tone={request.irreversible ? "warning" : "info"} title="Qué cambia">
+          <InlineNote tone={request.irreversible ? "warning" : "info"} title={uiText("Qué cambia")}>
             {request.consequence}
           </InlineNote>
         ) : null}
 
         {request?.irreversible ? (
-          <InlineNote tone="danger" title="No se puede deshacer">
-            El movimiento queda en la auditoría. Corregirlo exige registrar otra operación en sentido contrario.
-          </InlineNote>
+          <InlineNote tone="danger" title={uiText("No se puede deshacer")}>
+            {uiText("El movimiento queda en la auditoría. Corregirlo exige registrar otra operación en sentido contrario.")}</InlineNote>
         ) : null}
 
         {/* En el teléfono la acción peligrosa ocupa el ancho y «Cancelar»

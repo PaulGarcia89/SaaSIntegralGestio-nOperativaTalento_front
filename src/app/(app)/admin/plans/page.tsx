@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
@@ -64,6 +66,7 @@ const limitLabels: Record<keyof PlanLimitsDto, string> = {
 };
 
 export default function PlansPage() {
+  const uiText = useUiText();
   const { can } = useAppStore();
   const queryClient = useQueryClient();
   const plans = useQuery({ queryKey: ["plan-catalog"], queryFn: fetchPlanCatalog });
@@ -130,34 +133,33 @@ export default function PlansPage() {
   if (!can("admin.subscription")) {
     return (
       <BlockedState
-        title="Sin acceso al catálogo de planes"
+        title={uiText("Sin acceso al catálogo de planes")}
         cause="Los precios y los topes de cada plan alcanzan a todas las empresas de la plataforma."
         owner="Quien administra la plataforma"
         resolution="Si necesitas consultarlo, pide el permiso «Administrar suscripciones»."
       />
     );
   }
-  if (plans.isPending || modules.isPending) return <AsyncState state="loading" title="Cargando catálogo de planes" />;
+  if (plans.isPending || modules.isPending) return <AsyncState state="loading" title={uiText("Cargando catálogo de planes")} />;
   if (plans.isError || modules.isError) {
-    return <AsyncState state="error" title="No fue posible cargar los planes" onRetry={() => { plans.refetch(); modules.refetch(); }} />;
+    return <AsyncState state="error" title={uiText("No fue posible cargar los planes")} onRetry={() => { plans.refetch(); modules.refetch(); }} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno de plataforma"
-        title="Planes y límites"
-        description="Define precios, módulos incluidos y límites operativos. Un valor sin límite se muestra como ilimitado."
+        eyebrow={uiText("Gobierno de plataforma")}
+        title={uiText("Planes y límites")}
+        description={uiText("Define precios, módulos incluidos y límites operativos. Un valor sin límite se muestra como ilimitado.")}
         actions={
           can("admin.subscription") && availableCodes.length > 0 ? (
-            <Button onClick={openCreate}><Plus className="size-4" />Nuevo plan</Button>
+            <Button onClick={openCreate}><Plus className="size-4" />{uiText("Nuevo plan")}</Button>
           ) : null
         }
       />
 
-      <InlineFeedback tone="info" title="Los cambios afectan nuevas verificaciones de capacidad">
-        No se eliminan datos existentes automáticamente cuando un límite se reduce. Las operaciones posteriores deben respetar el nuevo máximo.
-      </InlineFeedback>
+      <InlineFeedback tone="info" title={uiText("Los cambios afectan nuevas verificaciones de capacidad")}>
+        {uiText("No se eliminan datos existentes automáticamente cuando un límite se reduce. Las operaciones posteriores deben respetar el nuevo máximo.")}</InlineFeedback>
 
       <section className="grid gap-5 xl:grid-cols-3">
         {plans.data?.map((plan) => (
@@ -176,11 +178,11 @@ export default function PlansPage() {
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-5">
               <div className="grid grid-cols-2 gap-3">
-                <Price label="Mensual" value={plan.priceMonthly} />
-                <Price label="Anual" value={plan.priceYearly} />
+                <Price label={uiText("Mensual")} value={plan.priceMonthly} />
+                <Price label={uiText("Anual")} value={plan.priceYearly} />
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Límites operativos</h3>
+                <h3 className="mb-2 text-sm font-semibold">{uiText("Límites operativos")}</h3>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
                   {(Object.keys(limitLabels) as Array<keyof PlanLimitsDto>).map((key) => (
                     <div key={key} className="rounded-xl bg-surface-section p-3">
@@ -191,22 +193,22 @@ export default function PlansPage() {
                 </dl>
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Módulos incluidos</h3>
+                <h3 className="mb-2 text-sm font-semibold">{uiText("Módulos incluidos")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {plan.modules.length ? plan.modules.map((module) => (
                     <Badge key={module.id} variant="outline"><Check className="mr-1 size-3" />{module.name}</Badge>
-                  )) : <span className="text-sm text-text-secondary">Sin módulos incluidos</span>}
+                  )) : <span className="text-sm text-text-secondary">{uiText("Sin módulos incluidos")}</span>}
                 </div>
               </div>
               <div className="mt-auto space-y-2 border-t pt-4">
                 {plan.subscriptions > 0 ? (
                   <p className="text-xs text-text-secondary">
-                    No se puede eliminar: {plan.subscriptions === 1
+                    {uiText("No se puede eliminar:")}{plan.subscriptions === 1
                       ? "una empresa lo tiene contratado"
                       : `${plan.subscriptions} empresas lo tienen contratado`}.
                   </p>
                 ) : (
-                  <p className="text-xs text-text-secondary">Ninguna empresa lo tiene contratado.</p>
+                  <p className="text-xs text-text-secondary">{uiText("Ninguna empresa lo tiene contratado.")}</p>
                 )}
                 <Button
                   size="sm"
@@ -224,8 +226,7 @@ export default function PlansPage() {
                     }).then((ok) => ok && remove.mutate(plan.id))
                   }
                 >
-                  <Trash2 className="size-4" />Eliminar
-                </Button>
+                  <Trash2 className="size-4" />{uiText("Eliminar")}</Button>
               </div>
             </CardContent>
           </Card>
@@ -236,12 +237,12 @@ export default function PlansPage() {
         <DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar plan" : "Crear plan"}</DialogTitle>
-            <DialogDescription>Configura el catálogo comercial y los límites verificables del servicio.</DialogDescription>
+            <DialogDescription>{uiText("Configura el catálogo comercial y los límites verificables del servicio.")}</DialogDescription>
           </DialogHeader>
           <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Nombre"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field>
-              <Field label="Nivel del plan">
+              <Field label={uiText("Nombre")}><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field>
+              <Field label={uiText("Nivel del plan")}>
                 <FormSelect
                   value={form.code}
                   disabled={Boolean(editing)}
@@ -252,19 +253,19 @@ export default function PlansPage() {
                   }))}
                 />
               </Field>
-              <Field label="Precio mensual"><Input type="number" min="0" step="0.01" value={form.priceMonthly} onChange={(event) => setForm({ ...form, priceMonthly: event.target.value })} /></Field>
-              <Field label="Precio anual"><Input type="number" min="0" step="0.01" value={form.priceYearly} onChange={(event) => setForm({ ...form, priceYearly: event.target.value })} /></Field>
+              <Field label={uiText("Precio mensual")}><Input type="number" min="0" step="0.01" value={form.priceMonthly} onChange={(event) => setForm({ ...form, priceMonthly: event.target.value })} /></Field>
+              <Field label={uiText("Precio anual")}><Input type="number" min="0" step="0.01" value={form.priceYearly} onChange={(event) => setForm({ ...form, priceYearly: event.target.value })} /></Field>
             </div>
-            <Field label="Descripción"><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
+            <Field label={uiText("Descripción")}><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
             <fieldset>
-              <legend className="mb-3 font-semibold">Límites</legend>
+              <legend className="mb-3 font-semibold">{uiText("Límites")}</legend>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {(Object.keys(limitLabels) as Array<keyof PlanLimitsDto>).map((key) => (
                   <Field key={key} label={limitLabels[key]}>
                     <Input
                       type="number"
                       min="1"
-                      placeholder="Ilimitado"
+                      placeholder={uiText("Ilimitado")}
                       value={form.limits[key]}
                       onChange={(event) => setForm({ ...form, limits: { ...form.limits, [key]: event.target.value } })}
                     />
@@ -273,7 +274,7 @@ export default function PlansPage() {
               </div>
             </fieldset>
             <fieldset>
-              <legend className="mb-3 font-semibold">Módulos incluidos</legend>
+              <legend className="mb-3 font-semibold">{uiText("Módulos incluidos")}</legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 {modules.data?.map((module) => {
                   const selected = form.moduleIds.includes(module.id);
@@ -293,10 +294,10 @@ export default function PlansPage() {
                 })}
               </div>
             </fieldset>
-            {save.isError ? <InlineFeedback tone="danger" title="No fue posible guardar">{getApiErrorMessage(save.error, "Revisa la información.")}</InlineFeedback> : null}
+            {save.isError ? <InlineFeedback tone="danger" title={uiText("No fue posible guardar")}>{getApiErrorMessage(save.error, "Revisa la información.")}</InlineFeedback> : null}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={!form.name.trim() || save.isPending}>{save.isPending ? "Guardando…" : "Guardar plan"}</Button>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>{uiText("Cancelar")}</Button>
+              <Button type="submit" disabled={!form.name.trim() || save.isPending}>{save.isPending ? uiText("Guardando…") : "Guardar plan"}</Button>
             </div>
           </form>
         </DialogContent>

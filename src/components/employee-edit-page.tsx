@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,6 +54,7 @@ type EvidenceDraft = {
 };
 
 export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
+  const uiText = useUiText();
   const { can, tenantUsers } = useAppStore();
   const queryClient = useQueryClient();
   const editor = useQuery({ queryKey: ["employee-editor", employeeId], queryFn: () => fetchEmployeeEditor(employeeId) });
@@ -115,84 +118,84 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
     toast.success(`Archivo preparado para ${label.toLowerCase()}`);
   };
 
-  if (editor.isLoading || !form) return <AsyncState state="loading" title="Cargando expediente editable" description="Preparamos los datos laborales, nómina y cumplimiento del empleado." />;
-  if (editor.isError || !editor.data) return <AsyncState state="error" title="No fue posible cargar el editor" description={getApiErrorMessage(editor.error, "El expediente no está disponible.")} onRetry={() => void editor.refetch()} />;
+  if (editor.isLoading || !form) return <AsyncState state="loading" title={uiText("Cargando expediente editable")} description={uiText("Preparamos los datos laborales, nómina y cumplimiento del empleado.")} />;
+  if (editor.isError || !editor.data) return <AsyncState state="error" title={uiText("No fue posible cargar el editor")} description={getApiErrorMessage(editor.error, "El expediente no está disponible.")} onRetry={() => void editor.refetch()} />;
 
   const update = (section: keyof EditorForm, key: string, value: string | boolean) => setForm((current) => current ? { ...current, [section]: { ...current[section], [key]: value } } : current);
   const activeBranches = (branches.data ?? []).filter((branch) => branch.status === "active");
 
   return <div className="space-y-6">
     <PageHeader
-      eyebrow="Personas / Empleados"
+      eyebrow={uiText("Personas / Empleados")}
       title={`Editar expediente: ${editor.data.employee.name}`}
       description={`Employee ID ${editor.data.employee.employeeNumber}. Esta es una pantalla completa de edición, no un modal, para actualizar todo el expediente sin perder contexto.`}
-      actions={<div className="flex flex-wrap gap-2"><Button asChild variant="secondary"><Link href={`/employees/${employeeId}`}><FileText className="size-4" />Ver expediente</Link></Button><Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />Directorio</Link></Button><Button onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? "Guardando..." : "Guardar expediente"}</Button></div>}
+      actions={<div className="flex flex-wrap gap-2"><Button asChild variant="secondary"><Link href={`/employees/${employeeId}`}><FileText className="size-4" />{uiText("Ver expediente")}</Link></Button><Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />{uiText("Directorio")}</Link></Button><Button onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? uiText("Guardando...") : "Guardar expediente"}</Button></div>}
     />
-    <InlineFeedback tone="info" title="Edición completa y auditable">Cada bloque se guarda en su dominio de backend y genera trazabilidad. SSN y tasas existentes permanecen protegidos; introduce un valor solo cuando quieras reemplazarlo.</InlineFeedback>
+    <InlineFeedback tone="info" title={uiText("Edición completa y auditable")}>{uiText("Cada bloque se guarda en su dominio de backend y genera trazabilidad. SSN y tasas existentes permanecen protegidos; introduce un valor solo cuando quieras reemplazarlo.")}</InlineFeedback>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
       <div className="space-y-5">
-        <EditorSection title="Información personal" description="Identidad legal y datos protegidos del expediente.">
-          <TextField label="Nombre legal" value={stringValue(form.personal.legalFirstName)} onChange={(value) => update("personal", "legalFirstName", value)} required />
-          <TextField label="Segundo nombre" value={stringValue(form.personal.middleName)} onChange={(value) => update("personal", "middleName", value)} />
-          <TextField label="Apellidos legales" value={stringValue(form.personal.legalLastName)} onChange={(value) => update("personal", "legalLastName", value)} required />
-          <TextField label="Nombre preferido" value={stringValue(form.personal.preferredName)} onChange={(value) => update("personal", "preferredName", value)} />
-          <TextField label="Fecha de nacimiento" type="date" value={stringValue(form.personal.dateOfBirth)} onChange={(value) => update("personal", "dateOfBirth", value)} />
-          <TextField label="Número de seguridad social parcial" value={stringValue(form.tax.ssnLast4)} onChange={(value) => update("tax", "ssnLast4", value)} />
+        <EditorSection title={uiText("Información personal")} description={uiText("Identidad legal y datos protegidos del expediente.")}>
+          <TextField label={uiText("Nombre legal")} value={stringValue(form.personal.legalFirstName)} onChange={(value) => update("personal", "legalFirstName", value)} required />
+          <TextField label={uiText("Segundo nombre")} value={stringValue(form.personal.middleName)} onChange={(value) => update("personal", "middleName", value)} />
+          <TextField label={uiText("Apellidos legales")} value={stringValue(form.personal.legalLastName)} onChange={(value) => update("personal", "legalLastName", value)} required />
+          <TextField label={uiText("Nombre preferido")} value={stringValue(form.personal.preferredName)} onChange={(value) => update("personal", "preferredName", value)} />
+          <TextField label={uiText("Fecha de nacimiento")} type="date" value={stringValue(form.personal.dateOfBirth)} onChange={(value) => update("personal", "dateOfBirth", value)} />
+          <TextField label={uiText("Número de seguridad social parcial")} value={stringValue(form.tax.ssnLast4)} onChange={(value) => update("tax", "ssnLast4", value)} />
         </EditorSection>
-        <EditorSection title="Contacto" description="Canales personales y de trabajo para el expediente.">
-          <TextField label="Email laboral" type="email" value={stringValue(form.contact.workEmail)} onChange={(value) => update("contact", "workEmail", value)} required />
-          <TextField label="Email personal" type="email" value={stringValue(form.contact.personalEmail)} onChange={(value) => update("contact", "personalEmail", value)} />
-          <TextField label="Teléfono" value={stringValue(form.contact.phone)} onChange={(value) => update("contact", "phone", value)} />
-          <TextField label="Dirección" value={stringValue(form.contact.addressLine1)} onChange={(value) => update("contact", "addressLine1", value)} />
-          <TextField label="Apartamento / línea 2" value={stringValue(form.contact.addressLine2)} onChange={(value) => update("contact", "addressLine2", value)} />
-          <TextField label="Ciudad" value={stringValue(form.contact.city)} onChange={(value) => update("contact", "city", value)} />
-          <TextField label="Estado" value={stringValue(form.contact.state)} onChange={(value) => update("contact", "state", value)} />
+        <EditorSection title={uiText("Contacto")} description={uiText("Canales personales y de trabajo para el expediente.")}>
+          <TextField label={uiText("Email laboral")} type="email" value={stringValue(form.contact.workEmail)} onChange={(value) => update("contact", "workEmail", value)} required />
+          <TextField label={uiText("Email personal")} type="email" value={stringValue(form.contact.personalEmail)} onChange={(value) => update("contact", "personalEmail", value)} />
+          <TextField label={uiText("Teléfono")} value={stringValue(form.contact.phone)} onChange={(value) => update("contact", "phone", value)} />
+          <TextField label={uiText("Dirección")} value={stringValue(form.contact.addressLine1)} onChange={(value) => update("contact", "addressLine1", value)} />
+          <TextField label={uiText("Apartamento / línea 2")} value={stringValue(form.contact.addressLine2)} onChange={(value) => update("contact", "addressLine2", value)} />
+          <TextField label={uiText("Ciudad")} value={stringValue(form.contact.city)} onChange={(value) => update("contact", "city", value)} />
+          <TextField label={uiText("Estado")} value={stringValue(form.contact.state)} onChange={(value) => update("contact", "state", value)} />
           <TextField label="ZIP" value={stringValue(form.contact.postalCode)} onChange={(value) => update("contact", "postalCode", value)} />
-          <TextField label="País" value={stringValue(form.contact.country)} onChange={(value) => update("contact", "country", value)} />
+          <TextField label={uiText("País")} value={stringValue(form.contact.country)} onChange={(value) => update("contact", "country", value)} />
         </EditorSection>
-        <EditorSection title="Información laboral" description="Cargo, sucursal, supervisor, fechas y estado de la relación laboral.">
-          <SelectField label="Sucursal principal" value={stringValue(form.employment.primaryBranchId)} onChange={(value) => update("employment", "primaryBranchId", value)} options={activeBranches.map((branch) => ({ value: branch.id, label: branch.name }))} placeholder="Selecciona una sucursal" />
-          <TextField label="Cargo" value={stringValue(form.employment.jobTitle)} onChange={(value) => update("employment", "jobTitle", value)} required />
-          <TextField label="Departamento" value={stringValue(form.employment.department)} onChange={(value) => update("employment", "department", value)} />
-          <SelectField label="Supervisor" value={stringValue(form.employment.supervisorUserId)} onChange={(value) => update("employment", "supervisorUserId", value)} options={tenantUsers.map((user) => ({ value: user.id, label: user.fullName }))} placeholder="Sin supervisor" allowEmpty />
-          <TextField label="Fecha de contratación" type="date" value={stringValue(form.employment.hireDate)} onChange={(value) => update("employment", "hireDate", value)} />
-          <TextField label="Fecha de inicio" type="date" value={stringValue(form.employment.startDate)} onChange={(value) => update("employment", "startDate", value)} />
-          <SelectField label="Tipo de empleo" value={stringValue(form.employment.employmentType)} onChange={(value) => update("employment", "employmentType", value)} options={employmentTypeOptions} />
-          <SelectField label="Estado de la relación laboral" value={stringValue(form.employment.employmentStatus)} onChange={(value) => update("employment", "employmentStatus", value)} options={employmentStatusOptions} />
-          <SelectField label="Estado del empleado" value={stringValue(form.employment.status)} onChange={(value) => update("employment", "status", value)} options={[{ value: "ACTIVE", label: "Activo" }, { value: "INACTIVE", label: "Inactivo" }, { value: "TERMINATED", label: "Finalizado" }]} />
-          <TextField label="Clasificación laboral" value={stringValue(form.employment.workerClassification)} onChange={(value) => update("employment", "workerClassification", value)} />
+        <EditorSection title={uiText("Información laboral")} description={uiText("Cargo, sucursal, supervisor, fechas y estado de la relación laboral.")}>
+          <SelectField label={uiText("Sucursal principal")} value={stringValue(form.employment.primaryBranchId)} onChange={(value) => update("employment", "primaryBranchId", value)} options={activeBranches.map((branch) => ({ value: branch.id, label: branch.name }))} placeholder={uiText("Selecciona una sucursal")} />
+          <TextField label={uiText("Cargo")} value={stringValue(form.employment.jobTitle)} onChange={(value) => update("employment", "jobTitle", value)} required />
+          <TextField label={uiText("Departamento")} value={stringValue(form.employment.department)} onChange={(value) => update("employment", "department", value)} />
+          <SelectField label="Supervisor" value={stringValue(form.employment.supervisorUserId)} onChange={(value) => update("employment", "supervisorUserId", value)} options={tenantUsers.map((user) => ({ value: user.id, label: user.fullName }))} placeholder={uiText("Sin supervisor")} allowEmpty />
+          <TextField label={uiText("Fecha de contratación")} type="date" value={stringValue(form.employment.hireDate)} onChange={(value) => update("employment", "hireDate", value)} />
+          <TextField label={uiText("Fecha de inicio")} type="date" value={stringValue(form.employment.startDate)} onChange={(value) => update("employment", "startDate", value)} />
+          <SelectField label={uiText("Tipo de empleo")} value={stringValue(form.employment.employmentType)} onChange={(value) => update("employment", "employmentType", value)} options={employmentTypeOptions} />
+          <SelectField label={uiText("Estado de la relación laboral")} value={stringValue(form.employment.employmentStatus)} onChange={(value) => update("employment", "employmentStatus", value)} options={employmentStatusOptions} />
+          <SelectField label={uiText("Estado del empleado")} value={stringValue(form.employment.status)} onChange={(value) => update("employment", "status", value)} options={[{ value: "ACTIVE", label: uiText("Activo", undefined, "status") }, { value: "INACTIVE", label: "Inactivo" }, { value: "TERMINATED", label: "Finalizado" }]} />
+          <TextField label={uiText("Clasificación laboral")} value={stringValue(form.employment.workerClassification)} onChange={(value) => update("employment", "workerClassification", value)} />
         </EditorSection>
-        <EditorSection title="Nómina" description="Configuración de pago, frecuencia, overtime y referencia de payroll.">
-          <SelectField label="Tipo de pago" value={stringValue(form.payroll.payType)} onChange={(value) => update("payroll", "payType", value)} options={paymentTypeOptions} />
-          <SecretField label="Salario o tarifa" current={editor.data.payroll?.payRateMasked} value={stringValue(form.payroll.payRate)} onChange={(value) => update("payroll", "payRate", value)} />
-          <SelectField label="Frecuencia de pago" value={stringValue(form.payroll.payFrequency)} onChange={(value) => update("payroll", "payFrequency", value)} options={frequencyOptions} />
-          <SelectField label="Método de pago" value={stringValue(form.payroll.paymentMethod)} onChange={(value) => update("payroll", "paymentMethod", value)} options={paymentMethodOptions} />
-          <TextField label="Proveedor de nómina" value={stringValue(form.payroll.payrollProvider)} onChange={(value) => update("payroll", "payrollProvider", value)} />
+        <EditorSection title={uiText("Nómina")} description={uiText("Configuración de pago, frecuencia, overtime y referencia de payroll.")}>
+          <SelectField label={uiText("Tipo de pago")} value={stringValue(form.payroll.payType)} onChange={(value) => update("payroll", "payType", value)} options={paymentTypeOptions} />
+          <SecretField label={uiText("Salario o tarifa")} current={editor.data.payroll?.payRateMasked} value={stringValue(form.payroll.payRate)} onChange={(value) => update("payroll", "payRate", value)} />
+          <SelectField label={uiText("Frecuencia de pago")} value={stringValue(form.payroll.payFrequency)} onChange={(value) => update("payroll", "payFrequency", value)} options={frequencyOptions} />
+          <SelectField label={uiText("Método de pago")} value={stringValue(form.payroll.paymentMethod)} onChange={(value) => update("payroll", "paymentMethod", value)} options={paymentMethodOptions} />
+          <TextField label={uiText("Proveedor de nómina")} value={stringValue(form.payroll.payrollProvider)} onChange={(value) => update("payroll", "payrollProvider", value)} />
           <TextField label="Payroll Employee ID" value={stringValue(form.payroll.payrollEmployeeId)} onChange={(value) => update("payroll", "payrollEmployeeId", value)} />
-          <TextField label="Referencia externa" value={stringValue(form.payroll.externalPayrollReference)} onChange={(value) => update("payroll", "externalPayrollReference", value)} />
-          <TextField label="Inicio de semana laboral" value={stringValue(form.payroll.workweekStartDay)} onChange={(value) => update("payroll", "workweekStartDay", value)} />
-          <TextField label="Hora de inicio" type="time" value={stringValue(form.payroll.workweekStartTime)} onChange={(value) => update("payroll", "workweekStartTime", value)} />
-          <ToggleField label="Elegible para overtime" checked={Boolean(form.payroll.overtimeEligible)} onChange={(value) => update("payroll", "overtimeEligible", value)} />
+          <TextField label={uiText("Referencia externa")} value={stringValue(form.payroll.externalPayrollReference)} onChange={(value) => update("payroll", "externalPayrollReference", value)} />
+          <TextField label={uiText("Inicio de semana laboral")} value={stringValue(form.payroll.workweekStartDay)} onChange={(value) => update("payroll", "workweekStartDay", value)} />
+          <TextField label={uiText("Hora de inicio")} type="time" value={stringValue(form.payroll.workweekStartTime)} onChange={(value) => update("payroll", "workweekStartTime", value)} />
+          <ToggleField label={uiText("Elegible para overtime")} checked={Boolean(form.payroll.overtimeEligible)} onChange={(value) => update("payroll", "overtimeEligible", value)} />
         </EditorSection>
-        <EditorSection title="Tax & Work Eligibility" description="W-4, I-9, E-Verify y Florida New Hire para el expediente de Florida.">
+        <EditorSection title="Tax & Work Eligibility" description={uiText("W-4, I-9, E-Verify y Florida New Hire para el expediente de Florida.")}>
           <SecretField label="SSN" current={editor.data.tax?.ssnMasked} value={stringValue(form.tax.ssn)} onChange={(value) => update("tax", "ssn", value)} />
-          <SelectField label="Estado Form W-4" value={stringValue(form.tax.w4Status)} onChange={(value) => update("tax", "w4Status", value)} options={w4Options} />
-          <TextField label="Referencia W-2" value={stringValue(form.tax.w2Reference)} onChange={(value) => update("tax", "w2Reference", value)} />
-          <SelectField label="Estado Form I-9" value={stringValue(form.eligibility.i9Status)} onChange={(value) => update("eligibility", "i9Status", value)} options={i9Options} />
-          <TextField label="Primer día de empleo" type="date" value={stringValue(form.eligibility.firstDayOfEmployment)} onChange={(value) => update("eligibility", "firstDayOfEmployment", value)} />
-          <SelectField label="Estado E-Verify" value={stringValue(form.eligibility.eVerifyStatus)} onChange={(value) => update("eligibility", "eVerifyStatus", value)} options={eVerifyOptions} />
-          <ToggleField label="E-Verify requerido" checked={Boolean(form.eligibility.eVerifyRequired)} onChange={(value) => update("eligibility", "eVerifyRequired", value)} />
-          <ToggleField label="Reverificación requerida" checked={Boolean(form.eligibility.reverificationRequired)} onChange={(value) => update("eligibility", "reverificationRequired", value)} />
+          <SelectField label={uiText("Estado Form W-4")} value={stringValue(form.tax.w4Status)} onChange={(value) => update("tax", "w4Status", value)} options={w4Options} />
+          <TextField label={uiText("Referencia W-2")} value={stringValue(form.tax.w2Reference)} onChange={(value) => update("tax", "w2Reference", value)} />
+          <SelectField label={uiText("Estado Form I-9")} value={stringValue(form.eligibility.i9Status)} onChange={(value) => update("eligibility", "i9Status", value)} options={i9Options} />
+          <TextField label={uiText("Primer día de empleo")} type="date" value={stringValue(form.eligibility.firstDayOfEmployment)} onChange={(value) => update("eligibility", "firstDayOfEmployment", value)} />
+          <SelectField label={uiText("Estado E-Verify")} value={stringValue(form.eligibility.eVerifyStatus)} onChange={(value) => update("eligibility", "eVerifyStatus", value)} options={eVerifyOptions} />
+          <ToggleField label={uiText("E-Verify requerido")} checked={Boolean(form.eligibility.eVerifyRequired)} onChange={(value) => update("eligibility", "eVerifyRequired", value)} />
+          <ToggleField label={uiText("Reverificación requerida")} checked={Boolean(form.eligibility.reverificationRequired)} onChange={(value) => update("eligibility", "reverificationRequired", value)} />
           <SelectField label="Florida New Hire" value={stringValue(form.floridaNewHire.status)} onChange={(value) => update("floridaNewHire", "status", value)} options={floridaOptions} />
-          <TextField label="Fecha límite Florida New Hire" type="date" value={stringValue(form.floridaNewHire.dueDate)} onChange={(value) => update("floridaNewHire", "dueDate", value)} />
-          <ToggleField label="Florida New Hire requerido" checked={Boolean(form.floridaNewHire.required)} onChange={(value) => update("floridaNewHire", "required", value)} />
+          <TextField label={uiText("Fecha límite Florida New Hire")} type="date" value={stringValue(form.floridaNewHire.dueDate)} onChange={(value) => update("floridaNewHire", "dueDate", value)} />
+          <ToggleField label={uiText("Florida New Hire requerido")} checked={Boolean(form.floridaNewHire.required)} onChange={(value) => update("floridaNewHire", "required", value)} />
           <div className="sm:col-span-2 rounded-2xl border border-dashed border-border-default bg-surface-elevated p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-medium">Evidencia documental</p>
-                <p className="mt-1 text-sm text-text-secondary">Adjunta foto o PDF para SSN, W-4, I-9 o Florida New Hire. Los archivos quedan preparados para el expediente.</p>
+                <p className="font-medium">{uiText("Evidencia documental")}</p>
+                <p className="mt-1 text-sm text-text-secondary">{uiText("Adjunta foto o PDF para SSN, W-4, I-9 o Florida New Hire. Los archivos quedan preparados para el expediente.")}</p>
               </div>
-              <Badge variant="outline">{evidenceDrafts.length} archivo{evidenceDrafts.length === 1 ? "" : "s"}</Badge>
+              <Badge variant="outline">{evidenceDrafts.length} {uiText(" archivo")}{evidenceDrafts.length === 1 ? "" : "s"}</Badge>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[
@@ -223,17 +226,17 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
             ) : null}
           </div>
         </EditorSection>
-        <EditorSection title="Contacto de emergencia" description="Información operativa, separada de payroll.">
-          <TextField label="Nombre" value={stringValue(form.emergencyContact.name)} onChange={(value) => update("emergencyContact", "name", value)} />
-          <TextField label="Relación" value={stringValue(form.emergencyContact.relationship)} onChange={(value) => update("emergencyContact", "relationship", value)} />
-          <TextField label="Teléfono" value={stringValue(form.emergencyContact.phone)} onChange={(value) => update("emergencyContact", "phone", value)} />
+        <EditorSection title={uiText("Contacto de emergencia")} description={uiText("Información operativa, separada de payroll.")}>
+          <TextField label={uiText("Nombre")} value={stringValue(form.emergencyContact.name)} onChange={(value) => update("emergencyContact", "name", value)} />
+          <TextField label={uiText("Relación")} value={stringValue(form.emergencyContact.relationship)} onChange={(value) => update("emergencyContact", "relationship", value)} />
+          <TextField label={uiText("Teléfono")} value={stringValue(form.emergencyContact.phone)} onChange={(value) => update("emergencyContact", "phone", value)} />
         </EditorSection>
       </div>
       <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
-        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Firma con DocuSeal</h2><p className="mt-2 text-sm text-text-secondary">Envía documentos laborales a {stringValue(editor.data.employee.contact.workEmail)} y recibe el PDF firmado en el expediente.</p>{docuSealTemplates.data?.templates?.length ? <div className="mt-4 grid gap-2">{docuSealTemplates.data.templates.map((template) => <Button key={template.key} type="button" variant="secondary" className="w-full justify-start" onClick={() => sendDocuSeal.mutate(template.key)} disabled={sendDocuSeal.isPending}>{template.label}</Button>)}</div> : <p className="mt-3 text-xs text-text-secondary">DocuSeal no está configurado todavía en el backend.</p>}</CardContent></Card>
-        <Card level={2}><CardContent className="p-5"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-brand" /><h2 className="font-semibold">Checklist y evidencia</h2></div><p className="mt-2 text-sm text-text-secondary">Los documentos, licencias, capacitación, seguridad y activos se administran desde el expediente, sin perder su trazabilidad.</p><Button asChild variant="secondary" className="mt-4 w-full"><Link href={`/employees/${employeeId}`}>Gestionar documentos y compliance</Link></Button></CardContent></Card>
-        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">Requisitos actuales</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p><p className="mt-1 text-xs text-text-secondary">{item.source}</p></div><Badge variant={statusVariant(item.status)}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">El checklist aparecerá al crear los requisitos aplicables.</p>}</div><p className="mt-4 text-xs text-text-secondary">Documentos cargados: {dossier360.data?.documents.summary.total ?? editor.data.requirements.length}</p></CardContent></Card>
-        <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? "Guardando..." : "Guardar todos los cambios"}</Button>
+        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">{uiText("Firma con DocuSeal")}</h2><p className="mt-2 text-sm text-text-secondary">{uiText("Envía documentos laborales a ")}{stringValue(editor.data.employee.contact.workEmail)} {uiText(" y recibe el PDF firmado en el expediente.")}</p>{docuSealTemplates.data?.templates?.length ? <div className="mt-4 grid gap-2">{docuSealTemplates.data.templates.map((template) => <Button key={template.key} type="button" variant="secondary" className="w-full justify-start" onClick={() => sendDocuSeal.mutate(template.key)} disabled={sendDocuSeal.isPending}>{template.label}</Button>)}</div> : <p className="mt-3 text-xs text-text-secondary">{uiText("DocuSeal no está configurado todavía en el backend.")}</p>}</CardContent></Card>
+        <Card level={2}><CardContent className="p-5"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-brand" /><h2 className="font-semibold">{uiText("Checklist y evidencia")}</h2></div><p className="mt-2 text-sm text-text-secondary">{uiText("Los documentos, licencias, capacitación, seguridad y activos se administran desde el expediente, sin perder su trazabilidad.")}</p><Button asChild variant="secondary" className="mt-4 w-full"><Link href={`/employees/${employeeId}`}>{uiText("Gestionar documentos y compliance")}</Link></Button></CardContent></Card>
+        <Card level={2}><CardContent className="p-5"><h2 className="font-semibold">{uiText("Requisitos actuales")}</h2><div className="mt-4 space-y-3">{requirements.length ? requirements.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border-default pb-3 last:border-0 last:pb-0"><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-text-secondary">{item.category}</p><p className="mt-1 text-xs text-text-secondary">{item.source}</p></div><Badge variant={statusVariant(item.status)}>{item.status.replaceAll("_", " ")}</Badge></div>) : <p className="text-sm text-text-secondary">{uiText("El checklist aparecerá al crear los requisitos aplicables.")}</p>}</div><p className="mt-4 text-xs text-text-secondary">{uiText("Documentos cargados: ")}{dossier360.data?.documents.summary.total ?? editor.data.requirements.length}</p></CardContent></Card>
+        <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !can("employees.update")}><Save className="size-4" />{save.isPending ? uiText("Guardando...") : uiText("Guardar todos los cambios")}</Button>
       </aside>
     </div>
   </div>;
@@ -241,7 +244,8 @@ export function EmployeeEditPage({ employeeId }: { employeeId: string }) {
 
 function EditorSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <Card level={2}><CardContent className="p-5"><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-text-secondary">{description}</p><div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div></CardContent></Card>; }
 function TextField({ label, value, onChange, required = false, type = "text" }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string }) { const id = `employee-edit-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`; return <FormField id={id} label={label} required={required}>{(field) => <Input {...field} type={type} value={value} onChange={(event) => onChange(event.target.value)} />}</FormField>; }
-function SecretField({ label, current, value, onChange }: { label: string; current?: string | null; value: string; onChange: (value: string) => void }) { return <FormField id={`employee-edit-${label.toLowerCase()}`} label={label}>{(field) => <div className="space-y-1"><Input {...field} type="password" value={value} placeholder={current ? `Actual: ${current}` : "Sin valor registrado"} onChange={(event) => onChange(event.target.value)} /><p className="text-xs text-text-secondary">Déjalo vacío para conservar el valor protegido.</p></div>}</FormField>; }
+function SecretField({ label, current, value, onChange }: { label: string; current?: string | null; value: string; onChange: (value: string) => void }) {
+  const uiText = useUiText(); return <FormField id={`employee-edit-${label.toLowerCase()}`} label={label}>{(field) => <div className="space-y-1"><Input {...field} type="password" value={value} placeholder={current ? `Actual: ${current}` : "Sin valor registrado"} onChange={(event) => onChange(event.target.value)} /><p className="text-xs text-text-secondary">{uiText("Déjalo vacío para conservar el valor protegido.")}</p></div>}</FormField>; }
 function SelectField({ label, value, onChange, options, placeholder, allowEmpty = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; placeholder?: string; allowEmpty?: boolean }) { const id = `employee-edit-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`; return <FormField id={id} label={label}>{(field) => <Select value={value || (allowEmpty ? "none" : undefined)} onValueChange={(next) => onChange(next === "none" ? "" : next)}><SelectTrigger {...field}><SelectValue placeholder={placeholder ?? "Selecciona una opción"} /></SelectTrigger><SelectContent>{allowEmpty ? <SelectItem value="none">{placeholder ?? "Sin seleccionar"}</SelectItem> : null}{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>}</FormField>; }
 function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border-default bg-surface-section px-3 text-sm font-medium"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>; }
 function stringValue(value: unknown) {

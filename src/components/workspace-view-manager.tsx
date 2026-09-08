@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FolderUp, Save, Share2, Trash2 } from "lucide-react";
@@ -33,6 +35,7 @@ export function WorkspaceViewManager({
   getConfig: () => ViewConfig;
   onApply: (config: ViewConfig) => void;
 }) {
+  const uiText = useUiText();
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
@@ -65,23 +68,23 @@ export function WorkspaceViewManager({
     }
   }
 
-  return <section aria-label="Vistas y preferencias" className="space-y-3 rounded-2xl border border-border-default bg-surface-elevated p-4">
+  return <section aria-label={uiText("Vistas y preferencias")} className="space-y-3 rounded-2xl border border-border-default bg-surface-elevated p-4">
     <div className="flex flex-wrap items-center gap-2">
       {views.data?.map((view) => <div key={view.id} className="flex items-center rounded-full border border-border-default bg-background">
-        <button type="button" className="min-h-10 px-3 text-sm font-medium" onClick={() => onApply(view.config)}>{view.name}{view.isDefault ? <span className="ml-1 text-xs text-text-secondary">Predeterminada</span> : null}{view.isShared ? <Share2 className="ml-1.5 inline size-3.5 text-text-secondary" aria-label="Compartida" /> : null}</button>
+        <button type="button" className="min-h-10 px-3 text-sm font-medium" onClick={() => onApply(view.config)}>{view.name}{view.isDefault ? <span className="ml-1 text-xs text-text-secondary">{uiText("Predeterminada")}</span> : null}{view.isShared ? <Share2 className="ml-1.5 inline size-3.5 text-text-secondary" aria-label={uiText("Compartida")} /> : null}</button>
         <button type="button" aria-label={`Exportar ${view.name}`} className="min-h-10 border-l px-2 text-text-secondary" onClick={() => downloadConfig(view.name, view.config)}><Download className="size-4" /></button>
         <button type="button" aria-label={`Eliminar ${view.name}`} className="min-h-10 border-l px-2 text-text-secondary" onClick={() => remove.mutate(view.id)}><Trash2 className="size-4" /></button>
       </div>)}
-      {!views.isLoading && !views.data?.length ? <p className="text-sm text-text-secondary">Aún no hay vistas guardadas para este workspace.</p> : null}
+      {!views.isLoading && !views.data?.length ? <p className="text-sm text-text-secondary">{uiText("Aún no hay vistas guardadas para este workspace.")}</p> : null}
     </div>
     <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-      <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Nombre de la vista" className="lg:max-w-xs" />
-      <label className="flex min-h-10 items-center gap-2 text-sm text-text-secondary"><input type="checkbox" checked={shared} onChange={(event) => setShared(event.target.checked)} />Compartir con el workspace</label>
-      <label className="flex min-h-10 items-center gap-2 text-sm text-text-secondary"><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />Usar como predeterminada</label>
-      <Button variant="secondary" disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}><Save className="size-4" />Guardar configuración</Button>
-      <Button variant="ghost" onClick={() => downloadConfig("configuracion-actual", getConfig())}><Download className="size-4" />Exportar actual</Button>
-      <Button variant="ghost" onClick={() => fileInput.current?.click()}><FolderUp className="size-4" />Importar</Button>
-      <input ref={fileInput} type="file" accept="application/json,.json" aria-label="Importar configuración de vista desde un archivo JSON" className="sr-only" onChange={(event) => void importConfig(event.target.files?.[0])} />
+      <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder={uiText("Nombre de la vista")} className="lg:max-w-xs" />
+      <label className="flex min-h-10 items-center gap-2 text-sm text-text-secondary"><input type="checkbox" checked={shared} onChange={(event) => setShared(event.target.checked)} />{uiText("Compartir con el workspace")}</label>
+      <label className="flex min-h-10 items-center gap-2 text-sm text-text-secondary"><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />{uiText("Usar como predeterminada")}</label>
+      <Button variant="secondary" disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}><Save className="size-4" />{uiText("Guardar configuración")}</Button>
+      <Button variant="ghost" onClick={() => downloadConfig("configuracion-actual", getConfig())}><Download className="size-4" />{uiText("Exportar actual")}</Button>
+      <Button variant="ghost" onClick={() => fileInput.current?.click()}><FolderUp className="size-4" />{uiText("Importar")}</Button>
+      <input ref={fileInput} type="file" accept="application/json,.json" aria-label={uiText("Importar configuración de vista desde un archivo JSON")} className="sr-only" onChange={(event) => void importConfig(event.target.files?.[0])} />
     </div>
   </section>;
 }

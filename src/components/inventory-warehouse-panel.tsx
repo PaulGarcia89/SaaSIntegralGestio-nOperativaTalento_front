@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, MapPin, Minus, Plus } from "lucide-react";
@@ -73,6 +75,7 @@ const PAGE_SIZE = 12;
  * una cantidad con signo; lo que cambia es quién le pone el signo.
  */
 export function InventoryWarehousePanel() {
+  const uiText = useUiText();
   const { can, currentBranch } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -123,7 +126,7 @@ export function InventoryWarehousePanel() {
   const columns: Array<DataColumn<InventoryWarehouseStockDto>> = [
     {
       key: "item",
-      header: "Referencia",
+      header: uiText("Referencia"),
       priority: "identity",
       render: (stock) => (
         <div className="min-w-0">
@@ -141,17 +144,17 @@ export function InventoryWarehousePanel() {
       priority: "primary",
       render: (stock) =>
         stock.belowMinimum ? (
-          <StatusBadge size="sm" tone="danger" label="Bajo mínimo" />
+          <StatusBadge size="sm" tone="danger" label={uiText("Bajo mínimo")} />
         ) : stock.needsReorder ? (
-          <StatusBadge size="sm" tone="warning" label="Toca reponer" />
+          <StatusBadge size="sm" tone="warning" label={uiText("Toca reponer")} />
         ) : (
-          <StatusBadge size="sm" tone="success" label="Estable" />
+          <StatusBadge size="sm" tone="success" label={uiText("Estable")} />
         ),
       sortValue: (stock) => (stock.belowMinimum ? 0 : stock.needsReorder ? 1 : 2),
     },
     {
       key: "available",
-      header: "Disponible",
+      header: uiText("Disponible"),
       priority: "primary",
       numeric: true,
       render: (stock) => (
@@ -182,16 +185,15 @@ export function InventoryWarehousePanel() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Inventario"
-        title="Almacén y stock"
-        description="Existencias no serializadas, ubicaciones, conteos y ajustes, con trazabilidad por sucursal."
+        eyebrow={uiText("Inventario")}
+        title={uiText("Almacén y stock")}
+        description={uiText("Existencias no serializadas, ubicaciones, conteos y ajustes, con trazabilidad por sucursal.")}
         meta={<span>{currentBranch?.name ?? "Sin sucursal"}</span>}
         actions={
           canManage ? (
             <Button variant="secondary" onClick={() => setDialog("location")}>
               <MapPin className="size-4" aria-hidden="true" />
-              Nueva ubicación
-            </Button>
+              {uiText("Nueva ubicación")}</Button>
           ) : undefined
         }
       />
@@ -205,34 +207,32 @@ export function InventoryWarehousePanel() {
               : `${needsReorder} ${needsReorder === 1 ? "referencia ha llegado" : "referencias han llegado"} al punto de reposición`
           }
         >
-          Registra la recepción de una compra o un ajuste para que la existencia vuelva a cuadrar con lo que hay en
-          la estantería.
-        </InlineNote>
+          {uiText("Registra la recepción de una compra o un ajuste para que la existencia vuelva a cuadrar con lo que hay en la estantería.")}</InlineNote>
       ) : null}
 
       <MetricRow>
-        <Metric label="Referencias en almacén" value={String(warehouse.data?.total ?? 0)} />
+        <Metric label={uiText("Referencias en almacén")} value={String(warehouse.data?.total ?? 0)} />
         <Metric
-          label="Bajo mínimo"
+          label={uiText("Bajo mínimo")}
           value={String(belowMinimum)}
           tone={belowMinimum > 0 ? "danger" : undefined}
         />
         <Metric
-          label="Toca reponer"
+          label={uiText("Toca reponer")}
           value={String(needsReorder)}
           tone={needsReorder > 0 ? "warning" : undefined}
         />
-        <Metric label="Ubicaciones activas" value={String(locations.data?.length ?? 0)} />
+        <Metric label={uiText("Ubicaciones activas")} value={String(locations.data?.length ?? 0)} />
       </MetricRow>
 
-      <PageSection title="Buscar" boxed>
+      <PageSection title={uiText("Buscar")} boxed>
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <div>
-            <Label htmlFor="warehouse-search">Referencia</Label>
+            <Label htmlFor="warehouse-search">{uiText("Referencia")}</Label>
             <Input
               id="warehouse-search"
               value={search}
-              placeholder="SKU o nombre del artículo"
+              placeholder={uiText("SKU o nombre del artículo")}
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
@@ -245,16 +245,15 @@ export function InventoryWarehousePanel() {
           <Button
             variant="secondary"
             loading={exportMovements.isPending}
-            loadingLabel="Preparando…"
+            loadingLabel={uiText("Preparando…")}
             onClick={() => exportMovements.mutate()}
           >
             <Download className="size-4" aria-hidden="true" />
-            Exportar movimientos
-          </Button>
+            {uiText("Exportar movimientos")}</Button>
         </div>
         {exportMovements.isError ? (
           <div className="mt-3">
-            <InlineNote tone="danger" title="No se pudo exportar">
+            <InlineNote tone="danger" title={uiText("No se pudo exportar")}>
               {getApiErrorMessage(exportMovements.error, "El servidor rechazó la descarga.")}
             </InlineNote>
           </div>
@@ -263,8 +262,8 @@ export function InventoryWarehousePanel() {
 
       {warehouse.isError ? (
         <ErrorState
-          title="No fue posible cargar el almacén"
-          detail={getApiErrorMessage(warehouse.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar el almacén")}
+          detail={getApiErrorMessage(warehouse.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void warehouse.refetch()}
         />
       ) : (
@@ -274,7 +273,7 @@ export function InventoryWarehousePanel() {
             loading={warehouse.isLoading}
             columns={columns}
             getKey={(stock) => stock.id}
-            caption="Existencias por artículo"
+            caption={uiText("Existencias por artículo")}
             emptyReason={search ? "no-matches" : "no-records"}
             onClearFilters={search ? () => setSearch("") : undefined}
             rowActions={
@@ -283,18 +282,14 @@ export function InventoryWarehousePanel() {
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button size="sm" variant="secondary" onClick={() => open(stock, "add")}>
                         <Plus className="size-4" aria-hidden="true" />
-                        Añadir
-                      </Button>
+                        {uiText("Añadir")}</Button>
                       <Button size="sm" variant="secondary" onClick={() => open(stock, "remove")}>
                         <Minus className="size-4" aria-hidden="true" />
-                        Retirar
-                      </Button>
+                        {uiText("Retirar")}</Button>
                       <Button size="sm" variant="ghost" onClick={() => open(stock, "count")}>
-                        Conteo
-                      </Button>
+                        {uiText("Conteo")}</Button>
                       <Button size="sm" variant="ghost" onClick={() => open(stock, "policy")}>
-                        Alertas
-                      </Button>
+                        {uiText("Alertas")}</Button>
                     </div>
                   )
                 : undefined
@@ -349,6 +344,7 @@ function WarehouseDialog({
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }) {
+  const uiText = useUiText();
   const { currentUser } = useAppStore();
   const [values, setValues] = useState<Record<string, string>>({});
   const [acknowledged, setAcknowledged] = useState(false);
@@ -448,14 +444,14 @@ function WarehouseDialog({
             <>
               <Choice
                 id="location-branch"
-                label="Sucursal"
+                label={uiText("Sucursal")}
                 value={values.branchId || branchId}
                 onChange={(value) => set("branchId", value)}
                 options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
               />
-              <Field id="location-code" label="Código" value={values.code} placeholder="ALM-01" onChange={(v) => set("code", v)} />
-              <Field id="location-name" label="Nombre" value={values.name} placeholder="Almacén principal" onChange={(v) => set("name", v)} />
-              <Field id="location-type" label="Tipo" value={values.type} placeholder="Almacén, sala, estante…" onChange={(v) => set("type", v)} />
+              <Field id="location-code" label={uiText("Código")} value={values.code} placeholder={uiText("ALM-01")} onChange={(v) => set("code", v)} />
+              <Field id="location-name" label={uiText("Nombre")} value={values.name} placeholder={uiText("Almacén principal")} onChange={(v) => set("name", v)} />
+              <Field id="location-type" label={uiText("Tipo")} value={values.type} placeholder={uiText("Almacén, sala, estante…")} onChange={(v) => set("type", v)} />
             </>
           ) : null}
 
@@ -471,7 +467,7 @@ function WarehouseDialog({
               />
               <Choice
                 id="adjust-location"
-                label="Ubicación (opcional)"
+                label={uiText("Ubicación (opcional)")}
                 value={values.locationId}
                 onChange={(value) => set("locationId", value)}
                 options={[
@@ -484,7 +480,7 @@ function WarehouseDialog({
               />
               <Field
                 id="adjust-reason"
-                label="Motivo"
+                label={uiText("Motivo")}
                 value={values.reason}
                 placeholder={kind === "add" ? "Recepción de proveedor, corrección…" : "Rotura, consumo interno, corrección…"}
                 onChange={(v) => set("reason", v)}
@@ -504,9 +500,9 @@ function WarehouseDialog({
               />
               <Field
                 id="count-notes"
-                label="Observaciones"
+                label={uiText("Observaciones")}
                 value={values.notes}
-                placeholder="Opcional"
+                placeholder={uiText("Opcional")}
                 onChange={(v) => set("notes", v)}
               />
             </>
@@ -516,7 +512,7 @@ function WarehouseDialog({
             <>
               <Field
                 id="policy-min"
-                label="Stock mínimo"
+                label={uiText("Stock mínimo")}
                 type="number"
                 min="0"
                 value={values.minQty ?? String(stock.minQty)}
@@ -524,7 +520,7 @@ function WarehouseDialog({
               />
               <Field
                 id="policy-reorder"
-                label="Punto de reposición"
+                label={uiText("Punto de reposición")}
                 type="number"
                 min="0"
                 value={values.reorderPoint ?? String(stock.reorderPoint)}
@@ -532,18 +528,18 @@ function WarehouseDialog({
               />
               <Field
                 id="policy-max"
-                label="Stock máximo"
+                label={uiText("Stock máximo")}
                 type="number"
                 min="0"
                 value={values.maxQty ?? (stock.maxQty ? String(stock.maxQty) : "")}
-                placeholder="Opcional"
+                placeholder={uiText("Opcional")}
                 onChange={(v) => set("maxQty", v)}
               />
             </>
           ) : null}
 
           {mutation.isError ? (
-            <InlineNote tone="danger" title="No se pudo guardar">
+            <InlineNote tone="danger" title={uiText("No se pudo guardar")}>
               {getApiErrorMessage(mutation.error, "El servidor rechazó la operación.")}
             </InlineNote>
           ) : null}
@@ -564,11 +560,10 @@ function WarehouseDialog({
               className="w-full"
               disabled={!values.code?.trim() || !values.name?.trim()}
               loading={mutation.isPending}
-              loadingLabel="Guardando…"
+              loadingLabel={uiText("Guardando…")}
               onClick={() => mutation.mutate()}
             >
-              Crear la ubicación
-            </Button>
+              {uiText("Crear la ubicación")}</Button>
           )}
         </div>
       </DialogContent>
@@ -784,12 +779,13 @@ function Choice({
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
+  const uiText = useUiText();
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
       <Select value={value} onValueChange={(next) => onChange(next === "NONE" ? "" : next)}>
         <SelectTrigger id={id}>
-          <SelectValue placeholder="Seleccionar" />
+          <SelectValue placeholder={uiText("Seleccionar")} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

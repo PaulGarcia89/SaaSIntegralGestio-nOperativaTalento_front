@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -115,6 +117,7 @@ const OPERACIONES: Operacion[] = [
 const MAX_ALERTAS = 5;
 
 export function RestaurantModulePanel() {
+  const uiText = useUiText();
   const { currentBranch, can, canAny } = useAppStore();
   const { warehouseId, warehouseName } = useRestaurantInventoryContext();
 
@@ -163,14 +166,14 @@ export function RestaurantModulePanel() {
     consulta.isError ? null : consulta.isLoading ? undefined : (valor ?? null);
 
   if (avanzado.isLoading && existencias.isLoading) {
-    return <SkeletonRows rows={5} label="Cargando el estado del inventario" />;
+    return <SkeletonRows rows={5} label={uiText("Cargando el estado del inventario")} />;
   }
 
   if (avanzado.isError && existencias.isError) {
     return (
       <ErrorState
-        title="No fue posible cargar el estado del inventario"
-        detail={getApiErrorMessage(avanzado.error, "Reintenta la consulta para continuar.")}
+        title={uiText("No fue posible cargar el estado del inventario")}
+        detail={getApiErrorMessage(avanzado.error, uiText("Reintenta la consulta para continuar."))}
         onRetry={() => {
           void avanzado.refetch();
           void existencias.refetch();
@@ -215,7 +218,7 @@ export function RestaurantModulePanel() {
       {/* ---- 1. Qué hago ahora ------------------------------------------ */}
       {recomendada ? (
         <NextAction
-          label="Empieza por aquí"
+          label={uiText("Empieza por aquí")}
           title={recomendada.title}
           detail={recomendada.detail}
           href={recomendada.href}
@@ -225,64 +228,64 @@ export function RestaurantModulePanel() {
       ) : (
         <EmptyState
           reason="no-records"
-          title="No hay nada urgente en este almacén"
-          description="Sin faltantes, sin lotes por vencer y sin entradas esperando confirmación. Puedes seguir con la operación del día."
+          title={uiText("No hay nada urgente en este almacén")}
+          description={uiText("Sin faltantes, sin lotes por vencer y sin entradas esperando confirmación. Puedes seguir con la operación del día.")}
         />
       )}
 
       {/* ---- 2. Cómo va el inventario ----------------------------------- */}
-      <StatusTileRow label="Estado del inventario">
+      <StatusTileRow label={uiText("Estado del inventario")}>
         <li className="min-w-0">
           <StatusTile
-            title="Bajo mínimo"
+            title={uiText("Bajo mínimo")}
             value={cifra(existencias.data ? bajoMinimo.length : undefined, existencias)}
             context="Productos por debajo de su existencia mínima."
             status={bajoMinimo.length > 0 ? { label: "Reponer", tone: "danger" as const } : undefined}
             href="/inventory/restaurant/stock?filter=LOW"
-            actionLabel="Ver faltantes"
+            actionLabel={uiText("Ver faltantes")}
             scope={warehouseName}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Próximos a vencer"
+            title={uiText("Próximos a vencer")}
             value={cifra(datos ? vencimientos.length : undefined, avanzado)}
             context="Lotes que caducan en los próximos días."
-            status={vencimientos.length > 0 ? { label: "Revisar", tone: "warning" as const } : undefined}
+            status={vencimientos.length > 0 ? { label: uiText("Revisar"), tone: "warning" as const } : undefined}
             href="/inventory/restaurant/lots?filter=7"
-            actionLabel="Ver lotes"
+            actionLabel={uiText("Ver lotes")}
             scope={warehouseName}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Entradas por confirmar"
+            title={uiText("Entradas por confirmar")}
             value={cifra(entradasBorrador, basico)}
             context="No suman al inventario hasta confirmarse."
             href="/inventory/restaurant/receipts?status=DRAFT"
-            actionLabel="Revisar entradas"
+            actionLabel={uiText("Revisar entradas")}
             scope={warehouseName}
           />
         </li>
         {puedeVerValor ? (
           <li className="min-w-0">
             <StatusTile
-              title="Valor del inventario"
+              title={uiText("Valor del inventario")}
               value={datos ? formatoMoneda(datos.inventoryValue) : cifra(undefined, avanzado)}
               context="Valorado al costo promedio del almacén activo."
               href="/inventory/restaurant/costs"
-              actionLabel="Ver costos"
+              actionLabel={uiText("Ver costos")}
               scope={warehouseName}
             />
           </li>
         ) : (
           <li className="min-w-0">
             <StatusTile
-              title="Diferencia de conteo"
+              title={uiText("Diferencia de conteo")}
               value={datos ? formatoNumero(datos.inventoryDifference) : cifra(undefined, avanzado)}
               context="Diferencia entre existencia teórica y contada."
               href="/inventory/restaurant/variance"
-              actionLabel="Ver diferencias"
+              actionLabel={uiText("Ver diferencias")}
               scope={warehouseName}
             />
           </li>
@@ -293,12 +296,12 @@ export function RestaurantModulePanel() {
           Producto, cantidad, unidad y ubicación, siempre juntos. */}
       {bajoMinimo.length > 0 ? (
         <PageSection
-          title="Productos bajo mínimo"
+          title={uiText("Productos bajo mínimo")}
           description={`En ${warehouseName}. Ordenados por lo lejos que están de su mínimo.`}
           id="bajo-minimo"
           actions={
             <Button asChild variant="secondary" size="sm">
-              <Link href="/inventory/restaurant/stock?filter=LOW">Ver todos</Link>
+              <Link href="/inventory/restaurant/stock?filter=LOW">{uiText("Ver todos")}</Link>
             </Button>
           }
         >
@@ -317,10 +320,10 @@ export function RestaurantModulePanel() {
                     {item.stock} {item.inventoryUnit}
                   </span>
                   <span className="block font-mono text-2xs text-ink-3 tabular-figures">
-                    mínimo {item.minimumStock} {item.inventoryUnit}
+                    {uiText("mínimo")}{item.minimumStock} {item.inventoryUnit}
                   </span>
                 </span>
-                <StatusBadge size="sm" tone="danger" label="Bajo mínimo" />
+                <StatusBadge size="sm" tone="danger" label={uiText("Bajo mínimo")} />
               </li>
             ))}
           </ul>
@@ -329,12 +332,12 @@ export function RestaurantModulePanel() {
 
       {vencimientos.length > 0 ? (
         <PageSection
-          title="Lotes próximos a vencer"
-          description="Registra la merma o dales salida antes de perder el producto."
+          title={uiText("Lotes próximos a vencer")}
+          description={uiText("Registra la merma o dales salida antes de perder el producto.")}
           id="vencimientos"
           actions={
             <Button asChild variant="secondary" size="sm">
-              <Link href="/inventory/restaurant/lots?filter=7">Ver todos</Link>
+              <Link href="/inventory/restaurant/lots?filter=7">{uiText("Ver todos")}</Link>
             </Button>
           }
         >
@@ -346,7 +349,7 @@ export function RestaurantModulePanel() {
               >
                 <span className="min-w-0 flex-1 basis-40">
                   <span className="block break-words text-sm font-medium text-ink-1">{lote.name}</span>
-                  <span className="block truncate font-mono text-xs text-ink-3">Lote {lote.lot}</span>
+                  <span className="block truncate font-mono text-xs text-ink-3">{uiText("Lote ")}{lote.lot}</span>
                 </span>
                 <span className="shrink-0 font-mono text-sm tabular-figures text-ink-1">{lote.quantity}</span>
                 <StatusBadge size="sm" tone="warning" label={`Vence ${fechaCorta(lote.expiresAt)}`} />
@@ -358,7 +361,7 @@ export function RestaurantModulePanel() {
 
       {/* ---- 4. Las operaciones del día --------------------------------- */}
       {operaciones.length > 0 ? (
-        <PageSection title="Operaciones del día" id="operaciones">
+        <PageSection title={uiText("Operaciones del día")} id="operaciones">
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {operaciones.map((operacion) => (
               <li key={operacion.key} className="min-w-0">
@@ -384,7 +387,7 @@ export function RestaurantModulePanel() {
           Barras y no líneas: `consumptionTrend` compara periodos cerrados,
           que son categorías, no una serie continua. */}
       <ChartCard
-        title="Consumo por periodo"
+        title={uiText("Consumo por periodo")}
         subtitle="Cuánto se consumió en cada periodo cerrado, para ver si el gasto se mueve."
         period={warehouseName}
         action={
@@ -399,7 +402,7 @@ export function RestaurantModulePanel() {
                 className={`size-4 ${avanzado.isFetching ? "animate-spin motion-reduce:animate-none" : ""}`}
                 aria-hidden="true"
               />
-              {avanzado.isFetching ? "Actualizando…" : "Actualizar"}
+              {avanzado.isFetching ? uiText("Actualizando…") : uiText("Actualizar")}
             </Button>
             <Button
               variant="secondary"
@@ -422,11 +425,10 @@ export function RestaurantModulePanel() {
         }
       >
         {avanzado.isLoading ? (
-          <ChartSkeleton label="Cargando el consumo del periodo" />
+          <ChartSkeleton label={uiText("Cargando el consumo del periodo")} />
         ) : avanzado.isError ? (
-          <InlineNote tone="warning" title="No fue posible cargar la tendencia">
-            El resto del panel sigue siendo válido. Vuelve a cargar para reintentarlo.
-          </InlineNote>
+          <InlineNote tone="warning" title={uiText("No fue posible cargar la tendencia")}>
+            {uiText("El resto del panel sigue siendo válido. Vuelve a cargar para reintentarlo.")}</InlineNote>
         ) : (
           <BarChart
             categories={tendencia.map((punto) => punto.label)}
@@ -438,7 +440,7 @@ export function RestaurantModulePanel() {
               },
             ]}
             categoryLabel="Periodo"
-            caption="Consumo registrado en cada periodo cerrado del almacén activo."
+            caption={uiText("Consumo registrado en cada periodo cerrado del almacén activo.")}
             formatValue={formatoMoneda}
             emptyReason="sin-registros"
           />

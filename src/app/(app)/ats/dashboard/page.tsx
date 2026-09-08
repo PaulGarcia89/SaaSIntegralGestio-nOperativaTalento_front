@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowRight, BriefcaseBusiness, CircleCheck, CircleSlash, Inbox, MessagesSquare, Plus } from "lucide-react";
@@ -22,7 +24,7 @@ import {
   fetchApplications,
   fetchAtsAnalytics,
   fetchInterviewCoordinationQueue,
-  fetchOperationalDashboard,
+  fetchOperationalDashboardInLocale,
   fetchVacancies,
 } from "@/lib/backend";
 import type { ApplicationStatusKey } from "@/lib/contracts";
@@ -168,6 +170,7 @@ function PhaseRail({
 }
 
 export default function TodayPage() {
+  const uiText = useUiText();
   const { can, currentBranch, currentTenant } = useAppStore();
   const { locale, t } = useLocale();
   const allowed = can("applications.view");
@@ -175,8 +178,8 @@ export default function TodayPage() {
   const dashboard = useQuery({
     // Empresa y sucursal forman parte de la clave: sin ellas, al cambiar de
     // contexto se seguiría mostrando la bandeja del contexto anterior.
-    queryKey: ["operational-dashboard", currentTenant.id, currentBranch?.id],
-    queryFn: fetchOperationalDashboard,
+    queryKey: ["operational-dashboard", currentTenant.id, currentBranch?.id, locale],
+    queryFn: () => fetchOperationalDashboardInLocale(locale),
     enabled: allowed,
     refetchInterval: 60_000,
   });
@@ -237,7 +240,7 @@ export default function TodayPage() {
   if (!allowed) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Reclutamiento" title={t("ats.today.title")} />
+        <PageHeader eyebrow={uiText("Reclutamiento")} title={t("ats.today.title")} />
         <EmptyState reason="no-records" title={t("ats.today.noAccessTitle")} description={t("ats.today.noAccessHelp")} />
       </div>
     );
@@ -338,7 +341,7 @@ export default function TodayPage() {
 
   const embudo: FunnelStage[] = (analitica.data?.funnel ?? []).map((etapa) => ({
     id: etapa.stageCode,
-    name: etapa.stageName,
+    name: uiText(etapa.stageName),
     value: etapa.reached,
   }));
 
@@ -360,7 +363,7 @@ export default function TodayPage() {
   return (
     <div className="space-y-6 pb-4">
       <PageHeader
-        eyebrow="Reclutamiento"
+        eyebrow={uiText("Reclutamiento")}
         title={t("ats.today.title")}
         description={t("ats.today.help")}
         actions={
@@ -480,7 +483,7 @@ export default function TodayPage() {
         title={t("ats.panel.funnelTitle")}
         subtitle={t("ats.panel.funnelSubtitle")}
         period={t("ats.panel.funnelPeriod", { days: DIAS_EMBUDO })}
-        source={analitica.data?.source}
+        source={analitica.data?.source ? uiText(analitica.data.source) : undefined}
       >
         {analitica.isLoading ? (
           <ChartSkeleton label={t("ats.panel.funnelLoading")} />
@@ -509,7 +512,7 @@ export default function TodayPage() {
                       key={etapa.stageCode}
                       className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm"
                     >
-                      <span className="min-w-0 text-ink-2">{etapa.stageName}</span>
+                      <span className="min-w-0 text-ink-2">{uiText(etapa.stageName)}</span>
                       <span className="shrink-0 text-ink-1">
                         <span className="font-mono font-semibold tabular-figures">
                           {textoDuracion(etapa.averageHours)}

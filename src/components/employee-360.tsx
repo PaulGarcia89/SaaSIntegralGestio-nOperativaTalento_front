@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -32,6 +34,7 @@ type DossierDocument = EmployeeDossier360Snapshot["documents"]["documents"][numb
 type DossierRequirement = EmployeeDossier360Snapshot["compliance"]["requirements"][number];
 
 export function Employee360Page({ employeeId }: { employeeId: string }) {
+  const uiText = useUiText();
   const { can, currentRole } = useAppStore();
   const queryClient = useQueryClient();
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -101,8 +104,8 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
     onError: (error) => setDocumentError(getApiErrorMessage(error, "No fue posible enviar el documento a DocuSeal.")),
   });
 
-  if (dossier.isLoading) return <AsyncState state="loading" title="Cargando expediente" description="Preparamos la información laboral y la trazabilidad del empleado." />;
-  if (dossier.isError || !dossier.data) return <AsyncState state="error" title="No fue posible cargar el expediente" description={getApiErrorMessage(dossier.error, "El expediente no está disponible en este contexto.")} onRetry={() => void dossier.refetch()} />;
+  if (dossier.isLoading) return <AsyncState state="loading" title={uiText("Cargando expediente")} description={uiText("Preparamos la información laboral y la trazabilidad del empleado.")} />;
+  if (dossier.isError || !dossier.data) return <AsyncState state="error" title={uiText("No fue posible cargar el expediente")} description={getApiErrorMessage(dossier.error, "El expediente no está disponible en este contexto.")} onRetry={() => void dossier.refetch()} />;
 
   const { employee, documents, history } = dossier.data;
   const assignments = branchAssignmentsOf(employee);
@@ -119,18 +122,18 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
           <div className="flex min-w-0 items-center gap-4">
             <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-action text-lg font-semibold text-on-action">{initials(employee.name)}</span>
             <div className="min-w-0">
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">Empleado</p>
+              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-ink-3">{uiText("Empleado")}</p>
               <h1 id="employee-name" className="mt-0.5 text-2xl font-semibold leading-tight text-ink-1 sm:text-3xl">{employee.name}</h1>
               <p className="mt-1 text-base text-ink-2">{employee.jobTitle ?? primary?.role ?? "Cargo sin definir"} · {primary?.branch.name ?? "Sucursal sin asignar"}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge variant={employee.status === "ACTIVE" ? "success" : "secondary"}>{statusLabel(employee.status)}</Badge>
-                {assignments.length > 1 ? <Badge variant="outline"><MapPin className="mr-1 size-3.5" />{assignments.length} sucursales</Badge> : null}
+                {assignments.length > 1 ? <Badge variant="outline"><MapPin className="mr-1 size-3.5" />{assignments.length} {uiText(" sucursales")}</Badge> : null}
               </div>
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />Directorio</Link></Button>
-            {can("employees.update") ? <Button asChild><Link href={`/employees/${employeeId}/edit`}><Pencil className="size-4" />Editar</Link></Button> : null}
+            <Button asChild variant="secondary"><Link href="/employees"><ArrowLeft className="size-4" />{uiText("Directorio")}</Link></Button>
+            {can("employees.update") ? <Button asChild><Link href={`/employees/${employeeId}/edit`}><Pencil className="size-4" />{uiText("Editar")}</Link></Button> : null}
           </div>
         </div>
       </section>
@@ -138,14 +141,14 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
       <Tabs defaultValue="overview" className="space-y-5">
         <div className="overflow-x-auto pb-1">
           <TabsList className="min-w-max">
-            <TabsTrigger value="overview">Resumen</TabsTrigger>
-            <TabsTrigger value="employment">Empleo</TabsTrigger>
-            {can("employees.read") ? <TabsTrigger value="payroll">Nómina</TabsTrigger> : null}
-            {can("employees.read") ? <TabsTrigger value="tax">Impuestos y elegibilidad</TabsTrigger> : null}
-            <TabsTrigger value="documents">Documentos</TabsTrigger>
-            <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
-            <TabsTrigger value="history">Historial</TabsTrigger>
-            {can("employees.read") ? <TabsTrigger value="audit">Auditoría</TabsTrigger> : null}
+            <TabsTrigger value="overview">{uiText("Resumen")}</TabsTrigger>
+            <TabsTrigger value="employment">{uiText("Empleo")}</TabsTrigger>
+            {can("employees.read") ? <TabsTrigger value="payroll">{uiText("Nómina")}</TabsTrigger> : null}
+            {can("employees.read") ? <TabsTrigger value="tax">{uiText("Impuestos y elegibilidad")}</TabsTrigger> : null}
+            <TabsTrigger value="documents">{uiText("Documentos")}</TabsTrigger>
+            <TabsTrigger value="compliance">{uiText("Cumplimiento")}</TabsTrigger>
+            <TabsTrigger value="history">{uiText("Historial")}</TabsTrigger>
+            {can("employees.read") ? <TabsTrigger value="audit">{uiText("Auditoría")}</TabsTrigger> : null}
           </TabsList>
         </div>
         <TabsContent value="overview">
@@ -205,30 +208,30 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Documento del expediente</DialogTitle>
-            <DialogDescription>Solo el administrador de empresa puede ver o reemplazar el archivo sensible.</DialogDescription>
+            <DialogTitle>{uiText("Documento del expediente")}</DialogTitle>
+            <DialogDescription>{uiText("Solo el administrador de empresa puede ver o reemplazar el archivo sensible.")}</DialogDescription>
           </DialogHeader>
           {selectedDocument ? (
             canManageFiles ? (
               <div className="space-y-4">
                 <div className="grid gap-3 rounded-2xl border border-border-default bg-surface-elevated p-4 sm:grid-cols-2">
-                  <Summary label="Documento" value={selectedDocument.originalName} />
-                  <Summary label="Estado" value={selectedDocument.status.replaceAll("_", " ")} />
-                  <Summary label="Tipo" value={selectedDocument.category} />
-                  <Summary label="Versión" value={`v${selectedDocument.version}`} />
-                  <Summary label="Tamaño" value={formatFileSize(selectedDocument.sizeBytes)} />
-                  <Summary label="Vigencia" value={selectedDocument.expiresAt ? formatDate(selectedDocument.expiresAt) : "Sin vencimiento"} />
+                  <Summary label={uiText("Documento")} value={selectedDocument.originalName} />
+                  <Summary label={uiText("Estado")} value={selectedDocument.status.replaceAll("_", " ")} />
+                  <Summary label={uiText("Tipo")} value={selectedDocument.category} />
+                  <Summary label={uiText("Versión")} value={`v${selectedDocument.version}`} />
+                  <Summary label={uiText("Tamaño")} value={formatFileSize(selectedDocument.sizeBytes)} />
+                  <Summary label={uiText("Vigencia")} value={selectedDocument.expiresAt ? formatDate(selectedDocument.expiresAt) : uiText("Sin vencimiento")} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" onClick={() => void openDocumentFile(employeeId, selectedDocument, setDocumentError)}><Download className="size-4" />Ver archivo</Button>
+                  <Button type="button" variant="secondary" onClick={() => void openDocumentFile(employeeId, selectedDocument, setDocumentError)}><Download className="size-4" />{uiText("Ver archivo")}</Button>
                 </div>
                 <div className="space-y-4 rounded-2xl border border-border-default p-4">
-                  <FormField id="employee-document-expires-at" label="Vigencia">{(field) => <Input {...field} type="date" value={documentExpiresAt} onChange={(event) => setDocumentExpiresAt(event.target.value)} />}</FormField>
-                  <FormField id="employee-document-notes" label="Notas">{(field) => <Input {...field} value={documentNotes} onChange={(event) => setDocumentNotes(event.target.value)} placeholder="Notas internas del expediente" />}</FormField>
-                  <FormField id="employee-document-file" label="Nuevo archivo">{(field) => <Input {...field} type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />}</FormField>
-                  {documentError ? <InlineFeedback tone="danger" title="No se pudo completar">{documentError}</InlineFeedback> : null}
+                  <FormField id="employee-document-expires-at" label={uiText("Vigencia")}>{(field) => <Input {...field} type="date" value={documentExpiresAt} onChange={(event) => setDocumentExpiresAt(event.target.value)} />}</FormField>
+                  <FormField id="employee-document-notes" label={uiText("Notas")}>{(field) => <Input {...field} value={documentNotes} onChange={(event) => setDocumentNotes(event.target.value)} placeholder={uiText("Notas internas del expediente")} />}</FormField>
+                  <FormField id="employee-document-file" label={uiText("Nuevo archivo")}>{(field) => <Input {...field} type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />}</FormField>
+                  {documentError ? <InlineFeedback tone="danger" title={uiText("No se pudo completar")}>{documentError}</InlineFeedback> : null}
                   <div className="flex flex-wrap justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={() => updateDocument.mutate({ documentId: selectedDocument.id, expiresAt: documentExpiresAt || null, notes: documentNotes || null })} disabled={updateDocument.isPending}>Actualizar vigencia</Button>
+                    <Button type="button" variant="secondary" onClick={() => updateDocument.mutate({ documentId: selectedDocument.id, expiresAt: documentExpiresAt || null, notes: documentNotes || null })} disabled={updateDocument.isPending}>{uiText("Actualizar vigencia")}</Button>
                     <Button
                       type="button"
                       onClick={() => {
@@ -240,13 +243,12 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
                       }}
                       disabled={replaceDocument.isPending}
                     >
-                      Reemplazar documento
-                    </Button>
+                      {uiText("Reemplazar documento")}</Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <InlineFeedback tone="warning" title="Acceso restringido">Solo el administrador de empresa puede ver o reemplazar archivos sensibles.</InlineFeedback>
+              <InlineFeedback tone="warning" title={uiText("Acceso restringido")}>{uiText("Solo el administrador de empresa puede ver o reemplazar archivos sensibles.")}</InlineFeedback>
             )
           ) : null}
         </DialogContent>
@@ -267,22 +269,22 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Completar documento requerido</DialogTitle>
-            <DialogDescription>Sube el archivo asociado al requisito para dejar trazabilidad en el expediente.</DialogDescription>
+            <DialogTitle>{uiText("Completar documento requerido")}</DialogTitle>
+            <DialogDescription>{uiText("Sube el archivo asociado al requisito para dejar trazabilidad en el expediente.")}</DialogDescription>
           </DialogHeader>
           {targetRequirement ? (
             <div className="space-y-4">
               <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
                 <p className="font-medium">{targetRequirement.title}</p>
-                <p className="mt-1 text-sm text-text-secondary">{targetRequirement.category} · {targetRequirement.jurisdiction} · {targetRequirement.required ? "Requerido" : "No requerido"}</p>
+                <p className="mt-1 text-sm text-text-secondary">{targetRequirement.category} · {targetRequirement.jurisdiction} · {targetRequirement.required ? "Requerido" : uiText("No requerido")}</p>
               </div>
               <div className="space-y-4">
-                <FormField id="requirement-document-file" label="Archivo">{(field) => <Input {...field} type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => setRequirementFile(event.target.files?.[0] ?? null)} />}</FormField>
-                <FormField id="requirement-document-expires" label="Vigencia">{(field) => <Input {...field} type="date" value={requirementExpiresAt} onChange={(event) => setRequirementExpiresAt(event.target.value)} />}</FormField>
-                <FormField id="requirement-document-notes" label="Notas">{(field) => <Input {...field} value={requirementNotes} onChange={(event) => setRequirementNotes(event.target.value)} placeholder="Notas internas del expediente" />}</FormField>
-                {documentError ? <InlineFeedback tone="danger" title="No se pudo completar">{documentError}</InlineFeedback> : null}
+                <FormField id="requirement-document-file" label={uiText("Archivo")}>{(field) => <Input {...field} type="file" accept=".pdf,image/jpeg,image/png" onChange={(event) => setRequirementFile(event.target.files?.[0] ?? null)} />}</FormField>
+                <FormField id="requirement-document-expires" label={uiText("Vigencia")}>{(field) => <Input {...field} type="date" value={requirementExpiresAt} onChange={(event) => setRequirementExpiresAt(event.target.value)} />}</FormField>
+                <FormField id="requirement-document-notes" label={uiText("Notas")}>{(field) => <Input {...field} value={requirementNotes} onChange={(event) => setRequirementNotes(event.target.value)} placeholder={uiText("Notas internas del expediente")} />}</FormField>
+                {documentError ? <InlineFeedback tone="danger" title={uiText("No se pudo completar")}>{documentError}</InlineFeedback> : null}
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button type="button" variant="secondary" onClick={() => setRequirementDialogOpen(false)}>Cancelar</Button>
+                  <Button type="button" variant="secondary" onClick={() => setRequirementDialogOpen(false)}>{uiText("Cancelar")}</Button>
                   <Button
                     type="button"
                     disabled={addDocument.isPending}
@@ -310,8 +312,7 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
                       );
                     }}
                   >
-                    Completar documento
-                  </Button>
+                    {uiText("Completar documento")}</Button>
                 </div>
               </div>
             </div>
@@ -323,35 +324,39 @@ export function Employee360Page({ employeeId }: { employeeId: string }) {
 }
 
 function Overview({ employee, documents, snapshot }: { employee: Awaited<ReturnType<typeof fetchEmployeeDetail>>["employee"]; documents: number; snapshot: EmployeeDossier360Snapshot["compliance"] | null }) {
+  const uiText = useUiText();
   const primary = primaryAssignmentOf(employee);
   const source = "recordSource" in employee ? employee.recordSource : undefined;
 
   return (
     <div className="space-y-5">
-      <Card level={2}><CardContent className="p-5"><SectionTitle icon={<UserRound className="size-4" />} title="Ficha" /><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label="Correo" value={employee.email} /><Datum label="Cargo" value={employee.jobTitle ?? primary?.role ?? "Sin definir"} /><Datum label="Sucursal principal" value={primary?.branch.name ?? "Sin asignar"} /><Datum label="Estado" value={statusLabel(employee.status)} /><Datum label="Origen" value={source === "CANDIDATE_CONVERSION" ? "Conversión de candidato" : "Directorio"} /><Datum label="Documentos en el expediente" value={String(documents)} /></dl></CardContent></Card>
+      <Card level={2}><CardContent className="p-5"><SectionTitle icon={<UserRound className="size-4" />} title={uiText("Ficha")} /><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label={uiText("Correo")} value={employee.email} /><Datum label={uiText("Cargo")} value={employee.jobTitle ?? primary?.role ?? "Sin definir"} /><Datum label={uiText("Sucursal principal")} value={primary?.branch.name ?? "Sin asignar"} /><Datum label={uiText("Estado")} value={statusLabel(employee.status)} /><Datum label={uiText("Origen")} value={source === "CANDIDATE_CONVERSION" ? "Conversión de candidato" : uiText("Directorio")} /><Datum label={uiText("Documentos en el expediente")} value={String(documents)} /></dl></CardContent></Card>
       {snapshot?.alerts?.length ? <InlineFeedback tone="warning" title={`${snapshot.alerts.length} ${snapshot.alerts.length === 1 ? "alerta de cumplimiento" : "alertas de cumplimiento"}`}>{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}
     </div>
   );
 }
 
 function Employment({ employee }: { employee: Awaited<ReturnType<typeof fetchEmployeeDetail>>["employee"] }) {
+  const uiText = useUiText();
   const assignments = branchAssignmentsOf(employee);
-  return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<BriefcaseBusiness className="size-4" />} title="Asignaciones activas" /><div className="mt-4 divide-y divide-border-default">{assignments.length ? assignments.map((assignment) => <div key={assignment.id} className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{assignment.branch?.name ?? "Sin nombre"}</p><p className="text-sm text-text-secondary">{assignment.role ?? "Sin rol"}</p></div><Badge variant={assignment.isPrimary ? "success" : "secondary"}>{assignment.isPrimary ? "Principal" : "Secundaria"}</Badge></div>) : <p className="text-sm text-text-secondary">No hay una sucursal asignada.</p>}</div></CardContent></Card></div>;
+  return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<BriefcaseBusiness className="size-4" />} title={uiText("Asignaciones activas")} /><div className="mt-4 divide-y divide-border-default">{assignments.length ? assignments.map((assignment) => <div key={assignment.id} className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{assignment.branch?.name ?? "Sin nombre"}</p><p className="text-sm text-text-secondary">{assignment.role ?? "Sin rol"}</p></div><Badge variant={assignment.isPrimary ? "success" : "secondary"}>{assignment.isPrimary ? "Principal" : "Secundaria"}</Badge></div>) : <p className="text-sm text-text-secondary">{uiText("No hay una sucursal asignada.")}</p>}</div></CardContent></Card></div>;
 }
 
 function Payroll({ snapshot, isLoading, error, onRetry }: SnapshotSectionProps) {
-  if (isLoading) return <AsyncState state="loading" title="Cargando nómina" description="Consultamos la configuración de nómina autorizada." />;
-  if (error) return <AsyncState state="error" title="No fue posible cargar nómina" description={getApiErrorMessage(error, "No tienes permiso para consultar esta sección del expediente.")} onRetry={onRetry} />;
+  const uiText = useUiText();
+  if (isLoading) return <AsyncState state="loading" title={uiText("Cargando nómina")} description={uiText("Consultamos la configuración de nómina autorizada.")} />;
+  if (error) return <AsyncState state="error" title={uiText("No fue posible cargar nómina")} description={getApiErrorMessage(error, "No tienes permiso para consultar esta sección del expediente.")} onRetry={onRetry} />;
   if (!snapshot) return null;
 
   const payroll = snapshot.payroll;
   const configured = Boolean(payroll.payType || payroll.payrollProvider || payroll.payrollEmployeeId);
-  return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<WalletCards className="size-4" />} title="Configuración de nómina" />{configured ? <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label="Tipo de pago" value={payroll.payType ?? "Sin configurar"} /><Datum label="Frecuencia" value={payroll.payFrequency ?? "Sin configurar"} /><Datum label="Elegible para horas extra" value={booleanLabel(payroll.overtimeEligible)} /><Datum label="Semana laboral" value={payroll.workweekStartDay ?? "Sin configurar"} /><Datum label="Proveedor" value={payroll.payrollProvider ?? "Sin configurar"} /><Datum label="ID de nómina" value={payroll.payrollEmployeeId ?? "Sin configurar"} /></dl> : <EmptyState title="Nómina aún no configurada" description="El expediente está preparado para enlazar una integración de nómina, pero el proveedor aún no ha registrado datos para este empleado." />}</CardContent></Card><InlineFeedback tone="info" title="Información protegida">Las tasas de pago y referencias externas no se solicitan ni se muestran hasta que el backend publique permisos y operaciones específicas de compensación.</InlineFeedback></div>;
+  return <div className="space-y-5"><Card level={2}><CardContent className="p-5"><SectionTitle icon={<WalletCards className="size-4" />} title={uiText("Configuración de nómina")} />{configured ? <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><Datum label={uiText("Tipo de pago")} value={payroll.payType ?? "Sin configurar"} /><Datum label={uiText("Frecuencia")} value={payroll.payFrequency ?? "Sin configurar"} /><Datum label={uiText("Elegible para horas extra")} value={booleanLabel(payroll.overtimeEligible)} /><Datum label={uiText("Semana laboral")} value={payroll.workweekStartDay ?? "Sin configurar"} /><Datum label={uiText("Proveedor")} value={payroll.payrollProvider ?? "Sin configurar"} /><Datum label={uiText("ID de nómina")} value={payroll.payrollEmployeeId ?? "Sin configurar"} /></dl> : <EmptyState title={uiText("Nómina aún no configurada")} description={uiText("El expediente está preparado para enlazar una integración de nómina, pero el proveedor aún no ha registrado datos para este empleado.")} />}</CardContent></Card><InlineFeedback tone="info" title={uiText("Información protegida")}>{uiText("Las tasas de pago y referencias externas no se solicitan ni se muestran hasta que el backend publique permisos y operaciones específicas de compensación.")}</InlineFeedback></div>;
 }
 
 function TaxEligibility({ snapshot, isLoading, error, onRetry }: SnapshotSectionProps) {
-  if (isLoading) return <AsyncState state="loading" title="Cargando impuestos y elegibilidad" />;
-  if (error) return <AsyncState state="error" title="No fue posible cargar impuestos y elegibilidad" description={getApiErrorMessage(error, "No tienes permiso para consultar esta sección del expediente.")} onRetry={onRetry} />;
+  const uiText = useUiText();
+  if (isLoading) return <AsyncState state="loading" title={uiText("Cargando impuestos y elegibilidad")} />;
+  if (error) return <AsyncState state="error" title={uiText("No fue posible cargar impuestos y elegibilidad")} description={getApiErrorMessage(error, "No tienes permiso para consultar esta sección del expediente.")} onRetry={onRetry} />;
   if (!snapshot) return null;
 
   const items = [
@@ -362,7 +367,7 @@ function TaxEligibility({ snapshot, isLoading, error, onRetry }: SnapshotSection
     { label: "Florida New Hire", status: snapshot.floridaNewHire.status, detail: snapshot.floridaNewHire.required ? (snapshot.floridaNewHire.dueDate ? `Vence ${formatDate(snapshot.floridaNewHire.dueDate)}` : "Pendiente de reporte") : "No requerido" },
   ];
 
-  return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <Card key={item.label} level={2}><CardContent className="p-5"><p className="font-semibold">{item.label}</p><div className="mt-3"><ComplianceBadge status={item.status} /></div><p className="mt-3 text-sm text-text-secondary">{item.detail}</p></CardContent></Card>)}</div><InlineFeedback tone="info" title="Datos fiscales protegidos">El expediente solo muestra valores enmascarados. Las configuraciones y documentos sensibles se gestionan mediante permisos y endpoints específicos.</InlineFeedback></div>;
+  return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <Card key={item.label} level={2}><CardContent className="p-5"><p className="font-semibold">{item.label}</p><div className="mt-3"><ComplianceBadge status={item.status} /></div><p className="mt-3 text-sm text-text-secondary">{item.detail}</p></CardContent></Card>)}</div><InlineFeedback tone="info" title={uiText("Datos fiscales protegidos")}>{uiText("El expediente solo muestra valores enmascarados. Las configuraciones y documentos sensibles se gestionan mediante permisos y endpoints específicos.")}</InlineFeedback></div>;
 }
 
 function Documents({
@@ -386,20 +391,20 @@ function Documents({
   onOpenDocument: (id: string) => void;
   onUpload: (file: File, documentType: string, expiresAt?: string | null, notes?: string | null) => void;
 }) {
-  if (isLoading) return <AsyncState state="loading" title="Cargando documentos" description="Consultamos el expediente documental." />;
+  const uiText = useUiText();
+  if (isLoading) return <AsyncState state="loading" title={uiText("Cargando documentos")} description={uiText("Consultamos el expediente documental.")} />;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Documentos del expediente</h2>
+          <h2 className="text-lg font-semibold">{uiText("Documentos del expediente")}</h2>
           <p className="mt-1 text-sm text-text-secondary">{summary ? `${summary.total} documento${summary.total === 1 ? "" : "s"} en expediente` : "Resumen no disponible"}</p>
         </div>
         {canManageFiles ? (
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-text-on-accent">
             <Upload className="size-4" />
-            Adjuntar documento
-            <Input
+            {uiText("Adjuntar documento")}<Input
               className="sr-only"
               type="file"
               accept=".pdf,image/jpeg,image/png"
@@ -412,8 +417,8 @@ function Documents({
           </label>
         ) : null}
       </div>
-      {!canManageFiles ? <InlineFeedback tone="warning" title="Acceso restringido">Solo el administrador de empresa puede ver o reemplazar archivos sensibles.</InlineFeedback> : null}
-      {canManageFiles ? <Card level={2}><CardContent className="p-5"><SectionTitle icon={<FilePenLine className="size-4" />} title="Solicitudes de firma DocuSeal" /><p className="mt-1 text-sm text-text-secondary">Envía un documento al correo del empleado y guarda el PDF firmado automáticamente al completarse.</p>{docuSealConfigured && docuSealTemplates.length ? <div className="mt-4 flex flex-wrap gap-2">{docuSealTemplates.map((template) => <Button key={template.key} type="button" variant="secondary" size="sm" onClick={() => onSendDocuSeal(template.key)}>{template.label}</Button>)}</div> : <p className="mt-3 text-sm text-text-secondary">DocuSeal aún no está configurado en el backend.</p>}</CardContent></Card> : null}
+      {!canManageFiles ? <InlineFeedback tone="warning" title={uiText("Acceso restringido")}>{uiText("Solo el administrador de empresa puede ver o reemplazar archivos sensibles.")}</InlineFeedback> : null}
+      {canManageFiles ? <Card level={2}><CardContent className="p-5"><SectionTitle icon={<FilePenLine className="size-4" />} title={uiText("Solicitudes de firma DocuSeal")} /><p className="mt-1 text-sm text-text-secondary">{uiText("Envía un documento al correo del empleado y guarda el PDF firmado automáticamente al completarse.")}</p>{docuSealConfigured && docuSealTemplates.length ? <div className="mt-4 flex flex-wrap gap-2">{docuSealTemplates.map((template) => <Button key={template.key} type="button" variant="secondary" size="sm" onClick={() => onSendDocuSeal(template.key)}>{template.label}</Button>)}</div> : <p className="mt-3 text-sm text-text-secondary">{uiText("DocuSeal aún no está configurado en el backend.")}</p>}</CardContent></Card> : null}
       {documents.length ? (
         <div className="grid gap-3">
           {documents.map((document) => (
@@ -426,23 +431,23 @@ function Documents({
                     <Badge variant={document.status === "APPROVED" ? "success" : document.status === "REJECTED" ? "destructive" : "secondary"}>{document.status.replaceAll("_", " ")}</Badge>
                   </div>
                   <p className="mt-2 text-sm text-text-secondary">{document.category} · {formatFileSize(document.sizeBytes)} · v{document.version}</p>
-                  <p className="mt-1 text-xs text-text-secondary">Escaneo: {document.scanStatus} · {document.expiresAt ? `Vence ${formatDate(document.expiresAt)}` : "Sin vencimiento"}</p>
+                  <p className="mt-1 text-xs text-text-secondary">{uiText("Escaneo: ")}{document.scanStatus} · {document.expiresAt ? `Vence ${formatDate(document.expiresAt)}` : uiText("Sin vencimiento")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {canManageFiles ? <Button variant="secondary" size="sm" onClick={() => onOpenDocument(document.id)}><Download className="size-4" />Ver archivo</Button> : null}
-                  {canManageFiles ? <Button variant="secondary" size="sm" onClick={() => onOpenDocument(document.id)}><FilePenLine className="size-4" />Reemplazar</Button> : null}
+                  {canManageFiles ? <Button variant="secondary" size="sm" onClick={() => onOpenDocument(document.id)}><Download className="size-4" />{uiText("Ver archivo")}</Button> : null}
+                  {canManageFiles ? <Button variant="secondary" size="sm" onClick={() => onOpenDocument(document.id)}><FilePenLine className="size-4" />{uiText("Reemplazar")}</Button> : null}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <EmptyState title="Aún no hay documentos" description={canManageFiles ? "Carga el primer archivo para incorporarlo al expediente." : "No hay archivos visibles para este rol."} />
+        <EmptyState title={uiText("Aún no hay documentos")} description={canManageFiles ? "Carga el primer archivo para incorporarlo al expediente." : "No hay archivos visibles para este rol."} />
       )}
       {summary ? (
         <Card level={2}>
           <CardContent className="p-5">
-            <SectionTitle icon={<ShieldCheck className="size-4" />} title="Requisitos del expediente" />
+            <SectionTitle icon={<ShieldCheck className="size-4" />} title={uiText("Requisitos del expediente")} />
             <div className="mt-4 divide-y divide-border-default">
               {summary.byCategory ? Object.entries(summary.byCategory).map(([category, count]) => (
                 <div key={category} className="flex items-center justify-between py-3">
@@ -469,20 +474,21 @@ function Compliance({
   canView: boolean;
   onCompleteRequirement: (requirement: DossierRequirement) => void;
 }) {
-  if (!canView) return <InlineFeedback tone="info" title="Sin permiso de cumplimiento">No cuentas con acceso al cumplimiento de este empleado.</InlineFeedback>;
-  if (isLoading) return <AsyncState state="loading" title="Cargando cumplimiento" description="Calculamos el estado del expediente." />;
-  if (!snapshot) return <EmptyState title="Sin datos de cumplimiento" description="El cumplimiento se habilita cuando exista información disponible para este expediente." />;
+  const uiText = useUiText();
+  if (!canView) return <InlineFeedback tone="info" title={uiText("Sin permiso de cumplimiento")}>{uiText("No cuentas con acceso al cumplimiento de este empleado.")}</InlineFeedback>;
+  if (isLoading) return <AsyncState state="loading" title={uiText("Cargando cumplimiento")} description={uiText("Calculamos el estado del expediente.")} />;
+  if (!snapshot) return <EmptyState title={uiText("Sin datos de cumplimiento")} description={uiText("El cumplimiento se habilita cuando exista información disponible para este expediente.")} />;
 
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard label="Requisitos" value={String(snapshot.requirements.length)} icon={<ShieldCheck className="size-5" />} />
-        <MetricCard label="Alertas" value={String(snapshot.alerts?.length ?? 0)} icon={<AlertTriangle className="size-5" />} />
-        <MetricCard label="Expediente" value="Activo" icon={<FileText className="size-5" />} />
+        <MetricCard label={uiText("Requisitos")} value={String(snapshot.requirements.length)} icon={<ShieldCheck className="size-5" />} />
+        <MetricCard label={uiText("Alertas")} value={String(snapshot.alerts?.length ?? 0)} icon={<AlertTriangle className="size-5" />} />
+        <MetricCard label={uiText("Expediente")} value="Activo" icon={<FileText className="size-5" />} />
       </div>
       <Card level={2}>
         <CardContent className="p-5">
-          <SectionTitle icon={<ShieldCheck className="size-4" />} title="Requisitos del expediente" />
+          <SectionTitle icon={<ShieldCheck className="size-4" />} title={uiText("Requisitos del expediente")} />
           <div className="mt-4 divide-y divide-border-default">
             {snapshot.requirements.length ? snapshot.requirements.map((item) => (
               <div key={item.id} className="flex flex-col gap-3 py-4 first:pt-0 lg:flex-row lg:items-center lg:justify-between">
@@ -492,36 +498,37 @@ function Compliance({
                     {item.category} · {item.jurisdiction}
                     {item.dueDate ? ` · vence ${formatDate(item.dueDate)}` : ""}
                   </p>
-                  <p className="mt-1 text-xs text-text-secondary">Código: {item.code}</p>
+                  <p className="mt-1 text-xs text-text-secondary">{uiText("Código: ")}{item.code}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={item.required ? "secondary" : "outline"}>{item.status.replaceAll("_", " ")}</Badge>
                   <Badge variant="outline">{item.expiresAt ? `Expira ${formatDate(item.expiresAt)}` : "Sin expiración"}</Badge>
                   {item.required && item.status !== "COMPLETE" ? (
                     <Button type="button" size="sm" variant="secondary" onClick={() => onCompleteRequirement(item)}>
-                      Completar documento
-                    </Button>
+                      {uiText("Completar documento")}</Button>
                   ) : null}
                 </div>
               </div>
-            )) : <p className="text-sm text-text-secondary">No hay requisitos configurados en este expediente.</p>}
+            )) : <p className="text-sm text-text-secondary">{uiText("No hay requisitos configurados en este expediente.")}</p>}
           </div>
         </CardContent>
       </Card>
-      {snapshot.alerts?.length ? <InlineFeedback tone="warning" title="Alertas del expediente">{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}
+      {snapshot.alerts?.length ? <InlineFeedback tone="warning" title={uiText("Alertas del expediente")}>{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}
     </div>
   );
 }
 
 function History({ events }: { events: Awaited<ReturnType<typeof fetchEmployeeDetail>>["history"] }) {
-  return <Card level={2}><CardContent className="p-5"><SectionTitle icon={<Clock3 className="size-4" />} title="Actividad del expediente" /><ol className="mt-5 space-y-5 border-l border-border-default pl-5">{events.length ? events.map((event) => <li key={event.id} className="relative"><span className="absolute -left-[1.7rem] top-1 size-3 rounded-full border-2 border-card bg-primary" /><p className="font-medium">{event.title}</p><p className="mt-1 text-sm text-text-secondary">{event.detail}</p><time className="mt-2 block text-xs text-text-secondary">{formatDate(event.at)}</time></li>) : <li className="text-sm text-text-secondary">Todavía no hay eventos de historial.</li>}</ol></CardContent></Card>;
+  const uiText = useUiText();
+  return <Card level={2}><CardContent className="p-5"><SectionTitle icon={<Clock3 className="size-4" />} title={uiText("Actividad del expediente")} /><ol className="mt-5 space-y-5 border-l border-border-default pl-5">{events.length ? events.map((event) => <li key={event.id} className="relative"><span className="absolute -left-[1.7rem] top-1 size-3 rounded-full border-2 border-card bg-primary" /><p className="font-medium">{event.title}</p><p className="mt-1 text-sm text-text-secondary">{event.detail}</p><time className="mt-2 block text-xs text-text-secondary">{formatDate(event.at)}</time></li>) : <li className="text-sm text-text-secondary">{uiText("Todavía no hay eventos de historial.")}</li>}</ol></CardContent></Card>;
 }
 
 function Audit({ snapshot, isLoading, error, onRetry }: SnapshotSectionProps) {
-  if (isLoading) return <AsyncState state="loading" title="Cargando auditoría" />;
-  if (error) return <AsyncState state="error" title="No fue posible cargar auditoría" description={getApiErrorMessage(error, "No tienes permiso para consultar esta sección del expediente.")} onRetry={onRetry} />;
+  const uiText = useUiText();
+  if (isLoading) return <AsyncState state="loading" title={uiText("Cargando auditoría")} />;
+  if (error) return <AsyncState state="error" title={uiText("No fue posible cargar auditoría")} description={getApiErrorMessage(error, "No tienes permiso para consultar esta sección del expediente.")} onRetry={onRetry} />;
   if (!snapshot) return null;
-  return <div className="space-y-5">{snapshot.alerts.length ? <InlineFeedback tone="warning" title="Alertas del expediente">{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}<Card level={2}><CardContent className="p-5"><SectionTitle icon={<Clock3 className="size-4" />} title="Trazabilidad del expediente" /><div className="mt-4 divide-y divide-border-default">{snapshot.auditTrail.length ? snapshot.auditTrail.map((event) => <div key={event.id} className="flex flex-col gap-1 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{event.action}</p><p className="text-sm text-text-secondary">{event.actorEmail ?? event.actorRole ?? "Sistema"}</p></div><time className="text-xs text-text-secondary">{formatDate(event.createdAt)}</time></div>) : <p className="text-sm text-text-secondary">No hay eventos auditables disponibles.</p>}</div></CardContent></Card></div>;
+  return <div className="space-y-5">{snapshot.alerts.length ? <InlineFeedback tone="warning" title={uiText("Alertas del expediente")}>{snapshot.alerts.map((alert) => alert.message).join(" · ")}</InlineFeedback> : null}<Card level={2}><CardContent className="p-5"><SectionTitle icon={<Clock3 className="size-4" />} title={uiText("Trazabilidad del expediente")} /><div className="mt-4 divide-y divide-border-default">{snapshot.auditTrail.length ? snapshot.auditTrail.map((event) => <div key={event.id} className="flex flex-col gap-1 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{event.action}</p><p className="text-sm text-text-secondary">{event.actorEmail ?? event.actorRole ?? "Sistema"}</p></div><time className="text-xs text-text-secondary">{formatDate(event.createdAt)}</time></div>) : <p className="text-sm text-text-secondary">{uiText("No hay eventos auditables disponibles.")}</p>}</div></CardContent></Card></div>;
 }
 
 type SnapshotSectionProps = { snapshot?: EmployeePayrollComplianceSnapshot; isLoading: boolean; error: unknown; onRetry: () => void };

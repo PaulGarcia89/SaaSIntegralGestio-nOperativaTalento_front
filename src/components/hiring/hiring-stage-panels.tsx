@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -138,6 +140,7 @@ function StageAction({ button, after }: { button: React.ReactNode; after?: strin
 
 /** Lista de comprobación gráfica: cada dato con su marca. */
 function CheckItem({ ok, label, value }: { ok: boolean; label: string; value: React.ReactNode }) {
+  const uiText = useUiText();
   return (
     <li className={cn("flex items-start gap-3 rounded-lg border p-3", ok ? "border-line bg-surface-1" : "border-status-warning/40 bg-status-warning/5")}>
       <span aria-hidden="true" className={cn("mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full", ok ? "bg-status-success text-white" : "bg-status-warning/15 text-status-warning")}>
@@ -146,7 +149,7 @@ function CheckItem({ ok, label, value }: { ok: boolean; label: string; value: Re
       <span className="min-w-0">
         <span className="block text-sm text-ink-2">{label}</span>
         <span className="block truncate text-base font-medium text-ink-1">{value}</span>
-        <span className="sr-only">{ok ? "Correcto" : "Requiere atención"}</span>
+        <span className="sr-only">{ok ? "Correcto" : uiText("Requiere atención")}</span>
       </span>
     </li>
   );
@@ -166,6 +169,7 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
 /* ------------------------------- Etapa 1 -------------------------------- */
 
 export function PreparationPanel({ contract, state, onAdvance }: { contract: HiringContractDto; state: HiringCaseState; onAdvance: () => void }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const responsible = contract.hrResponsibleUser ?? contract.hiringManagerUser;
   const responsibleName = responsible ? [responsible.firstName, responsible.lastName].filter(Boolean).join(" ") : null;
@@ -176,8 +180,7 @@ export function PreparationPanel({ contract, state, onAdvance }: { contract: Hir
         <StageAction
           button={
             <Button size="lg" onClick={onAdvance}>
-              Preparar oferta
-              <ArrowRight className="size-5" aria-hidden="true" />
+              {uiText("Preparar oferta")}<ArrowRight className="size-5" aria-hidden="true" />
             </Button>
           }
           after={`Después elegirás la oferta laboral que recibirá ${contract.candidate.fullName.split(" ")[0]}.`}
@@ -198,6 +201,7 @@ export function PreparationPanel({ contract, state, onAdvance }: { contract: Hir
 /* ------------------------------- Etapa 2 -------------------------------- */
 
 export function OfferPanel({ contract, state, onBack, onRefresh }: { contract: HiringContractDto; state: HiringCaseState; onBack?: () => void; onRefresh: () => Promise<void> }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
@@ -218,23 +222,20 @@ export function OfferPanel({ contract, state, onBack, onRefresh }: { contract: H
       <StageAction
         button={
           <Button size="lg" onClick={() => send.mutate()} loading={send.isPending} loadingLabel={t("hiring.panel.sendingOffer")}>
-            Enviar oferta
-            <ArrowRight className="size-5" aria-hidden="true" />
+            {uiText("Enviar oferta")}<ArrowRight className="size-5" aria-hidden="true" />
           </Button>
         }
         after={`${contract.candidate.fullName.split(" ")[0]} recibirá la oferta y podrá aceptarla o rechazarla.`}
       />
     ) : canUpdate && waitingResponse ? (
       <div className="space-y-3">
-        <p className="text-base text-ink-1">Cuando {contract.candidate.fullName.split(" ")[0]} te dé su respuesta, regístrala aquí.</p>
+        <p className="text-base text-ink-1">{uiText("Cuando ")}{contract.candidate.fullName.split(" ")[0]} {uiText(" te dé su respuesta, regístrala aquí.")}</p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button size="lg" onClick={() => respond.mutate({ accepted: true })} loading={respond.isPending} loadingLabel={t("vacancies.saving")}>
             <Check className="size-5" aria-hidden="true" />
-            Aceptó la oferta
-          </Button>
+            {uiText("Aceptó la oferta")}</Button>
           <Button size="lg" variant="secondary" onClick={() => setRejecting(true)} disabled={respond.isPending}>
-            No aceptó la oferta
-          </Button>
+            {uiText("No aceptó la oferta")}</Button>
         </div>
       </div>
     ) : null;
@@ -262,8 +263,7 @@ export function OfferPanel({ contract, state, onBack, onRefresh }: { contract: H
         </section>
       ) : (
         <InlineNote tone="info" title={t("hiring.panel.noOfferLinked")}>
-          La oferta se redacta en el perfil de reclutamiento de la persona. Aquí eliges cuál enviar.
-        </InlineNote>
+          {uiText("La oferta se redacta en el perfil de reclutamiento de la persona. Aquí eliges cuál enviar.")}</InlineNote>
       )}
 
       <HiringBlockerList state={state} candidateName={contract.candidate.fullName.split(" ")[0] || "la persona"} />
@@ -275,8 +275,7 @@ export function OfferPanel({ contract, state, onBack, onRefresh }: { contract: H
           {offers.data?.length ? (
             <>
               <label className="block space-y-2 text-base font-medium text-ink-1" htmlFor="hiring-offer-select">
-                Elige la oferta que se enviará
-                <select
+                {uiText("Elige la oferta que se enviará")}<select
                   id="hiring-offer-select"
                   value={selectedOfferId}
                   onChange={(event) => setSelectedOfferId(event.target.value)}
@@ -285,25 +284,23 @@ export function OfferPanel({ contract, state, onBack, onRefresh }: { contract: H
                   <option value="">{t("hiring.panel.selectOffer")}</option>
                   {offers.data.map((offer) => (
                     <option key={offer.id} value={offer.id}>
-                      Versión {offer.currentVersion} · {hiringOfferStatusLabel(offer.status)}
+                      {uiText("Versión")}{offer.currentVersion} · {hiringOfferStatusLabel(offer.status)}
                     </option>
                   ))}
                 </select>
               </label>
               <Button size="lg" onClick={() => link.mutate()} loading={link.isPending} loadingLabel={t("hiring.panel.linkingOffer")} disabled={!selectedOfferId}>
-                Vincular oferta
-              </Button>
+                {uiText("Vincular oferta")}</Button>
             </>
           ) : offers.isSuccess ? (
             <InlineNote tone="info" title={t("hiring.panel.noOffers")} action={<Button asChild variant="secondary"><Link href={`/ats/candidates/${contract.applicationId}#job-offers`}>{t("hiring.panel.createOffer")}</Link></Button>}>
-              Primero hay que redactar la oferta en el perfil de reclutamiento. Cuando exista, vuelve aquí para enviarla.
-            </InlineNote>
+              {uiText("Primero hay que redactar la oferta en el perfil de reclutamiento. Cuando exista, vuelve aquí para enviarla.")}</InlineNote>
           ) : null}
         </div>
       ) : null}
 
       {send.isSuccess ? <InlineNote tone="success" title={`Oferta enviada a ${contract.candidate.fullName}`}>{t("hiring.panel.waitingAnswer")}</InlineNote> : null}
-      {respond.isSuccess ? <InlineNote tone="success" title="Respuesta registrada">{t("hiring.panel.advanced")}</InlineNote> : null}
+      {respond.isSuccess ? <InlineNote tone="success" title={uiText("Respuesta registrada")}>{t("hiring.panel.advanced")}</InlineNote> : null}
       {failure ? <InlineNote tone="danger" title={t("hiring.panel.actionFailed")}>{hiringErrorMessage(failure, locale)}</InlineNote> : null}
 
       <HiringReasonDialog
@@ -366,6 +363,7 @@ function DocumentRow({ document, onApprove, onReject, canUpdate, pending }: { do
 }
 
 export function DocumentsPanel({ contract, state, documents, onBack, onRefresh }: { contract: HiringContractDto; state: HiringCaseState; documents: HiringContractDocumentDto[]; onBack?: () => void; onRefresh: () => Promise<void> }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
@@ -459,12 +457,10 @@ export function DocumentsPanel({ contract, state, documents, onBack, onRefresh }
           )}
           <div className="flex flex-col gap-2 sm:flex-row">
             <label className="flex-1 space-y-2 text-base font-medium text-ink-1" htmlFor="hiring-custom-document">
-              ¿Necesitas otro documento?
-              <Input id="hiring-custom-document" value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder={t("hiring.panel.docPlaceholder")} className="text-base" />
+              {uiText("¿Necesitas otro documento?")}<Input id="hiring-custom-document" value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder={t("hiring.panel.docPlaceholder")} className="text-base" />
             </label>
-            <Button className="sm:self-end" onClick={() => request.mutate({ type: "OTHER", title: customTitle.trim() })} disabled={!customTitle.trim()} loading={request.isPending} loadingLabel="Pidiendo…">
-              Pedir este documento
-            </Button>
+            <Button className="sm:self-end" onClick={() => request.mutate({ type: "OTHER", title: customTitle.trim() })} disabled={!customTitle.trim()} loading={request.isPending} loadingLabel={uiText("Pidiendo…")}>
+              {uiText("Pedir este documento")}</Button>
           </div>
         </section>
       ) : null}
@@ -472,15 +468,13 @@ export function DocumentsPanel({ contract, state, documents, onBack, onRefresh }
       <details className="group rounded-lg border border-line bg-surface-1">
         <summary className="flex min-h-[var(--control-h-base)] cursor-pointer list-none items-center gap-2 px-4 py-2 text-base font-medium text-ink-1 [&::-webkit-details-marker]:hidden">
           <PenLine className="size-5 text-ink-2" aria-hidden="true" />
-          Firmas electrónicas
-          <span className="ml-auto text-sm font-normal text-ink-2">{t("hiring.panel.signAtConfirm")}</span>
+          {uiText("Firmas electrónicas")}<span className="ml-auto text-sm font-normal text-ink-2">{t("hiring.panel.signAtConfirm")}</span>
         </summary>
         <p className="border-t border-line px-4 py-3 text-base text-ink-2">
-          El sistema necesita el expediente del empleado creado para poder enviar los documentos a firma, y ese expediente se crea al confirmar. Primero reúne y aprueba los documentos de arriba.
-        </p>
+          {uiText("El sistema necesita el expediente del empleado creado para poder enviar los documentos a firma, y ese expediente se crea al confirmar. Primero reúne y aprueba los documentos de arriba.")}</p>
       </details>
 
-      {request.isSuccess ? <InlineNote tone="success" title={t("hiring.panel.docRequested")}>{firstName} verá el documento en su lista de pendientes.</InlineNote> : null}
+      {request.isSuccess ? <InlineNote tone="success" title={t("hiring.panel.docRequested")}>{firstName} {uiText(" verá el documento en su lista de pendientes.")}</InlineNote> : null}
       {review.isSuccess ? <InlineNote tone="success" title={t("hiring.panel.docUpdated")}>{t("hiring.panel.progressRecalculated")}</InlineNote> : null}
       {request.error || review.error ? <InlineNote tone="danger" title={t("hiring.panel.actionFailed")}>{hiringErrorMessage(request.error ?? review.error, locale)}</InlineNote> : null}
 
@@ -499,6 +493,7 @@ export function DocumentsPanel({ contract, state, documents, onBack, onRefresh }
 /* ------------------------------- Etapa 4 -------------------------------- */
 
 export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: { contract: HiringContractDto; state: HiringCaseState; documents: HiringContractDocumentDto[]; onBack?: () => void; onRefresh: () => Promise<void> }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const { can, currentUser } = useAppStore();
   const canUpdate = can("applications.update");
@@ -559,7 +554,7 @@ export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: {
         <CheckItem ok label={t("hiring.panel.roleAndBranch")} value={`${contract.roleTitle ?? contract.vacancy.title} · ${contract.branch.name}`} />
         <CheckItem ok={Boolean(salaryText(version))} label={t("hiring.panel.agreedSalary")} value={salaryText(version) ?? t("hiring.panel.notInOffer")} />
         <CheckItem ok={Boolean(version?.employmentStartDate)} label={t("hiring.panel.startDate")} value={longDate(version?.employmentStartDate) ?? t("hiring.panel.undefined")} />
-        <CheckItem ok={Boolean(contract.jobOffer?.acceptedAt)} label="Oferta" value={contract.jobOffer?.acceptedAt ? `Aceptada el ${longDate(contract.jobOffer.acceptedAt)}` : hiringOfferStatusLabel(contract.jobOffer?.status)} />
+        <CheckItem ok={Boolean(contract.jobOffer?.acceptedAt)} label={uiText("Oferta")} value={contract.jobOffer?.acceptedAt ? `Aceptada el ${longDate(contract.jobOffer.acceptedAt)}` : hiringOfferStatusLabel(contract.jobOffer?.status)} />
         <CheckItem ok={state.pendingDocuments === 0} label={t("hiring.panel.docsLabel")} value={documents.length ? `${approved} de ${documents.length} aprobados` : t("hiring.panel.noDocsRequested")} />
       </ul>
 
@@ -577,8 +572,7 @@ export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: {
         />
       ) : (
         <InlineNote tone="info" title={t("hiring.panel.readOnly")}>
-          Tu perfil permite revisar esta contratación, pero no cerrarla. Pídeselo a la persona responsable de recursos humanos.
-        </InlineNote>
+          {uiText("Tu perfil permite revisar esta contratación, pero no cerrarla. Pídeselo a la persona responsable de recursos humanos.")}</InlineNote>
       )}
 
       {confirm.error ? <InlineNote tone="danger" title={t("hiring.panel.closeFailed")}>{hiringErrorMessage(confirm.error, locale)}</InlineNote> : null}
@@ -594,6 +588,7 @@ export function ReviewPanel({ contract, state, documents, onBack, onRefresh }: {
 /* ------------------------------- Etapa 5 -------------------------------- */
 
 export function OutcomePanel({ contract, onRefresh }: { contract: HiringContractDto; onRefresh: () => Promise<void> }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const { can } = useAppStore();
   const canSign = can("documents.sign") || can("applications.update");
@@ -613,7 +608,7 @@ export function OutcomePanel({ contract, onRefresh }: { contract: HiringContract
       </InlineNote>
 
       <dl className="grid gap-3 sm:grid-cols-3">
-        <Fact label="Empleado" value={contract.employee ? contract.employee.name : contract.candidate.fullName} />
+        <Fact label={uiText("Empleado")} value={contract.employee ? contract.employee.name : contract.candidate.fullName} />
         <Fact label={t("hiring.panel.activationDate")} value={longDate(contract.hiredAt) ?? "Hoy"} />
         <Fact label={t("hiring.panel.welcomePlan")} value={contract.onboardingFlowId ? t("hiring.panel.openAndReady") : t("hiring.panel.noOnboarding")} />
       </dl>
@@ -639,7 +634,7 @@ export function OutcomePanel({ contract, onRefresh }: { contract: HiringContract
           </ul>
         ) : null}
         {canSign ? (
-          <Button size="lg" variant={status?.allSent ? "secondary" : "default"} onClick={() => send.mutate()} loading={send.isPending} loadingLabel="Enviando…">
+          <Button size="lg" variant={status?.allSent ? "secondary" : "default"} onClick={() => send.mutate()} loading={send.isPending} loadingLabel={uiText("Enviando…")}>
             {status?.allSent ? t("hiring.panel.sendReminder") : t("hiring.panel.sendToSign")}
           </Button>
         ) : null}
@@ -665,6 +660,7 @@ export function OutcomePanel({ contract, onRefresh }: { contract: HiringContract
 /* ------------------------------ Cancelada ------------------------------- */
 
 export function CancelledPanel({ contract }: { contract: HiringContractDto }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   return (
     <Card level={1}>
@@ -679,7 +675,7 @@ export function CancelledPanel({ contract }: { contract: HiringContractDto }) {
             <p className="mt-1 text-base font-medium text-ink-1">{contract.cancelledReason}</p>
           </div>
         ) : null}
-        <Badge variant="destructive" className="text-sm">Cancelada el {longDate(contract.cancelledAt) ?? "—"}</Badge>
+        <Badge variant="destructive" className="text-sm">{uiText("Cancelada el ")}{longDate(contract.cancelledAt) ?? "—"}</Badge>
       </CardContent>
     </Card>
   );

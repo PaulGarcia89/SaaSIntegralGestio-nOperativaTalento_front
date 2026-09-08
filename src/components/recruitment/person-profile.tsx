@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -77,6 +79,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
  * recorrido con fases futuras que ya no va a recorrer.
  */
 function PersonProfile({ application }: { application: VacancyApplicationDto }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const client = useQueryClient();
   const { can } = useAppStore();
@@ -100,7 +103,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
 
   const undo = useMutation({
     mutationFn: ({ applicationId, expectedUpdatedAt }: { applicationId: string; expectedUpdatedAt: string }) => undoApplicationTransition(applicationId, expectedUpdatedAt),
-    onSuccess: async () => { toast.success("Listo, lo dejamos como estaba."); await refresh(); },
+    onSuccess: async () => { toast.success(uiText("Listo, lo dejamos como estaba.")); await refresh(); },
   });
 
   const move = useMutation({
@@ -184,7 +187,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
             </span>
             <div className="min-w-0">
               <h1 className="text-2xl font-semibold text-ink-1 sm:text-3xl">{name}</h1>
-              <p className="mt-1 text-ink-1">Se postuló para {application.vacancy.title}</p>
+              <p className="mt-1 text-ink-1">{uiText("Se postuló para ")}{application.vacancy.title}</p>
               <p className="text-sm text-ink-2">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
               <p className="font-mono text-xs text-ink-3 tabular-figures">{waitingLabel(application.appliedAt)}</p>
             </div>
@@ -199,8 +202,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
         <div className="mt-5 border-t border-line pt-4">
           {discarded ? (
             <p className="text-sm text-ink-2">
-              {firstName} salió del proceso. Su expediente se conserva y sigue apareciendo en la fase
-              «{phaseTitle(phase.id, locale)}».
+              {firstName} {uiText("salió del proceso. Su expediente se conserva y sigue apareciendo en la fase «")}{phaseTitle(phase.id, locale)}».
             </p>
           ) : (
             <RecruitmentPhaseRail currentStep={phase.step ?? 1} locale={locale} />
@@ -249,7 +251,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
             loadingLabel="Abriendo…"
           >
             <FileText className="size-4" aria-hidden="true" />
-            Ver el currículum de {firstName}
+            {uiText("Ver el currículum de")}{firstName}
           </Button>
         ) : null}
       </header>
@@ -327,8 +329,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
       {/* ---- Historia --------------------------------------------------- */}
       <section aria-labelledby="historia" className="space-y-3">
         <h2 id="historia" className="text-base font-semibold text-ink-1">
-          Cómo llegó hasta aquí
-        </h2>
+          {uiText("Cómo llegó hasta aquí")}</h2>
         <Timeline entries={timeline} />
       </section>
 
@@ -353,8 +354,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
 
         <SimpleSection title={t("profile.internalNotes")} hint={t("profile.internalNotesHint")}>
           <label className="block space-y-2 font-medium text-ink-1" htmlFor="person-notes">
-            Escribe lo que quieras recordar
-            <textarea
+            {uiText("Escribe lo que quieras recordar")}<textarea
               id="person-notes"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
@@ -399,8 +399,7 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
 
         <SimpleSection title={t("people.advancedTools")} hint={t("profile.advancedHint")}>
           <p className="mb-3 text-sm text-ink-2">
-            La ficha completa tiene todo lo anterior más las evaluaciones de entrevista, el comité de decisión, el gestor de ofertas y la agenda. Nada se perdió: sigue ahí.
-          </p>
+            {uiText("La ficha completa tiene todo lo anterior más las evaluaciones de entrevista, el comité de decisión, el gestor de ofertas y la agenda. Nada se perdió: sigue ahí.")}</p>
           <Button asChild variant="secondary" className="w-full sm:w-auto">
             <Link href={`/ats/candidates/${application.id}/avanzado`}>
               {t("profile.openFullRecord", { name: firstName })}

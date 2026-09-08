@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { ArrowRight, Building2, CreditCard, Mail, Megaphone, ShieldCheck, Users } from "lucide-react";
 import { Metric, MetricRow, PageHeader, PageSection } from "@/components/system";
@@ -30,6 +32,7 @@ import { useAppStore } from "@/store/app-store";
  */
 
 export default function CompanySettingsPage() {
+  const uiText = useUiText();
   const { currentTenant, can } = useAppStore();
 
   const destinations = [
@@ -43,7 +46,7 @@ export default function CompanySettingsPage() {
     {
       href: "/admin/branches",
       icon: Building2,
-      title: "Sucursales",
+      title: uiText("Sucursales"),
       detail: "Dónde opera la empresa. Cada persona y cada movimiento pertenece a una sucursal.",
       visible: can("branches.view"),
     },
@@ -57,7 +60,7 @@ export default function CompanySettingsPage() {
     {
       href: "/admin/roles",
       icon: ShieldCheck,
-      title: "Roles y permisos",
+      title: uiText("Roles y permisos"),
       detail: "Qué puede hacer cada rol dentro de cada módulo.",
       visible: can("admin.roles"),
     },
@@ -75,24 +78,24 @@ export default function CompanySettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Configuración"
+        eyebrow={uiText("Configuración")}
         title={currentTenant.name}
-        description="Los ajustes que afectan a toda la empresa: dónde opera, quién entra, cómo se presenta y desde qué dirección envía correo."
+        description={uiText("Los ajustes que afectan a toda la empresa: dónde opera, quién entra, cómo se presenta y desde qué dirección envía correo.")}
         actions={
           <Button asChild>
-            <Link href="/admin/company/career-portal">Ver el portal de empleo</Link>
+            <Link href="/admin/company/career-portal">{uiText("Ver el portal de empleo")}</Link>
           </Button>
         }
       />
 
       <MetricRow>
-        <Metric label="Estado" value={status.label} detail={status.detail} />
+        <Metric label={uiText("Estado")} value={status.label} detail={status.detail} />
         <Metric label="Plan" value={planTierLabel(currentTenant.plan)} />
-        <Metric label="Sucursales" value={String(currentTenant.branchCount ?? 0)} />
-        <Metric label="Personas" value={String(currentTenant.employeeCount ?? 0)} />
+        <Metric label={uiText("Sucursales")} value={String(currentTenant.branchCount ?? 0)} />
+        <Metric label={uiText("Personas")} value={String(currentTenant.employeeCount ?? 0)} />
       </MetricRow>
 
-      <PageSection title="Ajustes de la empresa" description="Cada uno abre la pantalla donde se cambia de verdad.">
+      <PageSection title={uiText("Ajustes de la empresa")} description={uiText("Cada uno abre la pantalla donde se cambia de verdad.")}>
         <ul className="grid gap-3 md:grid-cols-2">
           {destinations.map((destination) => {
             const Icon = destination.icon;
@@ -123,13 +126,12 @@ export default function CompanySettingsPage() {
       </PageSection>
 
       <PageSection
-        title="Módulos habilitados"
-        description="Lo que la empresa tiene contratado y aparece en el menú de su gente."
+        title={uiText("Módulos habilitados")}
+        description={uiText("Lo que la empresa tiene contratado y aparece en el menú de su gente.")}
       >
         {currentTenant.enabledModules.length === 0 ? (
           <p className="text-sm text-ink-2">
-            Esta empresa no tiene ningún módulo habilitado. Quien administra la plataforma puede activarlos.
-          </p>
+            {uiText("Esta empresa no tiene ningún módulo habilitado. Quien administra la plataforma puede activarlos.")}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {currentTenant.enabledModules.map((module) => (
@@ -142,15 +144,13 @@ export default function CompanySettingsPage() {
       </PageSection>
 
       <PageSection
-        title="Correo saliente"
-        description="Desde qué dirección salen las invitaciones, las ofertas y los recordatorios de la empresa."
+        title={uiText("Correo saliente")}
+        description={uiText("Desde qué dirección salen las invitaciones, las ofertas y los recordatorios de la empresa.")}
       >
         <div className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-4 text-sm text-ink-2">
           <Mail className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden="true" />
           <p>
-            Si no se configura, el producto envía desde su remitente por defecto y quien recibe el correo no reconoce a
-            la empresa.
-          </p>
+            {uiText("Si no se configura, el producto envía desde su remitente por defecto y quien recibe el correo no reconoce a la empresa.")}</p>
         </div>
         <div className="mt-4">
           <CompanyEmailSettings />

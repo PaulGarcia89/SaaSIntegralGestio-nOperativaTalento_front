@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Rows3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -83,6 +85,7 @@ export function useRestaurantInventoryContext() {
 }
 
 export function RestaurantInventoryContextBar() {
+  const uiText = useUiText();
   const { currentBranch, tenantBranches, setCurrentBranchId } = useAppStore();
   const { warehouseId, warehouses, setWarehouseId, hasPendingChanges, setHasPendingChanges, warehouseName, compactMode, toggleCompactMode, isLoading, error } = useRestaurantInventoryContext();
   /**
@@ -123,20 +126,20 @@ export function RestaurantInventoryContextBar() {
       setWarehouseId(id);
     });
   };
-  const location = (warehouse: Warehouse) => warehouse.location ?? warehouse.address ?? ([warehouse.city, warehouse.state].filter(Boolean).join(", ") || "Ubicación no registrada");
+  const location = (warehouse: Warehouse) => warehouse.location ?? warehouse.address ?? ([warehouse.city, warehouse.state].filter(Boolean).join(", ") || uiText("Ubicación no registrada"));
   return <div className="sticky top-2 z-20 space-y-3">
     <Card level={1}><CardContent className={`grid gap-3 p-3 md:grid-cols-[1fr_1fr_auto] ${compactMode ? "md:items-end" : "md:gap-4 md:p-4"}`}>
-      <div className="md:col-span-2"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">Contexto operativo</p><p className="mt-1 text-sm font-medium text-text-primary" aria-live="polite">{currentBranch?.name ?? "Sin sucursal"} · {warehouseName}{hasPendingChanges ? " · Cambios pendientes" : ""}</p></div>
-      <div><Label htmlFor="restaurant-global-branch">Sucursal activa</Label><select id="restaurant-global-branch" className="field mt-1" value={currentBranch?.id ?? ""} onChange={(event) => changeBranch(event.target.value)}><option value="">Seleccionar sucursal</option>{tenantBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div>
-      <div><Label htmlFor="restaurant-global-warehouse">Almacén activo</Label><select id="restaurant-global-warehouse" className="field mt-1" value={warehouseId} onChange={(event) => changeWarehouse(event.target.value)} disabled={isLoading || !currentBranch}><option value="">Seleccionar almacén</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{`${warehouse.code ? `${warehouse.code} · ` : ""}${warehouse.name ?? "Almacén"} · ${location(warehouse)}`}</option>)}</select><p className="mt-1 text-xs text-text-secondary">{selectedLocation(warehouses, warehouseId)}</p></div>
-      <Button type="button" size="sm" variant={compactMode ? "default" : "secondary"} className="min-h-11 whitespace-nowrap" onClick={toggleCompactMode}><Rows3 className="size-4" />{compactMode ? "Modo compacto activo" : "Modo compacto cocina"}</Button>
+      <div className="md:col-span-2"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">{uiText("Contexto operativo")}</p><p className="mt-1 text-sm font-medium text-text-primary" aria-live="polite">{currentBranch?.name ?? "Sin sucursal"} · {warehouseName}{hasPendingChanges ? " · Cambios pendientes" : ""}</p></div>
+      <div><Label htmlFor="restaurant-global-branch">{uiText("Sucursal activa")}</Label><select id="restaurant-global-branch" className="field mt-1" value={currentBranch?.id ?? ""} onChange={(event) => changeBranch(event.target.value)}><option value="">{uiText("Seleccionar sucursal")}</option>{tenantBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div>
+      <div><Label htmlFor="restaurant-global-warehouse">{uiText("Almacén activo")}</Label><select id="restaurant-global-warehouse" className="field mt-1" value={warehouseId} onChange={(event) => changeWarehouse(event.target.value)} disabled={isLoading || !currentBranch}><option value="">{uiText("Seleccionar almacén")}</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{`${warehouse.code ? `${warehouse.code} · ` : ""}${warehouse.name ?? "Almacén"} · ${location(warehouse)}`}</option>)}</select><p className="mt-1 text-xs text-text-secondary">{selectedLocation(warehouses, warehouseId, uiText("Ubicación no registrada"))}</p></div>
+      <Button type="button" size="sm" variant={compactMode ? "default" : "secondary"} className="min-h-11 whitespace-nowrap" onClick={toggleCompactMode}><Rows3 className="size-4" />{compactMode ? uiText("Modo compacto activo") : uiText("Modo compacto cocina")}</Button>
     </CardContent></Card>
-    {error ? <InlineFeedback tone="danger" title="No se pudieron cargar los almacenes">{getApiErrorMessage(error, "Revisa la conexión e inténtalo de nuevo.")}</InlineFeedback> : null}
-    {!isLoading && currentBranch && !warehouses.length ? <InlineFeedback tone="warning" title="Sin almacenes disponibles">La sucursal actual no tiene un almacén activo asignado.</InlineFeedback> : null}
+    {error ? <InlineFeedback tone="danger" title={uiText("No se pudieron cargar los almacenes")}>{getApiErrorMessage(error, "Revisa la conexión e inténtalo de nuevo.")}</InlineFeedback> : null}
+    {!isLoading && currentBranch && !warehouses.length ? <InlineFeedback tone="warning" title={uiText("Sin almacenes disponibles")}>{uiText("La sucursal actual no tiene un almacén activo asignado.")}</InlineFeedback> : null}
   </div>;
 }
 
-function selectedLocation(warehouses: Warehouse[], warehouseId: string) {
+function selectedLocation(warehouses: Warehouse[], warehouseId: string, fallback: string) {
   const warehouse = warehouses.find((item) => item.id === warehouseId);
-  return warehouse?.location ?? warehouse?.address ?? ([warehouse?.city, warehouse?.state].filter(Boolean).join(", ") || "Ubicación no registrada");
+  return warehouse?.location ?? warehouse?.address ?? ([warehouse?.city, warehouse?.state].filter(Boolean).join(", ") || fallback);
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,6 +21,7 @@ export function useUnsavedChanges(enabled: boolean, formId: string) {
 }
 
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
+  const uiText = useUiText();
   const router = useRouter();
   const [dirty, setDirty] = useState(false);
   const [dirtyFormId, setDirtyFormId] = useState("");
@@ -48,11 +51,12 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
 
   return <>
     {children}
-    {dirty ? <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border border-status-warning/40 bg-status-warning/15 px-4 py-2 text-sm font-medium text-status-warning shadow-lg" role="status">Cambios sin guardar</div> : null}
+    {dirty ? <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-full border border-status-warning/40 bg-status-warning/15 px-4 py-2 text-sm font-medium text-status-warning shadow-lg" role="status">{uiText("Cambios sin guardar")}</div> : null}
     <UnsavedChangesDialog open={Boolean(target)} onContinue={() => setTarget(null)} onDiscard={discard} onSave={save} />
   </>;
 }
 
 export function UnsavedChangesDialog({ open, onContinue, onDiscard, onSave, saving }: { open: boolean; onContinue: () => void; onDiscard: () => void; onSave: () => void; saving?: boolean }) {
-  return <Dialog open={open} onOpenChange={(next) => { if (!next) onContinue(); }}><DialogContent><DialogHeader><DialogTitle>Hay cambios sin guardar</DialogTitle><DialogDescription>Elige qué hacer antes de salir de esta pantalla.</DialogDescription></DialogHeader><div className="flex flex-col gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={onContinue}>Seguir editando</Button><Button type="button" variant="secondary" onClick={onDiscard}>Descartar</Button><Button type="button" onClick={onSave} disabled={saving} data-loading={saving}>{saving ? "Guardando…" : "Guardar y salir"}</Button></div></DialogContent></Dialog>;
+  const uiText = useUiText();
+  return <Dialog open={open} onOpenChange={(next) => { if (!next) onContinue(); }}><DialogContent><DialogHeader><DialogTitle>{uiText("Hay cambios sin guardar")}</DialogTitle><DialogDescription>{uiText("Elige qué hacer antes de salir de esta pantalla.")}</DialogDescription></DialogHeader><div className="flex flex-col gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={onContinue}>{uiText("Seguir editando")}</Button><Button type="button" variant="secondary" onClick={onDiscard}>{uiText("Descartar")}</Button><Button type="button" onClick={onSave} disabled={saving} data-loading={saving}>{saving ? uiText("Guardando…") : uiText("Guardar y salir")}</Button></div></DialogContent></Dialog>;
 }

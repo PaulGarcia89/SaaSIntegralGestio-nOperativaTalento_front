@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -106,6 +108,7 @@ const STATUS_OPTIONS = (["active", "trial", "past_due"] as const).map((value) =>
 }));
 
 export default function SubscriptionPage() {
+  const uiText = useUiText();
   const { can, canAccessGlobalGovernance } = useAppStore();
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
@@ -216,7 +219,7 @@ export default function SubscriptionPage() {
   if (!can("admin.subscription")) {
     return (
       <BlockedState
-        title="Sin acceso a las suscripciones"
+        title={uiText("Sin acceso a las suscripciones")}
         cause="Gestionar planes, ciclos y renovaciones es una tarea de la administración de la plataforma."
         owner="Quien administra la plataforma"
         resolution="Si necesitas consultarlas, pide el permiso «Administrar suscripciones»."
@@ -248,20 +251,20 @@ export default function SubscriptionPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno de la plataforma"
-        title="Suscripciones"
-        description="Plan, ciclo de cobro, precio y fecha de renovación de cada empresa. El precio que se guarda es el del catálogo del plan elegido."
-        actions={<Button onClick={startCreating}>Nueva suscripción</Button>}
+        eyebrow={uiText("Gobierno de la plataforma")}
+        title={uiText("Suscripciones")}
+        description={uiText("Plan, ciclo de cobro, precio y fecha de renovación de cada empresa. El precio que se guarda es el del catálogo del plan elegido.")}
+        actions={<Button onClick={startCreating}>{uiText("Nueva suscripción")}</Button>}
       />
 
       {subscriptionsQuery.isLoading || tenantsQuery.isLoading || plansQuery.isLoading ? (
-        <SkeletonRows rows={6} label="Cargando las suscripciones" />
+        <SkeletonRows rows={6} label={uiText("Cargando las suscripciones")} />
       ) : subscriptionsQuery.isError || tenantsQuery.isError || plansQuery.isError ? (
         <ErrorState
-          title="No fue posible cargar las suscripciones"
+          title={uiText("No fue posible cargar las suscripciones")}
           detail={getApiErrorMessage(
             subscriptionsQuery.error ?? tenantsQuery.error ?? plansQuery.error,
-            "Reintenta la consulta para continuar.",
+            uiText("Reintenta la consulta para continuar."),
           )}
           onRetry={() => {
             void subscriptionsQuery.refetch();
@@ -272,20 +275,20 @@ export default function SubscriptionPage() {
       ) : (
         <>
           <MetricRow>
-            <Metric label="Suscripciones" value={String(subscriptions.length)} />
+            <Metric label={uiText("Suscripciones")} value={String(subscriptions.length)} />
             <Metric
-              label="Al día"
+              label={uiText("Al día")}
               value={String(subscriptions.filter((item) => item.status === "active").length)}
               tone="success"
             />
             <Metric
-              label="Con pago vencido"
+              label={uiText("Con pago vencido")}
               value={String(subscriptions.filter((item) => item.status === "past_due").length)}
               detail="El acceso sigue abierto"
               tone={subscriptions.some((item) => item.status === "past_due") ? "danger" : undefined}
             />
             <Metric
-              label="Empresas sin suscripción"
+              label={uiText("Empresas sin suscripción")}
               value={String(
                 (tenantsQuery.data ?? []).filter(
                   (tenant) => !subscriptions.some((item) => item.tenantId === tenant.id),
@@ -297,8 +300,8 @@ export default function SubscriptionPage() {
           {open ? (
             <PageSection
               boxed
-              title={editing ? `Editar la suscripción de ${tenantName(editing.tenantId)}` : "Nueva suscripción"}
-              description="El precio lo fija el catálogo del plan y del ciclo elegidos: no se escribe a mano."
+              title={editing ? `Editar la suscripción de ${tenantName(editing.tenantId)}` : uiText("Nueva suscripción")}
+              description={uiText("El precio lo fija el catálogo del plan y del ciclo elegidos: no se escribe a mano.")}
             >
               <form
                 id="subscription-form"
@@ -307,16 +310,16 @@ export default function SubscriptionPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="min-w-0 space-y-2 md:col-span-2">
-                    <Label>Empresa</Label>
+                    <Label>{uiText("Empresa")}</Label>
                     <FormSelect
-                      placeholder="Selecciona la empresa"
+                      placeholder={uiText("Selecciona la empresa")}
                       value={formValues.tenantId}
                       onValueChange={(value) => form.setValue("tenantId", value, { shouldDirty: true })}
                       options={(tenantsQuery.data ?? []).map((tenant) => ({ label: tenant.name, value: tenant.id }))}
                     />
                     {formTenant ? (
                       <p className="text-2xs text-ink-3">
-                        {formTenant.employeeCount ?? 0} personas · {formTenant.branchCount ?? 0} sucursales ·{" "}
+                        {formTenant.employeeCount ?? 0} {uiText(" personas · ")}{formTenant.branchCount ?? 0} {uiText(" sucursales ·")}{" "}
                         {tenantStatusInfo(formTenant.status ?? "active").label}
                       </p>
                     ) : null}
@@ -331,7 +334,7 @@ export default function SubscriptionPage() {
                     {catalogPlan ? <p className="text-2xs text-ink-3">{catalogPlan.description}</p> : null}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Ciclo de cobro</Label>
+                    <Label>{uiText("Ciclo de cobro")}</Label>
                     <FormSelect
                       value={formValues.billingCycle}
                       onValueChange={(value) => applyCycle(value as "monthly" | "annual")}
@@ -339,7 +342,7 @@ export default function SubscriptionPage() {
                     />
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Estado del cobro</Label>
+                    <Label>{uiText("Estado del cobro")}</Label>
                     <FormSelect
                       value={formValues.status}
                       onValueChange={(value) =>
@@ -352,7 +355,7 @@ export default function SubscriptionPage() {
                     </p>
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="subscription-price">Precio que se cobrará</Label>
+                    <Label htmlFor="subscription-price">{uiText("Precio que se cobrará")}</Label>
                     <Input
                       id="subscription-price"
                       readOnly
@@ -360,14 +363,12 @@ export default function SubscriptionPage() {
                       value={formatPrice(catalogPrice)}
                     />
                     <p id="catalog-price-help" className="text-2xs text-ink-3">
-                      Sale del catálogo: plan {planTierLabel(formValues.plan)},{" "}
-                      {billingCycleLabel(formValues.billingCycle).toLocaleLowerCase("es")}. Es exactamente el importe
-                      que se guarda.
-                    </p>
+                      {uiText("Sale del catálogo: plan")}{planTierLabel(formValues.plan)},{" "}
+                      {billingCycleLabel(formValues.billingCycle).toLocaleLowerCase("es")}{uiText(". Es exactamente el importe que se guarda.")}</p>
                   </div>
                   <div className="min-w-0 space-y-2">
                     <DatePicker
-                      label="Fecha de renovación"
+                      label={uiText("Fecha de renovación")}
                       value={formValues.renewalDate ?? ""}
                       onChange={(value) => form.setValue("renewalDate", value, { shouldDirty: true })}
                     />
@@ -386,10 +387,8 @@ export default function SubscriptionPage() {
                 ) : null}
 
                 {formValues.status === "past_due" ? (
-                  <InlineNote tone="warning" title="Marcar el pago como vencido no corta el acceso">
-                    La empresa sigue entrando con normalidad. Para cortar el acceso hay que suspenderla desde la
-                    pantalla de empresas: son dos decisiones distintas y se toman por separado a propósito.
-                  </InlineNote>
+                  <InlineNote tone="warning" title={uiText("Marcar el pago como vencido no corta el acceso")}>
+                    {uiText("La empresa sigue entrando con normalidad. Para cortar el acceso hay que suspenderla desde la pantalla de empresas: son dos decisiones distintas y se toman por separado a propósito.")}</InlineNote>
                 ) : null}
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -402,10 +401,9 @@ export default function SubscriptionPage() {
                       form.reset();
                     }}
                   >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" loading={saveMutation.isPending} loadingLabel="Guardando…">
-                    {editing ? "Guardar cambios" : "Crear la suscripción"}
+                    {uiText("Cancelar")}</Button>
+                  <Button type="submit" loading={saveMutation.isPending} loadingLabel={uiText("Guardando…")}>
+                    {editing ? uiText("Guardar cambios") : "Crear la suscripción"}
                   </Button>
                 </div>
               </form>
@@ -415,8 +413,8 @@ export default function SubscriptionPage() {
           <FilterToolbar
             searchPlaceholder="Buscar por empresa, plan o estado"
             options={[
-              { label: "Todas", value: "" },
-              { label: "Al día", value: "active" },
+              { label: uiText("Todas"), value: "" },
+              { label: uiText("Al día"), value: "active" },
               { label: "En prueba", value: "trial" },
               { label: "Pago vencido", value: "past_due" },
             ]}
@@ -432,7 +430,7 @@ export default function SubscriptionPage() {
               title={query || activeFilter ? "Ninguna suscripción coincide" : "Todavía no hay suscripciones"}
               description={
                 query || activeFilter
-                  ? "Prueba con otro texto o quita el filtro de estado."
+                  ? uiText("Prueba con otro texto o quita el filtro de estado.")
                   : "Crea la primera suscripción para empezar a cobrar un plan."
               }
               onClearFilters={
@@ -455,7 +453,7 @@ export default function SubscriptionPage() {
                   columns={[
                     {
                       key: "tenant",
-                      header: "Empresa",
+                      header: uiText("Empresa"),
                       sortable: true,
                       render: (subscription) => tenantName(subscription.tenantId),
                     },
@@ -467,7 +465,7 @@ export default function SubscriptionPage() {
                     },
                     {
                       key: "status",
-                      header: "Cobro",
+                      header: uiText("Cobro"),
                       sortable: true,
                       render: (subscription) => {
                         const info = subscriptionStatusInfo(subscription.status);
@@ -495,7 +493,7 @@ export default function SubscriptionPage() {
                     },
                     {
                       key: "branches",
-                      header: "Sucursales",
+                      header: uiText("Sucursales"),
                       sortable: true,
                       mobileHidden: true,
                       render: (subscription) =>
@@ -503,7 +501,7 @@ export default function SubscriptionPage() {
                     },
                     {
                       key: "actions",
-                      header: "Acciones",
+                      header: uiText("Acciones"),
                       render: (subscription) => (
                         <div className="flex flex-wrap gap-2">
                           <Button
@@ -515,11 +513,9 @@ export default function SubscriptionPage() {
                               setOpen(true);
                             }}
                           >
-                            Editar
-                          </Button>
+                            {uiText("Editar")}</Button>
                           <Button size="sm" variant="destructive" onClick={() => setDeleting(subscription)}>
-                            Eliminar
-                          </Button>
+                            {uiText("Eliminar")}</Button>
                         </div>
                       ),
                     },
@@ -546,35 +542,34 @@ export default function SubscriptionPage() {
 
                     <dl className="divide-y divide-line rounded-md border border-line">
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Importe</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Importe")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">
                           {formatPrice(selectedSubscription.price)} ·{" "}
                           {billingCycleLabel(selectedSubscription.billingCycle)}
                         </dd>
                       </div>
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Próxima renovación</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Próxima renovación")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">
                           {formatDate(selectedSubscription.renewalDate)}
                         </dd>
                       </div>
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Estado de la empresa</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Estado de la empresa")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">
                           {tenantStatusInfo(selectedTenant?.status ?? "active").label}
                         </dd>
                       </div>
                       <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-                        <dt className="text-sm text-ink-2">Cobertura</dt>
+                        <dt className="text-sm text-ink-2">{uiText("Cobertura")}</dt>
                         <dd className="text-right text-sm font-medium text-ink-1">
-                          {selectedTenant?.branchCount ?? 0} sucursales · {selectedTenant?.employeeCount ?? 0} personas
-                        </dd>
+                          {selectedTenant?.branchCount ?? 0} {uiText(" sucursales · ")}{selectedTenant?.employeeCount ?? 0} {uiText("personas")}</dd>
                       </div>
                     </dl>
 
                     {(selectedTenant?.enabledModules ?? []).length > 0 ? (
                       <div>
-                        <p className="mb-2 text-2xs text-ink-3">Módulos habilitados en la empresa</p>
+                        <p className="mb-2 text-2xs text-ink-3">{uiText("Módulos habilitados en la empresa")}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {(selectedTenant?.enabledModules ?? []).map((module) => (
                             <span
@@ -599,7 +594,7 @@ export default function SubscriptionPage() {
         open={Boolean(deleting)}
         onOpenChange={(next) => !next && setDeleting(null)}
         title={deleting ? `¿Eliminar la suscripción de ${tenantName(deleting.tenantId)}?` : "Eliminar suscripción"}
-        description="La empresa se queda sin plan registrado. Su gente sigue entrando: cortar el acceso es otra decisión, y se toma desde la pantalla de empresas."
+        description={uiText("La empresa se queda sin plan registrado. Su gente sigue entrando: cortar el acceso es otra decisión, y se toma desde la pantalla de empresas.")}
         confirmLabel="Eliminar la suscripción"
         pending={deleteMutation.isPending}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
@@ -607,15 +602,13 @@ export default function SubscriptionPage() {
           deleting ? (
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                Deja de constar el plan {planTierLabel(deleting.plan)} por {formatPrice(deleting.price)}{" "}
+                {uiText("Deja de constar el plan")}{planTierLabel(deleting.plan)} {uiText(" por ")}{formatPrice(deleting.price)}{" "}
                 {billingCycleLabel(deleting.billingCycle).toLocaleLowerCase("es")}.
               </li>
-              <li>Se pierde la renovación pactada para el {formatDate(deleting.renewalDate)}.</li>
+              <li>{uiText("Se pierde la renovación pactada para el ")}{formatDate(deleting.renewalDate)}.</li>
               <li>
-                {deletingTenant?.name ?? "La empresa"} aparecerá como «Sin registro» hasta que se le cree otra
-                suscripción.
-              </li>
-              <li>El acceso de sus {deletingTenant?.employeeCount ?? 0} personas no cambia.</li>
+                {deletingTenant?.name ?? "La empresa"} {uiText("aparecerá como «Sin registro» hasta que se le cree otra suscripción.")}</li>
+              <li>{uiText("El acceso de sus ")}{deletingTenant?.employeeCount ?? 0} {uiText(" personas no cambia.")}</li>
             </ul>
           ) : null
         }

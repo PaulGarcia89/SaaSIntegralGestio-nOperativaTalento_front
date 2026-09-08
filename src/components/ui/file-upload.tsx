@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useRef, useState } from "react";
 import { Upload, X, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,7 @@ export function FileUpload({
   onFiles,
   className,
 }: FileUploadProps) {
+  const uiText = useUiText();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
 
@@ -70,11 +73,9 @@ export function FileUpload({
         </div>
         <div>
           <p className="text-sm font-medium">
-            Arrastra archivos o haz clic para seleccionar
-          </p>
+            {uiText("Arrastra archivos o haz clic para seleccionar")}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {accept.replace(/\./g, "").toUpperCase().replace(/,/g, ", ")} (máx. {maxFiles} archivos
-            {maxSizeBytes ? `, ${Math.round(maxSizeBytes / 1024 / 1024)} MB cada uno` : ""})
+            {accept.replace(/\./g, "").toUpperCase().replace(/,/g, ", ")} {uiText(" (máx. ")}{maxFiles} {uiText("archivos")}{maxSizeBytes ? `, ${Math.round(maxSizeBytes / 1024 / 1024)} MB cada uno` : ""})
           </p>
         </div>
       </button>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Check, Clock3, Mail, MapPin, X } from "lucide-react";
@@ -72,6 +74,7 @@ const PLAN_LABELS: Record<CompanyRegistrationRequestDto["plan"], string> = {
 };
 
 export default function CompanyRegistrationsPage() {
+  const uiText = useUiText();
   const { can } = useAppStore();
   const client = useQueryClient();
 
@@ -114,7 +117,7 @@ export default function CompanyRegistrationsPage() {
   if (!can("tenants.view")) {
     return (
       <BlockedState
-        title="Sin acceso a las solicitudes"
+        title={uiText("Sin acceso a las solicitudes")}
         cause="Revisar altas de empresa es una tarea de la administración de la plataforma."
         owner="Quien administra la plataforma"
         resolution="Si necesitas revisarlas, pide el permiso «Ver empresas»."
@@ -129,40 +132,40 @@ export default function CompanyRegistrationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno de la plataforma"
-        title="Solicitudes de empresa"
-        description="Revisa cada registro antes de crear la empresa, su suscripción, su sede principal y el acceso de quien la administrará."
+        eyebrow={uiText("Gobierno de la plataforma")}
+        title={uiText("Solicitudes de empresa")}
+        description={uiText("Revisa cada registro antes de crear la empresa, su suscripción, su sede principal y el acceso de quien la administrará.")}
       />
 
       {registrations.isLoading ? (
-        <SkeletonRows rows={4} label="Cargando las solicitudes" />
+        <SkeletonRows rows={4} label={uiText("Cargando las solicitudes")} />
       ) : registrations.isError ? (
         <ErrorState
-          title="No fue posible cargar las solicitudes"
-          detail={getApiErrorMessage(registrations.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar las solicitudes")}
+          detail={getApiErrorMessage(registrations.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void registrations.refetch()}
         />
       ) : (
         <>
           <MetricRow>
             <Metric
-              label="Pendientes de revisar"
+              label={uiText("Pendientes de revisar")}
               value={String(pending.length)}
               tone={pending.length > 0 ? "warning" : undefined}
             />
-            <Metric label="Aprobadas" value={String(approved.length)} tone="success" />
-            <Metric label="Recibidas en total" value={String(all.length)} />
+            <Metric label={uiText("Aprobadas")} value={String(approved.length)} tone="success" />
+            <Metric label={uiText("Recibidas en total")} value={String(all.length)} />
           </MetricRow>
 
           {all.length === 0 ? (
             <EmptyState
               reason="no-records"
-              title="No hay solicitudes"
-              description="Las altas enviadas desde el registro público aparecerán aquí para que alguien las revise."
+              title={uiText("No hay solicitudes")}
+              description={uiText("Las altas enviadas desde el registro público aparecerán aquí para que alguien las revise.")}
             />
           ) : (
             <PageSection
-              title={pending.length ? "Por revisar" : "Solicitudes"}
+              title={pending.length ? "Por revisar" : uiText("Solicitudes")}
               description={
                 pending.length
                   ? "Cada aprobación crea una empresa real con su suscripción y su primer acceso."
@@ -192,16 +195,14 @@ export default function CompanyRegistrationsPage() {
                       <div className="min-w-0 rounded-md border border-line bg-surface-2 p-3">
                         <dt className="flex items-center gap-2 text-2xs text-ink-3">
                           <MapPin className="size-3.5" aria-hidden="true" />
-                          Sede principal
-                        </dt>
+                          {uiText("Sede principal")}</dt>
                         <dd className="mt-1 truncate font-medium text-ink-1">{item.branchName}</dd>
                         <dd className="truncate text-ink-2">{item.branchLocation}</dd>
                       </div>
                       <div className="min-w-0 rounded-md border border-line bg-surface-2 p-3">
                         <dt className="flex items-center gap-2 text-2xs text-ink-3">
                           <Mail className="size-3.5" aria-hidden="true" />
-                          Quien la administrará
-                        </dt>
+                          {uiText("Quien la administrará")}</dt>
                         <dd className="mt-1 truncate font-medium text-ink-1">{item.adminName}</dd>
                         <dd className="truncate text-ink-2">{item.adminEmail}</dd>
                       </div>
@@ -210,7 +211,7 @@ export default function CompanyRegistrationsPage() {
                     <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-3">
                       <span className="inline-flex items-center gap-1">
                         <Clock3 className="size-3.5" aria-hidden="true" />
-                        {new Date(item.requestedAt).toLocaleString("es", {
+                        {new Date(item.requestedAt).toLocaleString(uiText.locale, {
                           dateStyle: "medium",
                           timeStyle: "short",
                         })}
@@ -222,12 +223,10 @@ export default function CompanyRegistrationsPage() {
                       <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                         <Button className="sm:flex-1" onClick={() => open(item, "approve")}>
                           <Check className="size-4" aria-hidden="true" />
-                          Aprobar
-                        </Button>
+                          {uiText("Aprobar")}</Button>
                         <Button className="sm:flex-1" variant="secondary" onClick={() => open(item, "reject")}>
                           <X className="size-4" aria-hidden="true" />
-                          Rechazar
-                        </Button>
+                          {uiText("Rechazar")}</Button>
                       </div>
                     ) : null}
                   </li>
@@ -248,21 +247,17 @@ export default function CompanyRegistrationsPage() {
           </DialogHeader>
 
           {decision === "approve" ? (
-            <InlineNote tone="warning" title="Qué se crea al aprobar">
-              La empresa, su suscripción de prueba, la sede «{active?.branchName}» y el acceso de{" "}
-              {active?.adminName} como {roleLabels.admin_empresa.toLocaleLowerCase("es")}. Se crea todo junto o no se
-              crea nada: si algo falla, no queda una empresa a medias.
-            </InlineNote>
+            <InlineNote tone="warning" title={uiText("Qué se crea al aprobar")}>
+              {uiText("La empresa, su suscripción de prueba, la sede «")}{active?.branchName}{uiText("» y el acceso de")}{" "}
+              {active?.adminName} {uiText(" como ")}{roleLabels.admin_empresa.toLocaleLowerCase("es")}{uiText(". Se crea todo junto o no se crea nada: si algo falla, no queda una empresa a medias.")}</InlineNote>
           ) : (
-            <InlineNote tone="info" title="Qué pasa al rechazar">
-              La solicitud queda cerrada. Tu observación es lo único que quien la envió va a leer para saber qué
-              corregir antes de volver a intentarlo.
-            </InlineNote>
+            <InlineNote tone="info" title={uiText("Qué pasa al rechazar")}>
+              {uiText("La solicitud queda cerrada. Tu observación es lo único que quien la envió va a leer para saber qué corregir antes de volver a intentarlo.")}</InlineNote>
           )}
 
           <div>
             <Label htmlFor="registration-notes">
-              Observación {decision === "reject" ? "(obligatoria)" : "(opcional)"}
+              {uiText("Observación")}{decision === "reject" ? "(obligatoria)" : "(opcional)"}
             </Label>
             <textarea
               id="registration-notes"
@@ -278,20 +273,19 @@ export default function CompanyRegistrationsPage() {
           </div>
 
           {review.isError ? (
-            <InlineNote tone="danger" title="No se pudo guardar la decisión">
+            <InlineNote tone="danger" title={uiText("No se pudo guardar la decisión")}>
               {getApiErrorMessage(review.error, "El servidor rechazó la operación.")}
             </InlineNote>
           ) : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={close}>
-              Cancelar
-            </Button>
+              {uiText("Cancelar")}</Button>
             <Button
               variant={decision === "approve" ? "default" : "destructive"}
               disabled={decision === "reject" && !notes.trim()}
               loading={review.isPending}
-              loadingLabel="Guardando…"
+              loadingLabel={uiText("Guardando…")}
               onClick={() => review.mutate()}
             >
               {decision === "approve" ? "Aprobar y crear la empresa" : "Rechazar la solicitud"}

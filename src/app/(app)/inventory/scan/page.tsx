@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Clipboard, Search } from "lucide-react";
@@ -31,6 +33,7 @@ import { assetStatusLabel, assetStatusTone, conditionLabel, conditionTone } from
  * · Desde el resultado no se podía ir a la ficha del activo.
  */
 export default function InventoryScanPage() {
+  const uiText = useUiText();
   const [tag, setTag] = useState("");
   const [copied, setCopied] = useState(false);
   const lookup = useMutation({ mutationFn: () => lookupInventoryAsset(tag) });
@@ -38,18 +41,17 @@ export default function InventoryScanPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <PageHeader
-        eyebrow="Operación móvil"
-        title="Consultar un activo"
-        description="Escribe la etiqueta, o escanéala con el lector del dispositivo, para ver de quién es y en qué estado está."
+        eyebrow={uiText("Operación móvil")}
+        title={uiText("Consultar un activo")}
+        description={uiText("Escribe la etiqueta, o escanéala con el lector del dispositivo, para ver de quién es y en qué estado está.")}
       />
 
-      <PageSection title="Etiqueta del activo" boxed>
+      <PageSection title={uiText("Etiqueta del activo")} boxed>
         <p className="text-sm text-ink-2">
-          Si tu dispositivo tiene lector de códigos, colócate en este campo y escanea: el valor se escribe solo.
-        </p>
+          {uiText("Si tu dispositivo tiene lector de códigos, colócate en este campo y escanea: el valor se escribe solo.")}</p>
         <div className="mt-3 space-y-3">
           <div>
-            <Label htmlFor="asset-tag">Etiqueta</Label>
+            <Label htmlFor="asset-tag">{uiText("Etiqueta")}</Label>
             <Input
               id="asset-tag"
               autoCapitalize="characters"
@@ -72,13 +74,12 @@ export default function InventoryScanPage() {
             onClick={() => lookup.mutate()}
           >
             <Search className="size-4" aria-hidden="true" />
-            Consultar
-          </Button>
+            {uiText("Consultar")}</Button>
         </div>
 
         {lookup.isError ? (
           <div className="mt-3">
-            <InlineNote tone="warning" title="No se encontró el activo">
+            <InlineNote tone="warning" title={uiText("No se encontró el activo")}>
               {getApiErrorMessage(
                 lookup.error,
                 "No hay ningún activo con esa etiqueta en la empresa activa. Comprueba que la copiaste entera.",
@@ -102,6 +103,7 @@ function AssetResult({
   copied: boolean;
   onCopied: (value: boolean) => void;
 }) {
+  const uiText = useUiText();
   return (
     <PageSection title={asset.item.name} description={`${asset.item.sku} · ${asset.serialNumber || "sin número de serie"}`} boxed>
       <p className="font-mono text-2xs uppercase tracking-[0.16em] text-ink-3">{asset.assetTag}</p>
@@ -113,18 +115,18 @@ function AssetResult({
 
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div>
-          <dt className="text-ink-3">Sucursal</dt>
+          <dt className="text-ink-3">{uiText("Sucursal")}</dt>
           <dd className="font-medium text-ink-1">{asset.branch.name}</dd>
         </div>
         <div>
-          <dt className="text-ink-3">En custodia de</dt>
+          <dt className="text-ink-3">{uiText("En custodia de")}</dt>
           <dd className="font-medium text-ink-1">{asset.employee?.name || "Sin asignar"}</dd>
         </div>
       </dl>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <Button asChild variant="secondary" className="sm:flex-1">
-          <Link href={`/inventory/assets?search=${encodeURIComponent(asset.assetTag)}`}>Abrir su ficha</Link>
+          <Link href={`/inventory/assets?search=${encodeURIComponent(asset.assetTag)}`}>{uiText("Abrir su ficha")}</Link>
         </Button>
         <Button
           variant="secondary"

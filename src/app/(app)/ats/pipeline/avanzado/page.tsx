@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { Suspense, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +41,7 @@ import { useLocale } from "@/components/locale-provider";
 const ALL = "ALL";
 
 function PipelineContent() {
+  const uiText = useUiText();
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -242,12 +245,12 @@ function PipelineContent() {
             {(compact || requestedVacancyId === ALL) ? <Badge variant="secondary">{currentStage?.name ?? application.currentStage?.name ?? t("adv.noStage")}</Badge> : null}
           </div>
           <div className="space-y-1 text-xs text-text-secondary">
-            <p>Recibida: {formatApplicationDate(application.appliedAt)}</p>
+            <p>{uiText("Recibida: ")}{formatApplicationDate(application.appliedAt)}</p>
             <p><span className="font-medium text-text-primary">{t("adv.next")}</span> {applicationNextAction(application.status)}</p>
             {application.stageDueAt ? <p className={application.isStageOverdue ? "font-medium text-status-danger" : ""}><Clock3 className="mr-1 inline size-3.5" />{application.isStageOverdue ? t("adv.slaBreached") : `SLA: ${formatApplicationDate(application.stageDueAt)}`}</p> : null}
           </div>
           {compact && can("applications.change_stage") && movableStages.length ? <p className="text-xs text-text-secondary">{t("adv.dragHint")}</p> : null}
-          {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">Pendiente: {pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} aprobaciones</p>{can("applications.change_stage") && (pendingTransition.requestedByUserId !== currentUser.id || canApproveOwnTransition) ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />Aprobar</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />Rechazar</Button></div> : <p>{t("adv.otherOwnerMustResolve")}</p>}</div> : null}
+          {pendingTransition ? <div className="space-y-2 rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 text-xs"><p className="font-medium">{uiText("Pendiente: ")}{pendingTransition.toStage.name}</p><p>{pendingTransition.approvals.length}/{pendingTransition.requiredApprovals} {uiText(" aprobaciones")}</p>{can("applications.change_stage") && (pendingTransition.requestedByUserId !== currentUser.id || canApproveOwnTransition) ? <div className="flex gap-2"><Button size="sm" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: true })} disabled={decide.isPending}><Check className="size-3.5" />{uiText("Aprobar")}</Button><Button size="sm" variant="secondary" onClick={() => decide.mutate({ applicationId: application.id, requestId: pendingTransition.id, approved: false })} disabled={decide.isPending}><X className="size-3.5" />{uiText("Rechazar")}</Button></div> : <p>{t("adv.otherOwnerMustResolve")}</p>}</div> : null}
           {can("applications.change_stage") && application.status !== "HIRED" && movableStages.length ? (
             <FilterField label={t("adv.moveTo")}>
               <Select
@@ -264,7 +267,7 @@ function PipelineContent() {
                   <SelectValue placeholder={t("adv.pickStage")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {currentStage ? <SelectItem value={currentStage.id!}>{currentStage.name} (actual)</SelectItem> : null}
+                  {currentStage ? <SelectItem value={currentStage.id!}>{currentStage.name} {uiText(" (actual)")}</SelectItem> : null}
                   {movableStages.map((stage) => (
                     <SelectItem key={stage.id} value={stage.id!}>{stage.name}</SelectItem>
                   ))}
@@ -293,7 +296,7 @@ function PipelineContent() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Reclutamiento"
+        eyebrow={uiText("Reclutamiento")}
         title={t("ats.selectionFlowByVacancy")}
         description={t("ats.selectionFlowDescription")}
       />
@@ -445,5 +448,6 @@ function PipelineContent() {
 }
 
 export default function PipelinePage() {
-  return <Suspense fallback={<AsyncState state="loading" title="Preparando pipeline" />}><PipelineContent /></Suspense>;
+  const uiText = useUiText();
+  return <Suspense fallback={<AsyncState state="loading" title={uiText("Preparando pipeline")} />}><PipelineContent /></Suspense>;
 }

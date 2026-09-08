@@ -98,14 +98,16 @@ function describe(table: Record<string, Described>, code: unknown, fallbackDetai
 
 export const planTierInfo = (code: unknown) =>
   describe(PLAN_TIERS, code, "Plan que este panel todavía no describe. Consulta el catálogo de planes.");
-export const planTierLabel = (code: unknown) => planTierInfo(code).label;
+export const planTierLabel = (code: unknown, locale: "es" | "en" = "es") => locale === "en" ? ({ starter: "Starter", growth: "Growth", enterprise: "Enterprise" }[String(code)] ?? String(code ?? "—")) : planTierInfo(code).label;
 
 export const tenantStatusInfo = (code: unknown) =>
   describe(TENANT_STATUS, code, "Estado de empresa que este panel todavía no describe.");
 export const tenantStatusLabel = (code: unknown) => tenantStatusInfo(code).label;
 
-export const subscriptionStatusInfo = (code: unknown) =>
-  describe(SUBSCRIPTION_STATUS, code, "Estado de suscripción que este panel todavía no describe.");
+export const subscriptionStatusInfo = (code: unknown, locale: "es" | "en" = "es") => {
+  const info = describe(SUBSCRIPTION_STATUS, code, "Estado de suscripción que este panel todavía no describe.");
+  return locale === "es" ? info : { ...info, label: ({ active: "Active", trial: "Trial", past_due: "Past due" } as Record<string, string>)[String(code)] ?? String(code ?? "—"), detail: "Subscription status" };
+};
 export const subscriptionStatusLabel = (code: unknown) => subscriptionStatusInfo(code).label;
 
 export const billingCycleInfo = (code: unknown) =>
@@ -167,18 +169,18 @@ export function formatPrice(value: unknown, currency = "USD"): string {
   }
 }
 
-export function formatDate(value: unknown): string {
+export function formatDate(value: unknown, locale: "es" | "en" = "es"): string {
   if (typeof value !== "string" || value.trim() === "") return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("es", { dateStyle: "medium" });
+  return date.toLocaleDateString(locale, { dateStyle: "medium" });
 }
 
-export function formatDateTime(value: unknown): string {
+export function formatDateTime(value: unknown, locale: "es" | "en" = "es"): string {
   if (typeof value !== "string" || value.trim() === "") return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("es", { dateStyle: "medium", timeStyle: "short" });
+  return date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }
 
 /**

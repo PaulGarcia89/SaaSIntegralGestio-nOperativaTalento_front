@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchPlatformAudit, getApiErrorMessage } from "@/lib/backend";
@@ -61,6 +63,7 @@ const PAGE_SIZE = 25;
 const ACTION_OPTIONS = [{ value: "", label: "Todas las acciones" }, ...auditActionFlatOptions()];
 
 export default function AuditPage() {
+  const uiText = useUiText();
   const { can } = useAppStore();
   const [action, setAction] = useState("");
   const [term, setTerm] = useState("");
@@ -79,9 +82,9 @@ export default function AuditPage() {
   if (!can("audit.view")) {
     return (
       <BlockedState
-        title="Sin acceso a la auditoría"
+        title={uiText("Sin acceso a la auditoría")}
         cause="El registro de auditoría contiene la actividad de todas las personas de la empresa."
-        owner="Quien administra la empresa"
+        owner={uiText("Quien administra la empresa")}
         resolution="Si necesitas consultarlo, pide el permiso «Ver auditoría»."
       />
     );
@@ -95,15 +98,15 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gobierno de la plataforma"
-        title="Auditoría"
-        description="Qué se hizo, en qué ruta y cuándo, dentro de tu alcance. Los registros no se pueden editar ni borrar desde aquí: es su razón de ser."
+        eyebrow={uiText("Gobierno de la plataforma")}
+        title={uiText("Auditoría")}
+        description={uiText("Qué se hizo, en qué ruta y cuándo, dentro de tu alcance. Los registros no se pueden editar ni borrar desde aquí: es su razón de ser.")}
       />
 
-      <PageSection title="Filtros" description="La acción se filtra en el servidor; el texto afina lo que ya está en pantalla.">
+      <PageSection title={uiText("Filtros")} description={uiText("La acción se filtra en el servidor; el texto afina lo que ya está en pantalla.")}>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="min-w-0 space-y-2">
-            <Label>Acción</Label>
+            <Label>{uiText("Acción")}</Label>
             <FormSelect
               value={action}
               onValueChange={(value) => {
@@ -115,17 +118,16 @@ export default function AuditPage() {
             {action ? <p className="text-2xs text-ink-3">{auditActionInfo(action).detail}</p> : null}
           </div>
           <div className="min-w-0 space-y-2">
-            <Label htmlFor="audit-term">Afinar esta página</Label>
+            <Label htmlFor="audit-term">{uiText("Afinar esta página")}</Label>
             <Input
               id="audit-term"
               value={term}
               onChange={(event) => setTerm(event.target.value)}
-              placeholder="Ruta, acción o identificador de usuario"
+              placeholder={uiText("Ruta, acción o identificador de usuario")}
               autoComplete="off"
             />
             <p className="text-2xs text-ink-3">
-              Busca dentro de los {items.length} eventos cargados, no en todo el histórico.
-            </p>
+              {uiText("Busca dentro de los")}{items.length} {uiText("eventos cargados, no en todo el histórico.")}</p>
           </div>
         </div>
 
@@ -140,18 +142,17 @@ export default function AuditPage() {
                 setPage(0);
               }}
             >
-              Quitar los filtros
-            </Button>
+              {uiText("Quitar los filtros")}</Button>
           </div>
         ) : null}
       </PageSection>
 
       {audit.isLoading ? (
-        <SkeletonRows rows={8} label="Cargando la auditoría" />
+        <SkeletonRows rows={8} label={uiText("Cargando la auditoría")} />
       ) : audit.isError ? (
         <ErrorState
-          title="No fue posible cargar la auditoría"
-          detail={getApiErrorMessage(audit.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar la auditoría")}
+          detail={getApiErrorMessage(audit.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void audit.refetch()}
         />
       ) : (
@@ -161,9 +162,9 @@ export default function AuditPage() {
               label={hasServerFilter ? "Eventos con esta acción" : "Eventos en tu alcance"}
               value={String(total)}
             />
-            <Metric label="En esta página" value={String(items.length)} detail={`De ${PAGE_SIZE} por página`} />
+            <Metric label={uiText("En esta página")} value={String(items.length)} detail={`De ${PAGE_SIZE} por página`} />
             <Metric
-              label="Que conviene revisar"
+              label={uiText("Que conviene revisar")}
               value={String(items.filter((item) => auditActionInfo(item.action).tone === "danger").length)}
               detail="Eliminaciones y documentos alterados"
               tone={items.some((item) => auditActionInfo(item.action).tone === "danger") ? "danger" : undefined}
@@ -195,9 +196,7 @@ export default function AuditPage() {
             <>
               {term && visible.length < items.length ? (
                 <InlineNote tone="info" title={`${visible.length} de ${items.length} eventos de esta página`}>
-                  El texto filtra solo lo cargado. Para buscar en todo el histórico, filtra por acción: eso sí llega al
-                  servidor.
-                </InlineNote>
+                  {uiText("El texto filtra solo lo cargado. Para buscar en todo el histórico, filtra por acción: eso sí llega al servidor.")}</InlineNote>
               ) : null}
 
               <ul className="space-y-2">
@@ -221,7 +220,7 @@ export default function AuditPage() {
                             {formatDateTime(item.createdAt)}
                           </time>
                           <p className="mt-1 text-2xs text-ink-3">
-                            {item.branchId ? "Sucursal" : "Empresa"}
+                            {item.branchId ? uiText("Sucursal") : uiText("Empresa")}
                             {item.userId ? ` · ${shortId(item.userId)}` : ""}
                           </p>
                         </div>

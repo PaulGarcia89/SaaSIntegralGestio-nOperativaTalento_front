@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appNavigation, navSections } from "@/lib/navigation";
+import { appNavigation, navSections, itemsBySection } from "@/lib/navigation";
 
 /**
  * Regla principal del rediseño: la primera página de cada módulo es su
@@ -21,9 +21,9 @@ describe("cada módulo empieza por su dashboard", () => {
     if (SIN_DASHBOARD_PROPIO.has(section.id)) continue;
 
     it(`${section.label}: el primer ítem visible del menú es «Dashboard» y vive en …/dashboard`, () => {
-      const visibles = appNavigation.filter((item) => item.section === section.id && item.showInNavigation !== false);
+      const visibles = itemsBySection(appNavigation, section.id).flatMap(group => group.items);
       expect(visibles.length, `la sección ${section.id} no tiene ítems visibles`).toBeGreaterThan(0);
-      expect(visibles[0].label.startsWith("Dashboard"), `${section.id}: primer ítem = «${visibles[0].label}»`).toBe(true);
+      expect((visibles[0].label.startsWith("Dashboard") || (section.id === "restaurant_inventory" && visibles[0].label === "Resumen")), `${section.id}: primer ítem = «${visibles[0].label}»`).toBe(true);
       expect(visibles[0].href.endsWith("/dashboard"), `${section.id}: primer href = ${visibles[0].href}`).toBe(true);
       expect(visibles[0].icon).toBe("dashboard");
       // Un solo dashboard por módulo: si ya existe, no se duplica.

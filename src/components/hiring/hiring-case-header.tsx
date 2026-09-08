@@ -19,11 +19,11 @@ export function initials(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
 }
 
-export function longDate(value?: string | null) {
+export function longDate(value?: string | null, locale: SupportedLocale = "es") {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("es", { dateStyle: "long" }).format(date);
+  return new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(date);
 }
 
 export function currentOfferVersion(contract: HiringContractDto): JobOfferVersionDto | undefined {
@@ -74,7 +74,7 @@ export function HiringCaseHeader({
 }) {
   const { locale, t } = useLocale();
   const version = currentOfferVersion(contract);
-  const startDate = longDate(version?.employmentStartDate);
+  const startDate = longDate(version?.employmentStartDate, locale);
   const salary = salaryText(version, locale);
   const firstName = contract.candidate.fullName.split(" ")[0] || "la persona";
   const waiting = state.cancelled

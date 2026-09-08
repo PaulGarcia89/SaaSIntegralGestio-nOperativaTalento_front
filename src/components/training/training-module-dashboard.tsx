@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import {
   ArrowRight,
@@ -38,6 +40,7 @@ type Destino = {
 };
 
 export function TrainingModuleDashboard() {
+  const uiText = useUiText();
   const { can } = useAppStore();
   const canManageTraining = can("training.manage");
 
@@ -53,42 +56,42 @@ export function TrainingModuleDashboard() {
     },
     {
       href: "/training/evaluations",
-      label: "Evaluaciones",
+      label: uiText("Evaluaciones"),
       description: "Pruebas pendientes y resultados de cada intento.",
       icon: ClipboardCheck,
       visible: can("training.view"),
     },
     {
       href: "/training/certificates",
-      label: "Certificados",
+      label: uiText("Certificados"),
       description: "Los que ya se emitieron y los que están por vencer.",
       icon: Award,
       visible: can("training.view"),
     },
     {
       href: "/training/results",
-      label: "Resultados",
+      label: uiText("Resultados"),
       description: "Avance por persona, curso y sucursal.",
       icon: LineChart,
       visible: can("training.view"),
     },
     {
       href: "/training/content",
-      label: "Gestionar cursos",
+      label: uiText("Gestionar cursos"),
       description: "Crear, revisar, aprobar y publicar contenido.",
       icon: GraduationCap,
       visible: canManageTraining,
     },
     {
       href: "/training/paths",
-      label: "Rutas y cumplimiento",
+      label: uiText("Rutas y cumplimiento"),
       description: "Itinerarios obligatorios y quién los tiene al día.",
       icon: Route,
       visible: canManageTraining,
     },
     {
       href: "/training/intelligence",
-      label: "Inteligencia",
+      label: uiText("Inteligencia"),
       description: "Recomendaciones y señales sobre el programa.",
       icon: Sparkles,
       visible: canManageTraining,
@@ -98,8 +101,8 @@ export function TrainingModuleDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Aprendizaje"
-        title="Dashboard de aprendizaje"
+        eyebrow={uiText("Aprendizaje")}
+        title={uiText("Dashboard de aprendizaje")}
         description={
           canManageTraining
             ? "Cómo va el programa de formación, qué necesita atención y por dónde seguir."
@@ -114,7 +117,7 @@ export function TrainingModuleDashboard() {
 
       {canManageTraining ? <AdminTrainingPanel /> : <LearnerTrainingPanel />}
 
-      <PageSection title="Operaciones del módulo" description="Cada pantalla dice para qué sirve, con icono y texto.">
+      <PageSection title={uiText("Operaciones del módulo")} description={uiText("Cada pantalla dice para qué sirve, con icono y texto.")}>
         <ul className="grid gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-3">
           {destinos.map(({ href, label, description, icon: Icon }) => (
             <li key={href}>

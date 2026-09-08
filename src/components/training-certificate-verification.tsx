@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useQuery } from "@tanstack/react-query";
 import { Award, Building2, CalendarDays, Hash, ShieldCheck } from "lucide-react";
 import Link from "next/link";
@@ -39,6 +41,7 @@ const STATUS: Record<string, { label: string; tone: Tone; note?: string }> = {
 };
 
 export function TrainingCertificateVerification({ code }: { code: string }) {
+  const uiText = useUiText();
   const query = useQuery({
     queryKey: ["public-training-certificate", code],
     queryFn: () => verifyPublicTrainingCertificate(code),
@@ -60,7 +63,7 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
       <div className="relative w-full max-w-3xl">
         {query.isLoading ? (
           <div aria-busy="true" aria-live="polite" className="rounded-lg border border-line bg-surface-1 p-8">
-            <span className="sr-only">Verificando la credencial</span>
+            <span className="sr-only">{uiText("Verificando la credencial")}</span>
             <SkeletonBlock className="h-72" />
           </div>
         ) : null}
@@ -68,12 +71,12 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
         {query.isError ? (
           <div className="rounded-lg border border-line bg-surface-1 p-6">
             <ErrorState
-              title="No encontramos esta credencial"
+              title={uiText("No encontramos esta credencial")}
               detail="El código puede estar mal copiado, o la credencial ya no existe. Comprueba el código con quien te lo entregó."
               onRetry={() => void query.refetch()}
             />
             <Button asChild variant="secondary" className="mt-4 w-full">
-              <Link href="/">Volver al inicio</Link>
+              <Link href="/">{uiText("Volver al inicio")}</Link>
             </Button>
           </div>
         ) : null}
@@ -90,11 +93,9 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
               <div className="flex flex-col gap-7 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-2xs font-semibold uppercase tracking-[0.26em] text-accent-ink">
-                    Credencial verificable
-                  </p>
+                    {uiText("Credencial verificable")}</p>
                   <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-1 sm:text-4xl">
-                    Certificado de aprendizaje
-                  </h1>
+                    {uiText("Certificado de aprendizaje")}</h1>
                 </div>
                 <div
                   aria-hidden="true"
@@ -105,22 +106,22 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
               </div>
 
               <div className="my-8 border-y border-line py-8">
-                <p className="text-sm text-ink-2">Otorgado a</p>
+                <p className="text-sm text-ink-2">{uiText("Otorgado a")}</p>
                 <p className="mt-1 text-3xl font-semibold tracking-tight text-ink-1">{data.learnerName}</p>
-                <p className="mt-5 text-sm text-ink-2">Por completar</p>
+                <p className="mt-5 text-sm text-ink-2">{uiText("Por completar")}</p>
                 <p className="mt-1 text-xl font-medium text-ink-1">
                   {data.title || "Formación sin título registrado"}
                 </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Detail icon={<Building2 />} label="Organización" value={data.organization} />
-                <Detail icon={<Hash />} label="Número" value={data.certificateNumber} mono />
-                <Detail icon={<CalendarDays />} label="Emisión" value={formatDateTime(data.issuedAt)} />
+                <Detail icon={<Building2 />} label={uiText("Organización")} value={data.organization} />
+                <Detail icon={<Hash />} label={uiText("Número")} value={data.certificateNumber} mono />
+                <Detail icon={<CalendarDays />} label={uiText("Emisión")} value={formatDateTime(data.issuedAt)} />
                 <Detail
                   icon={<CalendarDays />}
-                  label="Vigencia"
-                  value={data.expiresAt ? formatDateTime(data.expiresAt) : "Sin vencimiento"}
+                  label={uiText("Vigencia")}
+                  value={data.expiresAt ? formatDateTime(data.expiresAt) : uiText("Sin vencimiento")}
                 />
               </div>
 
@@ -128,7 +129,7 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
                 <div className="flex min-w-0 items-center gap-3">
                   <ShieldCheck className="size-6 shrink-0 text-ink-2" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="font-medium text-ink-1">Verificación oficial</p>
+                    <p className="font-medium text-ink-1">{uiText("Verificación oficial")}</p>
                     <p className="truncate font-mono text-xs text-ink-2">{data.verificationCode}</p>
                   </div>
                 </div>

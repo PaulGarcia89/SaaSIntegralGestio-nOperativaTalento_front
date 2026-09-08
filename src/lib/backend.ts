@@ -5336,6 +5336,10 @@ export function fetchOperationalDashboard() {
   return request<OperationalDashboardDto>("/dashboard/operational");
 }
 
+export function fetchOperationalDashboardInLocale(locale: "es" | "en") {
+  return request<OperationalDashboardDto>("/dashboard/operational", { headers: { "Accept-Language": locale } });
+}
+
 export type ReportQuery = {
   from?: string;
   to?: string;

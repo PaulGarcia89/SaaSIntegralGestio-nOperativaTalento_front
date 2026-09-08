@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,6 +25,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, options, 
   onOpenChange: (open: boolean) => void;
   onConfirm: (input: { reasonId?: string; reason: string }) => void;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
   const [reasonId, setReasonId] = useState("");
   const [reason, setReason] = useState("");
@@ -47,8 +50,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, options, 
 
         {needsOption ? (
           <label className="block space-y-2 text-base font-medium text-text-primary" htmlFor="reason-option">
-            ¿Por qué?
-            <select
+            {uiText("¿Por qué?")}<select
               id="reason-option"
               value={reasonId}
               onChange={(event) => setReasonId(event.target.value)}
@@ -61,8 +63,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, options, 
         ) : null}
 
         <label className="block space-y-2 text-base font-medium text-text-primary" htmlFor="reason-text">
-          Cuéntanos un poco más
-          <textarea
+          {uiText("Cuéntanos un poco más")}<textarea
             id="reason-text"
             value={reason}
             onChange={(event) => setReason(event.target.value)}

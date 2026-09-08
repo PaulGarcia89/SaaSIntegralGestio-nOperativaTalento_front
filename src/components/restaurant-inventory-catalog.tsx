@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
@@ -68,6 +70,7 @@ const updaters = { categories: updateRestaurantCategory, units: updateRestaurant
 const deactivators = { categories: deactivateRestaurantCategory, units: deactivateRestaurantUnit, suppliers: deactivateRestaurantSupplier, warehouses: deactivateRestaurantWarehouse, ingredients: deactivateRestaurantIngredient };
 
 export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKind }) {
+  const uiText = useUiText();
   const { can, currentBranch } = useAppStore();
   const canManage = can("restaurant_inventory.manage");
   const queryClient = useQueryClient();
@@ -88,7 +91,7 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
   const data = (query.data?.data ?? []) as RecordValue[];
   const openForm = (item?: RecordValue) => item ? setEditing(item) : setCreating(true);
   return <div className="space-y-4">
-    <PageHeader eyebrow="Catálogo" title={labels[kind]} description="Datos maestros administrados por empresa y consultados desde el backend." actions={canManage ? <Button onClick={() => openForm()}><Plus className="size-4" />Nuevo</Button> : undefined} />
+    <PageHeader eyebrow={uiText("Catálogo")} title={labels[kind]} description={uiText("Datos maestros administrados por empresa y consultados desde el backend.")} actions={canManage ? <Button onClick={() => openForm()}><Plus className="size-4" />{uiText("Nuevo")}</Button> : undefined} />
     <FilterBar
       search={search}
       onSearchChange={(value) => {
@@ -103,7 +106,7 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
       }}
     >
       <div className="min-w-0">
-        <Label htmlFor={`catalog-status-${kind}`}>Estado</Label>
+        <Label htmlFor={`catalog-status-${kind}`}>{uiText("Estado")}</Label>
         <select
           id={`catalog-status-${kind}`}
           className={SELECT_CLASS}
@@ -113,22 +116,22 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
             setPage(1);
           }}
         >
-          <option value="ACTIVE">Activos</option>
-          <option value="INACTIVE">Inactivos</option>
+          <option value="ACTIVE">{uiText("Activos")}</option>
+          <option value="INACTIVE">{uiText("Inactivos")}</option>
         </select>
       </div>
     </FilterBar>
 
     {mutation.error ? (
-      <InlineNote tone="danger" title="No se pudo completar la operación">
+      <InlineNote tone="danger" title={uiText("No se pudo completar la operación")}>
         {getApiErrorMessage(mutation.error, "Revisa los datos e inténtalo de nuevo.")}
       </InlineNote>
     ) : null}
 
     {query.error ? (
       <ErrorState
-        title="No fue posible cargar el catálogo"
-        detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+        title={uiText("No fue posible cargar el catálogo")}
+        detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))}
         onRetry={() => void query.refetch()}
       />
     ) : (
@@ -172,19 +175,15 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
     <Dialog open={Boolean(deactivating)} onOpenChange={(open) => !open && setDeactivating(null)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>¿Desactivar «{String(deactivating?.name ?? "este registro")}»?</DialogTitle>
+          <DialogTitle>{uiText("¿Desactivar «")}{String(deactivating?.name ?? "este registro")}»?</DialogTitle>
           <DialogDescription>
-            Dejará de poder elegirse en recetas, compras y movimientos nuevos.
-          </DialogDescription>
+            {uiText("Dejará de poder elegirse en recetas, compras y movimientos nuevos.")}</DialogDescription>
         </DialogHeader>
-        <InlineNote tone="info" title="Lo ya registrado se conserva">
-          Los movimientos, recetas y documentos que ya lo usan siguen intactos y se pueden seguir consultando. Puedes
-          volver a activarlo desde el filtro «Inactivos».
-        </InlineNote>
+        <InlineNote tone="info" title={uiText("Lo ya registrado se conserva")}>
+          {uiText("Los movimientos, recetas y documentos que ya lo usan siguen intactos y se pueden seguir consultando. Puedes volver a activarlo desde el filtro «Inactivos».")}</InlineNote>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={() => setDeactivating(null)}>
-            Mantenerlo activo
-          </Button>
+            {uiText("Mantenerlo activo")}</Button>
           <Button
             variant="destructive"
             loading={mutation.isPending}
@@ -195,8 +194,7 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
               setDeactivating(null);
             }}
           >
-            Desactivar
-          </Button>
+            {uiText("Desactivar")}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -228,6 +226,7 @@ function CatalogTable({
   onDeactivate: (item: RecordValue) => void;
   onClearFilters?: () => void;
 }) {
+  const uiText = useUiText();
   const headers: Array<[string, string]> =
     kind === "categories"
       ? [["name", "Nombre"], ["description", "Descripción"]]
@@ -269,7 +268,7 @@ function CatalogTable({
     })),
     {
       key: "status",
-      header: "Estado",
+      header: uiText("Estado"),
       priority: "primary",
       render: (item) => <RestaurantStatusBadge size="sm" status={String(item.status ?? "UNKNOWN")} />,
       sortValue: (item) => String(item.status ?? ""),
@@ -295,12 +294,10 @@ function CatalogTable({
               <div className="flex flex-wrap justify-end gap-2">
                 <Button size="sm" variant="secondary" onClick={() => onEdit(item)}>
                   <Pencil className="size-4" aria-hidden="true" />
-                  Editar
-                </Button>
+                  {uiText("Editar")}</Button>
                 {item.status === "ACTIVE" ? (
                   <Button size="sm" variant="ghost" onClick={() => onDeactivate(item)}>
-                    Desactivar
-                  </Button>
+                    {uiText("Desactivar")}</Button>
                 ) : null}
               </div>
             )
@@ -314,17 +311,19 @@ const SELECT_CLASS =
   "w-full min-w-0 rounded-md border border-line-control bg-surface-1 px-3 min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)] text-base text-ink-1 sm:text-sm";
 
 function CatalogForm({ kind, item, pending, error, branchId, onClose, onSubmit }: { kind: RestaurantCatalogKind; item: RecordValue | null; pending: boolean; error: unknown; branchId?: string; onClose: () => void; onSubmit: (values: FormValues) => void }) {
+  const uiText = useUiText();
   const categoryQuery = useQuery({ queryKey: ["restaurant-catalog", "categories", "ACTIVE"], queryFn: () => fetchRestaurantCategories({ status: "ACTIVE", pageSize: 200 }), enabled: kind === "ingredients" });
   const unitQuery = useQuery({ queryKey: ["restaurant-catalog", "units", "ACTIVE"], queryFn: () => fetchRestaurantUnits({ status: "ACTIVE", pageSize: 200 }), enabled: kind === "ingredients" });
   const [values, setValues] = useState<FormValues>(() => initialValues(kind, item, branchId));
   const [errors, setErrors] = useState<Record<string, string>>({});
-  if (!item && !branchId && kind === "warehouses") return <CatalogModal title="Nuevo almacén" onClose={onClose}><InlineNote tone="warning" title="Falta elegir la sucursal">Un almacén pertenece a una sucursal; elígela en la barra superior antes de crearlo.</InlineNote></CatalogModal>;
+  if (!item && !branchId && kind === "warehouses") return <CatalogModal title={uiText("Nuevo almacén")} onClose={onClose}><InlineNote tone="warning" title={uiText("Falta elegir la sucursal")}>{uiText("Un almacén pertenece a una sucursal; elígela en la barra superior antes de crearlo.")}</InlineNote></CatalogModal>;
   const update = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
   const fields = fieldsFor(kind);
-  return <CatalogModal title={`${item ? "Editar" : "Nuevo"} ${labels[kind].toLowerCase()}`} onClose={onClose}><div className="grid gap-3 sm:grid-cols-2">{fields.map((field) => <div key={field.key}><Label htmlFor={`catalog-${field.key}`}>{field.label}</Label>{field.select ? <select id={`catalog-${field.key}`} className={SELECT_CLASS} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)}><option value="">Seleccionar</option>{field.select.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : <Input id={`catalog-${field.key}`} type={field.type ?? "text"} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} />}{errors[field.key] ? <p id={`catalog-${field.key}-error`} role="alert" className="mt-1 text-2xs text-status-danger">{errors[field.key]}</p> : null}</div>)}{kind === "ingredients" ? <><SelectField id="catalog-categoryId" label="Categoría" value={values.categoryId ?? ""} options={(categoryQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("categoryId", value)} /><SelectField id="catalog-inventoryUnitId" label="Unidad de inventario" value={values.inventoryUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("inventoryUnitId", value)} /><SelectField id="catalog-purchaseUnitId" label="Unidad de compra" value={values.purchaseUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("purchaseUnitId", value)} /></> : null}</div>{categoryQuery.error || unitQuery.error ? <InlineNote tone="danger" title="No se pudieron cargar las opciones">{getApiErrorMessage(categoryQuery.error ?? unitQuery.error, "Reintenta para cargar categorías y unidades.")}</InlineNote> : null}{error ? <InlineNote tone="danger" title="No se pudo guardar">{getApiErrorMessage(error, "Revisa los datos.")}</InlineNote> : null}<div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button disabled={pending} onClick={() => { const nextErrors = validateRestaurantCatalogForm(kind, values); setErrors(nextErrors); if (!Object.keys(nextErrors).length) onSubmit(values); }}>{pending ? "Guardando…" : "Guardar"}</Button></div></CatalogModal>;
+  return <CatalogModal title={`${item ? "Editar" : "Nuevo"} ${labels[kind].toLowerCase()}`} onClose={onClose}><div className="grid gap-3 sm:grid-cols-2">{fields.map((field) => <div key={field.key}><Label htmlFor={`catalog-${field.key}`}>{field.label}</Label>{field.select ? <select id={`catalog-${field.key}`} className={SELECT_CLASS} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)}><option value="">{uiText("Seleccionar")}</option>{field.select.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : <Input id={`catalog-${field.key}`} type={field.type ?? "text"} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} />}{errors[field.key] ? <p id={`catalog-${field.key}-error`} role="alert" className="mt-1 text-2xs text-status-danger">{errors[field.key]}</p> : null}</div>)}{kind === "ingredients" ? <><SelectField id="catalog-categoryId" label={uiText("Categoría")} value={values.categoryId ?? ""} options={(categoryQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("categoryId", value)} /><SelectField id="catalog-inventoryUnitId" label={uiText("Unidad de inventario")} value={values.inventoryUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("inventoryUnitId", value)} /><SelectField id="catalog-purchaseUnitId" label={uiText("Unidad de compra")} value={values.purchaseUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("purchaseUnitId", value)} /></> : null}</div>{categoryQuery.error || unitQuery.error ? <InlineNote tone="danger" title={uiText("No se pudieron cargar las opciones")}>{getApiErrorMessage(categoryQuery.error ?? unitQuery.error, "Reintenta para cargar categorías y unidades.")}</InlineNote> : null}{error ? <InlineNote tone="danger" title={uiText("No se pudo guardar")}>{getApiErrorMessage(error, "Revisa los datos.")}</InlineNote> : null}<div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>{uiText("Cancelar")}</Button><Button disabled={pending} onClick={() => { const nextErrors = validateRestaurantCatalogForm(kind, values); setErrors(nextErrors); if (!Object.keys(nextErrors).length) onSubmit(values); }}>{pending ? uiText("Guardando…") : uiText("Guardar")}</Button></div></CatalogModal>;
 }
 
-function SelectField({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: [string, string][]; onChange: (value: string) => void }) { return <div><Label htmlFor={id}>{label}</Label><select id={id} className={SELECT_CLASS} value={value} onChange={(event) => onChange(event.target.value)}><option value="">Seleccionar</option>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></div>; }
+function SelectField({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: [string, string][]; onChange: (value: string) => void }) {
+  const uiText = useUiText(); return <div><Label htmlFor={id}>{label}</Label><select id={id} className={SELECT_CLASS} value={value} onChange={(event) => onChange(event.target.value)}><option value="">{uiText("Seleccionar")}</option>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></div>; }
 function CatalogModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

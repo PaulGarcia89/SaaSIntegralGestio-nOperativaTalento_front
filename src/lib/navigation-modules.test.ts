@@ -52,6 +52,8 @@ describe("el menú se abre módulo a módulo", () => {
 
   it("contratar un módulo no arrastra ninguna pantalla de otro", () => {
     for (const moduleKey of MODULE_KEYS) {
+      // Legacy key: reports now belong to each module.
+      if (moduleKey === "reports") continue;
       const withModule = menuFor([...BASIC, moduleKey]).map((item) => item.href);
       const without = menuFor(BASIC).map((item) => item.href);
       const added = withModule.filter((href) => !without.includes(href));
@@ -69,6 +71,8 @@ describe("el menú se abre módulo a módulo", () => {
     // empresa no puede usar aunque lo tenga contratado.
     const mute: string[] = [];
     for (const moduleKey of MODULE_KEYS) {
+      // Legacy key: reports now belong to each module.
+      if (moduleKey === "reports") continue;
       const added = menuFor([...BASIC, moduleKey]).filter((item) => item.module === moduleKey);
       if (added.length === 0 && !BASIC.includes(moduleKey)) mute.push(moduleKey);
     }

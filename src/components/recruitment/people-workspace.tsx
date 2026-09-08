@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -181,6 +183,7 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
 }
 
 function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
+  const uiText = useUiText();
   const { locale, t } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
@@ -240,7 +243,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
     onSuccess: async (updated, variables) => {
       await client.invalidateQueries({ queryKey: ["applications"] });
       toast.success(`Listo. ${firstNameOf(variables.application.candidate.fullName)} pasó a ${variables.stage.name}.`, {
-        action: { label: "Deshacer", onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }) },
+        action: { label: uiText("Deshacer"), onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }) },
       });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : t("people.moveFailed")),
@@ -260,7 +263,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
   return (
     <div className="space-y-5 pb-4">
       <PageHeader
-        eyebrow="Reclutamiento"
+        eyebrow={uiText("Reclutamiento")}
         title={t("people.title")}
         description={t("people.help")}
         actions={
@@ -400,27 +403,26 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
       <SimpleSection title={t("people.advancedTools")} hint={t("people.advancedHint")}>
         <p className="mb-3 text-sm text-ink-2">
-          Estas pantallas son más densas y están pensadas para quien ya conoce el sistema. Nada de lo que había se perdió: sigue aquí.
-        </p>
+          {uiText("Estas pantallas son más densas y están pensadas para quien ya conoce el sistema. Nada de lo que había se perdió: sigue aquí.")}</p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button asChild variant="secondary">
-            <Link href="/ats/candidates/avanzado">Lista avanzada: filtros, acciones en lote y exportar</Link>
+            <Link href="/ats/candidates/avanzado">{uiText("Lista avanzada: filtros, acciones en lote y exportar")}</Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/ats/pipeline/avanzado">Tablero avanzado: arrastrar y soltar, aprobaciones y automatizaciones</Link>
+            <Link href="/ats/pipeline/avanzado">{uiText("Tablero avanzado: arrastrar y soltar, aprobaciones y automatizaciones")}</Link>
           </Button>
         </div>
       </SimpleSection>
 
       <MobileActionBar>
         <Button asChild size="lg" className="w-full">
-          <Link href="/ats/dashboard">Volver al dashboard</Link>
+          <Link href="/ats/dashboard">{uiText("Volver al dashboard")}</Link>
         </Button>
       </MobileActionBar>
 
       <ReasonDialog
         open={Boolean(rejecting)}
-        title={rejecting ? `Descartar a ${firstNameOf(rejecting.application.candidate.fullName)}` : "Descartar"}
+        title={rejecting ? `Descartar a ${firstNameOf(rejecting.application.candidate.fullName)}` : uiText("Descartar")}
         description={t("people.rejectDescription")}
         confirmLabel={t("people.confirmReject")}
         options={rejectionReasons.data?.map((reason) => ({ id: reason.id, label: reason.label }))}

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import type { ReactNode } from "react";
 import { Trash2 } from "lucide-react";
 import {
@@ -112,6 +114,7 @@ export function ConfirmDeleteDialog({
   consequences?: ReactNode;
   confirmLabel?: string;
 }) {
+  const uiText = useUiText();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto p-0 sm:max-w-lg">
@@ -132,21 +135,19 @@ export function ConfirmDeleteDialog({
 
         <div className="space-y-3 px-5 py-5 sm:px-6">
           {consequences ? (
-            <InlineNote tone="danger" title="Qué desaparece">
+            <InlineNote tone="danger" title={uiText("Qué desaparece")}>
               {consequences}
             </InlineNote>
           ) : null}
-          <InlineNote tone="warning" title="No se puede deshacer">
-            Una vez eliminado, no hay forma de recuperarlo desde el producto.
-          </InlineNote>
+          <InlineNote tone="warning" title={uiText("No se puede deshacer")}>
+            {uiText("Una vez eliminado, no hay forma de recuperarlo desde el producto.")}</InlineNote>
         </div>
 
         {/* En el teléfono el botón peligroso ocupa el ancho y «Cancelar» queda
             encima: el pulgar llega antes a lo de abajo. */}
         <footer className="flex flex-col-reverse gap-2 border-t border-line bg-surface-2 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
-            Cancelar
-          </Button>
+            {uiText("Cancelar")}</Button>
           <Button
             type="button"
             variant="destructive"

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -76,6 +78,7 @@ type CatalogItem = { id: string; name: string; sku: string };
  * El contrato del backend no cambia.
  */
 export function InventoryPurchasesPanel() {
+  const uiText = useUiText();
   const { currentBranch, currentUser } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -117,47 +120,45 @@ export function InventoryPurchasesPanel() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Abastecimiento"
-        title="Compras y proveedores"
-        description="Solicita, aprueba y recibe compras viendo antes su efecto sobre las existencias."
+        eyebrow={uiText("Abastecimiento")}
+        title={uiText("Compras y proveedores")}
+        description={uiText("Solicita, aprueba y recibe compras viendo antes su efecto sobre las existencias.")}
         meta={<span>{currentBranch?.name ?? "Sin sucursal"}</span>}
         actions={
           <Button onClick={() => setDialog("order")}>
             <Plus className="size-4" aria-hidden="true" />
-            Nueva orden de compra
-          </Button>
+            {uiText("Nueva orden de compra")}</Button>
         }
       />
 
       {approve.error ? (
-        <InlineNote tone="danger" title="No se pudo aprobar la orden">
+        <InlineNote tone="danger" title={uiText("No se pudo aprobar la orden")}>
           {getApiErrorMessage(approve.error, "El servidor rechazó la aprobación.")}
         </InlineNote>
       ) : null}
 
       {orders.isLoading ? (
-        <SkeletonRows rows={4} label="Cargando las órdenes de compra" />
+        <SkeletonRows rows={4} label={uiText("Cargando las órdenes de compra")} />
       ) : orders.isError ? (
         <ErrorState
-          title="No fue posible cargar las órdenes"
-          detail={getApiErrorMessage(orders.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar las órdenes")}
+          detail={getApiErrorMessage(orders.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void orders.refetch()}
         />
       ) : !orders.data?.length ? (
         <EmptyState
           reason="no-records"
-          title="Todavía no hay órdenes de compra"
-          description="Una orden reserva lo que se va a comprar; al recibirla, la mercancía entra en el almacén."
+          title={uiText("Todavía no hay órdenes de compra")}
+          description={uiText("Una orden reserva lo que se va a comprar; al recibirla, la mercancía entra en el almacén.")}
           action={
             <Button onClick={() => setDialog("order")}>
               <Plus className="size-4" aria-hidden="true" />
-              Crear la primera orden
-            </Button>
+              {uiText("Crear la primera orden")}</Button>
           }
         />
       ) : (
         <>
-          <PageSection title="Abiertas" description="Órdenes que aún esperan aprobación o mercancía.">
+          <PageSection title={uiText("Abiertas")} description={uiText("Órdenes que aún esperan aprobación o mercancía.")}>
             {pending.length ? (
               <OrderList
                 orders={pending}
@@ -166,14 +167,13 @@ export function InventoryPurchasesPanel() {
                 onReceive={setReceiving}
               />
             ) : (
-              <InlineNote tone="success" title="Nada pendiente">
-                Todas las órdenes están recibidas o cerradas.
-              </InlineNote>
+              <InlineNote tone="success" title={uiText("Nada pendiente")}>
+                {uiText("Todas las órdenes están recibidas o cerradas.")}</InlineNote>
             )}
           </PageSection>
 
           {closed.length ? (
-            <PageSection title="Cerradas" description="Historial de compras ya completadas.">
+            <PageSection title={uiText("Cerradas")} description={uiText("Historial de compras ya completadas.")}>
               <OrderList orders={closed} catalogById={catalogById} />
             </PageSection>
           ) : null}
@@ -181,17 +181,16 @@ export function InventoryPurchasesPanel() {
       )}
 
       <PageSection
-        title="Proveedores"
+        title={uiText("Proveedores")}
         description={`${suppliers.data?.length ?? 0} registrados.`}
         actions={
           <Button size="sm" variant="secondary" onClick={() => setDialog("supplier")}>
             <Plus className="size-4" aria-hidden="true" />
-            Nuevo proveedor
-          </Button>
+            {uiText("Nuevo proveedor")}</Button>
         }
       >
         {suppliers.isLoading ? (
-          <SkeletonRows rows={2} label="Cargando los proveedores" />
+          <SkeletonRows rows={2} label={uiText("Cargando los proveedores")} />
         ) : suppliers.data?.length ? (
           <ul className="divide-y divide-line">
             {suppliers.data.map((supplier) => (
@@ -203,12 +202,11 @@ export function InventoryPurchasesPanel() {
         ) : (
           <EmptyState
             reason="no-records"
-            title="No hay proveedores"
-            description="Una orden de compra necesita un proveedor al que pedírsela."
+            title={uiText("No hay proveedores")}
+            description={uiText("Una orden de compra necesita un proveedor al que pedírsela.")}
             action={
               <Button variant="secondary" onClick={() => setDialog("supplier")}>
-                Registrar el primero
-              </Button>
+                {uiText("Registrar el primero")}</Button>
             }
           />
         )}
@@ -230,27 +228,23 @@ export function InventoryPurchasesPanel() {
       <Dialog open={Boolean(approving)} onOpenChange={(open) => !open && setApproving(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Aprobar la orden {approving?.code}?</DialogTitle>
+            <DialogTitle>{uiText("¿Aprobar la orden ")}{approving?.code}?</DialogTitle>
             <DialogDescription>
-              Queda autorizada para recibirse. Todavía no entra nada al almacén: eso ocurre al registrar la
-              recepción.
-            </DialogDescription>
+              {uiText("Queda autorizada para recibirse. Todavía no entra nada al almacén: eso ocurre al registrar la recepción.")}</DialogDescription>
           </DialogHeader>
-          <InlineNote tone="warning" title="Importe que se compromete">
-            {approving ? formatMoney(approving.totalAmount, approving.currency) : "—"} en{" "}
+          <InlineNote tone="warning" title={uiText("Importe que se compromete")}>
+            {approving ? formatMoney(approving.totalAmount, approving.currency) : "—"} {uiText(" en")}{" "}
             {approving?.lines.length === 1 ? "1 línea" : `${approving?.lines.length ?? 0} líneas`}.
           </InlineNote>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setApproving(null)}>
-              Todavía no
-            </Button>
+              {uiText("Todavía no")}</Button>
             <Button
               loading={approve.isPending}
               loadingLabel="Aprobando…"
               onClick={() => approving && approve.mutate(approving)}
             >
-              Aprobar la orden
-            </Button>
+              {uiText("Aprobar la orden")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -279,6 +273,7 @@ function OrderList({
   onApprove?: (order: Order) => void;
   onReceive?: (order: Order) => void;
 }) {
+  const uiText = useUiText();
   return (
     <ul className="divide-y divide-line">
       {orders.map((order) => {
@@ -298,10 +293,9 @@ function OrderList({
                 {order.lines.slice(0, 3).map((line) => (
                   <li key={line.id} className="truncate">
                     {catalogById.get(line.itemId)?.name ?? "Artículo"} ·{" "}
-                    {formatQuantity(line.receivedQty)} de {formatQuantity(line.quantity)} recibidas
-                  </li>
+                    {formatQuantity(line.receivedQty)} {uiText(" de ")}{formatQuantity(line.quantity)} {uiText("recibidas")}</li>
                 ))}
-                {order.lines.length > 3 ? <li>y {order.lines.length - 3} más</li> : null}
+                {order.lines.length > 3 ? <li>{uiText("y ")}{order.lines.length - 3} {uiText(" más")}</li> : null}
               </ul>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -312,13 +306,11 @@ function OrderList({
               />
               {onApprove && order.status === "DRAFT" ? (
                 <Button size="sm" onClick={() => onApprove(order)}>
-                  Aprobar
-                </Button>
+                  {uiText("Aprobar")}</Button>
               ) : null}
               {onReceive && ["APPROVED", "PARTIALLY_RECEIVED"].includes(order.status) && outstanding.length ? (
                 <Button size="sm" variant="secondary" onClick={() => onReceive(order)}>
-                  Registrar recepción
-                </Button>
+                  {uiText("Registrar recepción")}</Button>
               ) : null}
             </div>
           </li>
@@ -348,6 +340,7 @@ function ReceiveDialog({
   onClose: () => void;
   onDone: () => Promise<unknown>;
 }) {
+  const uiText = useUiText();
   const outstanding = order.lines.filter((line) => line.receivedQty < line.quantity);
 
   const [step, setStep] = useState<OperationStepId>("record");
@@ -462,10 +455,9 @@ function ReceiveDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Recepción de la orden {order.code}</DialogTitle>
+          <DialogTitle>{uiText("Recepción de la orden ")}{order.code}</DialogTitle>
           <DialogDescription>
-            Registra cuánto llegó realmente de cada artículo. Puede ser menos de lo pedido.
-          </DialogDescription>
+            {uiText("Registra cuánto llegó realmente de cada artículo. Puede ser menos de lo pedido.")}</DialogDescription>
         </DialogHeader>
 
         <OperationStepper state={operationState} onStepChange={setStep} />
@@ -480,12 +472,12 @@ function ReceiveDialog({
                     <div className="min-w-0">
                       <p className="truncate font-medium text-ink-1">{name(line)}</p>
                       <p className="font-mono text-2xs text-ink-3 tabular-figures">
-                        pendiente: {formatQuantity(remaining)} · coste unitario{" "}
+                        {uiText("pendiente:")}{formatQuantity(remaining)} {uiText(" · coste unitario")}{" "}
                         {formatMoney(line.unitCost, order.currency)}
                       </p>
                     </div>
                     <div>
-                      <Label htmlFor={`receive-${line.id}`}>Cantidad recibida</Label>
+                      <Label htmlFor={`receive-${line.id}`}>{uiText("Cantidad recibida")}</Label>
                       <Input
                         id={`receive-${line.id}`}
                         type="number"
@@ -504,9 +496,8 @@ function ReceiveDialog({
             </ul>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="secondary" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button onClick={() => setStep("review")}>Revisar impacto</Button>
+                {uiText("Cancelar")}</Button>
+              <Button onClick={() => setStep("review")}>{uiText("Revisar impacto")}</Button>
             </div>
           </div>
         ) : null}
@@ -516,8 +507,7 @@ function ReceiveDialog({
             <ImpactReview impact={impact} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="secondary" onClick={() => setStep("record")}>
-                Corregir las cantidades
-              </Button>
+                {uiText("Corregir las cantidades")}</Button>
               <Button
                 disabled={impact.blockers.length > 0}
                 onClick={() => {
@@ -525,8 +515,7 @@ function ReceiveDialog({
                   setStep("confirm");
                 }}
               >
-                Continuar
-              </Button>
+                {uiText("Continuar")}</Button>
             </div>
           </div>
         ) : null}
@@ -572,6 +561,7 @@ function PurchaseDialog({
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }) {
+  const uiText = useUiText();
   const [values, setValues] = useState<Record<string, string>>({});
   const [lines, setLines] = useState<DraftLine[]>([{ itemId: "", quantity: "", unitCost: "" }]);
   const set = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
@@ -618,7 +608,7 @@ function PurchaseDialog({
     <Dialog open={Boolean(kind)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{kind === "supplier" ? "Nuevo proveedor" : "Nueva orden de compra"}</DialogTitle>
+          <DialogTitle>{kind === "supplier" ? uiText("Nuevo proveedor") : uiText("Nueva orden de compra")}</DialogTitle>
           <DialogDescription>
             {kind === "supplier"
               ? "Los datos del proveedor al que se le pedirán las compras."
@@ -629,22 +619,22 @@ function PurchaseDialog({
         <div className="space-y-4">
           {kind === "supplier" ? (
             <>
-              <Field id="supplier-name" label="Nombre" value={values.name} onChange={(v) => set("name", v)} />
-              <Field id="supplier-email" label="Correo" type="email" value={values.email} onChange={(v) => set("email", v)} />
-              <Field id="supplier-phone" label="Teléfono" type="tel" value={values.phone} onChange={(v) => set("phone", v)} />
-              <Field id="supplier-tax" label="Identificación fiscal" value={values.taxId} onChange={(v) => set("taxId", v)} />
+              <Field id="supplier-name" label={uiText("Nombre")} value={values.name} onChange={(v) => set("name", v)} />
+              <Field id="supplier-email" label={uiText("Correo")} type="email" value={values.email} onChange={(v) => set("email", v)} />
+              <Field id="supplier-phone" label={uiText("Teléfono")} type="tel" value={values.phone} onChange={(v) => set("phone", v)} />
+              <Field id="supplier-tax" label={uiText("Identificación fiscal")} value={values.taxId} onChange={(v) => set("taxId", v)} />
             </>
           ) : null}
 
           {kind === "order" ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field id="order-code" label="Código" value={values.code} onChange={(v) => set("code", v)} />
+                <Field id="order-code" label={uiText("Código")} value={values.code} onChange={(v) => set("code", v)} />
                 <div>
-                  <Label htmlFor="order-supplier">Proveedor</Label>
+                  <Label htmlFor="order-supplier">{uiText("Proveedor")}</Label>
                   <Select value={values.supplierId ?? ""} onValueChange={(value) => set("supplierId", value)}>
                     <SelectTrigger id="order-supplier">
-                      <SelectValue placeholder="Seleccionar" />
+                      <SelectValue placeholder={uiText("Seleccionar")} />
                     </SelectTrigger>
                     <SelectContent>
                       {suppliers.map((supplier) => (
@@ -659,11 +649,11 @@ function PurchaseDialog({
 
               {/* Antes solo se podía pedir un artículo por orden. */}
               <div className="space-y-3">
-                <p className="text-sm font-medium text-ink-1">Artículos</p>
+                <p className="text-sm font-medium text-ink-1">{uiText("Artículos")}</p>
                 {lines.map((line, index) => (
                   <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_7rem_8rem_auto] sm:items-end">
                     <div className="min-w-0">
-                      <Label htmlFor={`order-item-${index}`}>Artículo</Label>
+                      <Label htmlFor={`order-item-${index}`}>{uiText("Artículo")}</Label>
                       <Select
                         value={line.itemId}
                         onValueChange={(value) =>
@@ -671,7 +661,7 @@ function PurchaseDialog({
                         }
                       >
                         <SelectTrigger id={`order-item-${index}`}>
-                          <SelectValue placeholder="Seleccionar" />
+                          <SelectValue placeholder={uiText("Seleccionar")} />
                         </SelectTrigger>
                         <SelectContent>
                           {catalog.map((item) => (
@@ -683,7 +673,7 @@ function PurchaseDialog({
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor={`order-qty-${index}`}>Cantidad</Label>
+                      <Label htmlFor={`order-qty-${index}`}>{uiText("Cantidad")}</Label>
                       <Input
                         id={`order-qty-${index}`}
                         type="number"
@@ -701,7 +691,7 @@ function PurchaseDialog({
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`order-cost-${index}`}>Coste unitario</Label>
+                      <Label htmlFor={`order-cost-${index}`}>{uiText("Coste unitario")}</Label>
                       <Input
                         id={`order-cost-${index}`}
                         type="number"
@@ -736,45 +726,44 @@ function PurchaseDialog({
                   onClick={() => setLines([...lines, { itemId: "", quantity: "", unitCost: "" }])}
                 >
                   <Plus className="size-4" aria-hidden="true" />
-                  Agregar artículo
-                </Button>
+                  {uiText("Agregar artículo")}</Button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field id="order-currency" label="Moneda" value={values.currency ?? "USD"} onChange={(v) => set("currency", v)} />
+                <Field id="order-currency" label={uiText("Moneda")} value={values.currency ?? "USD"} onChange={(v) => set("currency", v)} />
                 <Field
                   id="order-budget"
-                  label="Presupuesto"
+                  label={uiText("Presupuesto")}
                   type="number"
                   value={values.budget}
                   onChange={(v) => set("budget", v)}
                 />
-                <Field id="order-notes" label="Notas" value={values.notes} onChange={(v) => set("notes", v)} />
+                <Field id="order-notes" label={uiText("Notas")} value={values.notes} onChange={(v) => set("notes", v)} />
               </div>
 
               {/* Antes se firmaba la orden sin ver cuánto sumaba. */}
               <div className="flex items-baseline justify-between rounded-md border border-line bg-surface-2 px-4 py-3">
-                <span className="text-sm text-ink-2">Total de la orden</span>
+                <span className="text-sm text-ink-2">{uiText("Total de la orden")}</span>
                 <span className="font-mono text-lg tabular-figures text-ink-1">{formatMoney(total, currency)}</span>
               </div>
 
               {overBudget ? (
-                <InlineNote tone="warning" title="Por encima del presupuesto">
-                  El total supera el presupuesto que indicaste ({formatMoney(budget, currency)}).
+                <InlineNote tone="warning" title={uiText("Por encima del presupuesto")}>
+                  {uiText("El total supera el presupuesto que indicaste (")}{formatMoney(budget, currency)}).
                 </InlineNote>
               ) : null}
             </>
           ) : null}
 
           {mutation.isError ? (
-            <InlineNote tone="danger" title="No se pudo guardar">
+            <InlineNote tone="danger" title={uiText("No se pudo guardar")}>
               {getApiErrorMessage(mutation.error, "El servidor rechazó los datos.")}
             </InlineNote>
           ) : null}
 
           {missing.length ? (
             <p className="text-sm text-ink-2">
-              Falta {missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
+              {uiText("Falta")}{missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} y ${missing.at(-1)}`}.
             </p>
           ) : null}
 
@@ -782,11 +771,10 @@ function PurchaseDialog({
             className="w-full"
             disabled={missing.length > 0}
             loading={mutation.isPending}
-            loadingLabel="Guardando…"
+            loadingLabel={uiText("Guardando…")}
             onClick={() => mutation.mutate()}
           >
-            Guardar
-          </Button>
+            {uiText("Guardar")}</Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -85,6 +87,7 @@ const labels: Record<TrainingIntelligenceRecordType, string> = {
 const FORECAST_LIMIT = 8;
 
 export function TrainingIntelligencePanel() {
+  const uiText = useUiText();
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TrainingIntelligenceRecordType>("ROLE_PROFILE");
@@ -130,34 +133,33 @@ export function TrainingIntelligencePanel() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Aprendizaje"
-        title="Inteligencia de aprendizaje"
-        description="Competencias, carrera, feedback, retorno y previsiones, sin mezclar datos entre empresas."
+        eyebrow={uiText("Aprendizaje")}
+        title={uiText("Inteligencia de aprendizaje")}
+        description={uiText("Competencias, carrera, feedback, retorno y previsiones, sin mezclar datos entre empresas.")}
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus className="size-4" aria-hidden="true" />
-            Registrar señal
-          </Button>
+            {uiText("Registrar señal")}</Button>
         }
       />
 
       {intelligence.isLoading ? (
-        <SkeletonRows rows={5} label="Cargando la inteligencia de aprendizaje" />
+        <SkeletonRows rows={5} label={uiText("Cargando la inteligencia de aprendizaje")} />
       ) : intelligence.isError || !data ? (
         <ErrorState
-          title="No fue posible cargar la inteligencia de aprendizaje"
-          detail={getApiErrorMessage(intelligence.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar la inteligencia de aprendizaje")}
+          detail={getApiErrorMessage(intelligence.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void intelligence.refetch()}
         />
       ) : (
         <>
           <MetricRow>
-            <Metric label="Perfiles de competencia" value={String(data.competencyProfiles)} />
-            <Metric label="Evaluaciones" value={String(data.assessments)} />
-            <Metric label="Planes de carrera activos" value={String(data.careerPlans.active)} detail={`de ${data.careerPlans.total} en total`} />
-            <Metric label="Respuestas de feedback" value={String(data.feedback.responses)} />
+            <Metric label={uiText("Perfiles de competencia")} value={String(data.competencyProfiles)} />
+            <Metric label={uiText("Evaluaciones")} value={String(data.assessments)} />
+            <Metric label={uiText("Planes de carrera activos")} value={String(data.careerPlans.active)} detail={`de ${data.careerPlans.total} en total`} />
+            <Metric label={uiText("Respuestas de feedback")} value={String(data.feedback.responses)} />
             <Metric
-              label="Retorno de la inversión"
+              label={uiText("Retorno de la inversión")}
               value={data.roi.roiPercent === null ? "—" : `${data.roi.roiPercent} %`}
               detail={data.roi.measurements === 0 ? "sin mediciones todavía" : `sobre ${data.roi.measurements} mediciones`}
               tone={data.roi.roiPercent !== null && data.roi.roiPercent < 0 ? "danger" : undefined}
@@ -166,8 +168,8 @@ export function TrainingIntelligencePanel() {
 
           <div className="grid gap-5 xl:grid-cols-2">
             <PageSection
-              title="Brechas prioritarias"
-              description="Distancia entre el nivel evaluado y el nivel esperado."
+              title={uiText("Brechas prioritarias")}
+              description={uiText("Distancia entre el nivel evaluado y el nivel esperado.")}
               boxed
             >
               {data.gaps.length ? (
@@ -192,14 +194,14 @@ export function TrainingIntelligencePanel() {
               ) : (
                 <EmptyState
                   reason="no-records"
-                  title="Aún no hay brechas calculadas"
-                  description="Registra evaluaciones de competencia para que aparezcan aquí."
+                  title={uiText("Aún no hay brechas calculadas")}
+                  description={uiText("Registra evaluaciones de competencia para que aparezcan aquí.")}
                 />
               )}
             </PageSection>
 
             <PageSection
-              title="Previsión de cumplimiento"
+              title={uiText("Previsión de cumplimiento")}
               description={
                 data.forecasts.length > FORECAST_LIMIT
                   ? `Las ${FORECAST_LIMIT} cohortes más recientes, de ${data.forecasts.length} registradas.`
@@ -212,7 +214,7 @@ export function TrainingIntelligencePanel() {
                   {data.forecasts.slice(0, FORECAST_LIMIT).map((forecast) => (
                     <li key={forecast.id} className="py-3">
                       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                        <p className="min-w-0 truncate font-medium text-ink-1">Cohorte {forecast.cohortKey}</p>
+                        <p className="min-w-0 truncate font-medium text-ink-1">{uiText("Cohorte ")}{forecast.cohortKey}</p>
                         <StatusBadge
                           size="sm"
                           tone={forecast.projectedCompletionRate >= 80 ? "success" : "warning"}
@@ -220,8 +222,8 @@ export function TrainingIntelligencePanel() {
                         />
                       </div>
                       <p className="mt-1 font-mono text-2xs text-ink-3 tabular-figures">
-                        {forecast.completed} de {forecast.assigned} completados ·{" "}
-                        {forecast.projectedOverdue} en riesgo de vencer · calculada el{" "}
+                        {forecast.completed} {uiText(" de ")}{forecast.assigned} {uiText(" completados ·")}{" "}
+                        {forecast.projectedOverdue} {uiText(" en riesgo de vencer · calculada el")}{" "}
                         {formatDateTime(forecast.generatedAt)}
                       </p>
                     </li>
@@ -230,8 +232,8 @@ export function TrainingIntelligencePanel() {
               ) : (
                 <EmptyState
                   reason="no-records"
-                  title="Todavía no hay previsiones"
-                  description="Registra una previsión para empezar el seguimiento de la cohorte."
+                  title={uiText("Todavía no hay previsiones")}
+                  description={uiText("Registra una previsión para empezar el seguimiento de la cohorte.")}
                   action={
                     <Button
                       variant="secondary"
@@ -240,8 +242,7 @@ export function TrainingIntelligencePanel() {
                         setOpen(true);
                       }}
                     >
-                      Registrar una previsión
-                    </Button>
+                      {uiText("Registrar una previsión")}</Button>
                   }
                 />
               )}
@@ -253,11 +254,9 @@ export function TrainingIntelligencePanel() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Registrar señal</DialogTitle>
+            <DialogTitle>{uiText("Registrar señal")}</DialogTitle>
             <DialogDescription>
-              Elige el tipo y completa los datos. Los identificadores se toman de las personas, los cursos y las
-              competencias que ya existen.
-            </DialogDescription>
+              {uiText("Elige el tipo y completa los datos. Los identificadores se toman de las personas, los cursos y las competencias que ya existen.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Select value={type} onValueChange={(value) => chooseType(value as TrainingIntelligenceRecordType)}>
@@ -279,11 +278,10 @@ export function TrainingIntelligencePanel() {
             <Button
               className="w-full"
               loading={capture.isPending}
-              loadingLabel="Guardando…"
+              loadingLabel={uiText("Guardando…")}
               onClick={() => capture.mutate()}
             >
-              Guardar registro
-            </Button>
+              {uiText("Guardar registro")}</Button>
           </div>
         </DialogContent>
       </Dialog>

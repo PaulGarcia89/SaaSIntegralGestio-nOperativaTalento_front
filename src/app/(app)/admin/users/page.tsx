@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -89,6 +91,7 @@ const STATUS_OPTIONS = (["active", "invited", "suspended"] as const).map((value)
 }));
 
 export default function UsersPage() {
+  const uiText = useUiText();
   const { can, currentTenant, currentRole, currentUser, impersonation, tenants } = useAppStore();
   const isGlobalView = currentRole === "admin_saas" && !impersonation?.active;
   const queryClient = useQueryClient();
@@ -171,9 +174,9 @@ export default function UsersPage() {
   if (!can("admin.users")) {
     return (
       <BlockedState
-        title="Sin acceso a la gestión de usuarios"
+        title={uiText("Sin acceso a la gestión de usuarios")}
         cause="Ver y modificar identidades, invitaciones y accesos es una tarea de administración."
-        owner="Quien administra la empresa"
+        owner={uiText("Quien administra la empresa")}
         resolution="Si necesitas entrar, pide el permiso «Administrar usuarios»."
       />
     );
@@ -188,12 +191,12 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={isGlobalView ? "Gobierno de la plataforma" : currentTenant.name}
-        title="Usuarios"
+        eyebrow={isGlobalView ? uiText("Gobierno de la plataforma") : currentTenant.name}
+        title={uiText("Usuarios")}
         description={
           isGlobalView
-            ? "Todas las personas con acceso al producto, de todas las empresas. Para modificar a alguien, entra a su empresa."
-            : "Quién puede entrar, con qué rol y en qué estado. Suspender o eliminar corta el acceso de inmediato."
+            ? uiText("Todas las personas con acceso al producto, de todas las empresas. Para modificar a alguien, entra a su empresa.")
+            : uiText("Quién puede entrar, con qué rol y en qué estado. Suspender o eliminar corta el acceso de inmediato.")
         }
         actions={
           isGlobalView ? undefined : (
@@ -204,18 +207,17 @@ export default function UsersPage() {
                 setOpen(true);
               }}
             >
-              Nuevo usuario
-            </Button>
+              {uiText("Nuevo usuario")}</Button>
           )
         }
       />
 
       {usersQuery.isLoading ? (
-        <SkeletonRows rows={6} label="Cargando los usuarios" />
+        <SkeletonRows rows={6} label={uiText("Cargando los usuarios")} />
       ) : usersQuery.isError ? (
         <ErrorState
-          title="No fue posible cargar los usuarios"
-          detail={getApiErrorMessage(usersQuery.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar los usuarios")}
+          detail={getApiErrorMessage(usersQuery.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void usersQuery.refetch()}
         />
       ) : (
@@ -224,19 +226,17 @@ export default function UsersPage() {
               /admin/dashboard; aquí queda la lista y el alta. */}
 
           {isGlobalView ? (
-            <InlineNote tone="info" title="Vista de solo lectura">
-              Desde la vista global se consulta, no se modifica. Para crear, editar o eliminar a alguien, entra a su
-              empresa: así el cambio queda registrado dentro del alcance correcto.
-            </InlineNote>
+            <InlineNote tone="info" title={uiText("Vista de solo lectura")}>
+              {uiText("Desde la vista global se consulta, no se modifica. Para crear, editar o eliminar a alguien, entra a su empresa: así el cambio queda registrado dentro del alcance correcto.")}</InlineNote>
           ) : null}
 
           {!isGlobalView && open ? (
             <PageSection
               boxed
-              title={editing ? `Editar a ${editing.fullName}` : "Nuevo usuario"}
+              title={editing ? `Editar a ${editing.fullName}` : uiText("Nuevo usuario")}
               description={
                 editing
-                  ? "El cambio de rol o de estado se aplica en cuanto se guarda."
+                  ? uiText("El cambio de rol o de estado se aplica en cuanto se guarda.")
                   : `Se dará de alta en ${currentTenant.name} con el rol que elijas.`
               }
             >
@@ -247,57 +247,51 @@ export default function UsersPage() {
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="user-name">Nombre completo</Label>
+                    <Label htmlFor="user-name">{uiText("Nombre completo")}</Label>
                     <Input id="user-name" autoComplete="off" {...form.register("fullName")} />
                     {form.formState.errors.fullName ? (
                       <p className="text-2xs text-status-danger">{form.formState.errors.fullName.message}</p>
                     ) : null}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="user-email">Correo electrónico</Label>
+                    <Label htmlFor="user-email">{uiText("Correo electrónico")}</Label>
                     <Input id="user-email" inputMode="email" autoComplete="off" {...form.register("email")} />
-                    <p className="text-2xs text-ink-3">Es con lo que entra al producto.</p>
+                    <p className="text-2xs text-ink-3">{uiText("Es con lo que entra al producto.")}</p>
                     {form.formState.errors.email ? (
                       <p className="text-2xs text-status-danger">{form.formState.errors.email.message}</p>
                     ) : null}
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Rol</Label>
+                    <Label>{uiText("Rol")}</Label>
                     <FormSelect
                       value={selectedRole}
                       onValueChange={(value) => form.setValue("role", value as RoleKey, { shouldDirty: true })}
-                      options={ROLE_KEYS.map((role) => ({ label: roleLabels[role], value: role }))}
+                      options={ROLE_KEYS.map((role) => ({ label: uiText(roleLabels[role]), value: role }))}
                     />
-                    <p className="text-2xs text-ink-3">Decide qué pantallas ve y qué puede hacer en cada una.</p>
+                    <p className="text-2xs text-ink-3">{uiText("Decide qué pantallas ve y qué puede hacer en cada una.")}</p>
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label>Estado</Label>
+                    <Label>{uiText("Estado")}</Label>
                     <FormSelect
                       value={selectedStatus}
                       onValueChange={(value) =>
                         form.setValue("status", value as UserFormValues["status"], { shouldDirty: true })
                       }
-                      options={STATUS_OPTIONS}
+                      options={STATUS_OPTIONS.map(option => ({ ...option, label: uiText(option.label, undefined, "status") }))}
                     />
-                    <p className="text-2xs text-ink-3">{STATUS_DETAIL[selectedStatus]}</p>
+                    <p className="text-2xs text-ink-3">{uiText(STATUS_DETAIL[selectedStatus])}</p>
                   </div>
                 </div>
 
                 {suspendingSelf ? (
-                  <InlineNote tone="blocked" title="No puedes suspenderte a ti mismo">
-                    Quedarías sin poder entrar y sin nadie que pueda revertirlo desde tu propia sesión. Si quieres
-                    dejar de administrar, pide a otra persona con permiso de administración que haga el cambio.
-                  </InlineNote>
+                  <InlineNote tone="blocked" title={uiText("No puedes suspenderte a ti mismo")}>
+                    {uiText("Quedarías sin poder entrar y sin nadie que pueda revertirlo desde tu propia sesión. Si quieres dejar de administrar, pide a otra persona con permiso de administración que haga el cambio.")}</InlineNote>
                 ) : losingOwnAccess ? (
-                  <InlineNote tone="warning" title="Estás quitándote tus propios permisos de administración">
-                    Al guardar dejarás de ver esta pantalla y no podrás deshacerlo tú mismo. Asegúrate de que queda otra
-                    persona con rol de administración en la empresa.
-                  </InlineNote>
+                  <InlineNote tone="warning" title={uiText("Estás quitándote tus propios permisos de administración")}>
+                    {uiText("Al guardar dejarás de ver esta pantalla y no podrás deshacerlo tú mismo. Asegúrate de que queda otra persona con rol de administración en la empresa.")}</InlineNote>
                 ) : suspendingOther ? (
                   <InlineNote tone="warning" title={`${editing!.fullName} dejará de poder entrar`}>
-                    La sesión que tenga abierta deja de servir en cuanto recargue. Sus datos, su historial y sus
-                    asignaciones se conservan intactos: reactivarla le devuelve el acceso tal como estaba.
-                  </InlineNote>
+                    {uiText("La sesión que tenga abierta deja de servir en cuanto recargue. Sus datos, su historial y sus asignaciones se conservan intactos: reactivarla le devuelve el acceso tal como estaba.")}</InlineNote>
                 ) : null}
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -310,16 +304,15 @@ export default function UsersPage() {
                       form.reset();
                     }}
                   >
-                    Cancelar
-                  </Button>
+                    {uiText("Cancelar")}</Button>
                   <Button
                     type="submit"
                     variant={suspendingOther ? "destructive" : "default"}
                     disabled={suspendingSelf}
                     loading={saveMutation.isPending}
-                    loadingLabel="Guardando…"
+                    loadingLabel={uiText("Guardando…")}
                   >
-                    {!editing ? "Crear usuario" : suspendingOther ? "Guardar y suspender el acceso" : "Guardar cambios"}
+                    {!editing ? uiText("Crear usuario") : suspendingOther ? uiText("Guardar y suspender el acceso") : uiText("Guardar cambios")}
                   </Button>
                 </div>
               </form>
@@ -327,12 +320,12 @@ export default function UsersPage() {
           ) : null}
 
           <FilterToolbar
-            searchPlaceholder="Buscar por nombre, correo, rol o estado"
+            searchPlaceholder={uiText("Buscar por nombre, correo, rol o estado")}
             options={[
-              { label: "Todos", value: "" },
-              { label: "Con acceso", value: "active" },
-              { label: "Invitados", value: "invited" },
-              { label: "Suspendidos", value: "suspended" },
+              { label: uiText("Todos"), value: "" },
+              { label: uiText("Con acceso"), value: "active" },
+              { label: uiText("Invitados"), value: "invited" },
+              { label: uiText("Suspendidos"), value: "suspended" },
             ]}
             searchValue={query}
             onSearchChange={setQuery}
@@ -343,11 +336,11 @@ export default function UsersPage() {
           {scopedUsers.length === 0 ? (
             <EmptyState
               reason={query || activeFilter ? "no-matches" : "no-records"}
-              title={query || activeFilter ? "Nadie coincide con la búsqueda" : "Todavía no hay usuarios"}
+              title={query || activeFilter ? uiText("Nadie coincide con la búsqueda") : uiText("Todavía no hay usuarios")}
               description={
                 query || activeFilter
-                  ? "Prueba con otro texto o quita el filtro de estado."
-                  : "Da de alta a la primera persona para que pueda entrar."
+                  ? uiText("Prueba con otro texto o quita el filtro de estado.")
+                  : uiText("Da de alta a la primera persona para que pueda entrar.")
               }
               onClearFilters={
                 query || activeFilter
@@ -369,7 +362,7 @@ export default function UsersPage() {
                   ? [
                       {
                         key: "tenant",
-                        header: "Empresa",
+                        header: uiText("Empresa"),
                         sortable: true,
                         render: (user: UserDto) => tenantName(user),
                       },
@@ -377,30 +370,30 @@ export default function UsersPage() {
                   : []),
                 {
                   key: "name",
-                  header: "Nombre",
+                  header: uiText("Nombre"),
                   sortable: true,
                   render: (user) => (
                     <div className="min-w-0">
                       <p className="truncate font-medium text-ink-1">
                         {user.fullName}
-                        {user.id === currentUser.id ? <span className="text-ink-3"> · tú</span> : null}
+                        {user.id === currentUser.id ? <span className="text-ink-3"> {uiText(" · tú")}</span> : null}
                       </p>
                       <p className="truncate text-2xs text-ink-3">{user.email}</p>
                     </div>
                   ),
                 },
-                { key: "role", header: "Rol", sortable: true, render: (user) => roleLabels[user.role] },
+                { key: "role", header: uiText("Rol"), sortable: true, render: (user) => uiText(roleLabels[user.role]) },
                 {
                   key: "status",
-                  header: "Estado",
+                  header: uiText("Estado"),
                   sortable: true,
                   render: (user) => (
-                    <StatusBadge size="sm" tone={STATUS_TONE[user.status]} label={userStatusLabels[user.status]} />
+                    <StatusBadge size="sm" tone={STATUS_TONE[user.status]} label={uiText(userStatusLabels[user.status], undefined, "status")} />
                   ),
                 },
                 {
                   key: "email",
-                  header: "Correo",
+                  header: uiText("Correo"),
                   mobileHidden: true,
                   sortable: true,
                   render: (user) => <span className="break-all">{user.email}</span>,
@@ -409,7 +402,7 @@ export default function UsersPage() {
                   ? [
                       {
                         key: "actions",
-                        header: "Acciones",
+                        header: uiText("Acciones"),
                         render: (user: UserDto) => (
                           <div className="flex flex-wrap gap-2">
                             <Button
@@ -426,21 +419,19 @@ export default function UsersPage() {
                                 setOpen(true);
                               }}
                             >
-                              Editar
-                            </Button>
+                              {uiText("Editar")}</Button>
                             <Button
                               size="sm"
                               variant="destructive"
                               disabled={user.id === currentUser.id}
                               title={
                                 user.id === currentUser.id
-                                  ? "No puedes eliminar tu propia cuenta"
+                                  ? uiText("No puedes eliminar tu propia cuenta")
                                   : undefined
                               }
                               onClick={() => setDeleting(user)}
                             >
-                              Eliminar
-                            </Button>
+                              {uiText("Eliminar")}</Button>
                           </div>
                         ),
                       },
@@ -456,19 +447,19 @@ export default function UsersPage() {
         open={Boolean(deleting)}
         onOpenChange={(next) => !next && setDeleting(null)}
         title={deleting ? `¿Eliminar a ${deleting.fullName}?` : "Eliminar usuario"}
-        description="Eliminar borra la cuenta. Si solo quieres que deje de entrar por un tiempo, suspéndela: se puede deshacer."
+        description={uiText("Eliminar borra la cuenta. Si solo quieres que deje de entrar por un tiempo, suspéndela: se puede deshacer.")}
         confirmLabel="Eliminar la cuenta"
         pending={deleteMutation.isPending}
         onConfirm={() => deleting && deleteMutation.mutate(deleting)}
         consequences={
           deleting ? (
             <ul className="list-disc space-y-1 pl-5">
-              <li>Pierde el acceso de inmediato: la sesión que tenga abierta deja de servir al recargar.</li>
+              <li>{uiText("Pierde el acceso de inmediato: la sesión que tenga abierta deja de servir al recargar.")}</li>
               <li>
-                Deja de constar como {roleLabels[deleting.role].toLocaleLowerCase("es")} en {currentTenant.name}.
+                {uiText("Deja de constar como")}{roleLabels[deleting.role].toLocaleLowerCase("es")} {uiText(" en ")}{currentTenant.name}.
               </li>
-              <li>Lo que ya registró (vacantes, cursos, movimientos) sigue existiendo y conserva su firma.</li>
-              <li>Volver a darle acceso exige crear la cuenta otra vez desde cero.</li>
+              <li>{uiText("Lo que ya registró (vacantes, cursos, movimientos) sigue existiendo y conserva su firma.")}</li>
+              <li>{uiText("Volver a darle acceso exige crear la cuenta otra vez desde cero.")}</li>
             </ul>
           ) : null
         }

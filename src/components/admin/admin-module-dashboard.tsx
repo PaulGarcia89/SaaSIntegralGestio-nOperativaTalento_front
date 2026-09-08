@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/components/locale-provider";
+import type { TranslationParams } from "@/i18n/types";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Building2, ClipboardList, CreditCard, GitBranch, ShieldCheck, UsersRound } from "lucide-react";
@@ -21,7 +23,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { fetchBranches, fetchPlatformAudit, fetchSubscriptions, fetchTenantUsers, getApiErrorMessage } from "@/lib/backend";
 import { auditActionLabel } from "@/lib/audit-labels";
-import { moduleLabels, roleLabels } from "@/lib/ui-labels";
 import { formatDate, formatDateTime, planTierLabel, subscriptionStatusInfo } from "@/lib/platform-labels";
 import { useAppStore } from "@/store/app-store";
 
@@ -44,7 +45,8 @@ import { useAppStore } from "@/store/app-store";
 const DIAS_AVISO_RENOVACION = 15;
 const MAX_CAMBIOS = 6;
 
-export function AdminModuleDashboard() {
+export function AdminModuleDashboard({ reports = false }: { reports?: boolean } = {}) {
+  const { t, locale } = useLocale();
   const { can, currentTenant, tenantBranches } = useAppStore();
   const puedeVer = can("admin.view");
   const veUsuarios = can("users.view");
@@ -80,11 +82,11 @@ export function AdminModuleDashboard() {
   if (!puedeVer) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Administración" title="Dashboard de la empresa" />
+        <PageHeader eyebrow={t("admin.dashboard.administration")} title={reports ? t("nav.Reportes") : t("admin.dashboard.companyDashboard")} />
         <EmptyState
           reason="no-records"
-          title="No tienes acceso a la administración"
-          description="Pide a quien administra la empresa el permiso de administración."
+          title={t("admin.dashboard.youDoNotHaveAccessToAdministration")}
+          description={t("admin.dashboard.askYourCompanyAdministratorForAdministrationAccess")}
         />
       </div>
     );
@@ -97,7 +99,7 @@ export function AdminModuleDashboard() {
   const usuariosSuspendidos = usuarios.data?.filter((usuario) => usuario.status === "suspended").length ?? 0;
 
   const suscripcion = suscripciones.data?.find((item) => item.tenantId === currentTenant.id) ?? null;
-  const estadoCobro = suscripcion ? subscriptionStatusInfo(suscripcion.status) : null;
+  const estadoCobro = suscripcion ? subscriptionStatusInfo(suscripcion.status, locale) : null;
   const diasRenovacion = suscripcion ? diasHasta(suscripcion.renewalDate) : null;
 
   const modulos = currentTenant.enabledModules ?? [];
@@ -106,7 +108,7 @@ export function AdminModuleDashboard() {
   const cifra = (consulta: { isLoading: boolean; isError: boolean }, permitido: boolean, valor?: number) =>
     !permitido ? null : consulta.isError ? null : consulta.isLoading ? undefined : (valor ?? 0);
 
-  const accion = siguienteAccion({
+  const accion = siguienteAccion(t, locale, {
     veSuscripcion,
     suscripcion,
     diasRenovacion,
@@ -117,21 +119,21 @@ export function AdminModuleDashboard() {
 
   const cambios: TimelineEntry[] = (auditoria.data?.items ?? []).map((entrada) => ({
     id: entrada.id,
-    title: auditActionLabel(entrada.action),
+    title: auditActionLabel(entrada.action, locale),
     detail: entrada.route ?? undefined,
-    when: formatDateTime(entrada.createdAt),
+    when: formatDateTime(entrada.createdAt, locale),
     who: entrada.userId ? nombreUsuario(entrada.userId, usuarios.data) : undefined,
   }));
 
   return (
     <div className="space-y-6 pb-4">
       <PageHeader
-        eyebrow="Administración"
-        title="Dashboard de la empresa"
-        description={`Cómo está ${currentTenant.name}: sucursales, usuarios, módulos y plan. Qué necesita atención y qué cambió hace poco.`}
+        eyebrow={t("admin.dashboard.administration")}
+        title={reports ? t("nav.Reportes") : t("admin.dashboard.companyDashboard")}
+        description={t("admin.dashboard.description", { company: currentTenant.name })}
         actions={
           <Button asChild variant="secondary">
-            <Link href="/admin">Ver el centro administrativo</Link>
+            <Link href="/admin">{t("admin.dashboard.openAdministrationCenter")}</Link>
           </Button>
         }
       />
@@ -149,130 +151,130 @@ export function AdminModuleDashboard() {
         />
       ) : null}
 
-      <StatusTileRow label="Estado de la empresa">
+      <StatusTileRow label={t("admin.dashboard.companyStatus")}>
         <li className="min-w-0">
           <StatusTile
-            title="Sucursales activas"
+            title={t("admin.dashboard.activeBranches")}
             value={veSucursales ? cifra(sucursales, veSucursales, sucursalesActivas) : tenantBranches.length}
             context={
               listaSucursales && listaSucursales.length !== sucursalesActivas
-                ? `${listaSucursales.length - (sucursalesActivas ?? 0)} inactivas.`
-                : "Cada persona y cada movimiento pertenece a una."
+                ? t("admin.dashboard.inactiveCount", { count: listaSucursales.length - (sucursalesActivas ?? 0) })
+                : t("admin.dashboard.everyPersonAndTransactionBelongsToABranch")
             }
             href={veSucursales ? "/admin/branches" : undefined}
-            actionLabel="Ver sucursales"
+            actionLabel={t("admin.dashboard.viewBranches")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Usuarios activos"
+            title={t("admin.dashboard.activeUsers")}
             value={cifra(usuarios, veUsuarios, usuariosActivos)}
             context={
               !veUsuarios
-                ? "Tu rol no ve la lista de usuarios."
+                ? t("admin.dashboard.yourRoleCannotViewTheUserList")
                 : usuariosInvitados > 0
-                  ? `${usuariosInvitados} ${usuariosInvitados === 1 ? "invitación sin aceptar" : "invitaciones sin aceptar"}.`
+                  ? t(usuariosInvitados === 1 ? "admin.dashboard.invitedOne" : "admin.dashboard.invitedMany", { count: usuariosInvitados })
                   : usuariosSuspendidos > 0
-                    ? `${usuariosSuspendidos} ${usuariosSuspendidos === 1 ? "suspendido" : "suspendidos"}.`
-                    : "Todas las invitaciones aceptadas."
+                    ? t(usuariosSuspendidos === 1 ? "admin.dashboard.suspendedOne" : "admin.dashboard.suspendedMany", { count: usuariosSuspendidos })
+                    : t("admin.dashboard.allInvitationsHaveBeenAccepted")
             }
-            status={usuariosInvitados > 0 ? { label: "Invitaciones pendientes", tone: "warning" as const } : undefined}
+            status={usuariosInvitados > 0 ? { label: t("admin.dashboard.pendingInvitations"), tone: "warning" as const } : undefined}
             href={veUsuarios ? "/admin/users" : undefined}
-            actionLabel="Ver usuarios"
+            actionLabel={t("admin.dashboard.viewUsers")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Módulos habilitados"
+            title={t("admin.dashboard.enabledModules")}
             value={modulos.length}
-            context={modulos.length > 0 ? modulos.map((modulo) => moduleLabels[modulo] ?? modulo).join(", ") : "Ningún módulo habilitado."}
+            context={modulos.length > 0 ? modulos.map((modulo) => t(`module.${modulo}`)).join(", ") : t("admin.dashboard.noModulesEnabled")}
             href={veSuscripcion ? "/admin/company/subscription" : undefined}
-            actionLabel="Ver plan"
+            actionLabel={t("admin.dashboard.viewPlan")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Plan contratado"
+            title={t("admin.dashboard.subscriptionPlan")}
             value={
               !veSuscripcion
-                ? planTierLabel(currentTenant.plan)
+                ? planTierLabel(currentTenant.plan, locale)
                 : suscripciones.isLoading
                   ? undefined
                   : suscripciones.isError
                     ? null
                     : suscripcion
-                      ? planTierLabel(suscripcion.plan)
-                      : planTierLabel(currentTenant.plan)
+                      ? planTierLabel(suscripcion.plan, locale)
+                      : planTierLabel(currentTenant.plan, locale)
             }
             context={
               suscripcion
-                ? `Renueva ${formatDate(suscripcion.renewalDate)}${typeof diasRenovacion === "number" ? ` (${describirDias(diasRenovacion)})` : ""}.`
+                ? t("admin.dashboard.renews", { date: formatDate(suscripcion.renewalDate, locale), relative: typeof diasRenovacion === "number" ? ` (${describirDias(diasRenovacion, locale)})` : "" })
                 : veSuscripcion && suscripciones.data
-                  ? "Sin suscripción registrada para esta empresa."
-                  : "Qué está contratado y cuándo renueva."
+                  ? t("admin.dashboard.noSubscriptionIsRegisteredForThisCompany")
+                  : t("admin.dashboard.yourSubscriptionAndItsRenewalDate")
             }
             status={
               estadoCobro && estadoCobro.tone === "danger"
                 ? { label: estadoCobro.label, tone: "danger" as const }
                 : typeof diasRenovacion === "number" && diasRenovacion <= DIAS_AVISO_RENOVACION
-                  ? { label: "Renueva pronto", tone: "warning" as const }
+                  ? { label: t("admin.dashboard.renewingSoon"), tone: "warning" as const }
                   : undefined
             }
             href={veSuscripcion ? "/admin/company/subscription" : undefined}
-            actionLabel="Ver plan"
+            actionLabel={t("admin.dashboard.viewPlan")}
           />
         </li>
       </StatusTileRow>
 
       {usuarios.isError ? (
-        <InlineNote tone="danger" title="No fue posible cargar los usuarios">
-          {getApiErrorMessage(usuarios.error, "Reintenta la consulta para continuar.")}
+        <InlineNote tone="danger" title={t("admin.dashboard.unableToLoadUsers")}>
+          {getApiErrorMessage(usuarios.error, t("admin.dashboard.retryTheRequestToContinue"))}
         </InlineNote>
       ) : null}
       {sucursales.isError ? (
-        <InlineNote tone="danger" title="No fue posible cargar las sucursales">
-          {getApiErrorMessage(sucursales.error, "Reintenta la consulta para continuar.")}
+        <InlineNote tone="danger" title={t("admin.dashboard.unableToLoadBranches")}>
+          {getApiErrorMessage(sucursales.error, t("admin.dashboard.retryTheRequestToContinue"))}
         </InlineNote>
       ) : null}
 
-      <PageSection title="Operaciones de administración" description="Cada pantalla dice para qué sirve, con icono y texto.">
+      <PageSection title={t("admin.dashboard.administrationTools")} description={t("admin.dashboard.chooseAToolToManageYourCompany")}>
         <ul className="grid gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-3">
           {can("admin.company") ? (
-            <Destino href="/admin/company" icon={Building2} label="Configuración de empresa" detail="Marca, portal de empleo y correo saliente." />
+            <Destino href="/admin/company" icon={Building2} label={t("admin.dashboard.companySettings")} detail={t("admin.dashboard.brandingCareersPortalAndOutgoingEmail")} />
           ) : null}
           {veSucursales ? (
-            <Destino href="/admin/branches" icon={GitBranch} label="Sucursales" detail="Dónde opera la empresa." />
+            <Destino href="/admin/branches" icon={GitBranch} label={t("admin.dashboard.branches")} detail={t("admin.dashboard.whereYourCompanyOperates")} />
           ) : null}
           {veUsuarios ? (
-            <Destino href="/admin/users" icon={UsersRound} label="Usuarios" detail="Quién puede entrar, con qué rol y en qué estado." />
+            <Destino href="/admin/users" icon={UsersRound} label={t("admin.dashboard.users")} detail={t("admin.dashboard.whoCanSignInTheirRoleAndAccountStatus")} />
           ) : null}
           {can("roles.view") ? (
-            <Destino href="/admin/roles" icon={ShieldCheck} label="Roles y permisos" detail="Qué puede hacer cada rol." />
+            <Destino href="/admin/roles" icon={ShieldCheck} label={t("admin.dashboard.rolesAndPermissions")} detail={t("admin.dashboard.whatEachRoleCanDo")} />
           ) : null}
           {veSuscripcion ? (
-            <Destino href="/admin/company/subscription" icon={CreditCard} label="Plan contratado" detail="Qué se paga y cuándo renueva." />
+            <Destino href="/admin/company/subscription" icon={CreditCard} label={t("admin.dashboard.subscriptionPlan")} detail={t("admin.dashboard.yourBillingAndRenewalDetails")} />
           ) : null}
           {veAuditoria ? (
-            <Destino href="/admin/audit" icon={ClipboardList} label="Auditoría" detail="Qué se hizo, quién y cuándo." />
+            <Destino href="/admin/audit" icon={ClipboardList} label={t("admin.dashboard.auditLog")} detail={t("admin.dashboard.whatHappenedWhoDidItAndWhen")} />
           ) : null}
         </ul>
       </PageSection>
 
       <div className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
-        <PageSection title="Sucursales" description="Estado de cada sede de la empresa." boxed>
+        <PageSection title={t("admin.dashboard.branches")} description={t("admin.dashboard.theStatusOfEachCompanyLocation")} boxed>
           {!veSucursales && tenantBranches.length === 0 ? (
-            <p className="text-sm text-ink-2">Tu rol no ve la lista de sucursales.</p>
+            <p className="text-sm text-ink-2">{t("admin.dashboard.yourRoleCannotViewTheBranchList")}</p>
           ) : sucursales.isLoading ? (
             <SkeletonRows rows={3} />
           ) : !listaSucursales || listaSucursales.length === 0 ? (
             <EmptyState
               reason="no-records"
-              title="Todavía no hay sucursales"
-              description="Sin una sucursal activa no se pueden registrar personas ni movimientos."
+              title={t("admin.dashboard.noBranchesYet")}
+              description={t("admin.dashboard.anActiveBranchIsRequiredToRegisterPeopleOrTransactions")}
               action={
                 veSucursales ? (
                   <Button asChild variant="outline">
-                    <Link href="/admin/branches">Crear sucursal</Link>
+                    <Link href="/admin/branches">{t("admin.dashboard.createBranch")}</Link>
                   </Button>
                 ) : undefined
               }
@@ -290,7 +292,7 @@ export function AdminModuleDashboard() {
                   <StatusBadge
                     size="sm"
                     tone={sucursal.status === "active" ? "success" : "neutral"}
-                    label={sucursal.status === "active" ? "Activa" : "Inactiva"}
+                    label={sucursal.status === "active" ? t("admin.dashboard.active") : t("admin.dashboard.inactive")}
                   />
                 </li>
               ))}
@@ -298,26 +300,25 @@ export function AdminModuleDashboard() {
           )}
         </PageSection>
 
-        <PageSection title="Cambió hace poco" description="Últimas acciones registradas en la auditoría de la empresa." boxed>
+        <PageSection title={t("admin.dashboard.recentChanges")} description={t("admin.dashboard.theLatestActionsInYourCompanyAuditLog")} boxed>
           {!veAuditoria ? (
-            <p className="text-sm text-ink-2">Tu rol no ve la auditoría.</p>
+            <p className="text-sm text-ink-2">{t("admin.dashboard.yourRoleCannotViewTheAuditLog")}</p>
           ) : auditoria.isLoading ? (
             <SkeletonRows rows={3} />
           ) : auditoria.isError ? (
             <ErrorState
-              title="No fue posible cargar la auditoría"
-              detail={getApiErrorMessage(auditoria.error, "Reintenta la consulta para continuar.")}
+              title={t("admin.dashboard.unableToLoadTheAuditLog")}
+              detail={getApiErrorMessage(auditoria.error, t("admin.dashboard.retryTheRequestToContinue"))}
               onRetry={() => void auditoria.refetch()}
             />
           ) : cambios.length === 0 ? (
-            <EmptyState reason="no-records" title="Sin acciones registradas" description="Cuando alguien cambie algo, quedará aquí." />
+            <EmptyState reason="no-records" title={t("admin.dashboard.noActionsRecorded")} description={t("admin.dashboard.changesWillAppearHereWhenTheyAreRecorded")} />
           ) : (
             <>
               <Timeline entries={cambios} />
               <p className="mt-4 text-sm">
                 <Link href="/admin/audit" className="inline-flex min-h-[var(--control-h-base)] items-center gap-1 font-medium text-ink-1 hover:underline">
-                  Ver toda la auditoría
-                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                  {t("admin.dashboard.viewFullAuditLog")}<ArrowRight className="size-3.5" aria-hidden="true" />
                 </Link>
               </p>
             </>
@@ -326,7 +327,7 @@ export function AdminModuleDashboard() {
       </div>
 
       {veUsuarios && usuarios.data ? (
-        <PageSection title="Usuarios por rol" description="Cuántas personas tienen cada rol en la empresa." boxed>
+        <PageSection title={t("admin.dashboard.usersByRole")} description={t("admin.dashboard.theNumberOfPeopleWithEachRoleInYourCompany")} boxed>
           <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {Object.entries(
               usuarios.data.reduce<Record<string, number>>((acumulado, usuario) => {
@@ -337,7 +338,7 @@ export function AdminModuleDashboard() {
               .sort((a, b) => b[1] - a[1])
               .map(([rol, total]) => (
                 <li key={rol} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-1 px-4 py-3">
-                  <span className="min-w-0 truncate text-sm font-medium text-ink-1">{roleLabels[rol as keyof typeof roleLabels] ?? rol}</span>
+                  <span className="min-w-0 truncate text-sm font-medium text-ink-1">{t(`role.${rol}`)}</span>
                   <span className="font-mono text-lg font-semibold tabular-figures text-ink-1">{total}</span>
                 </li>
               ))}
@@ -348,7 +349,7 @@ export function AdminModuleDashboard() {
   );
 }
 
-function siguienteAccion({
+function siguienteAccion(t: (key: string, params?: TranslationParams) => string, locale: "es" | "en", {
   veSuscripcion,
   suscripcion,
   diasRenovacion,
@@ -365,41 +366,41 @@ function siguienteAccion({
 }) {
   if (veSuscripcion && suscripcion?.status === "past_due") {
     return {
-      label: "Lo más urgente",
-      title: "Regularizar el cobro del plan",
-      detail: "El último cobro no se completó. Mientras siga así, la empresa puede perder acceso.",
+      label: t("admin.dashboard.mostUrgent"),
+      title: t("admin.dashboard.resolveTheSubscriptionPayment"),
+      detail: t("admin.dashboard.theLastPaymentFailedYourCompanyMayLoseAccessIfItRemainsUnpaid"),
       href: "/admin/company/subscription",
-      actionLabel: "Ver plan",
+      actionLabel: t("admin.dashboard.viewPlan"),
       tone: "danger" as const,
     };
   }
   if (sinSucursalActiva) {
     return {
-      label: "Lo más urgente",
-      title: "Activar al menos una sucursal",
-      detail: "Sin sucursal activa no se pueden registrar personas ni movimientos.",
+      label: t("admin.dashboard.mostUrgent"),
+      title: t("admin.dashboard.activateAtLeastOneBranch"),
+      detail: t("admin.dashboard.anActiveBranchIsRequiredToRegisterPeopleOrTransactions"),
       href: "/admin/branches",
-      actionLabel: "Ver sucursales",
+      actionLabel: t("admin.dashboard.viewBranches"),
       tone: "danger" as const,
     };
   }
   if (veSuscripcion && typeof diasRenovacion === "number" && diasRenovacion <= DIAS_AVISO_RENOVACION) {
     return {
-      label: "Lo siguiente",
-      title: "Revisar la renovación del plan",
-      detail: `El plan renueva ${describirDias(diasRenovacion)}.`,
+      label: t("admin.dashboard.nextStep"),
+      title: t("admin.dashboard.reviewSubscriptionRenewal"),
+      detail: t("admin.dashboard.planRenews", { relative: describirDias(diasRenovacion, locale) }),
       href: "/admin/company/subscription",
-      actionLabel: "Ver plan",
+      actionLabel: t("admin.dashboard.viewPlan"),
       tone: "warning" as const,
     };
   }
   if (veUsuarios && usuariosInvitados > 0) {
     return {
-      label: "Lo siguiente",
-      title: "Hay invitaciones sin aceptar",
-      detail: `${usuariosInvitados} ${usuariosInvitados === 1 ? "persona todavía no entró" : "personas todavía no entraron"} con su invitación. Reenvíala o revisa el correo.`,
+      label: t("admin.dashboard.nextStep"),
+      title: t("admin.dashboard.someInvitationsHaveNotBeenAccepted"),
+      detail: t(usuariosInvitados === 1 ? "admin.dashboard.inviteActionOne" : "admin.dashboard.inviteActionMany", { count: usuariosInvitados }),
       href: "/admin/users?status=invited",
-      actionLabel: "Ver usuarios",
+      actionLabel: t("admin.dashboard.viewUsers"),
       tone: "progress" as const,
     };
   }
@@ -412,10 +413,8 @@ function diasHasta(fecha: string) {
   return Math.ceil((objetivo - Date.now()) / 86_400_000);
 }
 
-function describirDias(dias: number) {
-  if (dias < 0) return `hace ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "día" : "días"}`;
-  if (dias === 0) return "hoy";
-  return `en ${dias} ${dias === 1 ? "día" : "días"}`;
+function describirDias(dias: number, locale: "es" | "en") {
+  return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(dias, "day");
 }
 
 function nombreUsuario(id: string, usuarios?: Array<{ id: string; name?: string | null; email?: string | null }>) {

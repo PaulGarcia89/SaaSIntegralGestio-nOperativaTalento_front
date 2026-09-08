@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Download, X } from "lucide-react";
@@ -88,6 +90,7 @@ const columnLabels: Record<ColumnKey, string> = {
 };
 
 export function RestaurantStockControlWorkspace({ view }: { view: View }) {
+  const uiText = useUiText();
   const { currentBranch, currentUser, can } = useAppStore();
   const { warehouseId, warehouseName } = useRestaurantInventoryContext();
   const [selectedMovement, setSelectedMovement] = useState<Record<string, unknown> | null>(null);
@@ -95,7 +98,7 @@ export function RestaurantStockControlWorkspace({ view }: { view: View }) {
   if (!currentBranch) {
     return (
       <BlockedState
-        title="Falta elegir la sucursal"
+        title={uiText("Falta elegir la sucursal")}
         cause="Las existencias son de una sucursal concreta y ahora mismo no hay ninguna activa."
         owner="Tú, desde el selector de sucursal"
         resolution="Elige una sucursal en la barra superior."
@@ -143,6 +146,7 @@ function StockView({
   warehouseName: string;
   showCosts: boolean;
 }) {
+  const uiText = useUiText();
   const params = useSearchParams();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState(() => params.get("filter") ?? "ALL");
@@ -173,7 +177,7 @@ function StockView({
   const columns: Array<DataColumn<(typeof rows)[number]>> = [
     {
       key: "name",
-      header: "Ingrediente",
+      header: uiText("Ingrediente"),
       priority: "identity",
       render: (item) => item.name,
       sortValue: (item) => item.name,
@@ -196,7 +200,7 @@ function StockView({
       priority: "primary",
       render: (item) =>
         item.stock < item.minimumStock ? (
-          <StatusBadge size="sm" tone="danger" label="Bajo mínimo" />
+          <StatusBadge size="sm" tone="danger" label={uiText("Bajo mínimo")} />
         ) : (
           <StatusBadge
             size="sm"
@@ -218,7 +222,7 @@ function StockView({
       ? [
           {
             key: "cost",
-            header: "Costo promedio",
+            header: uiText("Costo promedio"),
             priority: "secondary" as const,
             numeric: true,
             render: (item: (typeof rows)[number]) => formatMoney(item.averageCost),
@@ -232,12 +236,12 @@ function StockView({
     <div className="space-y-5">
       <PageHeader
         eyebrow="Control"
-        title="Existencias"
-        description="Busca ingredientes y detecta riesgos de mínimo, vencimiento o falta de movimiento."
+        title={uiText("Existencias")}
+        description={uiText("Busca ingredientes y detecta riesgos de mínimo, vencimiento o falta de movimiento.")}
         meta={
           <>
             <span>{warehouseName}</span>
-            <span>{rows.length} registros</span>
+            <span>{rows.length} {uiText(" registros")}</span>
           </>
         }
         actions={
@@ -257,8 +261,7 @@ function StockView({
             }
           >
             <Download className="size-4" aria-hidden="true" />
-            Exportar CSV
-          </Button>
+            {uiText("Exportar CSV")}</Button>
         }
       />
 
@@ -270,34 +273,32 @@ function StockView({
         onClear={() => setFilter("ALL")}
       >
         <div className="min-w-0">
-          <Label htmlFor="stock-filter">Alertas</Label>
+          <Label htmlFor="stock-filter">{uiText("Alertas")}</Label>
           <select
             id="stock-filter"
             className={SELECT_CLASS}
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           >
-            <option value="ALL">Todas</option>
-            <option value="LOW">Bajo mínimo</option>
-            <option value="EXPIRED">Vencidos</option>
+            <option value="ALL">{uiText("Todas")}</option>
+            <option value="LOW">{uiText("Bajo mínimo")}</option>
+            <option value="EXPIRED">{uiText("Vencidos")}</option>
             <option value="NO_MOVEMENT" disabled={!hasMovementSignal}>
-              Sin movimiento{!hasMovementSignal ? " (no disponible)" : ""}
+              {uiText("Sin movimiento")}{!hasMovementSignal ? " (no disponible)" : ""}
             </option>
           </select>
         </div>
       </FilterBar>
 
       {filter === "NO_MOVEMENT" && !hasMovementSignal ? (
-        <InlineNote tone="info" title="Esta señal no está disponible">
-          El servidor no entrega la fecha del último movimiento en este listado, así que no se puede saber cuáles
-          llevan tiempo quietos.
-        </InlineNote>
+        <InlineNote tone="info" title={uiText("Esta señal no está disponible")}>
+          {uiText("El servidor no entrega la fecha del último movimiento en este listado, así que no se puede saber cuáles llevan tiempo quietos.")}</InlineNote>
       ) : null}
 
       {query.error ? (
         <ErrorState
-          title="No fue posible cargar las existencias"
-          detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar las existencias")}
+          detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void query.refetch()}
         />
       ) : (
@@ -306,7 +307,7 @@ function StockView({
           loading={query.isLoading}
           columns={columns}
           getKey={(item) => item.id}
-          caption="Existencias por ingrediente"
+          caption={uiText("Existencias por ingrediente")}
           emptyReason={search || filter !== "ALL" ? "no-matches" : "no-records"}
           onClearFilters={
             search || filter !== "ALL"
@@ -341,6 +342,7 @@ function LotsView({
   warehouseId?: string;
   showCosts: boolean;
 }) {
+  const uiText = useUiText();
   const params = useSearchParams();
   const [filter, setFilter] = useState(() => params.get("filter") ?? "");
 
@@ -354,12 +356,12 @@ function LotsView({
   const columns: Array<DataColumn<(typeof rows)[number]>> = [
     {
       key: "ingredient",
-      header: "Ingrediente",
+      header: uiText("Ingrediente"),
       priority: "identity",
       render: (item) => (
         <div className="min-w-0">
           <p className="truncate font-medium text-ink-1">{item.ingredientName}</p>
-          <p className="truncate font-mono text-2xs text-ink-3">lote {item.lotCode}</p>
+          <p className="truncate font-mono text-2xs text-ink-3">{uiText("lote ")}{item.lotCode}</p>
         </div>
       ),
       sortValue: (item) => item.ingredientName,
@@ -379,14 +381,14 @@ function LotsView({
     },
     {
       key: "expires",
-      header: "Vencimiento",
+      header: uiText("Vencimiento"),
       priority: "primary",
       render: (item) => formatDate(item.expiresAt),
       sortValue: (item) => item.expiresAt,
     },
     {
       key: "quantity",
-      header: "Cantidad",
+      header: uiText("Cantidad"),
       priority: "secondary",
       numeric: true,
       render: (item) => (
@@ -398,7 +400,7 @@ function LotsView({
     },
     {
       key: "warehouse",
-      header: "Almacén",
+      header: uiText("Almacén"),
       priority: "secondary",
       render: (item) => item.warehouseName,
       sortValue: (item) => item.warehouseName,
@@ -407,7 +409,7 @@ function LotsView({
       ? [
           {
             key: "cost",
-            header: "Costo",
+            header: uiText("Costo"),
             priority: "detail" as const,
             numeric: true,
             render: (item: (typeof rows)[number]) => formatMoney(item.cost),
@@ -420,10 +422,10 @@ function LotsView({
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Trazabilidad"
-        title="Lotes y vencimientos"
-        description="Prioriza los lotes vencidos y los que están por vencer antes de tener que registrar una merma."
-        meta={<span>{rows.length} lotes</span>}
+        eyebrow={uiText("Trazabilidad")}
+        title={uiText("Lotes y vencimientos")}
+        description={uiText("Prioriza los lotes vencidos y los que están por vencer antes de tener que registrar una merma.")}
+        meta={<span>{rows.length} {uiText(" lotes")}</span>}
         actions={
           <Button
             variant="secondary"
@@ -442,14 +444,13 @@ function LotsView({
             }
           >
             <Download className="size-4" aria-hidden="true" />
-            Exportar CSV
-          </Button>
+            {uiText("Exportar CSV")}</Button>
         }
       />
 
       {/* Los atajos de vencimiento caben en una fila que se desliza sola en el
           teléfono, sin apilarse en cuatro líneas. */}
-      <nav aria-label="Filtrar por vencimiento">
+      <nav aria-label={uiText("Filtrar por vencimiento")}>
         <ul className="min-w-0 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {EXPIRY_FILTERS.map(([id, label]) => (
             <li key={id || "all"} className="shrink-0">
@@ -468,8 +469,8 @@ function LotsView({
 
       {query.error ? (
         <ErrorState
-          title="No fue posible cargar los lotes"
-          detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar los lotes")}
+          detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void query.refetch()}
         />
       ) : (
@@ -478,7 +479,7 @@ function LotsView({
           loading={query.isLoading}
           columns={columns}
           getKey={(item) => item.id}
-          caption="Lotes y vencimientos"
+          caption={uiText("Lotes y vencimientos")}
           emptyReason={filter ? "no-matches" : "no-records"}
           onClearFilters={filter ? () => setFilter("") : undefined}
         />
@@ -504,6 +505,7 @@ function MovementView({
   selectedMovement: Record<string, unknown> | null;
   onSelect: (movement: Record<string, unknown> | null) => void;
 }) {
+  const uiText = useUiText();
   const storageKey = `restaurant-kardex-filters:${currentUserId}:${branchId}`;
   const [refresh, setRefresh] = useState(0);
   const stored = readFilters(storageKey);
@@ -647,15 +649,14 @@ function MovementView({
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Auditoría"
-        title="Kardex de movimientos"
-        description="Entradas, salidas y saldos. Los filtros se guardan por persona y sucursal."
-        meta={<span>{rows.length} movimientos</span>}
+        eyebrow={uiText("Auditoría")}
+        title={uiText("Kardex de movimientos")}
+        description={uiText("Entradas, salidas y saldos. Los filtros se guardan por persona y sucursal.")}
+        meta={<span>{rows.length} {uiText(" movimientos")}</span>}
         actions={
           <Button variant="secondary" onClick={() => exportCsv("kardex.csv", exportRows)}>
             <Download className="size-4" aria-hidden="true" />
-            Exportar CSV
-          </Button>
+            {uiText("Exportar CSV")}</Button>
         }
       />
 
@@ -667,14 +668,14 @@ function MovementView({
         onClear={() => update({ search: "", type: "ALL", from: "", to: "" })}
       >
         <div className="min-w-0">
-          <Label htmlFor="kardex-type">Tipo</Label>
+          <Label htmlFor="kardex-type">{uiText("Tipo")}</Label>
           <select
             id="kardex-type"
             className={SELECT_CLASS}
             value={type}
             onChange={(event) => update({ type: event.target.value })}
           >
-            <option value="ALL">Todos</option>
+            <option value="ALL">{uiText("Todos")}</option>
             {Array.from(new Set((query.data ?? []).map((item) => item.type))).map((item) => (
               <option key={item} value={item}>
                 {restaurantStatusLabel(item)}
@@ -683,17 +684,17 @@ function MovementView({
           </select>
         </div>
         <div className="min-w-0">
-          <Label htmlFor="kardex-from">Desde</Label>
+          <Label htmlFor="kardex-from">{uiText("Desde")}</Label>
           <Input id="kardex-from" type="date" value={from} onChange={(event) => update({ from: event.target.value })} />
         </div>
         <div className="min-w-0">
-          <Label htmlFor="kardex-to">Hasta</Label>
+          <Label htmlFor="kardex-to">{uiText("Hasta")}</Label>
           <Input id="kardex-to" type="date" value={to} onChange={(event) => update({ to: event.target.value })} />
         </div>
       </FilterBar>
 
       <details className="rounded-md border border-line bg-surface-1 px-3 py-2 text-sm">
-        <summary className="cursor-pointer list-none font-medium text-ink-1">Columnas visibles</summary>
+        <summary className="cursor-pointer list-none font-medium text-ink-1">{uiText("Columnas visibles")}</summary>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-3">
           {pickable.map((key) => (
             <label
@@ -715,8 +716,8 @@ function MovementView({
 
       {query.error ? (
         <ErrorState
-          title="No fue posible cargar el Kardex"
-          detail={getApiErrorMessage(query.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar el Kardex")}
+          detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void query.refetch()}
         />
       ) : (
@@ -725,7 +726,7 @@ function MovementView({
           loading={query.isLoading}
           columns={dataColumns}
           getKey={(item) => item.id}
-          caption="Movimientos de inventario"
+          caption={uiText("Movimientos de inventario")}
           onRowAction={(item) => onSelect(item as unknown as Record<string, unknown>)}
           rowActionLabel={(item) => `Ver el detalle del movimiento de ${item.ingredientName}`}
           emptyReason={activeFilters ? "no-matches" : "no-records"}
@@ -756,6 +757,7 @@ function MovementDetail({
   showCosts: boolean;
   onClose: () => void;
 }) {
+  const uiText = useUiText();
   const values: Array<[string, unknown]> = [
     ["Fecha", formatDate(String(movement.date ?? ""))],
     ["Tipo", restaurantStatusLabel(String(movement.type ?? ""))],
@@ -771,25 +773,25 @@ function MovementDetail({
     <>
       <button
         type="button"
-        aria-label="Cerrar el detalle"
+        aria-label={uiText("Cerrar el detalle")}
         className="fixed inset-0 z-40 bg-ink-1/40"
         onClick={onClose}
       />
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label="Detalle del movimiento"
+        aria-label={uiText("Detalle del movimiento")}
         onKeyDown={(event) => event.key === "Escape" && onClose()}
         className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-line bg-surface-1 pb-[env(safe-area-inset-bottom)] shadow-xl"
       >
         <div className="flex items-start justify-between gap-3 border-b border-line p-5">
           <div className="min-w-0">
-            <p className="text-2xs uppercase tracking-[0.16em] text-ink-3">Detalle del movimiento</p>
+            <p className="text-2xs uppercase tracking-[0.16em] text-ink-3">{uiText("Detalle del movimiento")}</p>
             <h2 className="truncate text-lg font-semibold text-ink-1">
               {String(movement.ingredientName ?? "Ingrediente")}
             </h2>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar el detalle">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label={uiText("Cerrar el detalle")}>
             <X className="size-4" aria-hidden="true" />
           </Button>
         </div>

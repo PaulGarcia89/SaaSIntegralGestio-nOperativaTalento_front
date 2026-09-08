@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -29,5 +31,6 @@ function SchedulingContent() {
 }
 
 export default function CandidateInterviewSchedulingPage() {
-  return <main className="mx-auto min-h-screen max-w-3xl px-4 py-10 sm:px-6"><Suspense fallback={<AsyncState state="loading" title="Preparando agenda" />}><SchedulingContent /></Suspense></main>;
+  const uiText = useUiText();
+  return <main className="mx-auto min-h-screen max-w-3xl px-4 py-10 sm:px-6"><Suspense fallback={<AsyncState state="loading" title={uiText("Preparando agenda")} />}><SchedulingContent /></Suspense></main>;
 }

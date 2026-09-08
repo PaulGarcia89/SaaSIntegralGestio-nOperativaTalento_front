@@ -1,5 +1,7 @@
 "use client";
 
+import { useUiText } from "@/components/ui-copy";
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ClipboardList, FileSignature, LineChart, ShieldCheck, Users } from "lucide-react";
@@ -48,6 +50,7 @@ const MAX_ATENCION = 4;
 const MAX_CAMBIOS = 6;
 
 export function OnboardingModuleDashboard() {
+  const uiText = useUiText();
   const { can, currentBranch } = useAppStore();
   const puedeVer = can("onboarding.view");
   const puedeGestionar = can("onboarding.manage");
@@ -69,11 +72,11 @@ export function OnboardingModuleDashboard() {
   if (!puedeVer) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Personas" title="Dashboard de incorporación" />
+        <PageHeader eyebrow={uiText("Personas")} title={uiText("Dashboard de incorporación")} />
         <EmptyState
           reason="no-records"
-          title="No tienes acceso a las incorporaciones"
-          description="Pide a quien administra la empresa el permiso para ver incorporaciones."
+          title={uiText("No tienes acceso a las incorporaciones")}
+          description={uiText("Pide a quien administra la empresa el permiso para ver incorporaciones.")}
         />
       </div>
     );
@@ -131,12 +134,12 @@ export function OnboardingModuleDashboard() {
   return (
     <div className="space-y-6 pb-4">
       <PageHeader
-        eyebrow="Personas"
-        title="Dashboard de incorporación"
-        description="Cómo van las incorporaciones de la sucursal, cuáles necesitan atención y qué hacer ahora."
+        eyebrow={uiText("Personas")}
+        title={uiText("Dashboard de incorporación")}
+        description={uiText("Cómo van las incorporaciones de la sucursal, cuáles necesitan atención y qué hacer ahora.")}
         actions={
           <Button asChild variant="secondary">
-            <Link href="/onboarding/documents">Ver incorporaciones</Link>
+            <Link href="/onboarding/documents">{uiText("Ver incorporaciones")}</Link>
           </Button>
         }
       />
@@ -144,20 +147,20 @@ export function OnboardingModuleDashboard() {
       <ActiveContext />
 
       {expedientes.isLoading ? (
-        <SkeletonRows rows={3} label="Cargando incorporaciones" />
+        <SkeletonRows rows={3} label={uiText("Cargando incorporaciones")} />
       ) : expedientes.isError ? (
         <ErrorState
-          title="No fue posible cargar las incorporaciones"
-          detail={getApiErrorMessage(expedientes.error, "Reintenta la consulta para continuar.")}
+          title={uiText("No fue posible cargar las incorporaciones")}
+          detail={getApiErrorMessage(expedientes.error, uiText("Reintenta la consulta para continuar."))}
           onRetry={() => void expedientes.refetch()}
         />
       ) : siguiente ? (
         <NextAction
-          label={atencion[0] ? "Lo más urgente" : "Lo siguiente"}
+          label={atencion[0] ? uiText("Lo más urgente") : uiText("Lo siguiente")}
           title={`Abrir la incorporación de ${siguiente.employee.name}`}
           detail={describir(siguiente, tareasVencidas(siguiente))}
           href={`/onboarding/documents?flowId=${encodeURIComponent(siguiente.id)}`}
-          actionLabel="Abrir"
+          actionLabel={uiText("Abrir")}
           tone={atencion[0]?.graves ? "danger" : atencion[0] ? "warning" : "progress"}
         />
       ) : (
@@ -173,79 +176,78 @@ export function OnboardingModuleDashboard() {
       )}
 
       {analitica.isError ? (
-        <InlineNote tone="danger" title="No fue posible cargar la analítica de incorporación">
-          {getApiErrorMessage(analitica.error, "Reintenta la consulta para continuar.")}
+        <InlineNote tone="danger" title={uiText("No fue posible cargar la analítica de incorporación")}>
+          {getApiErrorMessage(analitica.error, uiText("Reintenta la consulta para continuar."))}
         </InlineNote>
       ) : null}
 
-      <StatusTileRow label="Estado de las incorporaciones">
+      <StatusTileRow label={uiText("Estado de las incorporaciones")}>
         <li className="min-w-0">
           <StatusTile
-            title="En curso"
+            title={uiText("En curso")}
             value={cifraExpedientes(enCurso.length)}
             context="Personas que todavía no terminaron su incorporación."
-            scope={currentBranch ? currentBranch.name : "Todas las sucursales"}
+            scope={currentBranch ? currentBranch.name : uiText("Todas las sucursales")}
             href="/onboarding/documents"
-            actionLabel="Ver incorporaciones"
+            actionLabel={uiText("Ver incorporaciones")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="En riesgo"
+            title={uiText("En riesgo")}
             value={cifraAnalitica(resumen?.atRisk)}
             context="Expedientes que el servidor marca con riesgo de retraso."
-            status={resumen && resumen.atRisk > 0 ? { label: "Revisar", tone: "warning" as const } : undefined}
+            status={resumen && resumen.atRisk > 0 ? { label: uiText("Revisar"), tone: "warning" as const } : undefined}
             href="/onboarding/analytics"
-            actionLabel="Ver analítica"
+            actionLabel={uiText("Ver analítica")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Tareas vencidas"
+            title={uiText("Tareas vencidas")}
             value={cifraExpedientes(totalVencidas)}
             context="Tareas abiertas cuya fecha límite ya pasó."
             status={totalVencidas > 0 && expedientes.data ? { label: "Atrasado", tone: "danger" as const } : undefined}
             href="/onboarding/documents"
-            actionLabel="Ver incorporaciones"
+            actionLabel={uiText("Ver incorporaciones")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title="Cumplimiento documental"
+            title={uiText("Cumplimiento documental")}
             value={analitica.isLoading ? undefined : cumplimiento === null ? null : `${cumplimiento} %`}
             context="Documentos aprobados sobre los requeridos."
             href="/onboarding/signatures"
-            actionLabel="Ver documentos"
+            actionLabel={uiText("Ver documentos")}
           />
         </li>
       </StatusTileRow>
 
       {parcial ? (
         <InlineNote tone="info" title={`Se muestran ${flujos.length} de ${expedientes.data?.total ?? 0} incorporaciones`}>
-          Las cifras de arriba se cuentan sobre las cargadas. El listado completo está en Incorporaciones.
-        </InlineNote>
+          {uiText("Las cifras de arriba se cuentan sobre las cargadas. El listado completo está en Incorporaciones.")}</InlineNote>
       ) : null}
 
-      <PageSection title="Operaciones del módulo" description="Cada pantalla dice para qué sirve, con icono y texto.">
+      <PageSection title={uiText("Operaciones del módulo")} description={uiText("Cada pantalla dice para qué sirve, con icono y texto.")}>
         <ul className="grid gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
-          <Destino href="/onboarding/documents" icon={Users} label="Incorporaciones" detail="Cada expediente con sus tareas, documentos y avance." />
-          <Destino href="/onboarding/signatures" icon={FileSignature} label="Documentos y firmas" detail="Paquetes por firmar y documentos por revisar." />
-          <Destino href="/onboarding/analytics" icon={LineChart} label="Analítica" detail="Tiempos por etapa, riesgos y comparativas." />
+          <Destino href="/onboarding/documents" icon={Users} label={uiText("Incorporaciones")} detail="Cada expediente con sus tareas, documentos y avance." />
+          <Destino href="/onboarding/signatures" icon={FileSignature} label={uiText("Documentos y firmas")} detail="Paquetes por firmar y documentos por revisar." />
+          <Destino href="/onboarding/analytics" icon={LineChart} label={uiText("Analítica")} detail="Tiempos por etapa, riesgos y comparativas." />
           {puedeGestionar ? (
-            <Destino href="/onboarding/compliance" icon={ShieldCheck} label="Cumplimiento" detail="Retención, evidencias de firma y políticas." />
+            <Destino href="/onboarding/compliance" icon={ShieldCheck} label={uiText("Cumplimiento")} detail="Retención, evidencias de firma y políticas." />
           ) : (
-            <Destino href="/onboarding/operations" icon={ClipboardList} label="Operaciones" detail="Tareas operativas ligadas a cada incorporación." />
+            <Destino href="/onboarding/operations" icon={ClipboardList} label={uiText("Operaciones")} detail="Tareas operativas ligadas a cada incorporación." />
           )}
         </ul>
       </PageSection>
 
       {atencion.length > 0 ? (
         <PageSection
-          title="Requieren atención"
-          description="Alertas graves, tareas vencidas o bloqueadas. Primero las más urgentes."
+          title={uiText("Requieren atención")}
+          description={uiText("Alertas graves, tareas vencidas o bloqueadas. Primero las más urgentes.")}
           id="atencion"
         >
-          <EntityCardList label="Incorporaciones que requieren atención" columns={2}>
+          <EntityCardList label={uiText("Incorporaciones que requieren atención")} columns={2}>
             {atencion.slice(0, MAX_ATENCION).map(({ flujo, graves, vencidas, bloqueadas }) => (
               <EntityCard
                 key={flujo.id}
@@ -256,13 +258,13 @@ export function OnboardingModuleDashboard() {
                   graves > 0
                     ? { label: "Alerta grave", tone: "danger" }
                     : vencidas > 0
-                      ? { label: "Tareas vencidas", tone: "warning" }
-                      : { label: "Bloqueada", tone: "blocked" }
+                      ? { label: uiText("Tareas vencidas"), tone: "warning" }
+                      : { label: uiText("Bloqueada"), tone: "blocked" }
                 }
                 facts={[
-                  { label: "Vencidas", value: vencidas },
+                  { label: uiText("Vencidas"), value: vencidas },
                   { label: "Bloqueadas", value: bloqueadas },
-                  { label: "Inicio", value: formatDate(flujo.startedAt) },
+                  { label: uiText("Inicio"), value: formatDate(flujo.startedAt) },
                 ]}
                 progress={{ label: "Avance", value: flujo.progressPercent, max: 100 }}
                 nextStep={flujo.nextAction?.title ?? flujo.alerts[0]?.message}
@@ -273,11 +275,11 @@ export function OnboardingModuleDashboard() {
         </PageSection>
       ) : null}
 
-      <PageSection title="Cambió hace poco" description="Los últimos movimientos registrados en las incorporaciones cargadas." boxed>
+      <PageSection title={uiText("Cambió hace poco")} description={uiText("Los últimos movimientos registrados en las incorporaciones cargadas.")} boxed>
         {expedientes.isLoading ? (
           <SkeletonRows rows={3} />
         ) : cambios.length === 0 ? (
-          <EmptyState reason="no-records" title="Sin movimientos todavía" description="Cuando una incorporación avance, aparecerá aquí." />
+          <EmptyState reason="no-records" title={uiText("Sin movimientos todavía")} description={uiText("Cuando una incorporación avance, aparecerá aquí.")} />
         ) : (
           <Timeline entries={cambios} />
         )}

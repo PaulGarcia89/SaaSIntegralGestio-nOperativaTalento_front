@@ -1,0 +1,37 @@
+@media (hover: hover) and (pointer: fine) {
+  .featureCard {
+    transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+  }
+
+  .featureIcon {
+    transition: transform 260ms ease;
+  }
+
+  .featureCard:hover {
+    transform: translateY(-6px) rotate(-0.5deg);
+    border-color: rgb(245 158 11 / 45%);
+    box-shadow: 0 16px 28px rgb(0 0 0 / 20%);
+  }
+
+  .featureCard:nth-child(even):hover {
+    transform: translateY(-6px) rotate(0.5deg);
+  }
+
+  .featureCard:hover .featureIcon {
+    transform: translateY(-2px) scale(1.08);
+    transform-origin: left center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .featureCard,
+  .featureIcon {
+    transition: none;
+  }
+
+  .featureCard:hover,
+  .featureCard:nth-child(even):hover,
+  .featureCard:hover .featureIcon {
+    transform: none;
+  }
+}

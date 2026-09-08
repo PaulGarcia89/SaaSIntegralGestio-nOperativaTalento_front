@@ -19,6 +19,7 @@ import { DEMO_MODE_ENABLED } from "@/components/integration-state";
 import { FormErrorSummary } from "@/components/form-error-summary";
 import { LanguageSelector } from "@/components/language-selector";
 import { useLocale } from "@/components/locale-provider";
+import styles from "./login.module.css";
 
 // El esquema se construye DENTRO del componente: declarado a nivel de módulo
 // no alcanza a `t`, así que sus mensajes de validación se quedaban en español
@@ -91,8 +92,8 @@ export default function LoginPage() {
                 { icon: <Building2 className="size-5 text-accent-fill" />, key: "scope" },
                 { icon: <ShieldCheck className="size-5 text-accent-fill" />, key: "tailored" },
               ].map((item) => (
-                <div key={item.key} className="rounded-3xl border border-surface-dark-ink/10 bg-surface-1/6 p-5">
-                  <div className="mb-3">{item.icon}</div>
+                <div key={item.key} className={`${styles.featureCard} rounded-3xl border border-surface-dark-ink/10 bg-surface-1/6 p-5`}>
+                  <div className={`${styles.featureIcon} mb-3`}>{item.icon}</div>
                   <h2 className="font-semibold">{t(`auth.hero.${item.key}.title`)}</h2>
                   <p className="mt-2 text-sm leading-7 text-surface-dark-ink/68">{t(`auth.hero.${item.key}.copy`)}</p>
                 </div>

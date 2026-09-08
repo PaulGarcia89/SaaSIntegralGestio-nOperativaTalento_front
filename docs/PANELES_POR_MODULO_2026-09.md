@@ -320,16 +320,77 @@ de archivo ni logotipos de clientes inventados:
 | Cómo funciona (`#como-funciona`), portal de candidatos, cierre y pie | Contenido anterior con la retícula y el ámbar de la marca | Escalonado |
 
 Archivos: `landing-hero.tsx`, `landing-showcase.tsx`, `landing-mocks.tsx`,
-`landing-motion.tsx` (Reveal, RevealGroup, RotatingWord, Float sobre
+`public/motion.tsx` (Reveal, RevealGroup, RotatingWord, Float sobre
 framer-motion, ya presente en el proyecto), `landing-sections.tsx`,
-`page.tsx`; en `globals.css`, `.landing-grid`, `.landing-glow`,
-`.landing-marquee`, `.landing-tilt`. Todo el texto pasa por `t()`
+`page.tsx`; en `globals.css`, `.public-grid`, `.public-glow`,
+`.public-marquee`, `.public-tilt`. Todo el texto pasa por `t()`
 (`landing.hero.*`, `landing.mock.*`, `landing.strip.*`, `landing.flow.*`,
 `landing.branches.*`, `landing.plans.*`, `landing.roles.*Hint`) y la prueba
 de la portada sigue vigilando que no haya literales. `prefers-reduced-motion`
 apaga todo el movimiento (los componentes usan `useReducedMotion` y el CSS
 global corta las animaciones). Verificado a 390, 768 y 1440 px sin
 desbordes y con todos los enlaces y botones ≥ 44 px.
+
+## 2.octies Portal de empleos `/jobs` (2026-09-08)
+
+La misma gramática de la portada aplicada a la única pantalla que ve quien
+busca trabajo. Cambios respecto de la versión anterior:
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| Buscador suelto bajo el titular | Campo de 56 px DENTRO del hero grafito, con botón de borrar | En un portal de empleo buscar es la primera acción, no una más |
+| Sin forma de acotar | Facetas de modalidad, área y ciudad calculadas sobre las vacantes existentes, con recuento por botón | Si nadie publica remoto, «Remoto» no aparece; el recuento dice el resultado antes de pulsar |
+| Tarjeta = foto + dos insignias + botón | Jornada, sueldo cuando existe y número de plazas; tarjeta entera pulsable con UN solo elemento enfocable (enlace estirado sobre el título) | Son las tres preguntas que se hacen antes de abrir una oferta |
+| Imagen de archivo cuando la vacante no traía foto | Panel de marca con el icono del área | No fingir una fotografía que no existe |
+| — | Sección «cómo es postularse» (tres pasos) y acceso a seguir la postulación | El miedo de quien busca trabajo es el silencio |
+
+Archivos: `careers/vacancy-card.tsx`, `careers/careers-sections.tsx`,
+`career-portal-shell.tsx`, `candidate-nav.tsx` (variante `tone="dark"`).
+Las primitivas de movimiento y las clases de fondo pasaron de `landing-*` a
+`public-*` para que portada y portal compartan UNA definición; la portada no
+cambia de aspecto. La prueba de textos a mano se movió a
+`components/public/public-i18n.test.ts` y ahora cubre las dos superficies.
+Verificado a 390, 768 y 1440 px: sin desbordes; las tarjetas de una fila
+miden lo mismo (`h-full`).
+
+## 2.novies Inicio de sesión (2026-09-08)
+
+Es la única pantalla que ve TODO el mundo. Correcciones, por orden de
+impacto real:
+
+1. **Los campos no declaraban `autocomplete`.** Ni el llavero de iOS ni
+   ningún gestor de contraseñas ofrecía rellenar nada. Ahora `username` y
+   `current-password`, con `type="email"`, `inputmode`, `autocapitalize` y
+   `enterkeyhint`. Es la mejora más útil del cambio y no se ve.
+2. **En móvil el panel de marketing iba primero.** En un iPhone había que
+   pasar un titular y dos tarjetas antes de ver el campo del correo. El
+   panel grande existe solo a partir de `lg`; en móvil queda una banda
+   compacta y el formulario entra entero en la primera pantalla (851 px de
+   página frente a 844 de ventana).
+3. **Tres botones apilados del mismo tamaño** —entrar, «olvidé mi
+   contraseña» y «volver al sitio»— competían entre sí. Solo entrar es una
+   acción; los otros dos son enlaces y se ven como tales.
+4. **La casilla «recordar» no hacía nada:** no existe tal parámetro en
+   `POST /auth/login`. Ahora recuerda el CORREO en el dispositivo y el
+   rótulo lo dice. Se lee con `useSyncExternalStore` —instantánea `null` en
+   el servidor— para no hidratar mal ni encadenar renders.
+5. El botón de ver la contraseña medía 16 px; ahora 44.
+6. Se pasó de `bg-card` / `text-muted-foreground` / `border-border` a los
+   tokens del sistema.
+7. El panel de marca medía 850 px de alto y en un portátil de 844 px el
+   titular se comía la marca y el pie. Recortado a ~750 px.
+
+`LanguageSelector` gana `tone="dark"` (aditivo, ninguna llamada existente
+cambia de aspecto): el control claro sobre grafito se leía como una pegatina.
+
+Se conserva: `authenticateUser` y su contrato, el `returnTo` validado contra
+rutas relativas, el resumen accesible de errores, el atajo del entorno de
+prueba y todas las claves de traducción anteriores.
+
+Verificado a 390, 428, 768, 1440 y 1920 px sobre el **HTML real del build**
+(no una maqueta): sin desplazamiento horizontal, objetivos táctiles de 44 px
+o más y campo de correo a 17 px en móvil, por encima del umbral de zoom de
+Safari.
 
 ## 3. Componentes nuevos del sistema
 

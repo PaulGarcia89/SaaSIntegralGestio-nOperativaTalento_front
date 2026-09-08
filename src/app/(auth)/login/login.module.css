@@ -1,37 +1,23 @@
-@media (hover: hover) and (pointer: fine) {
-  .featureCard {
-    transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
-  }
+/* Entrada del formulario: una sola pasada corta, sin escalonar los campos.
+   Escalonarlos retrasaría la aparición del correo, que es justo lo que se
+   viene a tocar. `prefers-reduced-motion` la deja quieta. */
+.enter {
+  animation: login-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 
-  .featureIcon {
-    transition: transform 260ms ease;
+@keyframes login-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
   }
-
-  .featureCard:hover {
-    transform: translateY(-6px) rotate(-0.5deg);
-    border-color: rgb(245 158 11 / 45%);
-    box-shadow: 0 16px 28px rgb(0 0 0 / 20%);
-  }
-
-  .featureCard:nth-child(even):hover {
-    transform: translateY(-6px) rotate(0.5deg);
-  }
-
-  .featureCard:hover .featureIcon {
-    transform: translateY(-2px) scale(1.08);
-    transform-origin: left center;
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .featureCard,
-  .featureIcon {
-    transition: none;
-  }
-
-  .featureCard:hover,
-  .featureCard:nth-child(even):hover,
-  .featureCard:hover .featureIcon {
-    transform: none;
+  .enter {
+    animation: none;
   }
 }

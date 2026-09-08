@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EmptyState, InlineNote, StatusBadge } from "@/components/system";
 import { LocalVideoLesson, VideoLesson, type VideoProgressEvent } from "@/components/training-learning-hub";
-import { getApiErrorMessage, resolveTrainingAssetUrl, updateTrainingLessonProgress } from "@/lib/backend";
+import { fetchProtectedMediaBlob, getApiErrorMessage, resolveTrainingAssetUrl, updateTrainingLessonProgress } from "@/lib/backend";
 import type { LearnerTrainingCourseDto, LearnerTrainingLessonDto } from "@/lib/contracts";
 import { blockHtml } from "@/lib/training-rich-text";
 import { formatMinutes } from "@/lib/training-labels";
@@ -429,13 +429,13 @@ function LessonView({
       <div className="space-y-4">
         {isVideo ? (
           lesson.videoUrl ? (
-            <VideoLesson lesson={lesson} assignmentId={assignmentId} url={resolveTrainingAssetUrl(lesson.videoUrl) ?? lesson.videoUrl} onProgress={onVideoProgress} />
+            <ProtectedVideoLesson lesson={lesson} assignmentId={assignmentId} url={lesson.videoUrl} onProgress={onVideoProgress} />
           ) : videoBlocks.length === 0 ? (
             <LocalVideoLesson courseId={course.id} lesson={lesson} assignmentId={assignmentId} onProgress={onVideoProgress} />
           ) : null
         ) : null}
         {videoBlocks.map((block) => (
-          <VideoLesson key={block.id} lesson={lesson} assignmentId={assignmentId} url={resolveTrainingAssetUrl(block.resourceUrl) ?? block.resourceUrl!} onProgress={onVideoProgress} />
+          <ProtectedVideoLesson key={block.id} lesson={lesson} assignmentId={assignmentId} url={block.resourceUrl!} onProgress={onVideoProgress} />
         ))}
         {otherBlocks.map((block) => (
           <ContentBlock key={block.id} block={block} />
@@ -577,4 +577,51 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("es", { dateStyle: "long" }).format(date);
+}
+
+/**
+ * Video de una lección, con sesión.
+ *
+ * Si la URL es de la propia API (`/api/…`), el archivo se descarga con el
+ * token de sesión y se reproduce desde un `blob:`; un `<video src>` directo
+ * no puede enviar `Authorization` y el servidor respondía 401. Las URL
+ * externas se pasan tal cual.
+ */
+function ProtectedVideoLesson({ lesson, assignmentId, url, onProgress }: { lesson: LearnerTrainingLessonDto; assignmentId: string; url: string; onProgress: (event: VideoProgressEvent) => Promise<unknown> | void }) {
+  const isProtected = url.startsWith("/api/");
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isProtected) return;
+    let active = true;
+    let created: string | null = null;
+    fetchProtectedMediaBlob(url)
+      .then((blob) => {
+        if (!active || !blob) return;
+        created = URL.createObjectURL(blob);
+        setObjectUrl(created);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(getApiErrorMessage(cause, "No fue posible descargar el video."));
+      });
+    return () => {
+      active = false;
+      if (created) URL.revokeObjectURL(created);
+      // Al cambiar de lección se vuelve al estado de carga.
+      setObjectUrl(null);
+      setError(null);
+    };
+  }, [url, isProtected]);
+
+  if (!isProtected) {
+    return <VideoLesson lesson={lesson} assignmentId={assignmentId} url={resolveTrainingAssetUrl(url) ?? url} onProgress={onProgress} />;
+  }
+  if (error) {
+    return <InlineNote tone="danger" title="No fue posible cargar el video">{error}</InlineNote>;
+  }
+  if (!objectUrl) {
+    return <div className="aspect-video w-full animate-pulse rounded-xl bg-surface-3" role="status" aria-label="Cargando video" />;
+  }
+  return <VideoLesson lesson={lesson} assignmentId={assignmentId} url={objectUrl} onProgress={onProgress} />;
 }

@@ -3625,6 +3625,21 @@ export function fetchTrainingAdminVideo(courseId: string, lessonId: string) {
   );
 }
 
+/**
+ * Descarga con credenciales un archivo servido por la API (por ejemplo el
+ * video de una lección: `/api/training/video/assignments/…/file`).
+ *
+ * Un `<video src>` no envía la cabecera `Authorization`, y el servidor solo
+ * acepta el token ahí: apuntar la etiqueta directamente a la ruta devolvía
+ * 401 y el reproductor mostraba «No fue posible cargar el video». Se pide con
+ * la sesión y se reproduce desde un `blob:`. Para URL externas (YouTube,
+ * CDN) devuelve `null`: esas sí se cargan directas.
+ */
+export function fetchProtectedMediaBlob(url: string) {
+  if (!url.startsWith("/api/")) return Promise.resolve<Blob | null>(null);
+  return request<Blob>(url.slice("/api".length), {}, { responseType: "blob" });
+}
+
 export function fetchTrainingCourseQuality(courseId: string) {
   return request<TrainingCourseQualityDto>(
     `/training/admin/courses/${encodeURIComponent(courseId)}/quality`,

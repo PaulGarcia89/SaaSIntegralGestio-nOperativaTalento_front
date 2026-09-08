@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { FileSpreadsheet, FileText, UserPlus, Users } from "lucide-react";
+import { CalendarClock, ChevronRight, FileCheck, FileSpreadsheet, History, UserPlus, UserRoundX, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { EmployeesModulePanel } from "@/components/employees/employees-module-panel";
-import { EmptyState, InlineNote, PageHeader, PageSection, StatusTile } from "@/components/system";
+import { EmptyState, ErrorState, PageHeader, PageSection, SkeletonRows, StatusTile, StatusTileRow } from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { fetchOnboardingAnalytics } from "@/lib/backend";
+import { fetchEmployeesSummary, fetchOnboardingAnalytics, getApiErrorMessage } from "@/lib/backend";
+import { auditActionLabel } from "@/lib/audit-labels";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/components/locale-provider";
 import { useAppStore } from "@/store/app-store";
 
@@ -27,9 +29,9 @@ import { useAppStore } from "@/store/app-store";
      · `/onboarding/analytics` para las incorporaciones en curso, SOLO si la
        empresa tiene contratado el módulo de incorporación y quien mira tiene
        permiso para verlo.
-   Lo que NO se muestra —perfiles incompletos, documentos por vencer,
-   actividad reciente— es porque el backend lo expone por empleado, no
-   agregado. Está anotado como trabajo de servidor pendiente, no inventado.
+     · `/employees/summary` (nuevo, 2026-09-08) para perfiles incompletos,
+       documentos por vencer o sin revisar y los últimos cambios. Antes eso
+       existía solo expediente por expediente y aquí se decía que faltaba.
    ========================================================================== */
 
 export function PeopleModuleDashboard() {
@@ -80,6 +82,8 @@ export function PeopleModuleDashboard() {
       {/* Estado del personal y reparto por sucursal. Cada tarjeta abre el
           directorio ya filtrado. */}
       <EmployeesModulePanel />
+
+      <PeopleAttention branchId={currentBranch?.id} tenantId={currentTenant.id} />
 
       {/* Incorporaciones en curso: dato de Incorporación, no de Personas.
           Se enseña aquí porque responde a «¿quién está entrando?», pero se
@@ -158,12 +162,6 @@ export function PeopleModuleDashboard() {
         </ul>
       </PageSection>
 
-      <InlineNote tone="info" title={t("people.panel.pendingTitle")}>
-        <span className="flex items-start gap-2">
-          <FileText className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{t("people.panel.pendingHelp")}</span>
-        </span>
-      </InlineNote>
     </div>
   );
 }
@@ -195,4 +193,175 @@ function QuickAction({
       </Link>
     </li>
   );
+}
+
+/* ==========================================================================
+   ATENCIÓN Y CAMBIOS RECIENTES — `GET /employees/summary`
+   ==========================================================================
+   Lo que antes estaba anotado como «el servidor no lo agrega»: perfiles
+   incompletos, documentos por vencer o vencidos, documentos sin revisar y
+   los últimos cambios sobre expedientes. Ahora lo cuenta el servidor para
+   la sucursal activa, con el mismo recorte que la lista de empleados.
+
+   Sin dato no es cero: mientras carga se muestran siluetas y si el servidor
+   falla se dice, con reintento.
+   ========================================================================== */
+
+function PeopleAttention({ branchId, tenantId }: { branchId?: string; tenantId: string }) {
+  const { t } = useLocale();
+  const resumen = useQuery({
+    queryKey: ["employees-summary", tenantId, branchId ?? null],
+    queryFn: () => fetchEmployeesSummary(branchId),
+    staleTime: 60_000,
+  });
+  const data = resumen.data;
+  const cargando = resumen.isPending;
+  const valor = (n: number | undefined) => (resumen.isError ? null : cargando ? undefined : n);
+
+  const documentosUrgentes = data ? data.documents.expired + data.documents.expiringWithin30Days : undefined;
+
+  return (
+    <>
+      <PageSection title={t("people.panel.attentionTitle")} description={t("people.panel.attentionHelp")} id="atencion">
+        {resumen.isError ? (
+          <ErrorState
+            title={t("people.panel.attentionError")}
+            detail={getApiErrorMessage(resumen.error, t("people.panel.attentionErrorDetail"))}
+            onRetry={() => void resumen.refetch()}
+          />
+        ) : (
+          <StatusTileRow label={t("people.panel.attentionTitle")} className="xl:grid-cols-3">
+            <li className="min-w-0">
+              <StatusTile
+                title={t("people.panel.incompleteProfiles")}
+                value={valor(data?.incompleteProfiles.count)}
+                context={t("people.panel.incompleteProfilesContext")}
+                status={data ? { label: data.incompleteProfiles.count ? t("people.panel.needsAttention") : t("people.panel.allGood"), tone: data.incompleteProfiles.count ? "warning" : "success" } : undefined}
+                href="/employees?status=ACTIVE"
+                actionLabel={t("people.panel.quickDirectory")}
+                icon={<UserRoundX className="size-5" aria-hidden="true" />}
+              />
+            </li>
+            <li className="min-w-0">
+              <StatusTile
+                title={t("people.panel.documentsDue")}
+                value={valor(documentosUrgentes)}
+                context={data ? t("people.panel.documentsDueContext", { expired: data.documents.expired, soon: data.documents.expiringWithin30Days }) : t("people.panel.documentsDueContextLoading")}
+                status={data ? { label: data.documents.expired ? t("people.panel.expired") : documentosUrgentes ? t("people.panel.needsAttention") : t("people.panel.allGood"), tone: data.documents.expired ? "danger" : documentosUrgentes ? "warning" : "success" } : undefined}
+                icon={<CalendarClock className="size-5" aria-hidden="true" />}
+              />
+            </li>
+            <li className="min-w-0">
+              <StatusTile
+                title={t("people.panel.documentsToReview")}
+                value={valor(data?.documents.pendingReview)}
+                context={t("people.panel.documentsToReviewContext")}
+                status={data ? { label: data.documents.pendingReview ? t("people.panel.needsAttention") : t("people.panel.allGood"), tone: data.documents.pendingReview ? "progress" : "success" } : undefined}
+                icon={<FileCheck className="size-5" aria-hidden="true" />}
+              />
+            </li>
+          </StatusTileRow>
+        )}
+
+        {data && (data.incompleteProfiles.sample.length || data.documents.sample.length) ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+            {data.incompleteProfiles.sample.length ? (
+              <SampleList
+                title={t("people.panel.incompleteProfiles")}
+                more={data.incompleteProfiles.count - data.incompleteProfiles.sample.length}
+                items={data.incompleteProfiles.sample.map((persona) => ({
+                  key: persona.id,
+                  href: `/employees/${persona.id}`,
+                  name: persona.name,
+                  detail: `${t("people.panel.missing")}: ${persona.missing.map((campo) => t(`people.panel.field.${campo}`)).join(", ")}`,
+                  tone: "warning" as const,
+                }))}
+              />
+            ) : null}
+            {data.documents.sample.length ? (
+              <SampleList
+                title={t("people.panel.documentsDue")}
+                more={data.documents.expired + data.documents.expiringWithin30Days - data.documents.sample.length}
+                items={data.documents.sample.map((documento) => ({
+                  key: documento.id,
+                  href: `/employees/${documento.employeeId}`,
+                  name: documento.employeeName,
+                  detail: `${documento.category} · ${documento.expired ? t("people.panel.expiredOn") : t("people.panel.expiresOn")} ${fechaCorta(documento.expiresAt)}`,
+                  tone: documento.expired ? ("danger" as const) : ("warning" as const),
+                }))}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </PageSection>
+
+      <PageSection title={t("people.panel.recentTitle")} description={t("people.panel.recentHelp")} id="cambios">
+        {resumen.isError ? (
+          <p className="text-sm text-ink-2">{t("people.panel.attentionError")}</p>
+        ) : cargando ? (
+          <SkeletonRows rows={4} label={t("people.panel.recentTitle")} />
+        ) : data && data.recentChanges.length ? (
+          <ol className="divide-y divide-line rounded-lg border border-line bg-surface-1">
+            {data.recentChanges.map((cambio) => (
+              <li key={cambio.id} className="flex items-start gap-3 px-4 py-3">
+                <History className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-ink-1">
+                    <span className="font-medium">{auditActionLabel(cambio.action)}</span>
+                    {cambio.employeeName ? (
+                      <>
+                        {" · "}
+                        {cambio.employeeId ? <Link href={`/employees/${cambio.employeeId}`} className="underline-offset-4 hover:underline">{cambio.employeeName}</Link> : cambio.employeeName}
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="truncate text-xs text-ink-3">
+                    {fechaHora(cambio.createdAt)}
+                    {cambio.actorEmail ? ` · ${cambio.actorEmail}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <EmptyState reason="no-records" title={t("people.panel.recentEmpty")} description={t("people.panel.recentEmptyHelp")} />
+        )}
+      </PageSection>
+    </>
+  );
+}
+
+function SampleList({ title, items, more }: { title: string; items: Array<{ key: string; href: string; name: string; detail: string; tone: "warning" | "danger" }>; more: number }) {
+  const { t } = useLocale();
+  return (
+    <div className="rounded-lg border border-line bg-surface-1">
+      <h3 className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink-1">{title}</h3>
+      <ul className="divide-y divide-line">
+        {items.map((item) => (
+          <li key={item.key}>
+            <Link href={item.href} className="flex min-h-[var(--control-h-touch)] items-center gap-3 px-4 py-2 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-focus">
+              <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", item.tone === "danger" ? "bg-status-danger" : "bg-status-warning")} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink-1">{item.name}</span>
+                <span className="block truncate text-xs text-ink-2">{item.detail}</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {more > 0 ? <p className="border-t border-line px-4 py-2 text-xs text-ink-3">{t("people.panel.andMore", { count: more })}</p> : null}
+    </div>
+  );
+}
+
+function fechaCorta(value: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("es", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function fechaHora(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }

@@ -367,11 +367,14 @@ en localhost no se han ejecutado.** El script del repositorio
 seguido de `up -d --build`, sin borrar volúmenes con nombre— y debe
 ejecutarlo una persona en la máquina.
 
-### Separar Personas de Productividad
+### Separar Personas de Productividad — hecho antes de esta sesión
 
-`/employees` exige hoy el permiso `productivity.view`. Separarlo toca
-permisos y migración en el backend; queda identificado y **sin tocar** a la
-espera de confirmación explícita.
+Quedó resuelto en `770a2e9` («Personas y Productividad: dos módulos»):
+`/employees` se protege solo por `employees.read` (en el servidor cada ruta
+de `EmployeesController` lleva ese permiso, ninguna `productivity.view`),
+Personas tiene sección de menú propia y `requiresCommercialModule` está
+apagado para el módulo `people`. No hacía falta migración ni cambio de
+permisos. Esta nota reemplaza a la que lo daba por pendiente.
 
 ### Prueba de usabilidad
 
@@ -380,26 +383,24 @@ tareas (evaluar un candidato, continuar un curso, recibir mercancía),
 registrando éxito, errores, tiempo y peticiones de ayuda— queda como
 entregable pendiente.
 
-### Datos que el backend no agrega hoy
+### Datos agregados de Personas — resuelto con `GET /employees/summary` (2026-09-08)
 
-El encargo pide en Personas «perfiles incompletos» y «documentos pendientes o
-próximos a vencer». El backend expone eso **por empleado**
-(`/employees/:id/payroll-compliance`), no agregado. Mostrarlo aquí exigiría
-contarlo sobre la página cargada y presentar un parcial como total, así que
-queda anotado en lugar de inventado. Requiere un endpoint de resumen.
+Nuevo endpoint en `EmployeesController`, declarado antes de `:id`:
 
-Lo mismo con «cambios recientes» del módulo de Personas: hay auditoría por
-empleado, no un feed del módulo.
+| | |
+|---|---|
+| Permiso | `employees.read` (el mismo que la lista). Sin permiso nuevo, sin migración: solo lectura sobre tablas existentes |
+| Alcance | Sucursal activa (o `?branchId=`, validada contra la empresa) y `buildBranchScopedWhere(actor)`, exactamente como `findAll`: quien no puede listar a alguien tampoco lo cuenta |
+| `headcount` | Total y por estado (`groupBy`) |
+| `incompleteProfiles` | Activos sin cargo, sin teléfono o sin contacto de emergencia; cifra total + muestra de 5 con qué falta |
+| `documents` | Vigentes (no borrados ni sustituidos): sin revisar, vencidos, por vencer en 30 días; muestra de 5 ordenada por vencimiento |
+| `recentChanges` | Últimas 10 entradas de `AuditLog` con `entityType = Employee` sobre expedientes del alcance |
+| `truncated` | `true` si el alcance supera 2 000 expedientes (la auditoría se limita a esos) |
 
-### Traducciones
-
-Quedan ~2.900 cadenas en castellano dentro de `.tsx`. Las tres bibliotecas
-compartidas (`lib/backend.ts`, `lib/operation-flow.ts`, `lib/ui-labels.ts`)
-necesitan una decisión de API: devolver claves en lugar de texto.
-
-### Docker
-
-La reconstrucción de imágenes locales sigue pendiente a propósito, hasta que
-los paneles restantes estén hechos. Cuando toque: reconstruir imágenes
-locales, actualizar contenedores, **conservar base de datos y volúmenes**,
-verificar front y back en localhost. Sin despliegues remotos ni `git push`.
+Prueba unitaria en `employees.service.spec.ts`. El panel `/people/dashboard`
+gana la sección «Qué necesita atención» (tres tarjetas de estado, listas de
+muestra enlazadas al expediente) y «Cambios recientes»; el aviso «el
+servidor todavía no lo resume» desaparece. Verificado con specimen a 390 y
+1440 px. Nota: `test/rbac/rbac-security.test.ts` tiene 4 fallos previos
+(vacantes, portal de candidatos, entrevistadores, contratación) que no
+dependen de este cambio; se reproducen igual sin él.

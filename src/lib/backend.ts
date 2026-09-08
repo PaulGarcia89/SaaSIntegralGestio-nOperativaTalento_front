@@ -1945,6 +1945,26 @@ export type EmployeeDirectoryResponse = {
 
 type EmployeeDirectoryApiResponse = Omit<EmployeeDirectoryResponse, "data"> & { data: EmployeeApiItem[] };
 
+/** `GET /employees/summary`: resumen de Personas por sucursal, contado por el servidor. */
+export type EmployeesSummaryDto = {
+  branchId: string;
+  generatedAt: string;
+  headcount: { total: number; active: number; inactive: number; suspended: number; terminated: number };
+  incompleteProfiles: {
+    count: number;
+    criteria: string[];
+    sample: Array<{ id: string; name: string; missing: string[] }>;
+  };
+  documents: {
+    pendingReview: number;
+    expired: number;
+    expiringWithin30Days: number;
+    sample: Array<{ id: string; employeeId: string; employeeName: string; category: string; originalName: string; expiresAt: string | null; expired: boolean }>;
+  };
+  recentChanges: Array<{ id: string; action: string | null; employeeId: string | null; employeeName: string | null; actorEmail: string | null; actorRole: string | null; createdAt: string }>;
+  truncated: boolean;
+};
+
 function normalizeEmployeeDirectoryItem(employee: EmployeeApiItem): EmployeeDirectoryItem {
   const assignments = Array.isArray(employee.branchAssignments)
     ? employee.branchAssignments
@@ -2054,6 +2074,13 @@ export function fetchEmployees(input: { search?: string; status?: string; branch
       if (!shouldUseMockBackend(error)) throw error;
       return fetchMockEmployees(input);
     });
+}
+
+/** Resumen del módulo de Personas. Sin sustituto de prueba: si el servidor no responde, la pantalla lo dice. */
+export function fetchEmployeesSummary(branchId?: string) {
+  const query = new URLSearchParams();
+  if (branchId) query.set("branchId", branchId);
+  return request<EmployeesSummaryDto>(`/employees/summary${query.size ? `?${query}` : ""}`);
 }
 
 export function updateEmployee(id: string, input: UpdateEmployeeInput) {

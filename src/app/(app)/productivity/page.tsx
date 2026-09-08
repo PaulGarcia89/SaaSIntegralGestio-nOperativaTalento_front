@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Camera, Clock3, MapPinned, Play, RefreshCw, Sparkles, TriangleAlert } from "lucide-react";
+import { Play, RefreshCw, Sparkles } from "lucide-react";
 import {
   createProductivityDemoEvent,
   fetchProductivityAlerts,
@@ -20,7 +21,17 @@ import {
 } from "@/lib/productivity-demo";
 import { useAppStore } from "@/store/app-store";
 import { AsyncState } from "@/components/async-state";
-import { InlineFeedback, PageHeader } from "@/components/design-system";
+import {
+  ActiveContext,
+  EmptyState,
+  InlineNote,
+  PageHeader,
+  PageSection,
+  StatusBadge,
+  StatusTile,
+  StatusTileRow,
+  Timeline,
+} from "@/components/system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -98,7 +109,17 @@ export default function ProductivityPage() {
   const { currentBranch } = useAppStore();
   const branchId = currentBranch?.id;
   const queryClient = useQueryClient();
-  const [running, setRunning] = useState(true);
+  /*
+   * La simulación arranca DETENIDA.
+   *
+   * Antes empezaba sola al abrir la pantalla y escribía un evento inventado
+   * en la base de datos cada 3,2 segundos. Nadie había pedido nada: bastaba
+   * con entrar. Eso mezcla datos simulados con datos reales en la misma tabla
+   * y, cuanto más tiempo se deja la pestaña abierta, más difícil es
+   * distinguirlos después. Ahora hay que pulsar «Iniciar simulación», y el
+   * aviso dice antes de pulsarlo qué va a pasar.
+   */
+  const [running, setRunning] = useState(false);
   const [frame, setFrame] = useState(0);
 
   const overview = useQuery({
@@ -198,205 +219,254 @@ export default function ProductivityPage() {
     return <AsyncState state="error" title="No pudimos cargar Productividad" description={error instanceof Error ? error.message : undefined} onRetry={() => void Promise.all([overview.refetch(), cameras.refetch(), zones.refetch(), events.refetch()])} />;
   }
   const overviewData = overview.data!;
-  const metricItems = [
-    [Activity, "Eventos", overviewData.totalEvents],
-    [Clock3, "Tiempo activo", formatMinutes(overviewData.activeSeconds)],
-    [Clock3, "Sin actividad", formatMinutes(overviewData.idleSeconds)],
-    [Camera, "Cámaras en línea", overviewData.camerasOnline],
-    [MapPinned, "Zonas activas", overviewData.zonesActive],
-    [TriangleAlert, "Alertas", overviewData.alertsOpen],
-  ] as const;
 
-  const visibleAlerts = alerts.data?.slice(0, 4) ?? [];
-  const visibleZones = insights.data?.zones?.length ? insights.data.zones : sessionSummary.byZone.map((item) => ({
-    zone: { id: item.zone.id, name: item.zone.name },
-    events: item.events,
-    activeSeconds: item.activeSeconds,
-    idleSeconds: item.idleSeconds,
-    confidence: item.confidence,
-  }));
+  const visibleAlerts = alerts.data ?? [];
+  const visibleZones = insights.data?.zones?.length
+    ? insights.data.zones
+    : sessionSummary.byZone.map((item) => ({
+        zone: { id: item.zone.id, name: item.zone.name },
+        events: item.events,
+        activeSeconds: item.activeSeconds,
+        idleSeconds: item.idleSeconds,
+        confidence: item.confidence,
+      }));
+
+  const sinCamaras = session.cameras.length === 0;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Operación y capacidad"
         title="Productividad"
-        description="Demostración visual de cámaras, zonas y eventos operativos. No representa evaluaciones automáticas ni decisiones laborales."
+        description="Ocupación y flujo por zona, medidos con las cámaras registradas en esta sucursal. No evalúa a personas ni sustituye una decisión laboral."
+      />
+
+      <ActiveContext />
+
+      {/* ---- 1. Qué necesita atención -----------------------------------
+          Las alertas abiertas son lo único de esta pantalla que exige una
+          acción. Si las hay, van antes que cualquier cifra. */}
+      {visibleAlerts.length > 0 ? (
+        <PageSection
+          title="Alertas abiertas"
+          description="Situaciones que el sistema marcó para que alguien las mire."
+          id="alertas"
+        >
+          <ul className="grid gap-3 md:grid-cols-2">
+            {visibleAlerts.slice(0, 4).map((alert) => (
+              <li key={alert.id}>
+                <article className="flex h-full flex-col gap-2 rounded-lg border border-status-warning/40 bg-surface-1 p-4">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <h3 className="min-w-0 text-sm font-semibold text-ink-1">{alert.title}</h3>
+                    <StatusBadge size="sm" tone="warning" label={alert.status} />
+                  </div>
+                  <p className="text-sm text-ink-2">{alert.description}</p>
+                  <p className="mt-auto text-2xs text-ink-3">{formatTime(alert.createdAt)}</p>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </PageSection>
+      ) : null}
+
+      {/* ---- 2. Cómo está la sucursal -----------------------------------
+          Cifras del backend, no de la simulación. Cuatro, no seis: «Eventos»
+          y «Sin actividad» son detalle del periodo y viven en el desglose por
+          zona, que es donde se pueden interpretar. */}
+      <StatusTileRow label="Estado de la operación">
+        <li className="min-w-0">
+          <StatusTile
+            title="Cámaras en línea"
+            value={overviewData.camerasOnline}
+            context="Registrando ahora mismo en esta sucursal."
+            status={
+              overviewData.camerasOnline === 0
+                ? { label: "Ninguna activa", tone: "warning" as const }
+                : undefined
+            }
+            href="/productivity/cameras"
+            actionLabel="Ver cámaras"
+          />
+        </li>
+        <li className="min-w-0">
+          <StatusTile
+            title="Zonas con actividad"
+            value={overviewData.zonesActive}
+            context="Zonas que registraron movimiento en el periodo."
+            href="/productivity/cameras"
+            actionLabel="Ver zonas"
+          />
+        </li>
+        <li className="min-w-0">
+          <StatusTile
+            title="Alertas abiertas"
+            value={overviewData.alertsOpen}
+            context="Sin revisar o sin resolver."
+            status={
+              overviewData.alertsOpen > 0
+                ? { label: "Requieren revisión", tone: "warning" as const }
+                : undefined
+            }
+          />
+        </li>
+        <li className="min-w-0">
+          <StatusTile
+            title="Tiempo activo"
+            value={formatMinutes(overviewData.activeSeconds)}
+            context={`Frente a ${formatMinutes(overviewData.idleSeconds)} sin actividad.`}
+            scope={insights.data ? `Del ${insights.data.period.from} al ${insights.data.period.to}` : undefined}
+          />
+        </li>
+      </StatusTileRow>
+
+      {/* ---- 3. Reparto por zona ---------------------------------------- */}
+      {visibleZones.length > 0 ? (
+        <PageSection
+          title="Actividad por zona"
+          description="Cuánto tiempo estuvo activa cada zona y con qué confianza lo midió la cámara."
+          id="zonas"
+        >
+          <ul className="space-y-1">
+            {visibleZones.slice(0, 6).map((item) => (
+              <li
+                key={item.zone.id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface-1 px-4 py-3"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-ink-1">{item.zone.name}</span>
+                  <span className="block truncate text-xs text-ink-3">
+                    {item.events} eventos · {formatMinutes(item.activeSeconds)} activos · {formatMinutes(item.idleSeconds)} inactivos
+                  </span>
+                </span>
+                {/* La confianza acompaña siempre a la medida: sin ella, un
+                    porcentaje de una cámara mal calibrada se lee igual que
+                    uno fiable. */}
+                <StatusBadge
+                  size="sm"
+                  tone={item.confidence >= 70 ? "success" : item.confidence >= 40 ? "warning" : "danger"}
+                  label={`Confianza ${item.confidence} %`}
+                />
+              </li>
+            ))}
+          </ul>
+        </PageSection>
+      ) : null}
+
+      {/* ---- 4. Recomendaciones ----------------------------------------- */}
+      {insights.data?.recommendations.length ? (
+        <PageSection
+          title="Para revisión humana"
+          description="Sugerencias derivadas de la medición. Ninguna se aplica sola."
+          id="recomendaciones"
+        >
+          <ul className="grid gap-3 md:grid-cols-2">
+            {insights.data.recommendations.map((item) => (
+              <li key={item.zoneId}>
+                <article className="flex h-full flex-col gap-2 rounded-lg border border-line bg-surface-1 p-4">
+                  <h3 className="text-sm font-semibold text-ink-1">{item.title}</h3>
+                  <p className="text-sm text-ink-2">{item.explanation}</p>
+                  <p className="mt-auto text-sm font-medium text-accent-ink">
+                    Siguiente paso: {item.suggestedAction}
+                  </p>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </PageSection>
+      ) : null}
+
+      {/* ---- 5. Simulación de demostración ------------------------------
+          Separada del resto y apagada de fábrica. Todo lo de arriba son
+          cifras del backend; esto de aquí escribe eventos inventados en la
+          misma base de datos, y el aviso lo dice ANTES de que nadie pulse. */}
+      <PageSection
+        title="Simulación de demostración"
+        description="Genera eventos de ejemplo para enseñar cómo se ve el módulo cuando hay actividad."
+        id="simulacion"
         actions={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setRunning((current) => !current)}
-              disabled={session.cameras.length === 0}
-            >
-              {running ? <RefreshCw className="size-4" /> : <Play className="size-4" />}
-              {running ? "Pausar demo" : "Reanudar demo"}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setRunning((current) => !current)} disabled={sinCamaras}>
+              {running ? <RefreshCw className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
+              {running ? "Detener simulación" : "Iniciar simulación"}
             </Button>
             <Button
+              variant="secondary"
               onClick={() => {
                 const nextEvent = createNextDemoEvent(session);
                 if (nextEvent) createEvent.mutate(nextEvent);
               }}
-              disabled={session.cameras.length === 0 || createEvent.isPending}
+              disabled={sinCamaras || createEvent.isPending}
             >
-              <Sparkles className="size-4" />
-              {createEvent.isPending ? "Guardando evento" : "Generar evento"}
+              <Sparkles className="size-4" aria-hidden="true" />
+              {createEvent.isPending ? "Guardando…" : "Generar un evento"}
             </Button>
-          </>
+          </div>
         }
-      />
+      >
+        <div className="space-y-4">
+          <InlineNote tone="warning" title="Los eventos que genere se guardan en la base de datos">
+            Quedan marcados con origen «DEMO» y suman a los contadores de arriba. Úsalo para demostraciones, no
+            sobre datos de operación real.
+          </InlineNote>
 
-      <InlineFeedback tone="info" title="Escenario de demostración activo">
-        Cada captura demo se almacena en la base de datos y vuelve a consultarse desde el backend para poblar estas métricas.
-      </InlineFeedback>
+          {sinCamaras ? (
+            <EmptyState
+              reason="no-records"
+              title="No hay cámaras activas en esta sucursal"
+              description="Registra y activa una cámara antes de simular. No se generan datos sin una cámara real detrás."
+              action={
+                <Button asChild variant="secondary">
+                  <Link href="/productivity/cameras">Ir a Cámaras y zonas</Link>
+                </Button>
+              }
+            />
+          ) : null}
 
-      {session.cameras.length === 0 ? (
-        <InlineFeedback tone="warning" title="No hay cámaras activas en esta sucursal">
-          Registra y activa una cámara en Cámaras y zonas antes de iniciar la demostración. No se generarán datos ficticios.
-        </InlineFeedback>
-      ) : null}
+          {createEvent.isError ? (
+            <InlineNote tone="danger" title="El evento no pudo almacenarse">
+              {createEvent.error instanceof Error ? createEvent.error.message : "El backend rechazó el registro."}
+            </InlineNote>
+          ) : null}
 
-      {createEvent.isError ? (
-        <InlineFeedback tone="danger" title="El evento no pudo almacenarse">
-          {createEvent.error instanceof Error ? createEvent.error.message : "El backend rechazó el registro."}
-        </InlineFeedback>
-      ) : null}
+          {!sinCamaras ? (
+            <>
+              <DemoCameraPreview session={session} />
 
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
-        <DemoCameraPreview session={session} />
-        <Card level={2}>
-          <CardContent className="space-y-4 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-brand">Resumen del demo</p>
-                <h2 className="text-xl font-semibold">{currentBranch.name}</h2>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <DemoFigure label="Productividad media" value={`${Math.round(sessionSummary.averageProductivity)} %`} />
+                <DemoFigure label="Eventos generados" value={String(sessionSummary.totalEvents)} />
+                <DemoFigure label="Tiempo activo simulado" value={formatMinutes(sessionSummary.activeSeconds)} />
+                <DemoFigure label="Cámaras en la simulación" value={String(sessionSummary.activeCameras)} />
               </div>
-              <Badge variant={running ? "success" : "secondary"}>{running ? "Grabando" : "En pausa"}</Badge>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-surface-section p-4">
-                <p className="text-sm text-text-secondary">Productividad promedio</p>
-                <p className="mt-2 text-3xl font-semibold">{Math.round(sessionSummary.averageProductivity)}%</p>
-              </div>
-              <div className="rounded-2xl bg-surface-section p-4">
-                <p className="text-sm text-text-secondary">Eventos generados</p>
-                <p className="mt-2 text-3xl font-semibold">{sessionSummary.totalEvents}</p>
-              </div>
-              <div className="rounded-2xl bg-surface-section p-4">
-                <p className="text-sm text-text-secondary">Tiempo activo demo</p>
-                <p className="mt-2 text-3xl font-semibold">{formatMinutes(sessionSummary.activeSeconds)}</p>
-              </div>
-              <div className="rounded-2xl bg-surface-section p-4">
-                <p className="text-sm text-text-secondary">Cámaras vivas</p>
-                <p className="mt-2 text-3xl font-semibold">{sessionSummary.activeCameras}</p>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border-default p-4">
-              <p className="text-sm font-medium">Cámaras registradas</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {session.cameras.map((camera) => (
-                  <Badge key={camera.id} variant="secondary">
-                    {camera.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {metricItems.map(([Icon, label, value]) => (
-          <Card key={label} level={2}>
-            <CardContent className="flex gap-3 p-4">
-              <Icon className="size-5 text-brand" />
-              <div>
-                <p className="text-sm text-text-secondary">{label}</p>
-                <p className="text-2xl font-semibold">{value}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card level={2}>
-          <CardContent className="space-y-4 p-5">
-            <h2 className="font-semibold">Línea de tiempo de actividad</h2>
-            <div className="space-y-3">
-              {session?.events.slice(0, 6).map((event) => (
-                <div key={event.id} className="rounded-2xl border border-border-default bg-surface-section p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium">{event.label}</p>
-                    <p className="text-xs text-text-secondary">{formatTime(event.occurredAt)}</p>
-                  </div>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    {event.cameraName} · {event.zoneName} · {event.peopleDetected} personas detectadas · {event.productivityScore}% productividad
-                  </p>
-                </div>
-              ))}
-              {session.events.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-border-default p-4 text-sm text-text-secondary">
-                  Aún no hay eventos demo almacenados para esta sucursal.
+              {session.events.length > 0 ? (
+                <Timeline
+                  entries={session.events.slice(0, 6).map((event) => ({
+                    id: event.id,
+                    title: event.label,
+                    detail: `${event.cameraName} · ${event.zoneName} · ${event.peopleDetected} personas · ${event.productivityScore} % productividad`,
+                    when: formatTime(event.occurredAt),
+                  }))}
+                />
+              ) : (
+                <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-2">
+                  Todavía no hay eventos de demostración para esta sucursal.
                 </p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </>
+          ) : null}
+        </div>
+      </PageSection>
+    </div>
+  );
+}
 
-        <Card level={2}>
-          <CardContent className="space-y-4 p-5">
-            <h2 className="font-semibold">Zonas activas</h2>
-            <div className="space-y-3">
-              {visibleZones.slice(0, 4).map((item) => (
-                <div key={item.zone.id} className="rounded-2xl bg-surface-section p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{item.zone.name}</p>
-                    <Badge variant="secondary">{item.confidence}% confianza</Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    {item.events} eventos · {formatMinutes(item.activeSeconds)} activos · {formatMinutes(item.idleSeconds)} inactivos
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {visibleAlerts.length ? (
-        <Card level={2}>
-          <CardContent className="space-y-3 p-5">
-            <h2 className="font-semibold">Alertas recientes</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              {visibleAlerts.map((alert) => (
-                <div key={alert.id} className="rounded-2xl border border-border-default bg-surface-section p-4">
-                  <p className="font-medium">{alert.title}</p>
-                  <p className="mt-1 text-sm text-text-secondary">{alert.description}</p>
-                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-text-secondary">{alert.status}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {insights.data?.recommendations.length ? (
-        <Card level={2}>
-          <CardContent className="space-y-3 p-5">
-            <h2 className="font-semibold">Recomendaciones para revisión humana</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              {insights.data.recommendations.map((item) => (
-                <div key={item.zoneId} className="rounded-2xl border border-primary/20 p-4">
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-1 text-sm text-text-secondary">{item.explanation}</p>
-                  <p className="mt-2 text-sm font-medium text-brand">Siguiente paso: {item.suggestedAction}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+/** Cifra de la simulación. Va en gris y sin acción: no es una medida real. */
+function DemoFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-surface-2 p-4">
+      <p className="text-sm text-ink-2">{label}</p>
+      <p className="mt-1 font-mono text-2xl font-semibold tabular-figures text-ink-1">{value}</p>
     </div>
   );
 }

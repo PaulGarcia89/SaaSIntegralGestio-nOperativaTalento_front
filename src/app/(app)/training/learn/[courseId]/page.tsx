@@ -39,8 +39,11 @@ export default function TrainingCourseLearnPage() {
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible sincronizar tu avance.")),
   });
 
+  // Sin ancho máximo: el reproductor y el vídeo ocupan todo el espacio que
+  // deja el menú. Con `max-w-6xl` el vídeo quedaba a la mitad de la pantalla
+  // en un monitor de 1920 px.
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="space-y-6 py-2">
       <Button asChild variant="ghost" className="-ml-3">
         <Link href="/training">
           <ArrowLeft className="size-4" aria-hidden="true" />

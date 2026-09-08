@@ -659,34 +659,18 @@ export function EmployeeCreatePage() {
           </Button>
         }
       />
-      <section aria-labelledby="employee-hiring-flow" className="rounded-2xl border border-border-default bg-surface-section p-5">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 id="employee-hiring-flow" className="font-semibold">{t("employees.create.centralFile")}</h2>
-            <p className="mt-1 text-sm text-text-secondary">{t("employees.create.centralFileDescription")}</p>
-          </div>
-          <Badge variant="outline">{t("employees.create.goal")}</Badge>
-        </div>
-        <ol className="mt-5 grid gap-3 md:grid-cols-4">
-          <HiringStep number="1" title={t("employees.create.flow.dataTitle")} description={t("employees.create.flow.dataDescription")} />
-          <HiringStep current number="2" title={t("employees.create.flow.payrollTitle")} description={t("employees.create.flow.payrollDescription")} />
-          <HiringStep number="3" title={t("employees.create.flow.evidenceTitle")} description={t("employees.create.flow.evidenceDescription")} />
-          <HiringStep number="4" title={t("employees.create.flow.auditTitle")} description={t("employees.create.flow.auditDescription")} />
-        </ol>
-      </section>
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
+      {/* Una sola guía: el paso a paso del formulario. Antes había además un
+          bloque fijo de cuatro «etapas» (siempre con la 2 resaltada), un aviso
+          y una columna lateral que vendía la carga masiva con tres cifras. */}
+      <p className="text-sm text-ink-2">
+        {tx("¿Vas a dar de alta a muchas personas?", "Adding many people?")}{" "}
+        <Link href="/employees/import" className="font-medium text-ink-1 underline underline-offset-4">
+          {tx("Cargar empleados desde un archivo", "Import employees from a file")}
+        </Link>
+      </p>
+      <div className="min-w-0 max-w-4xl">
         <Card level={2}>
           <CardContent className="p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-text-secondary">{t("employees.create.individual")}</p>
-                <h3 className="mt-1 text-xl font-semibold">{t("employees.create.manualTitle")}</h3>
-              </div>
-              <Badge variant="secondary">1 a 1</Badge>
-            </div>
-            <InlineFeedback tone="info" title={t("employees.create.onlyNecessaryTitle")}>
-              {t("employees.create.onlyNecessaryDescription")}
-            </InlineFeedback>
             <form
               className="mt-5 space-y-4"
               onSubmit={(event) => {
@@ -716,62 +700,6 @@ export function EmployeeCreatePage() {
           </CardContent>
         </Card>
 
-        <div className="min-w-0 space-y-5">
-          <Card level={2}>
-            <CardContent className="p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-text-secondary">Carga masiva</p>
-                  <h3 className="mt-1 text-xl font-semibold">Cargar empleados en lote</h3>
-                </div>
-                <Badge variant="secondary">CSV / Excel</Badge>
-              </div>
-              <div className="mt-4 rounded-2xl border border-border-default bg-surface-elevated p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-brand">
-                    <Upload className="size-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">Ideal para altas de equipo completas</p>
-                    <p className="mt-1 text-sm leading-6 text-text-secondary">
-                      Revisa el archivo antes de confirmar y crea expedientes con validación previa.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-                  <Metric label="Formato" value="XLSX" />
-                  <Metric label="Límite" value="500" />
-                  <Metric label="Flujo" value="Prevalidado" />
-                </div>
-                <ol className="mt-4 grid min-w-0 gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-                  <GuideStep number="1" title="Preparar" description="Descarga la plantilla y organiza nombre, correo, sucursal y cargo." icon={<FileSpreadsheet className="size-4" />} accent="primary" />
-                  <GuideStep number="2" title="Validar" description="Sube el archivo y revisa errores antes de confirmar la carga." icon={<ShieldCheck className="size-4" />} accent="info" />
-                  <GuideStep number="3" title="Confirmar" description="Ejecuta la carga cuando todas las filas estén listas." icon={<CheckCircle2 className="size-4" />} accent="success" />
-                </ol>
-              </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button asChild type="button" variant="secondary" className="w-full sm:w-auto">
-                <Link href="/employees/import">
-                  <FileSpreadsheet className="size-4" />
-                  Cargar empleados
-                </Link>
-              </Button>
-            </div>
-            </CardContent>
-          </Card>
-
-          <Card level={2}>
-            <CardContent className="p-6">
-              <p className="text-sm font-medium text-text-secondary">Qué queda centralizado</p>
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-text-secondary">
-                <li>Datos personales y de contacto.</li>
-                <li>Sucursal principal y cargo actual.</li>
-                <li>Estado del empleado y trazabilidad de cambios.</li>
-                <li>Documentos y soportes asociados para auditoría.</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );
@@ -800,29 +728,9 @@ function InitialChecklist() {
   return <div className="space-y-4"><InlineFeedback tone="info" title="Checklist generado automáticamente">La creación del empleado registra estos requisitos como pendientes o no requeridos según las opciones elegidas. La evidencia se administra desde el expediente.</InlineFeedback><div className="grid gap-3 sm:grid-cols-2">{requirements.map((requirement) => <div key={requirement} className="flex items-center justify-between rounded-xl border border-border-default bg-surface-elevated p-4"><span className="font-medium">{requirement}</span><Badge variant="secondary">Pendiente</Badge></div>)}</div></div>;
 }
 
-function HiringStep({ current = false, description, number, title }: { current?: boolean; description: string; number: string; title: string }) {
-  return (
-    <li className={current ? "rounded-xl border border-primary/30 bg-primary/5 p-4" : "rounded-xl border border-border-default bg-surface-elevated p-4"}>
-      <span className={current ? "text-xs font-semibold text-brand" : "text-xs font-semibold text-text-secondary"}>Paso {number}</span>
-      <p className="mt-1 font-medium">{title}</p>
-      <p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p>
-    </li>
-  );
-}
-
 function ReviewDatum({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</dt><dd className="mt-1 font-medium">{value || "Sin definir"}</dd></div>;
 }
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border-default bg-card p-3">
-      <p className="text-xs text-text-secondary">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
-    </div>
-  );
-}
-
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (

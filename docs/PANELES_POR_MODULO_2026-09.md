@@ -263,6 +263,14 @@ necesario. Qué se cambió en cada flujo:
 | Productividad · cámaras y zonas | Dos formularios primero, dos avisos explicativos, las cámaras al final | Primero lo que existe; el alta plegada en «Agregar cámara o zona» (abierta solo si no hay ninguna); sin avisos |
 | Administración · usuarios | Cuatro cifras que ya da `/admin/dashboard` | Solo la lista y el alta |
 
+
+Segunda pasada (misma fecha):
+
+| Módulo · pantalla | Antes | Ahora |
+|---|---|---|
+| Personas · alta de empleado | Bloque fijo de cuatro «etapas» (siempre con la 2 resaltada), aviso «solo lo necesario», etiqueta «1 a 1» y una columna lateral con cifras y guía de la carga masiva | Solo el paso a paso real del formulario (con el `Stepper` del sistema) y un enlace de una línea a la carga masiva |
+| Operaciones (activos, restaurante: consumo, merma, producción, conteos, compras) | `OperationStepper` como pastillas de texto con número | Mismo paso a paso gráfico del sistema; solo se puede volver a los pasos que la operación permite |
+
 Componente nuevo del sistema: `Stepper` (`components/system/stepper.tsx`).
 Sin cambios de backend. Verificado con specimen del expediente de
 incorporación a 390 y 1440 px.

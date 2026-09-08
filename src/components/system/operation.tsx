@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { BlockerList, StatusBadge, WarningList } from "@/components/system/feedback";
+import { Stepper } from "@/components/system/stepper";
 import {
   OPERATION_STEPS,
   OPERATION_STEP_LABELS,
@@ -43,66 +44,30 @@ export function OperationStepper({
   const { t } = useLocale();
   const current = stepIndex(state.step);
 
+  // El mismo paso a paso gráfico que en contratación, cursos y entradas de
+  // mercancía: círculos unidos por una línea. Solo se puede volver a los pasos
+  // que la operación permite (`canNavigateTo`); los demás no son botones.
   return (
-    <nav aria-label={t("sys.operationProgress")}>
-      <ol className="flex min-w-0 gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {OPERATION_STEPS.map((step, index) => {
-          const done = state.completed.includes(step) && index < current;
-          const active = step === state.step;
-          const reachable = onStepChange ? canNavigateTo(state, step) : false;
-
-          const content = (
-            <>
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-full border font-mono text-2xs tabular-figures",
-                  active && "border-accent-line bg-accent-fill text-on-accent-fill",
-                  done && "border-status-success bg-status-success/15 text-status-success",
-                  !active && !done && "border-line text-ink-3",
-                )}
-              >
-                {done ? <Check className="size-3" /> : index + 1}
-              </span>
-              <span className="truncate">{OPERATION_STEP_LABELS[step]}</span>
-            </>
-          );
-
-          const shared = cn(
-            "flex items-center gap-2 whitespace-nowrap rounded-full border px-3 text-xs font-medium",
-            active ? "border-accent-line/50 bg-accent-fill/10 text-ink-1" : "border-transparent text-ink-2",
-          );
-
-          return (
-            <li key={step} className="shrink-0">
-              {reachable && !active ? (
-                <button
-                  type="button"
-                  onClick={() => onStepChange?.(step)}
-                  className={shared}
-                  style={{ minHeight: "var(--control-h-base)" }}
-                >
-                  {content}
-                </button>
-              ) : (
-                <span
-                  className={shared}
-                  aria-current={active ? "step" : undefined}
-                  style={{ minHeight: "var(--control-h-base)" }}
-                >
-                  {content}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+    <div>
+      <Stepper
+        label={t("sys.operationProgress")}
+        steps={OPERATION_STEPS.map((step) => ({ label: OPERATION_STEP_LABELS[step] }))}
+        current={current}
+        onSelect={
+          onStepChange
+            ? (index) => {
+                const target = OPERATION_STEPS[index];
+                if (canNavigateTo(state, target)) onStepChange(target);
+              }
+            : undefined
+        }
+      />
       {/* Redundancia textual: el estado del paso no puede depender solo del
           color del círculo. */}
       <p className="sr-only" aria-live="polite">
         Paso {current + 1} de {OPERATION_STEPS.length}: {OPERATION_STEP_LABELS[state.step]}
       </p>
-    </nav>
+    </div>
   );
 }
 

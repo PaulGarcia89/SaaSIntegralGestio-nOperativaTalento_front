@@ -348,8 +348,14 @@ anchos.
 
 ### Paneles que faltan
 
-- `onboarding` — `/onboarding/documents`
-- Empresas y sucursales, suscripciones, roles y permisos
+Ninguno: desde 2026-09-08 cada módulo (incluidos Incorporación y
+Administración) abre con su propia página «Dashboard» (§ 2.ter).
+
+### Deuda menor de código
+
+- `restaurant-recipes-workspace.tsx`: `RecipeCard` y `RecipeCost` ya no se usan (quedaron las variantes «Secure»); `employee-360.tsx`: `employeeId` y `onCompleteRequirement` sin uso. Son avisos de ESLint, no errores.
+- `hiring-queue-metrics.tsx` sigue sin ningún importador.
+- Firmas, entrevistas, recetas y carga de empleados mezclan claves `t()` nuevas con literales en español que ya existían; el inglés de esas pantallas queda parcial.
 
 ### Docker: no verificado desde esta sesión
 

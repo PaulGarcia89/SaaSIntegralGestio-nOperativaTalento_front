@@ -410,6 +410,29 @@
   "common.globalContextDetail": "You are viewing the whole platform.",
   "common.company": "Company",
   "common.branch": "Branch",
+  "people.panel.eyebrow": "People",
+  "people.panel.title": "People overview",
+  "people.panel.description": "How many people there are, in which status, and who is joining. The directory and the records are one step away.",
+  "people.panel.register": "Register employee",
+  "people.panel.registerHelp": "Add a person with their branch and job title.",
+  "people.panel.noAccessTitle": "You don't have access to People",
+  "people.panel.noAccessHelp": "Ask a company administrator for permission to view employees.",
+  "people.panel.onboardingTitle": "Onboarding in progress",
+  "people.panel.onboardingHelp": "People who are joining. Managed in the Onboarding module.",
+  "people.panel.onboardingActive": "Active onboardings",
+  "people.panel.onboardingActiveContext": "Open onboarding flows at this branch.",
+  "people.panel.onboardingAtRisk": "At risk",
+  "people.panel.onboardingAtRiskContext": "Onboardings with overdue or blocked tasks.",
+  "people.panel.needsAttention": "Needs attention",
+  "people.panel.review": "Review",
+  "people.panel.seeOnboarding": "See onboardings",
+  "people.panel.quickTitle": "Quick access",
+  "people.panel.quickDirectory": "See employees",
+  "people.panel.quickDirectoryHelp": "Directory with search, filters and records.",
+  "people.panel.bulkImport": "Bulk import",
+  "people.panel.bulkImportHelp": "Several people at once from a spreadsheet.",
+  "people.panel.pendingTitle": "Incomplete profiles and expiring documents",
+  "people.panel.pendingHelp": "That information exists record by record, but the server does not yet summarise it for the whole company. As soon as it does, it will appear here as one more card.",
   "training.panel.loading": "Loading your training",
   "training.panel.errorTitle": "Your training could not be loaded",
   "training.panel.adminErrorTitle": "The training summary could not be loaded",
@@ -2600,6 +2623,10 @@
   "apply.analyzing": "Reading…",
   "apply.detectedData": "Detected data · confidence {{confidence}}",
   "nav.section.inicio": "Home",
+  "nav.section.people": "People",
+  "nav.group.Productividad": "Productivity",
+  "nav.Resumen de personas": "People overview",
+  "nav.Resumen de productividad": "Productivity overview",
   "nav.section.operacion": "Daily operations",
   "nav.section.supervision": "Oversight",
   "nav.section.reportes": "Reports",
@@ -2657,7 +2684,7 @@
   ,"nav.section.ats": "Recruiting"
   ,"nav.section.onboarding": "Onboarding"
   ,"nav.section.training": "Training"
-  ,"nav.section.productivity": "People and productivity"
+  ,"nav.section.productivity": "Productivity"
   ,"nav.section.asset_inventory": "Asset inventory"
   ,"nav.section.restaurant_inventory": "Restaurant inventory"
   ,"nav.section.notifications": "Alerts"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ActiveContext, InlineNote, PageSection, StatusTile, StatusTileRow } from "@/components/system";
 import { fetchEmployees } from "@/lib/backend";
@@ -39,15 +40,19 @@ const ESTADOS = ["ACTIVE", "INACTIVE", "TERMINATED"] as const;
  *  leerse de un vistazo y se convierte en otra tabla. */
 const MAX_SUCURSALES = 8;
 
-export function EmployeesModulePanel({
-  onSelectStatus,
-  onSelectBranch,
-}: {
-  /** Aplica el filtro de estado del directorio que hay debajo. */
-  onSelectStatus: (status: "all" | "ACTIVE" | "INACTIVE" | "TERMINATED") => void;
-  /** Aplica el filtro de sucursal. Cadena vacía = todas. */
-  onSelectBranch: (branchId: string) => void;
-}) {
+/**
+ * Enlaces al directorio con el filtro ya puesto.
+ *
+ * El panel vive en /people y el directorio en /employees. Cada tarjeta abre
+ * el directorio filtrado por lo que la tarjeta cuenta, y el directorio da
+ * prioridad a lo que llega en la URL sobre el filtro guardado.
+ */
+const alDirectorio = (params: Record<string, string>) => {
+  const query = new URLSearchParams(params);
+  return `/employees${query.size ? `?${query}` : ""}`;
+};
+
+export function EmployeesModulePanel() {
   const { t } = useLocale();
   const { currentTenant, currentBranch, tenantBranches } = useAppStore();
   const alcance = currentBranch?.name ?? t("common.allBranches");
@@ -104,7 +109,7 @@ export function EmployeesModulePanel({
             value={activos}
             context={t("employees.panel.activeContext")}
             scope={alcance}
-            onAction={() => onSelectStatus("ACTIVE")}
+            href={alDirectorio({ status: "ACTIVE" })}
             actionLabel={t("employees.panel.filter")}
           />
         </li>
@@ -114,7 +119,7 @@ export function EmployeesModulePanel({
             value={inactivos}
             context={t("employees.panel.inactiveContext")}
             scope={alcance}
-            onAction={() => onSelectStatus("INACTIVE")}
+            href={alDirectorio({ status: "INACTIVE" })}
             actionLabel={t("employees.panel.filter")}
           />
         </li>
@@ -124,7 +129,7 @@ export function EmployeesModulePanel({
             value={desvinculados}
             context={t("employees.panel.terminatedContext")}
             scope={alcance}
-            onAction={() => onSelectStatus("TERMINATED")}
+            href={alDirectorio({ status: "TERMINATED" })}
             actionLabel={t("employees.panel.filter")}
           />
         </li>
@@ -134,7 +139,7 @@ export function EmployeesModulePanel({
             value={cifra(total)}
             context={t("employees.panel.totalContext")}
             scope={alcance}
-            onAction={() => onSelectStatus("all")}
+            href={alDirectorio({ status: "all" })}
             actionLabel={t("employees.panel.seeAll")}
           />
         </li>
@@ -149,9 +154,8 @@ export function EmployeesModulePanel({
           <ul className="space-y-1">
             {repartoSucursales.map((fila) => (
               <li key={fila.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelectBranch(fila.id)}
+                <Link
+                  href={alDirectorio({ branch: fila.id })}
                   className={cn(
                     "flex w-full items-center gap-4 rounded-lg border border-line bg-surface-1 px-4 py-3 text-left",
                     "min-h-[var(--control-h-touch)] sm:min-h-[var(--control-h-base)]",
@@ -172,7 +176,7 @@ export function EmployeesModulePanel({
                   <span className="w-14 shrink-0 text-right font-mono text-lg font-semibold tabular-figures text-ink-1">
                     {fila.total ?? "—"}
                   </span>
-                </button>
+                </Link>
               </li>
             ))}
           </ul>

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPrefixes = ["/dashboard", "/profile", "/employees", "/notifications", "/reports", "/ats", "/onboarding", "/training", "/productivity", "/inventory", "/admin"];
+const protectedPrefixes = ["/dashboard", "/profile", "/people", "/employees", "/notifications", "/reports", "/ats", "/onboarding", "/training", "/productivity", "/inventory", "/admin"];
 
 export function proxy(request: NextRequest) {
   const protectedRoute = protectedPrefixes.some((prefix) => request.nextUrl.pathname === prefix || request.nextUrl.pathname.startsWith(`${prefix}/`));

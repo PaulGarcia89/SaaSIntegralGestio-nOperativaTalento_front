@@ -410,6 +410,29 @@
   "common.globalContextDetail": "Estás consultando toda la plataforma.",
   "common.company": "Empresa",
   "common.branch": "Sucursal",
+  "people.panel.eyebrow": "Personas",
+  "people.panel.title": "Resumen de personas",
+  "people.panel.description": "Cuánta gente hay, en qué estado y quién está entrando. El directorio y los expedientes están a un paso.",
+  "people.panel.register": "Registrar empleado",
+  "people.panel.registerHelp": "Alta de una persona con su sucursal y su cargo.",
+  "people.panel.noAccessTitle": "No tienes acceso a Personas",
+  "people.panel.noAccessHelp": "Pide a un administrador de la empresa el permiso para ver empleados.",
+  "people.panel.onboardingTitle": "Incorporaciones en curso",
+  "people.panel.onboardingHelp": "Personas que están entrando. Se gestionan en el módulo de Incorporación.",
+  "people.panel.onboardingActive": "Incorporaciones activas",
+  "people.panel.onboardingActiveContext": "Flujos de entrada abiertos en esta sucursal.",
+  "people.panel.onboardingAtRisk": "En riesgo",
+  "people.panel.onboardingAtRiskContext": "Incorporaciones con tareas atrasadas o bloqueadas.",
+  "people.panel.needsAttention": "Requieren atención",
+  "people.panel.review": "Revisar",
+  "people.panel.seeOnboarding": "Ver incorporaciones",
+  "people.panel.quickTitle": "Accesos rápidos",
+  "people.panel.quickDirectory": "Ver empleados",
+  "people.panel.quickDirectoryHelp": "Directorio con búsqueda, filtros y expedientes.",
+  "people.panel.bulkImport": "Carga masiva",
+  "people.panel.bulkImportHelp": "Varias personas de una vez desde una hoja de cálculo.",
+  "people.panel.pendingTitle": "Perfiles incompletos y documentos por vencer",
+  "people.panel.pendingHelp": "Esa información existe expediente por expediente, pero el servidor todavía no la resume para toda la empresa. En cuanto lo haga, aparecerá aquí como una tarjeta más.",
   "training.panel.loading": "Cargando tu formación",
   "training.panel.errorTitle": "No fue posible cargar tu formación",
   "training.panel.adminErrorTitle": "No fue posible cargar el resumen de formación",
@@ -2600,6 +2623,10 @@
   "apply.analyzing": "Analizando…",
   "apply.detectedData": "Datos detectados · confianza {{confidence}}",
   "nav.section.inicio": "Inicio",
+  "nav.section.people": "Personas",
+  "nav.group.Productividad": "Productividad",
+  "nav.Resumen de personas": "Resumen de personas",
+  "nav.Resumen de productividad": "Resumen de productividad",
   "nav.section.operacion": "Operación diaria",
   "nav.section.supervision": "Supervisión",
   "nav.section.reportes": "Reportes",
@@ -2657,7 +2684,7 @@
   ,"nav.section.ats": "Reclutamiento"
   ,"nav.section.onboarding": "Incorporación"
   ,"nav.section.training": "Capacitación"
-  ,"nav.section.productivity": "Personas y productividad"
+  ,"nav.section.productivity": "Productividad"
   ,"nav.section.asset_inventory": "Inventario de activos"
   ,"nav.section.restaurant_inventory": "Inventario de restaurante"
   ,"nav.section.notifications": "Alertas"

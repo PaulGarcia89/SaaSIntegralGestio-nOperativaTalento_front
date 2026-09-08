@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Download, FilePenLine, FileSpreadsheet, Filter, LayoutList, MapPin, RotateCcw, Search, ShieldCheck, Upload, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +18,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { InlineFeedback, MobileFilterSheet, ResponsiveDataView, Wizard } from "@/components/design-system";
 import { DataView, PageHeader, StatusBadge, type DataColumn } from "@/components/system";
 import { technicalLabel } from "@/lib/ui-labels";
-import { EmployeesModulePanel } from "@/components/employees/employees-module-panel";
 import { ApiError, bulkCreateEmployees, bulkUpdateEmployeeStatus, createDocuSealSubmission, createEmployee, deleteEmployee, fetchBranches, fetchDocuSealTemplates, fetchEmployeeDetail, fetchEmployees, fetchMyPreferences, getApiErrorMessage, restoreEmployee, uploadEmployeeDocument, updateMyPreference, type CreateEmployeeInput, type EmployeeDirectoryItem, type EmployeeDirectoryResponse, type EmployeeRegistrationInput } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { validateOnboardingDocumentFile } from "@/lib/onboarding-document-security";
@@ -42,9 +41,23 @@ export function EmployeesDirectoryPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { can, currentTenant, currentBranch, tenantBranches } = useAppStore();
+  /*
+   * El panel de Personas (/people) enlaza aquí con `?status=` y `?branch=`.
+   * Un enlace que dice «ver solo los activos» y abre el directorio con el
+   * filtro guardado de la última vez no cumple lo que promete, así que lo
+   * que viene en la URL manda sobre la preferencia guardada.
+   */
+  const searchParams = useSearchParams();
+  const urlStatus = searchParams.get("status");
+  const urlBranch = searchParams.get("branch");
+  const statusFromUrl = (["all", "ACTIVE", "INACTIVE", "TERMINATED", "DELETED"] as const).includes(
+    urlStatus as EmployeeStatusFilter,
+  )
+    ? (urlStatus as EmployeeStatusFilter)
+    : null;
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<EmployeeStatusFilter>("all");
-  const [branchFilter, setBranchFilter] = useState(currentBranch?.id ?? "");
+  const [status, setStatus] = useState<EmployeeStatusFilter>(statusFromUrl ?? "all");
+  const [branchFilter, setBranchFilter] = useState(urlBranch ?? currentBranch?.id ?? "");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -141,8 +154,8 @@ export function EmployeesDirectoryPage() {
         } | undefined;
         if (stored) {
           if (stored.search !== undefined) setSearch(stored.search);
-          if (stored.status !== undefined) setStatus((["all", "ACTIVE", "INACTIVE", "TERMINATED", "DELETED"] as const).includes(stored.status as EmployeeStatusFilter) ? (stored.status as EmployeeStatusFilter) : "all");
-          if (stored.branchFilter !== undefined) setBranchFilter(stored.branchFilter);
+          if (stored.status !== undefined && !statusFromUrl) setStatus((["all", "ACTIVE", "INACTIVE", "TERMINATED", "DELETED"] as const).includes(stored.status as EmployeeStatusFilter) ? (stored.status as EmployeeStatusFilter) : "all");
+          if (stored.branchFilter !== undefined && !urlBranch) setBranchFilter(stored.branchFilter);
           if (stored.pageSize && [10, 20, 50, 100].includes(stored.pageSize)) setPageSize(stored.pageSize);
           if (stored.viewMode) setViewMode(stored.viewMode);
           if (stored.sortField) setSortField(stored.sortField);
@@ -156,6 +169,11 @@ export function EmployeesDirectoryPage() {
     return () => {
       active = false;
     };
+    // Se ejecuta una sola vez, al montar: carga la preferencia guardada y la
+    // deja por debajo de lo que trajo la URL en ese momento. Reaccionar a
+    // cambios posteriores de la URL aquí volvería a pisar los filtros que el
+    // usuario acaba de tocar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -270,22 +288,6 @@ export function EmployeesDirectoryPage() {
             </>
           ) : null
         }
-      />
-
-      {/*
-        Panel del módulo.
-        La pantalla abría directamente en la tabla: para saber cuánta gente
-        hay activa había que filtrarla. Ahora abre con el estado del módulo y
-        el directorio queda como segundo nivel. Las tarjetas no navegan: dejan
-        aplicado el filtro del directorio que está justo debajo, que es lo que
-        el usuario iba a hacer a mano.
-      */}
-      <EmployeesModulePanel
-        onSelectStatus={(value) => {
-          setStatus(value);
-          resetFilters();
-        }}
-        onSelectBranch={updateBranchFilter}
       />
 
       <Card level={2}>

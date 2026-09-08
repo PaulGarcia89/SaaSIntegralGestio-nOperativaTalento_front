@@ -17,6 +17,17 @@ export type ModuleKey =
   | "ats"
   | "onboarding"
   | "training"
+  /**
+   * Personas: empleados, expedientes y documentos laborales.
+   *
+   * NO es un módulo comercial del backend —no existe `ModuleCode.PEOPLE`—:
+   * los endpoints de `/employees` se protegen solo por permiso
+   * (`employees.read`, `employees.create`, `employees.update`) y no por
+   * módulo contratado. Aquí es una clave de módulo para que la navegación y
+   * las rutas tengan sección, icono y política propias, separadas de
+   * Productividad, con la que compartía sección por accidente.
+   */
+  | "people"
   | "productivity"
   | "asset_inventory"
   | "restaurant_inventory"
@@ -166,6 +177,7 @@ export const MODULE_KEYS = [
   "ats",
   "onboarding",
   "training",
+  "people",
   "productivity",
   "asset_inventory",
   "restaurant_inventory",

@@ -15,6 +15,7 @@ import {
   Building2,
   ChartNoAxesCombined,
   ChevronDown,
+  Cctv,
   ChevronRight,
   ClipboardCheck,
   Command,
@@ -107,7 +108,7 @@ const navigationIcons: Record<NavItem["icon"], LucideIcon> = {
   signatures: FileSignature,
   training: GraduationCap,
   evaluations: BookOpenCheck,
-  productivity: ChartNoAxesCombined,
+  productivity: Cctv,
   inventory: Boxes,
   admin: Landmark,
   users: UserCog,
@@ -126,7 +127,10 @@ const sectionIcons: Record<NavSection, LucideIcon> = {
   ats: Briefcase,
   onboarding: FileSignature,
   training: GraduationCap,
-  productivity: Users,
+  people: Users,
+  // Una cámara, no personas: lo que se vigila son zonas y equipos. El icono
+  // de personas era la razón por la que las dos secciones parecían la misma.
+  productivity: Cctv,
   asset_inventory: Boxes,
   restaurant_inventory: UtensilsCrossed,
   reportes: ChartNoAxesCombined,

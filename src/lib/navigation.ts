@@ -1,6 +1,6 @@
 import type { ModuleKey, PermissionKey, RoleKey, SubscriptionAccessState } from "@/lib/contracts";
 
-export type NavGroup = "Inicio" | "Personas" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Inventario de activos" | "Inventario de restaurante" | "Analítica" | "Administración" | "Gobierno de plataforma";
+export type NavGroup = "Inicio" | "Personas" | "Productividad" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Inventario de activos" | "Inventario de restaurante" | "Analítica" | "Administración" | "Gobierno de plataforma";
 export type NavItem = { href: string; label: string; group: NavGroup; section: NavSection; module: ModuleKey; permission: PermissionKey; requiredPermissions: PermissionKey[]; audience: "shared" | "saas" | "tenant"; featureFlag: string; available: boolean; requiresCommercialModule?: boolean; showInNavigation?: boolean; subscriptionStates?: SubscriptionAccessState[]; branchRequired?: boolean; roles?: RoleKey[]; strictRoles?: boolean; icon: "dashboard" | "notifications" | "reports" | "profile" | "vacancies" | "candidates" | "interviews" | "documents" | "signatures" | "training" | "evaluations" | "productivity" | "inventory" | "admin" | "users" | "roles" | "company" | "tenants" | "branches" | "modules" | "subscription" | "queues" };
 const live: SubscriptionAccessState[] = ["active", "trial", "grace_period"];
 
@@ -29,6 +29,7 @@ export type NavSection =
   | "ats"
   | "onboarding"
   | "training"
+  | "people"
   | "productivity"
   | "asset_inventory"
   | "restaurant_inventory"
@@ -52,7 +53,14 @@ export const navSections: ReadonlyArray<{ id: NavSection; label: string; hint: s
   { id: "ats", label: "Reclutamiento", hint: "Vacantes, candidatos y contratación" },
   { id: "onboarding", label: "Incorporación", hint: "Documentos y firmas de quien entra" },
   { id: "training", label: "Capacitación", hint: "Cursos, evaluaciones y certificados" },
-  { id: "productivity", label: "Personas y productividad", hint: "Equipo, turnos e indicadores" },
+  // Personas y Productividad eran UNA sección, «Personas y productividad»,
+  // aunque el backend las trata como cosas distintas: /employees se protege
+  // solo por permiso (`employees.read`) y /productivity exige además el
+  // módulo AI_PRODUCTIVITY. Compartir sección hacía que una empresa sin
+  // Productividad contratada perdiera también el directorio de empleados,
+  // que sí tenía derecho a ver.
+  { id: "people", label: "Personas", hint: "Empleados, expedientes y documentos" },
+  { id: "productivity", label: "Productividad", hint: "Cámaras, zonas e indicadores" },
   { id: "asset_inventory", label: "Inventario de activos", hint: "Equipos, entregas y devoluciones" },
   { id: "restaurant_inventory", label: "Inventario de restaurante", hint: "Ingredientes, recetas y consumo" },
   { id: "reportes", label: "Reportes", hint: "Lo que se consulta y se exporta" },
@@ -104,7 +112,11 @@ export function sectionForNavItem(item: { href: string; group: NavGroup; module:
 const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "requiredPermissions" | "section">> = [
   { href: "/dashboard", label: "Inicio", group: "Inicio", module: "dashboard", permission: "dashboard.view", audience: "shared", icon: "dashboard" },
   { href: "/profile", label: "Mi perfil", group: "Inicio", module: "profile", permission: "profile.view", audience: "shared", icon: "profile" },
-  { href: "/employees", label: "Empleados", group: "Personas", module: "productivity", permission: "productivity.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "users", roles: ["admin_saas", "admin_empresa", "supervisor"] },
+  // Personas es una capacidad base: el backend no tiene módulo comercial
+  // para ella y protege /employees solo por permiso. `requiresCommercialModule`
+  // se apaga abajo para el módulo `people`, igual que para `admin`.
+  { href: "/people", label: "Resumen de personas", group: "Personas", module: "people", permission: "employees.read", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "dashboard", roles: ["admin_saas", "admin_empresa", "supervisor"] },
+  { href: "/employees", label: "Empleados", group: "Personas", module: "people", permission: "employees.read", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "users", roles: ["admin_saas", "admin_empresa", "supervisor"] },
   { href: "/onboarding/documents", label: "Incorporaciones", group: "Personas", module: "onboarding", permission: "onboarding.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "documents" },
   { href: "/onboarding/signatures", label: "Documentos y firmas", group: "Personas", module: "onboarding", permission: "onboarding.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "signatures" },
   { href: "/ats", label: "Hoy", group: "Reclutamiento", module: "ats", permission: "applications.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "dashboard", roles: ["admin_saas", "admin_empresa", "rrhh", "reclutador"] },
@@ -129,8 +141,8 @@ const configuredNavigation: Array<Omit<NavItem, "featureFlag" | "available" | "r
   { href: "/training/content", label: "Gestionar cursos", group: "Aprendizaje", module: "training", permission: "training.manage", audience: "shared", subscriptionStates: live, icon: "training", roles: ["admin_saas", "admin_empresa", "rrhh", "instructor"] },
   { href: "/training/paths", label: "Rutas y cumplimiento", group: "Aprendizaje", module: "training", permission: "training.manage", audience: "shared", subscriptionStates: live, icon: "training", roles: ["admin_saas", "admin_empresa", "rrhh", "instructor"] },
   { href: "/training/integrations", label: "Integraciones formativas", group: "Aprendizaje", module: "training", permission: "training.integrations.manage", audience: "shared", subscriptionStates: live, icon: "training", roles: ["admin_saas", "admin_empresa", "rrhh", "instructor"] },
-  { href: "/productivity", label: "Productividad", group: "Operaciones", module: "productivity", permission: "productivity.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "productivity", roles: ["admin_saas", "admin_empresa", "supervisor"] },
-  { href: "/productivity/cameras", label: "Cámaras y zonas", group: "Operaciones", module: "productivity", permission: "productivity.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "productivity", roles: ["admin_saas", "admin_empresa"] },
+  { href: "/productivity", label: "Resumen de productividad", group: "Productividad", module: "productivity", permission: "productivity.view", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "productivity", roles: ["admin_saas", "admin_empresa", "supervisor"] },
+  { href: "/productivity/cameras", label: "Cámaras y zonas", group: "Productividad", module: "productivity", permission: "productivity.manage", audience: "shared", subscriptionStates: live, branchRequired: true, icon: "productivity", roles: ["admin_saas", "admin_empresa"] },
   // El selector entre los dos inventarios. No pertenece a ninguno de los dos
   // módulos: exigir `asset_inventory` hacía que una empresa con SOLO
   // restaurante recibiera «este módulo no está habilitado», que es falso. La
@@ -218,7 +230,7 @@ export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
   // en «Administración»— se libraba de la puerta del módulo, así que una
   // empresa sin el inventario de restaurante contratado veía igualmente su
   // sección con la configuración dentro.
-  requiresCommercialModule: (["dashboard", "profile", "admin"] as string[]).includes(item.module)
+  requiresCommercialModule: (["dashboard", "profile", "admin", "people"] as string[]).includes(item.module)
     ? false
     : item.requiresCommercialModule,
   available: !unavailableRouteHrefs.has(item.href),

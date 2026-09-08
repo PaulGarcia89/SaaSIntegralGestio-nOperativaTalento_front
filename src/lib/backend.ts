@@ -496,7 +496,7 @@ const uiPermissionToBackendCodes: Partial<Record<PermissionKey, string[]>> = {
     "training.progress.read",
   ],
   "training.integrations.manage": ["training.integrations.manage"],
-  "productivity.view": [],
+  "productivity.view": ["productivity.view"],
   "productivity.manage": ["productivity.manage"],
   "asset_inventory.view": [],
   "asset_inventory.manage": [],
@@ -811,7 +811,7 @@ function deriveEnabledModules(source: string[] | undefined, includeAdmin = false
   return [...enabled];
 }
 
-function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[], isSuperAdmin: boolean): PermissionKey[] {
+export function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[], isSuperAdmin: boolean): PermissionKey[] {
   const mapped = new Set<PermissionKey>(["dashboard.view", "notifications.view", "profile.view"]);
   const hasAny = (prefix: string) => codes.some((code) => code.startsWith(prefix));
   const hasCode = (code: string) => codes.includes(code);
@@ -955,10 +955,20 @@ function backendCodesToUiPermissions(codes: string[], enabledModules: ModuleKey[
       mapped.add("restaurant_inventory.manage");
     }
   }
-  if (enabledModules.includes("productivity")) {
+  /*
+   * Productividad: módulo contratado Y permiso del rol, como en el backend.
+   *
+   * Antes bastaba con que la empresa tuviera el módulo: el permiso se daba a
+   * todo el mundo. Pero `/productivity/*` exige en el servidor el código
+   * `productivity.view` (`@RequirePermissions('productivity.view')`), que en
+   * los roles sembrados solo tiene el administrador de la empresa. Un
+   * supervisor veía el menú y recibía 403 en cada pantalla. Ahora el menú
+   * dice lo mismo que el servidor.
+   */
+  if (enabledModules.includes("productivity") && hasCode("productivity.view")) {
     mapped.add("productivity.view");
   }
-  if (hasCode("productivity.manage")) {
+  if (enabledModules.includes("productivity") && hasCode("productivity.manage")) {
     mapped.add("productivity.manage");
   }
   if (enabledModules.includes("reports")) {

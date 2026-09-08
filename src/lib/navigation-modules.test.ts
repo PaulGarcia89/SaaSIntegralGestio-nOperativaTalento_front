@@ -41,7 +41,9 @@ describe("el menú se abre módulo a módulo", () => {
     // La exención se decidía por el ÁREA de la pantalla, así que
     // `/inventory/restaurant/settings` —que cae en «Administración»— se
     // libraba de la puerta y una empresa sin restaurante veía su sección.
-    const BASE: ModuleKey[] = ["dashboard", "profile", "admin"];
+    // `people` también es base: el backend no tiene módulo comercial para
+    // Personas y protege /employees solo por permiso (`employees.read`).
+    const BASE: ModuleKey[] = ["dashboard", "profile", "admin", "people"];
     const intruders = visible.filter(
       (item) => !BASIC.includes(item.module) && !BASE.includes(item.module),
     );

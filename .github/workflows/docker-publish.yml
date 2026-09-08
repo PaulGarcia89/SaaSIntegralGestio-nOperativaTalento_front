@@ -2,7 +2,7 @@ name: Publicar imagen Docker del frontend
 
 on:
   push:
-    branches: [main]
+    branches: [main, rediseno-visual-2026-09-06]
   workflow_dispatch:
 
 permissions:

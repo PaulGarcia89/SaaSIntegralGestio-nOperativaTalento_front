@@ -3,8 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { InlineFeedback } from "@/components/design-system";
 import { Button } from "@/components/ui/button";
+import { InlineNote } from "@/components/system";
 import { HiringReasonDialog } from "@/components/hiring/hiring-action-dialog";
 import { HiringContractMetadataEditor } from "@/components/hiring/hiring-contract-metadata-editor";
 import { hiringErrorMessage } from "@/components/hiring/hiring-stage-panels";
@@ -32,24 +32,24 @@ import { useLocale } from "@/components/locale-provider";
  */
 export function HiringDisclosure({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <details className="group rounded-2xl border border-border-default bg-surface-elevated">
-      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 text-base font-medium text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+    <details className="group rounded-lg border border-line bg-surface-1">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3 text-base font-medium text-ink-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
         <span>
           {title}
-          {hint ? <span className="mt-0.5 block text-base font-normal text-text-secondary">{hint}</span> : null}
+          {hint ? <span className="mt-0.5 block text-base font-normal text-ink-2">{hint}</span> : null}
         </span>
-        <ChevronDown className="size-5 shrink-0 text-text-secondary motion-safe:transition-transform group-open:rotate-180" aria-hidden="true" />
+        <ChevronDown className="size-5 shrink-0 text-ink-2 motion-safe:transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
-      <div className="border-t border-border-default p-4">{children}</div>
+      <div className="border-t border-line p-4">{children}</div>
     </details>
   );
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="border-b border-border-default py-3 last:border-b-0">
-      <dt className="text-base text-text-secondary">{label}</dt>
-      <dd className="mt-1 text-base text-text-primary">{value}</dd>
+    <div className="border-b border-line py-3 last:border-b-0">
+      <dt className="text-base text-ink-2">{label}</dt>
+      <dd className="mt-1 text-base text-ink-1">{value}</dd>
     </div>
   );
 }
@@ -69,8 +69,8 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
 
   return (
     <section aria-labelledby="hiring-more" className="space-y-3">
-      <h2 id="hiring-more" className="text-xl font-semibold text-text-primary">{t("hiring.details.more")}</h2>
-      <p className="text-base text-text-secondary">{t("hiring.details.moreHint")}</p>
+      <h2 id="hiring-more" className="text-xl font-semibold text-ink-1">{t("hiring.details.more")}</h2>
+      <p className="text-base text-ink-2">{t("hiring.details.moreHint")}</p>
 
       <HiringDisclosure title="Oferta laboral" hint={hiringOfferStatusLabel(contract.jobOffer?.status)}>
         {contract.jobOffer?.versions?.length ? (
@@ -84,7 +84,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
             ))}
           </dl>
         ) : (
-          <p className="text-base text-text-secondary">{t("hiring.details.noOffer")}</p>
+          <p className="text-base text-ink-2">{t("hiring.details.noOffer")}</p>
         )}
       </HiringDisclosure>
 
@@ -100,7 +100,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
             ))}
           </dl>
         ) : (
-          <p className="text-base text-text-secondary">{t("hiring.details.noDocs")}</p>
+          <p className="text-base text-ink-2">{t("hiring.details.noDocs")}</p>
         )}
       </HiringDisclosure>
 
@@ -117,9 +117,9 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
         {history.length ? (
           <ol className="space-y-3">
             {[...history].reverse().map((event) => (
-              <li key={event.id} className="border-l-2 border-border-default pl-3">
-                <p className="text-base font-medium text-text-primary">{hiringActionLabel(event.action, contract.status)}</p>
-                <p className="mt-0.5 text-base text-text-secondary">
+              <li key={event.id} className="border-l-2 border-line pl-3">
+                <p className="text-base font-medium text-ink-1">{hiringActionLabel(event.action, contract.status)}</p>
+                <p className="mt-0.5 text-base text-ink-2">
                   {longDate(event.occurredAt) ?? event.occurredAt}
                   {" · "}
                   {hiringStatusLabel(event.nextState as HiringContractDto["status"], locale) ?? event.nextState}
@@ -128,7 +128,7 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
             ))}
           </ol>
         ) : (
-          <p className="text-base text-text-secondary">{t("hiring.details.noHistory")}</p>
+          <p className="text-base text-ink-2">{t("hiring.details.noHistory")}</p>
         )}
       </HiringDisclosure>
 
@@ -149,15 +149,15 @@ export function HiringSecondaryDetails({ contract, state, documents, history, on
               key={`${contract.id}-${contract.priority ?? "MEDIUM"}-${contract.deadlineAt ?? ""}`}
               contract={contract}
             />
-            <div className="rounded-2xl border border-status-danger/40 bg-status-danger/[0.04] p-4">
-              <h3 className="text-lg font-semibold text-text-primary">{t("hiring.details.cancelThis")}</h3>
-              <p className="mt-1 text-base text-text-secondary">
+            <div className="rounded-lg border border-status-danger/40 bg-status-danger/[0.04] p-4">
+              <h3 className="text-lg font-semibold text-ink-1">{t("hiring.details.cancelThis")}</h3>
+              <p className="mt-1 text-base text-ink-2">
                 La contratación se cerrará y no se podrá retomar desde aquí. Tendrás que escribir el motivo.
               </p>
               <Button variant="destructive" className="mt-3" onClick={() => setCancelOpen(true)}>
                 Cancelar contratación
               </Button>
-              {cancel.error ? <InlineFeedback tone="danger" title={t("hiring.details.cancelFailed")}>{hiringErrorMessage(cancel.error, locale)}</InlineFeedback> : null}
+              {cancel.error ? <InlineNote tone="danger" title={t("hiring.details.cancelFailed")}>{hiringErrorMessage(cancel.error, locale)}</InlineNote> : null}
             </div>
           </div>
         </HiringDisclosure>

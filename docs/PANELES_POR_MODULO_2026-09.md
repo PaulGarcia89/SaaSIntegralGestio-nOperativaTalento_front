@@ -208,6 +208,28 @@ Invariantes conservadas:
 
 ---
 
+## 2.quater Flujo de contratación: revisión de usabilidad (2026-09-08)
+
+Objetivo: que `/hiring/[id]` sea intuitivo, gráfico y con solo la información
+necesaria en cada paso. Qué se cambió y por qué:
+
+| Antes | Ahora |
+|---|---|
+| La etapa se decía tres veces: «Etapa 2 de 5 · 40 % completado», raíl de cinco tarjetas con «Pendiente / Etapa actual», y «Paso 2 de 5» en el panel | Un solo **paso a paso gráfico**: cinco círculos con icono unidos por una línea que se rellena; completada = verde con marca, actual = relleno oscuro y título en negrita, pendiente = hueco. Las etapas ya alcanzadas se pueden pulsar para volver a mirarlas |
+| Cabecera con nombre, puesto, empresa, sucursal, correo, estado técnico, quién actúa, inicio, plazo y sueldo | Cabecera con **tres respuestas**: quién (nombre, puesto · sucursal), quién actúa (una sola pastilla: «Te toca a ti» / «Esperando a Ana» / «Completada») y, solo si existen, sueldo e inicio como dos datos con icono. El resto sigue en «Más detalles», plegado |
+| Botón principal al final del panel, tras tablas de datos | **Acción principal arriba** del panel, destacada, con «qué pasa después» al lado; el detalle va debajo |
+| Preparación: tabla de cinco filas que repetía la cabecera | Lista de comprobación gráfica (marca verde / aviso) con lo que hay que confirmar; solo el responsable puede fallar |
+| Oferta: tabla de cinco filas con el estado dentro | Tres datos (puesto, sueldo, inicio) + estado como etiqueta; vencimiento en una línea |
+| Documentos: lista con tipo·estado en texto y aviso largo de firmas | Barra «2 de 3 documentos obligatorios aprobados», icono de estado por documento (aprobado / rechazado / por revisar / esperando), aviso de firmas plegado |
+| Revisión final: tabla de seis filas | Lista de comprobación con marcas; lo que falta sale en ámbar |
+| Bloqueos en cajas de tres columnas | Una línea por bloqueo (qué falta · quién lo resuelve) y «¿Por qué?» desplegable |
+| Ficha de la lista con estado técnico + etapa + quién actúa + «Paso 2 de 5» dos veces | Estado = quién actúa; avance con el nombre de la etapa; plazo; siguiente paso |
+| Tokens del sistema antiguo (`text-text-primary`, `rounded-2xl`, `Card level`) | Tokens del sistema actual (`ink`, `line`, `surface`, `InlineNote`) |
+
+Sin cambios de backend ni de la máquina de estados: `resolveHiringCase`,
+`stageForView` y las mutaciones son las mismas. Verificado con specimen a 390 y
+1440 px: sin desbordamiento, todos los controles ≥ 44 px.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

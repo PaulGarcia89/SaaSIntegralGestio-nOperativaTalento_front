@@ -1,8 +1,6 @@
 "use client";
 
-import { CalendarDays, CircleAlert, CircleCheck, Clock3, UserRound } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { CalendarDays, CircleAlert, CircleCheck, Clock3, UserRound, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HiringContractDto, JobOfferVersionDto } from "@/lib/contracts";
 import {
@@ -10,8 +8,9 @@ import {
   hiringStatusLabel,
   hiringWaitingLabel,
   type HiringCaseState,
+  type HiringStageId,
 } from "@/lib/hiring-ux";
-import { HiringProgressBar, HiringStageRail } from "@/components/hiring/hiring-stage-rail";
+import { HiringStageRail } from "@/components/hiring/hiring-stage-rail";
 import { useLocale } from "@/components/locale-provider";
 import { translate } from "@/i18n";
 import type { SupportedLocale } from "@/i18n/types";
@@ -47,113 +46,151 @@ export function salaryText(version?: JobOfferVersionDto, locale: SupportedLocale
 }
 
 /**
- * Encabezado del centro de contratación.
+ * Cabecera del centro de contratación.
  *
- * Responde en un vistazo las tres primeras preguntas del rediseño: a quién
- * estoy contratando, en qué etapa estoy y quién tiene que actuar ahora. Todo
- * en texto de 16 px o mayor, sin abreviaturas y sin depender del color.
+ * Responde tres preguntas y solo tres: a quién contrato, en qué paso estoy y
+ * quién tiene que actuar ahora.
+ *
+ * Antes decía además el correo, la empresa, el estado técnico, el plazo del
+ * proceso, «Etapa 2 de 5», «40 % completado» y un raíl con la palabra
+ * «Pendiente» bajo tres tarjetas: la etapa aparecía tres veces y la persona
+ * tenía que leer dos pantallas antes de llegar al botón. Todo eso sigue
+ * disponible en «Más detalles», abajo, plegado.
+ *
+ * El sueldo y la fecha de inicio se muestran solo cuando existen, como dos
+ * datos con icono; sin oferta no hay nada que decir y no se enseña «Por
+ * definir» dos veces.
  */
-export function HiringCaseHeader({ contract, state }: { contract: HiringContractDto; state: HiringCaseState }) {
+export function HiringCaseHeader({
+  contract,
+  state,
+  viewing,
+  onSelectStage,
+}: {
+  contract: HiringContractDto;
+  state: HiringCaseState;
+  viewing?: HiringStageId;
+  onSelectStage?: (stage: HiringStageId) => void;
+}) {
   const { locale, t } = useLocale();
   const version = currentOfferVersion(contract);
   const startDate = longDate(version?.employmentStartDate);
-  const deadline = longDate(contract.deadlineAt);
-  const waiting = hiringWaitingLabel(state.waitingOn, contract.candidate.fullName.split(" ")[0] || "la persona");
+  const salary = salaryText(version, locale);
+  const firstName = contract.candidate.fullName.split(" ")[0] || "la persona";
+  const waiting = state.cancelled
+    ? hiringStatusLabel(contract.status, locale)
+    : state.completed
+      ? t("hiring.rail.completed")
+      : hiringWaitingLabel(state.waitingOn, firstName);
+
+  const pillTone = state.cancelled
+    ? "border-status-danger/40 bg-status-danger/10 text-status-danger"
+    : state.completed
+      ? "border-status-success/40 bg-status-success/10 text-status-success"
+      : state.waitingOn === "CANDIDATO"
+        ? "border-status-warning/40 bg-status-warning/10 text-status-warning"
+        : "border-accent-line/50 bg-accent-fill/10 text-ink-1";
+  const PillIcon = state.cancelled ? CircleAlert : state.completed ? CircleCheck : state.waitingOn === "CANDIDATO" ? Clock3 : UserRound;
 
   return (
-    <Card level={1}>
-      <CardContent className="space-y-7 p-5 sm:p-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden="true" className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary text-xl font-semibold text-text-on-accent">
-              {initials(contract.candidate.fullName)}
-            </span>
-            <div className="min-w-0">
-              <p className="text-base font-medium text-text-secondary">{t("hiring.header.forPerson")}</p>
-              <h1 className="mt-1 text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{contract.candidate.fullName}</h1>
-              <p className="mt-2 text-lg text-text-primary">{contract.roleTitle ?? contract.vacancy.title}</p>
-              <p className="mt-1 text-base text-text-secondary">
-                {contract.vacancy.tenant?.name ?? t("hiring.activeCompany")} · {contract.branch.name}
-              </p>
-              <p className="mt-1 text-base text-text-secondary">{contract.candidate.email}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant={state.completed ? "success" : state.cancelled ? "destructive" : state.blockers.length ? "warning" : "secondary"}
-              className="text-sm"
-            >
-              {hiringStatusLabel(contract.status, locale)}
-            </Badge>
-            <span className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium", state.waitingOn === "CANDIDATO" ? "border-status-warning/40 bg-status-warning/10 text-text-primary" : state.waitingOn === "EMPRESA" ? "border-primary/40 bg-primary/10 text-text-primary" : "border-border-default text-text-secondary")}>
-              {state.waitingOn === "CANDIDATO" ? <Clock3 className="size-4" aria-hidden="true" /> : state.waitingOn === "EMPRESA" ? <UserRound className="size-4" aria-hidden="true" /> : <CircleCheck className="size-4" aria-hidden="true" />}
-              {waiting}
-            </span>
+    <section aria-labelledby="hiring-case-title" className="rounded-lg border border-line bg-surface-1 p-5 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <span
+            aria-hidden="true"
+            className="flex size-14 shrink-0 items-center justify-center rounded-full bg-action text-lg font-semibold text-on-action"
+          >
+            {initials(contract.candidate.fullName)}
+          </span>
+          <div className="min-w-0">
+            <h1 id="hiring-case-title" className="line-clamp-2 break-words text-2xl font-semibold leading-tight text-ink-1 sm:text-3xl">
+              {contract.candidate.fullName}
+            </h1>
+            <p className="mt-1 truncate text-base text-ink-2">
+              {contract.roleTitle ?? contract.vacancy.title} · {contract.branch.name}
+            </p>
           </div>
         </div>
 
-        <dl className="grid gap-4 border-t border-border-default pt-5 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <dt className="text-base text-text-secondary">{t("hiring.header.startDate")}</dt>
-            <dd className="mt-1 flex items-center gap-2 text-base font-medium text-text-primary">
-              <CalendarDays className="size-5 text-text-secondary" aria-hidden="true" />
-              {startDate ?? t("hiring.header.toBeSet")}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-base text-text-secondary">{t("hiring.header.processDeadline")}</dt>
-            <dd className="mt-1 text-base font-medium text-text-primary">{deadline ?? t("hiring.header.noDeadline")}</dd>
-          </div>
-          <div>
-            <dt className="text-base text-text-secondary">Sueldo ofrecido</dt>
-            <dd className="mt-1 text-base font-medium text-text-primary">{salaryText(version, locale) ?? t("hiring.header.toBeSet")}</dd>
-          </div>
-        </dl>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-2 self-start rounded-full border px-3 py-1.5 text-sm font-medium",
+            pillTone,
+          )}
+        >
+          <PillIcon className="size-4" aria-hidden="true" />
+          {waiting}
+        </span>
+      </div>
 
-        <HiringProgressBar state={state} />
-        <HiringStageRail state={state} />
-      </CardContent>
-    </Card>
+      {salary || startDate ? (
+        <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-2">
+          {salary ? (
+            <div className="flex items-center gap-2">
+              <Wallet className="size-4 text-ink-3" aria-hidden="true" />
+              <dt className="sr-only">{t("hiring.panel.salary")}</dt>
+              <dd className="font-medium text-ink-1">{salary}</dd>
+            </div>
+          ) : null}
+          {startDate ? (
+            <div className="flex items-center gap-2">
+              <CalendarDays className="size-4 text-ink-3" aria-hidden="true" />
+              <dt className="sr-only">{t("hiring.header.startDate")}</dt>
+              <dd>
+                {t("hiring.header.startsOn")} <span className="font-medium text-ink-1">{startDate}</span>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      <div className="mt-6 border-t border-line pt-6">
+        <HiringStageRail state={state} viewing={viewing} onSelect={onSelectStage} />
+      </div>
+    </section>
   );
 }
 
 /**
- * Bloqueos explicados.
+ * Bloqueos, en una línea cada uno.
  *
- * La regla es que nunca se enseña un botón apagado sin decir por qué. Cada
- * bloqueo responde qué falta, por qué hace falta, quién lo resuelve y qué se
- * habilita después.
+ * Antes cada bloqueo era una caja con tres columnas (por qué · quién · qué
+ * sigue). Aquí se dice lo imprescindible —qué falta y quién lo resuelve— y
+ * el porqué se abre solo si alguien lo pide. La regla se conserva: nunca un
+ * botón apagado sin explicación.
  */
 export function HiringBlockerList({ state, candidateName }: { state: HiringCaseState; candidateName: string }) {
   const { locale, t } = useLocale();
   if (!state.blockers.length) return null;
   return (
-    <div className="space-y-3">
+    <ul className="space-y-2" aria-label={t("hiring.blocker.listAria")}>
       {state.blockers.map((blocker) => {
         const explanation = explainHiringBlocker(blocker, candidateName, locale);
         return (
-          <div key={`${explanation.code}-${explanation.what}`} role="status" className="rounded-2xl border border-status-warning/40 bg-status-warning/[0.06] p-4">
-            <p className="flex items-start gap-2 text-base font-semibold text-text-primary">
-              <CircleAlert className="mt-0.5 size-5 shrink-0 text-status-warning" aria-hidden="true" />
-              {explanation.what}
-            </p>
-            <dl className="mt-3 grid gap-2 pl-7 text-base text-text-secondary sm:grid-cols-3">
-              <div>
-                <dt className="font-medium text-text-primary">{t("hiring.blocker.whyLabel")}</dt>
-                <dd>{explanation.why}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-text-primary">{t("hiring.blocker.whoLabel")}</dt>
-                <dd>{explanation.who}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-text-primary">{t("hiring.blocker.nextLabel")}</dt>
-                <dd>{explanation.unlocks}</dd>
-              </div>
-            </dl>
-          </div>
+          <li key={`${explanation.code}-${explanation.what}`} role="status" className="rounded-lg border border-status-warning/40 bg-status-warning/5 px-4 py-3">
+            <details className="group">
+              <summary className="flex min-h-[var(--control-h-base)] cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
+                <CircleAlert className="size-5 shrink-0 text-status-warning" aria-hidden="true" />
+                <span className="min-w-0 flex-1 text-base">
+                  <span className="block font-semibold text-ink-1">{explanation.what}</span>
+                  <span className="block text-sm text-ink-2">{t("hiring.blocker.whoLabel")}: {explanation.who}</span>
+                </span>
+                <span className="shrink-0 self-center text-sm font-medium text-ink-2 group-open:hidden">{t("hiring.blocker.why")}</span>
+              </summary>
+              <dl className="mt-2 grid gap-2 pl-8 text-sm text-ink-2 sm:grid-cols-2">
+                <div>
+                  <dt className="font-medium text-ink-1">{t("hiring.blocker.whyLabel")}</dt>
+                  <dd>{explanation.why}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-ink-1">{t("hiring.blocker.nextLabel")}</dt>
+                  <dd>{explanation.unlocks}</dd>
+                </div>
+              </dl>
+            </details>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }

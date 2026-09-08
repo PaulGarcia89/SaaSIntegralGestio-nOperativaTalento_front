@@ -477,26 +477,24 @@ function HiringCaseCard({ item }: { item: HiringContractDto }) {
       subtitle={`${item.roleTitle ?? item.vacancy.title} · ${item.branch.name}`}
       avatarName={item.candidate.fullName}
       href={`/hiring/${item.id}`}
+      // La ficha responde tres cosas: quién debe actuar (estado), en qué paso
+      // va (avance) y qué hacer (siguiente paso). El estado técnico
+      // («Oferta enviada») y el «Paso 2 de 5» repetido en dos sitios sobraban.
       status={{
-        label: hiringStatusLabel(item.status, locale),
+        label: state.completed
+          ? t("hiring.rail.completed")
+          : state.cancelled
+            ? hiringStatusLabel(item.status, locale)
+            : hiringWaitingLabel(state.waitingOn, nombre, locale),
         tone: state.completed
           ? "success"
           : state.cancelled
             ? "neutral"
-            : state.blockers.length
+            : state.waitingOn === "EMPRESA"
               ? "warning"
               : "progress",
       }}
       facts={[
-        {
-          label: t("hiring.list.stage"),
-          value: t("hiring.stepOfTitle", {
-            step: stage.step,
-            total: HIRING_STAGES.length,
-            title: hiringStageTitle(stage.id, locale),
-          }),
-        },
-        { label: t("hiring.list.whoActs"), value: hiringWaitingLabel(state.waitingOn, nombre, locale) },
         {
           label: t("hiring.list.deadline"),
           value: plazo === "OVERDUE"
@@ -505,9 +503,9 @@ function HiringCaseCard({ item }: { item: HiringContractDto }) {
         },
       ]}
       progress={{
-        label: t("common.progress"),
+        label: t("hiring.list.stage"),
         value: state.progressPercent,
-        detail: t("hiring.panel.stageOf", { step: stage.step, total: HIRING_STAGES.length }),
+        detail: t("hiring.stepOfTitle", { step: stage.step, total: HIRING_STAGES.length, title: hiringStageTitle(stage.id, locale) }),
       }}
       nextStep={state.primaryAction.label}
     />
@@ -567,7 +565,12 @@ export function HiringContractDetailPage({ contractId }: { contractId: string })
         </Button>
       </nav>
 
-      <HiringCaseHeader contract={item} state={state} />
+      <HiringCaseHeader
+        contract={item}
+        state={state}
+        viewing={stage}
+        onSelectStage={(next) => setRequestedStage(stageForView(state, next) === next ? next : null)}
+      />
 
       {state.cancelled ? <CancelledPanel contract={item} /> : null}
       {!state.cancelled && stage === "PREPARACION" ? <PreparationPanel contract={item} state={state} onAdvance={() => setRequestedStage("OFERTA")} /> : null}

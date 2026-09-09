@@ -796,6 +796,64 @@ opacidad—: rótulos de 10px, 5,41:1; distintivo del plan, 6,45:1; valores,
 14,5:1. AA pide 4,5:1.
 
 
+## 2.vicies Plantilla de los correos (2026-09-09)
+
+**No había plantilla que estilizar: no había correo en HTML.**
+`communication-delivery.service.ts` enviaba `text: notification.message` y nada
+más, por SMTP y por Resend. Un candidato recibía un párrafo suelto, sin
+remitente reconocible, sin saber de qué empresa venía, a qué vacante
+correspondía ni en qué punto del proceso estaba. Para mucha gente ese correo es
+el ÚNICO contacto con el producto.
+
+### Lo que ahora lleva el correo
+
+Filo superior con el color de la empresa, cuadro de iniciales o logotipo,
+título, mensaje, **tarjeta de contexto** —Empresa, Sucursal, Vacante y Etapa,
+esta última como distintivo—, botón de acción y pie con el motivo del envío y el
+correo de soporte.
+
+Los datos ya estaban en la base y no salían en ninguna parte. La postulación se
+localiza por dos caminos, en este orden: el mensaje del ATS cuando el correo ES
+una respuesta de la conversación, y si no el `applicationId` que los avisos de
+etapa, entrevista y SLA **ya guardaban en su `payload`** sin que nadie lo
+leyera. Sin ninguno de los dos no se inventa nada: quedan las filas que sí se
+saben —empresa, y la sucursal activa del destinatario—, y las vacías no se
+dibujan.
+
+### Decisiones de la plantilla
+
+| Decisión | Motivo |
+|---|---|
+| Tablas y estilos en línea | Outlook de Windows compone con el motor de Word: ignora `flex`, `grid`, `float` y casi toda hoja externa o incrustada. Una maqueta moderna se desarma justo en el cliente corporativo donde más se leen estos correos |
+| Un único `<style>`, solo con una consulta de medios | Outlook de escritorio la ignora —y allí la ventana siempre es ancha, así que la maqueta fija de 600px es la correcta—; en el móvil, rótulo y valor en la misma fila no caben y se apilan |
+| **Todo valor interpolado se escapa** | El nombre de una empresa, de una vacante o de una sucursal los escribe un usuario: sin escapar, un `<` rompe el correo y una etiqueta completa lo convierte en vector de inyección |
+| El botón va siempre en tinta oscura | El color del inquilino es arbitrario: un amarillo de marca con texto blanco encima no llega ni de lejos a AA. La marca se nota en el filo, el cuadro de iniciales y el distintivo de etapa, donde el contraste se CALCULA (`tintaSobre`) en vez de suponerse |
+| `urlAccion` solo acepta `http(s)` | Un `javascript:` o un `data:` convertiría el botón principal del correo en un enlace hostil |
+| Línea de vista previa oculta | Sin ella, la bandeja rellena ese hueco con el primer texto que encuentre, que suele ser «Ver en la plataforma» |
+| El color de marca que no sea hexadecimal se descarta | Se escribía dentro de un atributo `style`: cualquier otra cosa se colaba tal cual |
+
+### Compatibilidad
+
+El correo sale como `multipart/alternative`. **El texto plano se conserva** —el
+mensaje íntegro, primero, y el contexto después—, así que el hilado de
+respuestas del ATS, que se apoya en el texto citado, no cambia de
+comportamiento. Quien filtre el HTML sigue recibiendo todo.
+
+El cuerpo se compone DESPUÉS de validar la configuración del proveedor: si la
+configuración está incompleta, ya no se consulta la base de datos para nada.
+
+**Sin migración, sin esquema nuevo, sin endpoint nuevo, sin permiso nuevo.** El
+`include` de Prisma que ya existía se amplía en solo lectura (sucursal activa
+del destinatario) y se añade una consulta de lectura **solo cuando** la
+notificación pertenece a una postulación.
+
+15 pruebas nuevas (10 de la plantilla, 5 del servicio): escapado, filas vacías,
+esquemas de URL hostiles, color inválido, tinta legible sobre marca clara y
+oscura, ausencia de `flex`/`grid`, y que empresa, sucursal, vacante y etapa
+aparecen en las DOS partes del correo. `npx nest build` EXIT 0.
+`scripts/preview-notification-email.ts` genera los dos casos para revisarlos en
+un cliente real sin enviar nada.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

@@ -392,6 +392,244 @@ Verificado a 390, 428, 768, 1440 y 1920 px sobre el **HTML real del build**
 o más y campo de correo a 17 px en móvil, por encima del umbral de zoom de
 Safari.
 
+## 2.decies Inicio: la forma de cada gráfico (2026-09-08)
+
+Dos de los tres gráficos del centro operativo estaban en la forma equivocada,
+y faltaba el que los datos ya permitían.
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| «Pendientes por vencimiento» en barras verticales, todas del mismo ámbar, con tres de cinco tramos a cero | Barras **horizontales** con color por urgencia: rojo lo vencido, ámbar lo de hoy, grafito el resto | Es un reparto entre tramos con orden de urgencia y nombres largos. En vertical media tinta eran columnas vacías, y con un solo color «Vencidos» y «Sin fecha» pesaban lo mismo a la vista |
+| «Actividad de los últimos 7 días» en barras | **Área temporal** con cruceta y globo | Una serie temporal se lee en línea. En barras, un día con 13 registros dejaba los otros seis como rayas de un píxel |
+| «Salud operativa» como una cifra más entre siete | **Medidor** con pista, cifra grande y el desglose que la penaliza | Es una proporción contra un límite y el resumen de la pantalla, no una métrica de la fila |
+| — | **«Dónde se concentra el trabajo»**: carga por módulo | Cada tarea y cada alerta traen su `module` y no se mostraba en ninguna parte. Es lo que decide a qué pantalla ir |
+
+**Los gráficos son controles.** Bajo los dos de reparto hay una fila de
+botones —etiqueta directa con su color y su cifra— que filtra las listas de
+pendientes y alertas; las tres cifras del pie del medidor hacen lo mismo. Se
+filtran las LISTAS, nunca los gráficos: si al pulsar «Vencidos» el gráfico se
+quedase con una sola barra se perdería el contexto que justifica el filtro.
+Son botones de verdad, así que funcionan con teclado y con lector de pantalla
+sin añadir nada. Cuando hay filtro puesto, la lista vacía distingue «no hay
+nada» de «tu filtro no encuentra nada» y ofrece quitarlo.
+
+Piezas nuevas en `components/dashboard/operational-widgets.tsx` (`HealthMeter`
+con `role="meter"` y sus tres valores, `ChartFilterChips`). De compartido solo
+se añadió, de forma aditiva: `groupByModule` y `DUE_BUCKET_TONE` en
+`lib/dashboard-insights.ts` —con nueve pruebas nuevas, incluidas las del
+plegado de la cola en «Otros» sin perder registros— y la prop
+`categoryColorClasses` de `BarChart`, que solo tiene efecto con una sola serie
+y con tonos de estado, nunca como paleta categórica. Ninguna llamada existente
+cambia de aspecto.
+
+Se corrigió además que los enlaces «Ver registros» de las métricas medían
+14 px de alto, por debajo del mínimo táctil.
+
+Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que **renderiza
+los componentes de verdad** —los tres gráficos y el medidor salen de
+`renderToStaticMarkup`, no están dibujados a mano— con el CSS compilado del
+proyecto.
+
+Pendiente, fuera del alcance de esta pantalla: `LineChart` dibuja leyenda
+aunque haya una sola serie, mientras que `BarChart` la omite. Igualarlo tocaría
+todos los gráficos de línea de la aplicación.
+
+## 2.undecies Panel de Reclutamiento (2026-09-08)
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| Cuatro tarjetas de estado, dos de ellas repitiendo cifras del reparto por fase: «Postulaciones nuevas» = fase POSTULARON, «Decisiones pendientes» = fase DECIDIDO | Las tarjetas cubren solo lo que las fases no cubren —vacantes activas y entrevistas por coordinar— más **conversión a contratación** y **tiempo hasta contratar** | El mismo número dos veces en dos formas obliga a descubrir que son el mismo. La urgencia de las dos retiradas no se pierde: pasa a una insignia en la propia fase, donde ya estaba el número |
+| Sin ninguna variación: «el backend entrega el estado de ahora, no una serie temporal» | Variación real en las dos cifras nuevas | El comentario estaba desfasado. `summary.changes` compara la ventana de 90 días con la anterior y ya se descargaba. La prop `trend` de `StatusTile` llevaba existiendo sin usarse |
+| Sin tendencia | **«Cómo evoluciona el proceso»**: postulaciones y contrataciones por semana | `trends[]` viene en la MISMA respuesta que el embudo. La pantalla lo descargaba y lo tiraba, y sin él no podía contestar si el reclutamiento va mejor o peor que antes |
+| «Tiempo medio por etapa» como lista de texto bajo el embudo | **Barras horizontales** en su propia tarjeta, al lado del embudo | Comparar cuatro magnitudes leyendo cifras es el trabajo de unas barras. El tamaño de muestra sigue escrito al pie: sin él, una media de 7 casos y una de 700 se leen igual |
+
+Dos correcciones de detalle: el eje de tiempos mezclaba unidades («0 h · 1 d ·
+2,1 d») porque el formateador salta de horas a días en 24; ahora se elige una
+sola unidad para todo el gráfico según el mayor valor. Y la conversión se
+imprimía como `${n}%`, que en español daba «8.3%» en vez de «8,3 %».
+
+Se corrigió también `TaskCard`: el enlace de acción llevaba `flex w-full
+sm:w-auto`, y un elemento de BLOQUE con `width:auto` ocupa todo el ancho, así
+que el `sm:w-auto` no encogía nada y en escritorio salían tres botones oscuros
+a todo el ancho compitiendo con la acción recomendada. Pasa a `inline-flex`.
+Esta pantalla es la única que usa el componente.
+
+No se tocó el embudo —está bien planteado y su nota sobre por qué NO se deriva
+de las cifras de ocupación sigue siendo correcta—, ni el panel de contratación
+incrustado, ni el backend.
+
+Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que renderiza
+los componentes de verdad con el CSS compilado del proyecto.
+
+## 2.duodecies Panel de Incorporación (2026-09-08)
+
+Era el **único panel de módulo sin un solo gráfico**: cuatro cifras, una
+rejilla de accesos, tarjetas y una línea de tiempo.
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| «En curso: 12» y nada más | **«Cómo van las que están en curso»**: reparto por tramo de avance | Doce incorporaciones al 10 % y doce al 90 % son la misma cifra y situaciones opuestas. `progressPercent` venía en cada expediente sin agregarse |
+| Solo se contaban las tareas vencidas | **«Qué frena las incorporaciones»**: vencidas, bloqueadas, en curso y pendientes | Lo que frena una incorporación es la tarea, no el expediente. Bloqueadas y en curso estaban en los datos sin mirarse |
+| — | **«Dónde se atasca el proceso»**: tiempo medio por etapa | `timeByStage` venía en la misma respuesta de analítica que la pantalla ya descargaba y no se pintaba aquí |
+| Cuatro cifras | Seis: entran **completitud** y **tiempo hasta productividad** | Son los dos resultados del módulo y no aparecían en su panel |
+| «En curso» y «Tareas vencidas» se contaban sobre las 50 cargadas; «En riesgo» y «Cumplimiento» sobre todas, sin distinguirlo | Cada tarjeta declara su alcance | Dos cifras de la misma fila que cuentan poblaciones distintas mienten si no lo dicen. El aviso de «parcial» salía debajo y solo a veces |
+| «Requieren atención» solo existía si había problemas | **«Incorporaciones en curso»**, ordenada por urgencia | En un día tranquilo el panel del módulo no enseñaba a NINGUNA de las personas que se estaban incorporando |
+
+Los dos gráficos de reparto son controles: filtran la lista. Se filtra la
+LISTA, nunca los gráficos, por la misma razón que en el Inicio.
+
+**Agujero de traducción cerrado.** Buena parte de los textos de esta pantalla
+estaban escritos a pelo, fuera de `uiText`, así que en inglés se quedaban en
+español —«Personas que todavía no terminaron su incorporación», «Tareas
+abiertas cuya fecha límite ya pasó», «Atrasado», «Alerta grave», «Avance»…—.
+La prueba que vigila esto solo mira lo que ya está marcado, así que no los
+veía. Son 53 cadenas nuevas en el diccionario inglés.
+
+Lógica nueva en `lib/onboarding-insights.ts` (tramos de avance, estado de
+tarea, orden por urgencia), pura y con 14 pruebas: entre ellas que una tarea
+vencida Y bloqueada cuenta como vencida —el vencimiento es lo que obliga a
+actuar hoy—, que un porcentaje imposible no inventa un tramo, y que el orden
+es estable con independencia del orden del arreglo de entrada.
+
+Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que renderiza
+los componentes de verdad con el CSS compilado del proyecto.
+
+## 2.terdecies Panel de Capacitación (2026-09-08)
+
+Son dos paneles distintos según el papel, y cada uno tenía su problema.
+
+### Quien administra: eran cuatro números y nada más
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| Una fila de cuatro tarjetas; ni acción recomendada, ni gráfico, ni lista | **Acción recomendada**: el curso con más personas fuera de plazo, con cuántas son de cuántas asignadas y su avance medio | Era el único panel de módulo que no decía por dónde empezar |
+| Vencidas, sin comenzar, en progreso y completadas como cuatro cifras sueltas | **«Cómo va el programa»**: el mismo reparto en barras, con color de urgencia | Las cuatro suman el total de asignaciones: es un reparto de un todo, y como números separados no se ve la proporción |
+| Decía cuántas personas van tarde, pero no en qué curso | **«Dónde se atasca la formación»**: cursos con gente fuera de plazo, de más a menos, con cuántos hay asignados detrás de cada barra | Es la respuesta a «¿a quién persigo?». Tres vencidos sobre cuatro asignados y tres sobre trescientos no son el mismo problema |
+| — | **Avance medio** y **aprobación** como cifras | `/training/admin/analytics/overview` ya existía y no se consultaba desde aquí; de ahí sale todo lo anterior |
+
+Es una petición más, y es la única fuente de `byCourse`, del avance medio y de
+la tasa de aprobación. Los tablones profundos —matriz de cumplimiento,
+rendimiento por curso ordenable, efectividad— se quedan en Resultados.
+
+### Quien aprende
+
+- **La cabecera prometía «qué vence pronto» y no estaba en ninguna parte.**
+  `upcomingDue` venía en la respuesta sin usarse. Ahora es cifra y entra en la
+  lista, descontando lo que ya está vencido, que tiene su propia cifra.
+- **La lista se comía unas categorías con otras.** Concatenaba vencidos, en
+  curso y nuevos y cortaba a cuatro fichas: con tres vencidos y cinco en curso
+  no aparecía ni un solo curso por empezar, aunque el rótulo dijera que
+  estaban. Ahora reparte por rondas —uno de cada, empezando por lo más
+  urgente—, así que las primeras fichas representan todo lo que hay sin dejar
+  de poner delante lo vencido. `intercalar` está en cinco pruebas, incluida la
+  que reproduce exactamente ese caso.
+
+**Agujero de traducción cerrado** en la pantalla contenedora: los rótulos y
+descripciones de los siete accesos del módulo, la descripción de la cabecera y
+el botón principal estaban escritos a pelo, fuera de `uiText`.
+
+Verificado a 390, 768 y 1440 px sin desbordes, en los dos papeles, sobre
+maquetas que renderizan los componentes de verdad con el CSS compilado.
+
+## 2.quaterdecies Panel de Personas (2026-09-08)
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| Activos, Inactivos y Desvinculados junto al Total | Los **cuatro** estados, con **Suspendidos** | El sistema tiene cuatro estados y solo se consultaban tres, así que en cuanto había una persona suspendida las cifras no sumaban el total y no había forma de saber dónde estaba la diferencia. El filtro ya existía en el backend; simplemente no se pedía |
+| Cuatro tarjetas del mismo tamaño para cuatro partes de un mismo total | Una cifra de cabecera y el **reparto en barras**, con una fila de enlaces al directorio ya filtrado | La proporción, que es lo que se quiere saber al abrir el módulo, había que calcularla mentalmente. Los enlaces conservan lo que hacían las tarjetas |
+| «Perfiles incompletos», «documentos por vencer» y «documentos sin revisar» sin declarar alcance | Cada tarjeta declara el suyo, y se avisa cuando contradice al de arriba | `GET /employees/summary` **exige** una sucursal: esas cifras son siempre de UNA, mientras las de plantilla cuentan toda la empresa si no hay sucursal activa. Dos filas de la misma pantalla contando poblaciones distintas sin decirlo es peor que no enseñar la segunda |
+| La cifra de perfiles incompletos aparecía sin su regla | Se imprime el criterio que manda el servidor en `criteria` | Un recuento sin el criterio con el que se calculó no se puede discutir |
+
+Nueve tarjetas seguidas en tres filas pasan a una cifra, un gráfico y dos
+filas de tres.
+
+No se tocó el reparto por sucursal: es una navegación —cada fila abre el
+directorio filtrado— y no solo un gráfico. Queda anotado que su barra está
+dibujada a mano en vez de con el motor de gráficos, así que no tiene tabla de
+respaldo ni globo; cambiarlo costaría la navegación y se deja para cuando el
+motor acepte barras navegables.
+
+Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que renderiza
+los componentes de verdad con el CSS compilado del proyecto.
+
+## 2.quindecies Panel de Productividad (2026-09-08)
+
+### Lo importante: la pantalla enseñaba datos simulados sin decirlo
+
+Cuando el servidor no devolvía zonas medidas en `insights`, «Actividad por
+zona» caía a `sessionSummary.byZone`, construido con los eventos de origen
+`DEMO`, y los pintaba bajo el mismo título, con el mismo aspecto y sin
+ninguna marca. Todo el cuidado que hay en la sección de simulación —el aviso,
+el arranque en pausa, la etiqueta DEMO— se perdía justo ahí.
+
+Se conserva la caída, porque enseñar la forma del módulo con datos de ejemplo
+es útil cuando todavía no hay medición, pero ahora la sección lo dice **antes
+del gráfico**, no después.
+
+### El resto
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| «Tiempo activo: 45 min · frente a 12 min sin actividad» en prosa | **«Tiempo medido en la sucursal»**, barra apilada, y una cifra de **uso de la sucursal** | Es una proporción, y es la medida que da nombre al módulo |
+| «Actividad por zona» como lista de seis pares de minutos | **Barras apiladas** por zona, con la confianza de cada medida debajo | Comparar seis pares de minutos leyéndolos es justo el trabajo de unas barras. La confianza sigue al lado: sin ella, el dato de una cámara mal calibrada se lee igual que uno fiable |
+| «Cámaras en línea: 3» | «3 **de 5**» | El total estaba en la misma respuesta ya descargada |
+| El recuadro de cámara falsa (360 px) más sus cifras y su línea de tiempo ocupaban más pantalla que todo lo real | La vista previa se **pliega** | La simulación sigue estando, con su aviso y su arranque en pausa; deja de dominar |
+
+Los dos gráficos usan **la misma codificación** para el mismo par de
+conceptos. La primera versión pintaba «con/sin actividad» de dos maneras
+distintas en la misma pantalla, lo que obliga a aprender dos leyendas para
+una sola idea.
+
+**Idioma fijado y agujero de traducción.** `Intl.DateTimeFormat("es", …)`
+estaba escrito a mano, así que en inglés la pantalla seguía diciendo
+«14 sept»; ahora el idioma es un argumento. Y otras 29 cadenas estaban fuera
+de `uiText`: «Registrando ahora mismo en esta sucursal», «Sin revisar o sin
+resolver», «Iniciar simulación», «Confianza 70 %»…
+
+Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que renderiza
+los componentes de verdad con el CSS compilado del proyecto.
+
+## 2.sexdecies Panel de Inventario de activos (2026-09-09)
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| «Disponibles» y «En custodia» sueltas, y «Requieren atención» sumando devoluciones con mantenimiento en un número ya indescomponible | **«Dónde están los activos»**: reparto por estado en barras, con cada barra enlazando al listado filtrado | Es un reparto y se leía como cifras inconexas |
+| El servidor cuenta `total` sobre TODOS los estados pero solo desglosa cuatro | Se calcula el **resto** y se dibuja como «Otros estados» cuando existe | Los retirados, perdidos o reservados no aparecían en ninguna tarjeta y nadie lo notaba |
+| Del almacén se pintaba solo `belowMinimum` | **«Qué falta en el almacén»** con las dos medidas y el denominador (`references`) en el subtítulo | «En punto de pedido» es el aviso temprano: lo que todavía se puede reponer a tiempo |
+| — | **Compras en curso** | `operations.purchaseOrdersInProgress` venía en la misma respuesta, existe la pantalla de compras, y no se enseñaba en ninguna parte |
+
+**Bajo mínimo y punto de pedido NO se apilan.** El servidor los calcula con
+dos umbrales distintos sobre la misma referencia (`qty < minQty` y
+`qty <= reorderPoint`), y nada garantiza que el punto de pedido esté por
+encima del mínimo, así que no son conjuntos excluyentes y presentarlos como
+un reparto sería mentir sobre el total. Van como dos medidas contra el mismo
+denominador, con una nota que explica el solape.
+
+**La acción recomendada estaba escrita a pelo, entera.** `siguienteAccion`
+devolvía rótulo, título, detalle y texto del botón como literales en español:
+el elemento más prominente de la pantalla se quedaba sin traducir de
+principio a fin. Ahora recibe el traductor y no escribe ni una palabra por su
+cuenta. Con las descripciones de las tarjetas y de los accesos, son 40 cadenas
+nuevas en el diccionario inglés.
+
+Los enlaces a `/inventory/assets/maintenance` y `/inventory/assets/warehouse`
+pasan a `/inventory/maintenance` y `/inventory/warehouse`: las primeras
+funcionaban, pero solo a través del alias `[...slug]` que redirige, así que
+ahorraban un salto y dejaban la pantalla con dos formas de nombrar la misma
+ruta.
+
+### Corrección en el motor de gráficos
+
+`ANCHO_MAXIMO_BANDA` era 96 px para las dos orientaciones. En vertical es una
+columna normal; en horizontal son 96 px de ALTO —más de tres veces la fila de
+30 px que el propio gráfico reserva— y con dos categorías la barra llenaba la
+tarjeta como una losa. El tope pasa a depender de la orientación. Mejora
+todos los gráficos horizontales de la aplicación, no solo los de esta
+pantalla.
+
+Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que renderiza
+los componentes de verdad con el CSS compilado del proyecto.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

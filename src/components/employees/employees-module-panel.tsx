@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ActiveContext, InlineNote, PageSection, StatusTile, StatusTileRow } from "@/components/system";
+import { ActiveContext, InlineNote, PageSection, StatusTile } from "@/components/system";
+import { BarChart, ChartCard, ChartSkeleton } from "@/components/chart";
+import { URGENCY_COLOR_CLASS } from "@/components/dashboard/operational-widgets";
 import { fetchEmployees } from "@/lib/backend";
 import { useLocale } from "@/components/locale-provider";
 import { useAppStore } from "@/store/app-store";
@@ -33,8 +35,30 @@ import { cn } from "@/lib/utils";
    lugar de inventada.
    ========================================================================== */
 
-/** Estados del directorio que el backend acepta como filtro. */
-const ESTADOS = ["ACTIVE", "INACTIVE", "TERMINATED"] as const;
+/**
+ * Estados del directorio que el backend acepta como filtro.
+ *
+ * `SUSPENDED` faltaba, y su ausencia no era inocua: las tres cifras se
+ * presentaban al lado del Total, así que en cuanto había una persona
+ * suspendida no sumaban y no había forma de saber dónde estaba la
+ * diferencia. Cuatro cifras que cuadran valen más que tres que no.
+ */
+const ESTADOS = ["ACTIVE", "SUSPENDED", "INACTIVE", "TERMINATED"] as const;
+
+/**
+ * Color de cada estado.
+ *
+ * Es una escala de situación laboral, no una paleta categórica: el ámbar
+ * queda para lo que exige mirar —suspendido— y el resto es grafito, más
+ * apagado cuanto más lejos de la plantilla activa. Cada barra lleva su
+ * nombre escrito al lado.
+ */
+const COLOR_ESTADO: Record<(typeof ESTADOS)[number], string> = {
+  ACTIVE: "text-series-2",
+  SUSPENDED: URGENCY_COLOR_CLASS.warning,
+  INACTIVE: "text-series-2/45",
+  TERMINATED: URGENCY_COLOR_CLASS.neutral,
+};
 
 /** Máximo de sucursales con recuento propio. Más allá, la lista deja de
  *  leerse de un vistazo y se convierte en otra tabla. */
@@ -86,9 +110,20 @@ export function EmployeesModulePanel() {
   const cifra = (consulta: { isError: boolean; data?: { meta?: { total: number } } }) =>
     consulta.isError ? null : consulta.data?.meta?.total;
 
-  const activos = cifra(porEstado[0] ?? { isError: true });
-  const inactivos = cifra(porEstado[1] ?? { isError: true });
-  const desvinculados = cifra(porEstado[2] ?? { isError: true });
+  const etiquetaEstado: Record<(typeof ESTADOS)[number], string> = {
+    ACTIVE: t("employees.panel.active"),
+    SUSPENDED: t("employees.panel.suspended"),
+    INACTIVE: t("employees.panel.inactive"),
+    TERMINATED: t("employees.panel.terminated"),
+  };
+
+  const reparto = ESTADOS.map((estado, indice) => ({
+    estado,
+    label: etiquetaEstado[estado],
+    total: cifra(porEstado[indice] ?? { isError: true }),
+  }));
+  const cargandoReparto = reparto.some((fila) => fila.total === undefined);
+  const hayReparto = reparto.some((fila) => (fila.total ?? 0) > 0);
 
   const repartoSucursales = sucursales.map((sucursal, indice) => ({
     id: sucursal.id,
@@ -102,48 +137,65 @@ export function EmployeesModulePanel() {
     <div className="space-y-5">
       <ActiveContext />
 
-      <StatusTileRow label={t("employees.panel.tilesLabel")}>
-        <li className="min-w-0">
-          <StatusTile
-            title={t("employees.panel.active")}
-            value={activos}
-            context={t("employees.panel.activeContext")}
-            scope={alcance}
-            href={alDirectorio({ status: "ACTIVE" })}
-            actionLabel={t("employees.panel.filter")}
-          />
-        </li>
-        <li className="min-w-0">
-          <StatusTile
-            title={t("employees.panel.inactive")}
-            value={inactivos}
-            context={t("employees.panel.inactiveContext")}
-            scope={alcance}
-            href={alDirectorio({ status: "INACTIVE" })}
-            actionLabel={t("employees.panel.filter")}
-          />
-        </li>
-        <li className="min-w-0">
-          <StatusTile
-            title={t("employees.panel.terminated")}
-            value={desvinculados}
-            context={t("employees.panel.terminatedContext")}
-            scope={alcance}
-            href={alDirectorio({ status: "TERMINATED" })}
-            actionLabel={t("employees.panel.filter")}
-          />
-        </li>
-        <li className="min-w-0">
-          <StatusTile
-            title={t("employees.panel.total")}
-            value={cifra(total)}
-            context={t("employees.panel.totalContext")}
-            scope={alcance}
-            href={alDirectorio({ status: "all" })}
-            actionLabel={t("employees.panel.seeAll")}
-          />
-        </li>
-      </StatusTileRow>
+      {/* Una sola cifra de cabecera y el reparto dibujado.
+          Antes eran cuatro tarjetas del mismo tamaño para cuatro números que
+          son partes de un mismo total: la proporción, que es lo que se quiere
+          saber al abrir el módulo, había que calcularla mentalmente. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:items-start">
+        {/* Una sola tarjeta no es una lista: `StatusTileRow` sigue siendo una
+            rejilla de cuatro columnas en pantalla ancha y aquí la habría
+            partido en cuatro tiras de 55px. */}
+        <StatusTile
+          title={t("employees.panel.total")}
+          value={cifra(total)}
+          context={t("employees.panel.totalContext")}
+          scope={alcance}
+          href={alDirectorio({ status: "all" })}
+          actionLabel={t("employees.panel.seeAll")}
+        />
+
+        <ChartCard
+          title={t("employees.panel.mixTitle")}
+          subtitle={t("employees.panel.mixSubtitle")}
+          period={alcance}
+        >
+          {cargandoReparto ? (
+            <ChartSkeleton label={t("employees.panel.tilesLabel")} />
+          ) : !hayReparto ? (
+            <BarChart categories={[]} series={[]} emptyReason="sin-registros" />
+          ) : (
+            <>
+              <BarChart
+                orientation="horizontal"
+                categories={reparto.map((fila) => fila.label)}
+                series={[
+                  { id: "estado", name: t("employees.panel.people"), values: reparto.map((fila) => fila.total ?? 0) },
+                ]}
+                categoryColorClasses={reparto.map((fila) => COLOR_ESTADO[fila.estado])}
+                caption={t("employees.panel.mixCaption")}
+                categoryLabel={t("employees.panel.state")}
+                formatValue={(valor) => String(valor)}
+              />
+              {/* Cada estado sigue abriendo el directorio ya filtrado, que es
+                  lo que hacían las cuatro tarjetas de antes. */}
+              <ul className="mt-4 flex flex-wrap gap-1.5">
+                {reparto.map((fila) => (
+                  <li key={fila.estado}>
+                    <Link
+                      href={alDirectorio({ status: fila.estado })}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface-1 px-3 text-sm text-ink-2 transition-colors hover:border-line-strong hover:text-ink-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                    >
+                      <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-sm bg-current", COLOR_ESTADO[fila.estado])} />
+                      <span className="truncate">{fila.label}</span>
+                      <span className="font-mono text-2xs tabular-figures text-ink-3">{fila.total ?? "—"}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </ChartCard>
+      </div>
 
       {repartoSucursales.length > 1 ? (
         <PageSection

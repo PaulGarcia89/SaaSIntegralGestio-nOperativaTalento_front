@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, ChevronRight, FileCheck, FileSpreadsheet, History, UserPlus, UserRoundX, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { EmployeesModulePanel } from "@/components/employees/employees-module-panel";
-import { EmptyState, ErrorState, PageHeader, PageSection, SkeletonRows, StatusTile, StatusTileRow } from "@/components/system";
+import { EmptyState, ErrorState, InlineNote, PageHeader, PageSection, SkeletonRows, StatusTile, StatusTileRow } from "@/components/system";
 import { Button } from "@/components/ui/button";
 import { fetchEmployeesSummary, fetchOnboardingAnalytics, getApiErrorMessage } from "@/lib/backend";
 import { auditActionLabel } from "@/lib/audit-labels";
@@ -83,7 +83,7 @@ export function PeopleModuleDashboard() {
           directorio ya filtrado. */}
       <EmployeesModulePanel />
 
-      <PeopleAttention branchId={currentBranch?.id} tenantId={currentTenant.id} />
+      <PeopleAttention branchId={currentBranch?.id} branchName={currentBranch?.name} tenantId={currentTenant.id} />
 
       {/* Incorporaciones en curso: dato de Incorporación, no de Personas.
           Se enseña aquí porque responde a «¿quién está entrando?», pero se
@@ -207,7 +207,15 @@ function QuickAction({
    falla se dice, con reintento.
    ========================================================================== */
 
-function PeopleAttention({ branchId, tenantId }: { branchId?: string; tenantId: string }) {
+function PeopleAttention({
+  branchId,
+  branchName,
+  tenantId,
+}: {
+  branchId?: string;
+  branchName?: string;
+  tenantId: string;
+}) {
   const { t } = useLocale();
   const resumen = useQuery({
     queryKey: ["employees-summary", tenantId, branchId ?? null],
@@ -219,6 +227,20 @@ function PeopleAttention({ branchId, tenantId }: { branchId?: string; tenantId: 
   const valor = (n: number | undefined) => (resumen.isError ? null : cargando ? undefined : n);
 
   const documentosUrgentes = data ? data.documents.expired + data.documents.expiringWithin30Days : undefined;
+
+  /*
+   * Alcance de estas cifras.
+   *
+   * `GET /employees/summary` EXIGE una sucursal: si no se le pasa una, usa la
+   * activa de la sesión. O sea que esta sección habla siempre de UNA sucursal,
+   * mientras que las cifras de plantilla de más arriba cuentan toda la empresa
+   * cuando no hay sucursal seleccionada. Dos filas de la misma pantalla
+   * contando poblaciones distintas y sin decirlo es peor que no enseñar la
+   * segunda: por eso cada tarjeta lleva su alcance y, cuando las dos no
+   * coinciden, se avisa en una línea.
+   */
+  const alcance = branchName ?? (data ? t("people.panel.attentionOneBranch") : undefined);
+  const contradice = !branchName && Boolean(data);
 
   return (
     <>
@@ -239,6 +261,7 @@ function PeopleAttention({ branchId, tenantId }: { branchId?: string; tenantId: 
                 status={data ? { label: data.incompleteProfiles.count ? t("people.panel.needsAttention") : t("people.panel.allGood"), tone: data.incompleteProfiles.count ? "warning" : "success" } : undefined}
                 href="/employees?status=ACTIVE"
                 actionLabel={t("people.panel.quickDirectory")}
+                scope={alcance}
                 icon={<UserRoundX className="size-5" aria-hidden="true" />}
               />
             </li>
@@ -248,6 +271,7 @@ function PeopleAttention({ branchId, tenantId }: { branchId?: string; tenantId: 
                 value={valor(documentosUrgentes)}
                 context={data ? t("people.panel.documentsDueContext", { expired: data.documents.expired, soon: data.documents.expiringWithin30Days }) : t("people.panel.documentsDueContextLoading")}
                 status={data ? { label: data.documents.expired ? t("people.panel.expired") : documentosUrgentes ? t("people.panel.needsAttention") : t("people.panel.allGood"), tone: data.documents.expired ? "danger" : documentosUrgentes ? "warning" : "success" } : undefined}
+                scope={alcance}
                 icon={<CalendarClock className="size-5" aria-hidden="true" />}
               />
             </li>
@@ -257,11 +281,30 @@ function PeopleAttention({ branchId, tenantId }: { branchId?: string; tenantId: 
                 value={valor(data?.documents.pendingReview)}
                 context={t("people.panel.documentsToReviewContext")}
                 status={data ? { label: data.documents.pendingReview ? t("people.panel.needsAttention") : t("people.panel.allGood"), tone: data.documents.pendingReview ? "progress" : "success" } : undefined}
+                scope={alcance}
                 icon={<FileCheck className="size-5" aria-hidden="true" />}
               />
             </li>
           </StatusTileRow>
         )}
+
+        {contradice ? (
+          <InlineNote tone="info" title={t("people.panel.scopeMismatchTitle")} className="mt-4">
+            {t("people.panel.scopeMismatchHelp")}
+          </InlineNote>
+        ) : null}
+
+        {/* La regla que produce la cifra, tal como la manda el servidor en
+            `criteria`. Un recuento sin su criterio no se puede discutir. */}
+        {data && data.incompleteProfiles.criteria.length ? (
+          <p className="mt-3 text-2xs leading-5 text-ink-3">
+            {t("people.panel.incompleteCriteria", {
+              fields: data.incompleteProfiles.criteria
+                .map((campo) => t(`people.panel.field.${campo}`))
+                .join(", "),
+            })}
+          </p>
+        ) : null}
 
         {data && (data.incompleteProfiles.sample.length || data.documents.sample.length) ? (
           <div className="mt-4 grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">

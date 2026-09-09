@@ -53,6 +53,19 @@ export type BarChartProps = {
   emptyAction?: React.ReactNode;
   /** Fuerza la orientación en lugar de decidirla por el ancho disponible. */
   orientation?: "vertical" | "horizontal";
+  /**
+   * Color por CATEGORÍA en vez de por serie, una clase de texto por categoría.
+   *
+   * Solo tiene efecto con una sola serie, que es el único caso en que no crea
+   * ambigüedad: con dos series el color ya está diciendo cuál es cuál. Existe
+   * para las escalas ordinales —tramos de vencimiento, niveles de riesgo—,
+   * donde las categorías NO son intercambiables y pintarlas todas del mismo
+   * color hace que la primera y la última pesen lo mismo a la vista. No es una
+   * paleta categórica: quien la usa pasa tonos de estado, y la categoría lleva
+   * siempre su nombre escrito al lado, así que el color nunca es el único
+   * portador de la información.
+   */
+  categoryColorClasses?: readonly (string | undefined)[];
   className?: string;
 };
 
@@ -76,6 +89,7 @@ export function BarChart({
   emptyReason = "sin-registros",
   emptyAction,
   orientation,
+  categoryColorClasses,
   className,
 }: BarChartProps) {
   const { ref, width } = useChartWidth();
@@ -133,10 +147,20 @@ export function BarChart({
     range: horizontal ? [area.left, area.right] : [area.bottom, area.top],
   });
 
-  // Con una o dos categorías la banda ocuparía media pantalla; una barra de
-  // 400 px no dice más que una de 96 y desplaza el rótulo del valor. Se
-  // limita el grosor y la barra se centra en su banda.
-  const ANCHO_MAXIMO_BANDA = 96;
+  /*
+   * Grosor máximo de la barra.
+   *
+   * Con una o dos categorías la banda ocuparía media pantalla; una barra de
+   * 400 px no dice más que una fina y desplaza el rótulo del valor. Se limita
+   * el grosor y la barra se centra en su banda.
+   *
+   * El tope depende de la orientación, que es donde estaba el fallo: 96 px de
+   * ANCHO en una columna vertical es una barra normal, pero 96 px de ALTO en
+   * una barra horizontal es una losa —tres veces el alto de su propia fila de
+   * 30 px—, y con dos categorías llenaba la tarjeta. En horizontal el tope va
+   * a la altura de fila que el propio gráfico reserva.
+   */
+  const ANCHO_MAXIMO_BANDA = horizontal ? ALTO_POR_CATEGORIA : 96;
   const anchoBandaBruto = escalaCategoria.bandwidth();
   const anchoBanda = Math.min(anchoBandaBruto, ANCHO_MAXIMO_BANDA);
   const desplazamientoBanda = (anchoBandaBruto - anchoBanda) / 2;
@@ -153,6 +177,12 @@ export function BarChart({
   );
 
   const activo = indiceRaton ?? indiceFoco;
+
+  // Con más de una serie el color ya distingue las series: pintar además por
+  // categoría dejaría dos significados en el mismo canal.
+  const colorPorCategoria = utiles.length === 1 && (categoryColorClasses?.length ?? 0) > 0;
+  const claseCategoria = (indice: number): string =>
+    categoryColorClasses?.[indice] ?? seriesColorClass(0);
 
   const leyenda: ChartLegendEntry[] = utiles.map((serie, indice) => ({
     id: serie.id,
@@ -200,7 +230,7 @@ export function BarChart({
       id: serie.id,
       label: serie.name,
       value: Number.isFinite(serie.values[indice]) ? formatValue(serie.values[indice]) : "sin dato",
-      colorClassName: seriesColorClass(posicion),
+      colorClassName: colorPorCategoria ? claseCategoria(indice) : seriesColorClass(posicion),
     }));
 
   const descripcionCategoria = (indice: number): string =>
@@ -315,7 +345,7 @@ export function BarChart({
         {utiles.map((serie, indiceSerie) => {
           const idPatron = `${idBase}-patron-${indiceSerie}`;
           return (
-            <g key={serie.id} className={seriesColorClass(indiceSerie)}>
+            <g key={serie.id} className={colorPorCategoria ? undefined : seriesColorClass(indiceSerie)}>
               <defs>
                 <SeriesPattern id={idPatron} index={indiceSerie} />
               </defs>
@@ -329,7 +359,10 @@ export function BarChart({
                     y={caja.y}
                     width={Math.max(0, caja.width)}
                     height={Math.max(0, caja.height)}
-                    fill={seriesFill(indiceSerie, idPatron)}
+                    className={colorPorCategoria ? claseCategoria(indiceCategoria) : undefined}
+                    // Con color por categoría la barra es siempre maciza: el
+                    // patrón de trama distingue SERIES, y aquí solo hay una.
+                    fill={colorPorCategoria ? "currentColor" : seriesFill(indiceSerie, idPatron)}
                     opacity={activo === null || activo === indiceCategoria ? 1 : 0.55}
                   />
                 );

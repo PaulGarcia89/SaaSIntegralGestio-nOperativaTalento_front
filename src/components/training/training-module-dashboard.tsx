@@ -47,52 +47,52 @@ export function TrainingModuleDashboard() {
   const destinos: Destino[] = [
     {
       href: "/training",
-      label: canManageTraining ? "Cursos y asignaciones" : "Mis cursos",
+      label: canManageTraining ? uiText("Cursos y asignaciones") : uiText("Mis cursos"),
       description: canManageTraining
-        ? "Prioridades, asignaciones, lanzamientos y supervisión del programa."
-        : "Continuar donde lo dejaste y ver qué te falta.",
+        ? uiText("Prioridades, asignaciones, lanzamientos y supervisión del programa.")
+        : uiText("Continuar donde lo dejaste y ver qué te falta."),
       icon: BookOpen,
       visible: true,
     },
     {
       href: "/training/evaluations",
       label: uiText("Evaluaciones"),
-      description: "Pruebas pendientes y resultados de cada intento.",
+      description: uiText("Pruebas pendientes y resultados de cada intento."),
       icon: ClipboardCheck,
       visible: can("training.view"),
     },
     {
       href: "/training/certificates",
       label: uiText("Certificados"),
-      description: "Los que ya se emitieron y los que están por vencer.",
+      description: uiText("Los que ya se emitieron y los que están por vencer."),
       icon: Award,
       visible: can("training.view"),
     },
     {
       href: "/training/results",
       label: uiText("Resultados"),
-      description: "Avance por persona, curso y sucursal.",
+      description: uiText("Avance por persona, curso y sucursal."),
       icon: LineChart,
       visible: can("training.view"),
     },
     {
       href: "/training/content",
       label: uiText("Gestionar cursos"),
-      description: "Crear, revisar, aprobar y publicar contenido.",
+      description: uiText("Crear, revisar, aprobar y publicar contenido."),
       icon: GraduationCap,
       visible: canManageTraining,
     },
     {
       href: "/training/paths",
       label: uiText("Rutas y cumplimiento"),
-      description: "Itinerarios obligatorios y quién los tiene al día.",
+      description: uiText("Itinerarios obligatorios y quién los tiene al día."),
       icon: Route,
       visible: canManageTraining,
     },
     {
       href: "/training/intelligence",
       label: uiText("Inteligencia"),
-      description: "Recomendaciones y señales sobre el programa.",
+      description: uiText("Recomendaciones y señales sobre el programa."),
       icon: Sparkles,
       visible: canManageTraining,
     },
@@ -105,12 +105,12 @@ export function TrainingModuleDashboard() {
         title={uiText("Dashboard de aprendizaje")}
         description={
           canManageTraining
-            ? "Cómo va el programa de formación, qué necesita atención y por dónde seguir."
-            : "Tu formación: qué continuar, qué debes y qué vence pronto."
+            ? uiText("Cómo va el programa de formación, qué necesita atención y por dónde seguir.")
+            : uiText("Tu formación: qué continuar, qué debes y qué vence pronto.")
         }
         actions={
           <Button asChild variant="outline">
-            <Link href="/training">{canManageTraining ? "Abrir cursos y asignaciones" : "Abrir mis cursos"}</Link>
+            <Link href="/training">{canManageTraining ? uiText("Abrir cursos y asignaciones") : uiText("Abrir mis cursos")}</Link>
           </Button>
         }
       />

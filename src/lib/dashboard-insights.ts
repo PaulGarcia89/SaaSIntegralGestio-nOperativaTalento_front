@@ -218,3 +218,84 @@ export function operationalHealth(
 
   return { score, tone, summary, overdue, dueToday, blocking };
 }
+
+/* ==========================================================================
+   CARGA POR MÓDULO
+   ==========================================================================
+   `module` es un campo real de cada tarea y de cada alerta, y hasta ahora no
+   se mostraba en ninguna parte: el Inicio decía CUÁNTO hay pendiente y CUÁNDO
+   vence, pero no DÓNDE está. Esto último es lo que decide a qué pantalla ir.
+   ========================================================================== */
+
+export type ModuleLoad = {
+  readonly module: string;
+  /** Tareas y alertas del módulo dentro del alcance. */
+  readonly total: number;
+  /** Cuántas de ellas están vencidas. Es lo que ordena la atención. */
+  readonly overdue: number;
+};
+
+/** Etiqueta de la fila que agrupa la cola larga. */
+export const OTHER_MODULES_LABEL = "Otros";
+
+/**
+ * Reparto de la carga por módulo, de mayor a menor.
+ *
+ * Más allá de `limit` filas el gráfico deja de leerse, así que la cola se
+ * pliega en una sola fila «Otros» en vez de seguir añadiendo barras. No se
+ * descarta nada: los totales de «Otros» son la suma real de lo plegado.
+ */
+export function groupByModule(
+  items: readonly OperationalDashboardItemDto[],
+  now: Date = new Date(),
+  limit = 6,
+): ModuleLoad[] {
+  const counts = new Map<string, { total: number; overdue: number }>();
+
+  for (const item of items) {
+    const key = item.module?.trim();
+    if (!key) continue;
+    const entry = counts.get(key) ?? { total: 0, overdue: 0 };
+    entry.total += 1;
+    if (dueBucket(item.dueAt, now) === "overdue") entry.overdue += 1;
+    counts.set(key, entry);
+  }
+
+  const ordenados = [...counts.entries()]
+    .map(([module, entry]) => ({ module, total: entry.total, overdue: entry.overdue }))
+    // A igualdad de total manda lo vencido, y en último término el nombre,
+    // para que dos consultas seguidas den siempre el mismo orden.
+    .sort((a, b) => b.total - a.total || b.overdue - a.overdue || a.module.localeCompare(b.module, "es"));
+
+  if (ordenados.length <= limit) return ordenados;
+
+  const cabeza = ordenados.slice(0, limit - 1);
+  const cola = ordenados.slice(limit - 1);
+  return [
+    ...cabeza,
+    {
+      module: OTHER_MODULES_LABEL,
+      total: cola.reduce((suma, entrada) => suma + entrada.total, 0),
+      overdue: cola.reduce((suma, entrada) => suma + entrada.overdue, 0),
+    },
+  ];
+}
+
+/* ==========================================================================
+   TONO DE URGENCIA
+   ==========================================================================
+   Los cinco tramos de vencimiento NO son cinco categorías intercambiables:
+   son una escala de urgencia. Pintarlos todos del mismo color hace que
+   «Vencidos» y «Sin fecha» pesen lo mismo a la vista, que es justo lo
+   contrario de lo que dicen los datos.
+   ========================================================================== */
+
+export type UrgencyTone = "danger" | "warning" | "info" | "neutral";
+
+export const DUE_BUCKET_TONE: Record<DueBucket, UrgencyTone> = {
+  overdue: "danger",
+  today: "warning",
+  week: "info",
+  later: "neutral",
+  none: "neutral",
+};

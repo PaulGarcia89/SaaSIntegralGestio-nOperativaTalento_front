@@ -19,7 +19,7 @@ import {
   StatusTile,
   StatusTileRow,
 } from "@/components/system";
-import { ChartCard, ChartSkeleton, FunnelChart, type FunnelStage } from "@/components/chart";
+import { BarChart, ChartCard, ChartSkeleton, FunnelChart, LineChart, type FunnelStage } from "@/components/chart";
 import {
   fetchApplications,
   fetchAtsAnalytics,
@@ -130,7 +130,13 @@ function PhaseRail({
   phases,
   locale,
 }: {
-  phases: Array<{ id: RecruitmentPhaseId; total: number | undefined; loading: boolean }>;
+  phases: Array<{
+    id: RecruitmentPhaseId;
+    total: number | undefined;
+    loading: boolean;
+    /** Aviso de que esa fase pide una acción, no solo que tiene gente. */
+    status?: { label: string; tone: "warning" | "progress" };
+  }>;
   locale: "es" | "en";
 }) {
   return (
@@ -160,6 +166,13 @@ function PhaseRail({
                   </span>
                 </span>
                 <span className="mt-1 block text-sm leading-relaxed text-ink-2">{phaseMeaning(phase.id, locale)}</span>
+                {/* La urgencia vive donde vive la cifra. Antes estaba en unas
+                    tarjetas aparte que repetían este mismo número. */}
+                {phase.status ? (
+                  <span className="mt-2 block">
+                    <StatusBadge size="sm" tone={phase.status.tone} label={phase.status.label} />
+                  </span>
+                ) : null}
               </span>
             </Link>
           </li>
@@ -251,28 +264,26 @@ export default function TodayPage() {
   // mismo, hay que leerlas todas para saber por dónde empezar.
   const [recommended, ...rest] = items;
 
-  const phases = MAIN_PHASES.map((phase, index) => ({
-    id: phase.id,
-    total: counts[index]?.data?.meta.total,
-    loading: Boolean(counts[index]?.isLoading),
-  }));
+  const phases = MAIN_PHASES.map((phase, index) => {
+    const total = counts[index]?.data?.meta.total;
+    const pide = typeof total === "number" && total > 0;
+    return {
+      id: phase.id,
+      total,
+      loading: Boolean(counts[index]?.isLoading),
+      status:
+        phase.id === "POSTULARON" && pide
+          ? { label: t("ats.panel.needsReview"), tone: "warning" as const }
+          : phase.id === "DECIDIDO" && pide
+            ? { label: t("ats.panel.awaitingDecision"), tone: "progress" as const }
+            : undefined,
+    };
+  });
 
   // Alcance escrito al pie de cada tarjeta. Las mismas cifras significan cosas
   // distintas en una sucursal y en toda la empresa; sin decirlo no hay forma de
   // saber cuál se está mirando.
   const alcance = currentBranch?.name ?? t("common.allBranches");
-
-  /** `undefined` = todavía cargando · `null` = el servidor no lo entrega. */
-  const conteoDeFase = (fase: RecruitmentPhaseId) => {
-    const indice = MAIN_PHASES.findIndex((phase) => phase.id === fase);
-    const consulta = counts[indice];
-    if (!consulta) return null;
-    if (consulta.isError) return null;
-    return consulta.data?.meta.total;
-  };
-
-  const nuevas = conteoDeFase("POSTULARON");
-  const decisiones = conteoDeFase("DECIDIDO");
 
   const vacantesActivas = (() => {
     if (vacantes.isError) return null;
@@ -290,15 +301,58 @@ export default function TodayPage() {
       ? coordinacion.data.meta.interviewCount + coordinacion.data.meta.requestCount
       : undefined;
 
-  /*
-   * Cuatro tarjetas, no doce. Son las cuatro preguntas con las que se abre el
-   * módulo: qué hay publicado, qué llegó, qué hay que agendar y qué espera una
-   * decisión mía. Cada una lleva a la lista ya filtrada, así que la tarjeta no
-   * solo informa: resuelve.
+  const textoDuracion = (horas: number) =>
+    horas < 24
+      ? t("ats.panel.hoursShort", { n: Math.round(horas) })
+      : t("ats.panel.daysShort", {
+          n: (horas / 24).toLocaleString(locale === "es" ? "es-ES" : "en-US", {
+            maximumFractionDigits: 1,
+          }),
+        });
+
+  const resumen = analitica.data?.summary;
+
+  /**
+   * Variación real frente al periodo anterior.
    *
-   * Ninguna lleva variación. El backend entrega el estado de ahora, no una
-   * serie temporal, y un «+12 % esta semana» inventado sería peor que su
-   * ausencia.
+   * La calcula el backend (`summary.changes`) comparando la ventana de 90 días
+   * con la anterior, así que no hay nada estimado aquí. Se omite por debajo de
+   * una décima: «+0,0 %» ocupa sitio y no dice nada.
+   *
+   * `mejorSiBaja` invierte la lectura para el tiempo hasta contratar, que es
+   * la única cifra del panel donde bajar es la buena noticia.
+   */
+  const variacion = (
+    valor: number | undefined,
+    { unidad, mejorSiBaja = false }: { unidad: "porcentaje" | "puntos"; mejorSiBaja?: boolean },
+  ): { label: string; tone: "success" | "warning" } | undefined => {
+    if (typeof valor !== "number" || !Number.isFinite(valor) || Math.abs(valor) < 0.1) return undefined;
+    const magnitud = Math.abs(valor).toLocaleString(locale === "es" ? "es-ES" : "en-US", {
+      maximumFractionDigits: 1,
+    });
+    const texto = `${valor > 0 ? "+" : "−"}${magnitud}${unidad === "puntos" ? " pp" : " %"}`;
+    return {
+      label: t("ats.panel.vsPrevious", { value: texto }),
+      tone: (mejorSiBaja ? valor < 0 : valor > 0) ? "success" : "warning",
+    };
+  };
+
+  /** Alcance y ventana de las cifras que salen de la analítica. */
+  const alcanceAnalitica = `${alcance} · ${t("ats.panel.funnelPeriod", { days: DIAS_EMBUDO })}`;
+
+  /*
+   * Cuatro tarjetas, y ninguna repite al reparto por fase de más abajo.
+   *
+   * Antes dos de las cuatro —«Postulaciones nuevas» y «Decisiones
+   * pendientes»— eran exactamente las cifras de las fases POSTULARON y
+   * DECIDIDO, dibujadas otra vez en otra forma. Su urgencia no se ha perdido:
+   * se movió a la insignia de la propia fase, que es donde ya estaba el
+   * número.
+   *
+   * En su lugar entran las dos preguntas que el panel no sabía contestar:
+   * cuánta gente acaba contratada y cuánto se tarda. Las dos vienen de la
+   * misma respuesta que ya se descargaba para el embudo, con la variación
+   * real frente al periodo anterior.
    */
   const tarjetas = [
     {
@@ -307,17 +361,7 @@ export default function TodayPage() {
       context: t("ats.panel.activeVacanciesContext"),
       href: "/ats/vacancies",
       actionLabel: t("ats.panel.seeVacancies"),
-    },
-    {
-      title: t("ats.panel.newApplications"),
-      value: nuevas,
-      context: t("ats.panel.newApplicationsContext"),
-      status:
-        typeof nuevas === "number" && nuevas > 0
-          ? { label: t("ats.panel.needsReview"), tone: "warning" as const }
-          : undefined,
-      href: "/ats/candidates?phase=POSTULARON",
-      actionLabel: t("ats.panel.review"),
+      scope: alcance,
     },
     {
       title: t("ats.panel.interviews"),
@@ -325,19 +369,71 @@ export default function TodayPage() {
       context: t("ats.panel.interviewsContext"),
       href: "/ats/interviews",
       actionLabel: t("ats.panel.seeInterviews"),
+      scope: alcance,
     },
     {
-      title: t("ats.panel.pendingDecisions"),
-      value: decisiones,
-      context: t("ats.panel.pendingDecisionsContext"),
-      status:
-        typeof decisiones === "number" && decisiones > 0
-          ? { label: t("ats.panel.awaitingDecision"), tone: "progress" as const }
+      title: t("ats.panel.conversion"),
+      value: analitica.isError
+        ? null
+        : resumen
+          // `${n}%` daba «8.3%» en español. El separador decimal y el espacio
+          // antes del signo dependen del idioma.
+          ? t("ats.panel.percentValue", {
+              value: resumen.conversionRate.toLocaleString(locale === "es" ? "es-ES" : "en-US", {
+                maximumFractionDigits: 1,
+              }),
+            })
           : undefined,
-      href: "/ats/candidates?phase=DECIDIDO",
-      actionLabel: t("ats.panel.decide"),
+      context: t("ats.panel.conversionContext"),
+      trend: variacion(resumen?.changes.conversionRate, { unidad: "puntos" }),
+      href: "/ats/analytics",
+      actionLabel: t("ats.panel.seeReports"),
+      scope: alcanceAnalitica,
+    },
+    {
+      title: t("ats.panel.timeToHire"),
+      value: analitica.isError
+        ? null
+        : resumen
+          ? resumen.averageTimeToHireHours > 0
+            ? textoDuracion(resumen.averageTimeToHireHours)
+            : "—"
+          : undefined,
+      context: t("ats.panel.timeToHireContext"),
+      // Tardar menos es mejor: la flecha hacia abajo aquí es buena noticia.
+      trend: variacion(resumen?.changes.averageTimeToHireHours, { unidad: "porcentaje", mejorSiBaja: true }),
+      href: "/ats/analytics",
+      actionLabel: t("ats.panel.seeReports"),
+      scope: alcanceAnalitica,
     },
   ];
+
+  /*
+   * Tendencia semanal.
+   *
+   * `trends` viene en la MISMA respuesta que el embudo, así que esto no cuesta
+   * una petición más: la pantalla ya lo tenía descargado y lo tiraba. El
+   * backend rellena con ceros las semanas sin movimiento, de modo que un hueco
+   * en la serie no existe y el cero es un dato, no una laguna.
+   *
+   * Dos series y no cuatro: postulaciones y contrataciones son la entrada y la
+   * salida del proceso. Rechazos y bajas están en Reportes, que es donde se va
+   * a investigar el porqué.
+   */
+  const tendencia = analitica.data?.trends ?? [];
+  const hayTendencia = tendencia.some((fila) => fila.applications > 0 || fila.hires > 0);
+  const etiquetaSemana = (indice: number) => {
+    const fila = tendencia[Math.round(indice)];
+    if (!fila) return "";
+    const fecha = new Date(`${fila.period}T00:00:00.000Z`);
+    return Number.isNaN(fecha.getTime())
+      ? fila.period
+      : new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-US", {
+          day: "numeric",
+          month: "short",
+          timeZone: "UTC",
+        }).format(fecha);
+  };
 
   const embudo: FunnelStage[] = (analitica.data?.funnel ?? []).map((etapa) => ({
     id: etapa.stageCode,
@@ -351,13 +447,21 @@ export default function TodayPage() {
     (etapa) => etapa.sampleSize >= MUESTRA_MINIMA && etapa.averageHours > 0,
   );
 
-  const textoDuracion = (horas: number) =>
-    horas < 24
-      ? t("ats.panel.hoursShort", { n: Math.round(horas) })
+  /*
+   * Unidad única para el eje de tiempos.
+   *
+   * `textoDuracion` cambia de horas a días al pasar de 24, que está bien para
+   * una cifra suelta pero rompe un eje: quedaba «0 h · 1 d · 2,1 d». Un eje
+   * mezcla unidades nunca, así que se elige una para todo el gráfico según el
+   * mayor valor y las barras se dibujan en esa unidad.
+   */
+  const enHoras = tiempos.every((etapa) => etapa.averageHours < 24);
+  const valorTiempo = (horas: number) => (enHoras ? horas : horas / 24);
+  const formatoTiempo = (valor: number) =>
+    enHoras
+      ? t("ats.panel.hoursShort", { n: Math.round(valor) })
       : t("ats.panel.daysShort", {
-          n: (horas / 24).toLocaleString(locale === "es" ? "es-ES" : "en-US", {
-            maximumFractionDigits: 1,
-          }),
+          n: valor.toLocaleString(locale === "es" ? "es-ES" : "en-US", { maximumFractionDigits: 1 }),
         });
 
   return (
@@ -476,12 +580,14 @@ export default function TodayPage() {
         <PhaseRail phases={phases} locale={locale} />
       </PageSection>
 
-      {/* ---- 5. Embudo por etapa ----------------------------------------
-          Pregunta que responde: ¿en qué etapa se está perdiendo la gente?
-          Dato del backend, no derivado de las cifras de arriba. */}
+      {/* ---- 5. Tendencia ------------------------------------------------
+          Pregunta que responde: ¿vamos mejor o peor que antes? El panel no
+          sabía contestarla, y el dato ya venía en la misma respuesta que el
+          embudo. A todo el ancho: una serie de trece semanas necesita
+          recorrido horizontal para que se vea la forma. */}
       <ChartCard
-        title={t("ats.panel.funnelTitle")}
-        subtitle={t("ats.panel.funnelSubtitle")}
+        title={t("ats.panel.trendTitle")}
+        subtitle={t("ats.panel.trendSubtitle")}
         period={t("ats.panel.funnelPeriod", { days: DIAS_EMBUDO })}
         source={analitica.data?.source ? uiText(analitica.data.source) : undefined}
       >
@@ -491,44 +597,105 @@ export default function TodayPage() {
           <InlineNote tone="warning" title={t("ats.panel.funnelErrorTitle")}>
             {t("ats.panel.funnelErrorHelp")}
           </InlineNote>
+        ) : hayTendencia ? (
+          <LineChart
+            series={[
+              {
+                id: "applications",
+                name: t("ats.panel.applicationsSeries"),
+                points: tendencia.map((fila, indice) => ({ x: indice, y: fila.applications })),
+              },
+              {
+                id: "hires",
+                name: t("ats.panel.hiresSeries"),
+                points: tendencia.map((fila, indice) => ({ x: indice, y: fila.hires })),
+              },
+            ]}
+            caption={t("ats.panel.trendCaption")}
+            xLabel={t("ats.panel.week")}
+            formatValue={(valor) => String(valor)}
+            formatX={etiquetaSemana}
+          />
         ) : (
-          <>
+          <LineChart series={[]} emptyReason="sin-registros" />
+        )}
+      </ChartCard>
+
+      {/* ---- 6. Embudo y tiempo por etapa --------------------------------
+          Dos preguntas distintas sobre lo mismo, una al lado de la otra:
+          dónde se pierde la gente y dónde se pierde el tiempo. El tiempo
+          por etapa era una lista de texto debajo del embudo; comparar cuatro
+          magnitudes leyendo cifras es justo el trabajo de unas barras. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title={t("ats.panel.funnelTitle")}
+          subtitle={t("ats.panel.funnelSubtitle")}
+          period={t("ats.panel.funnelPeriod", { days: DIAS_EMBUDO })}
+          source={analitica.data?.source ? uiText(analitica.data.source) : undefined}
+        >
+          {analitica.isLoading ? (
+            <ChartSkeleton label={t("ats.panel.funnelLoading")} />
+          ) : analitica.isError ? (
+            <InlineNote tone="warning" title={t("ats.panel.funnelErrorTitle")}>
+              {t("ats.panel.funnelErrorHelp")}
+            </InlineNote>
+          ) : (
             <FunnelChart
               stages={embudo}
               stageLabel={t("ats.panel.stage")}
               caption={t("ats.panel.funnelCaption")}
               emptyReason="sin-registros"
             />
+          )}
+        </ChartCard>
 
-            {tiempos.length > 0 ? (
-              <div className="mt-5 border-t border-line pt-4">
-                <h4 className="text-sm font-semibold text-ink-1">{t("ats.panel.stageTimeTitle")}</h4>
-                <p className="mt-1 text-xs text-ink-3">
-                  {t("ats.panel.stageTimeHelp", { min: MUESTRA_MINIMA })}
-                </p>
-                <ul className="mt-3 space-y-2">
-                  {tiempos.map((etapa) => (
-                    <li
-                      key={etapa.stageCode}
-                      className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm"
-                    >
-                      <span className="min-w-0 text-ink-2">{uiText(etapa.stageName)}</span>
-                      <span className="shrink-0 text-ink-1">
-                        <span className="font-mono font-semibold tabular-figures">
-                          {textoDuracion(etapa.averageHours)}
-                        </span>
-                        <span className="ml-2 text-xs text-ink-3">
-                          {t("ats.panel.sample", { n: etapa.sampleSize })}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </>
-        )}
-      </ChartCard>
+        <ChartCard
+          title={t("ats.panel.stageTimeTitle")}
+          subtitle={t("ats.panel.stageTimeHelp", { min: MUESTRA_MINIMA })}
+          period={t("ats.panel.funnelPeriod", { days: DIAS_EMBUDO })}
+          source={analitica.data?.source ? uiText(analitica.data.source) : undefined}
+        >
+          {analitica.isLoading ? (
+            <ChartSkeleton label={t("ats.panel.funnelLoading")} />
+          ) : analitica.isError ? (
+            <InlineNote tone="warning" title={t("ats.panel.funnelErrorTitle")}>
+              {t("ats.panel.funnelErrorHelp")}
+            </InlineNote>
+          ) : tiempos.length > 0 ? (
+            <>
+              <BarChart
+                orientation="horizontal"
+                categories={tiempos.map((etapa) => uiText(etapa.stageName))}
+                series={[
+                  {
+                    id: "horas",
+                    name: t("ats.panel.averageTime"),
+                    values: tiempos.map((etapa) => valorTiempo(etapa.averageHours)),
+                  },
+                ]}
+                caption={t("ats.panel.stageTimeCaption")}
+                categoryLabel={t("ats.panel.stage")}
+                formatValue={formatoTiempo}
+              />
+              {/* El tamaño de la muestra sigue a la vista: sin él, una media
+                  de siete casos y una de setecientos se leen igual. */}
+              <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-2xs text-ink-3">
+                {tiempos.map((etapa) => (
+                  <li key={etapa.stageCode}>
+                    {uiText(etapa.stageName)} · {t("ats.panel.sample", { n: etapa.sampleSize })}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <BarChart
+              categories={[]}
+              series={[]}
+              emptyReason="sin-registros"
+            />
+          )}
+        </ChartCard>
+      </div>
 
       {/* ---- Contratación ------------------------------------------------
           Última fase del mismo módulo. Tenía su propio «Dashboard de

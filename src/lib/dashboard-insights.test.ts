@@ -3,9 +3,12 @@ import type { OperationalDashboardItemDto, OperationalDashboardTone } from "@/li
 import {
   activityByDay,
   bucketByDue,
+  DUE_BUCKET_TONE,
   dueBucket,
   dueLabel,
+  groupByModule,
   operationalHealth,
+  OTHER_MODULES_LABEL,
   sortByPriority,
 } from "@/lib/dashboard-insights";
 
@@ -219,5 +222,71 @@ describe("operationalHealth", () => {
     const health = operationalHealth(muchos, muchos.map((entry) => ({ ...entry, kind: "alert" as const, tone: "danger" as const })), NOW);
     expect(health.score).toBeGreaterThanOrEqual(0);
     expect(health.score).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("groupByModule", () => {
+  it("cuenta por módulo y ordena de mayor a menor", () => {
+    const resultado = groupByModule(
+      [
+        item({ module: "Reclutamiento" }),
+        item({ module: "Reclutamiento" }),
+        item({ module: "Reclutamiento" }),
+        item({ module: "Aprendizaje" }),
+        item({ module: "Aprendizaje" }),
+        item({ module: "Inventario" }),
+      ],
+      NOW,
+    );
+    expect(resultado.map((entrada) => [entrada.module, entrada.total])).toEqual([
+      ["Reclutamiento", 3],
+      ["Aprendizaje", 2],
+      ["Inventario", 1],
+    ]);
+  });
+
+  it("cuenta aparte lo vencido de cada módulo", () => {
+    const resultado = groupByModule(
+      [
+        item({ module: "Aprendizaje", dueAt: at(2025, 3, 10) }),
+        item({ module: "Aprendizaje", dueAt: at(2025, 3, 20) }),
+      ],
+      NOW,
+    );
+    expect(resultado).toEqual([{ module: "Aprendizaje", total: 2, overdue: 1 }]);
+  });
+
+  it("ignora el módulo vacío en vez de crear una fila sin nombre", () => {
+    expect(groupByModule([item({ module: "" }), item({ module: "   " })], NOW)).toEqual([]);
+  });
+
+  it("pliega la cola en 'Otros' sin perder ningún registro", () => {
+    const items = ["A", "B", "C", "D", "E", "F", "G", "H"].map((nombre) => item({ module: nombre }));
+    const resultado = groupByModule(items, NOW, 3);
+
+    expect(resultado).toHaveLength(3);
+    expect(resultado[2].module).toBe(OTHER_MODULES_LABEL);
+    // Ocho registros entran, ocho salen: plegar no es descartar.
+    expect(resultado.reduce((suma, entrada) => suma + entrada.total, 0)).toBe(8);
+  });
+
+  it("con empate el orden es estable, no el del objeto", () => {
+    const primera = groupByModule([item({ module: "Zeta" }), item({ module: "Alfa" })], NOW);
+    const segunda = groupByModule([item({ module: "Alfa" }), item({ module: "Zeta" })], NOW);
+    expect(primera).toEqual(segunda);
+    expect(primera[0].module).toBe("Alfa");
+  });
+});
+
+describe("DUE_BUCKET_TONE", () => {
+  it("la urgencia baja conforme el tramo se aleja", () => {
+    expect(DUE_BUCKET_TONE.overdue).toBe("danger");
+    expect(DUE_BUCKET_TONE.today).toBe("warning");
+    expect(DUE_BUCKET_TONE.week).toBe("info");
+    expect(DUE_BUCKET_TONE.later).toBe("neutral");
+  });
+
+  it("sin fecha no es una urgencia: no puede pintarse de rojo", () => {
+    expect(DUE_BUCKET_TONE.none).toBe("neutral");
   });
 });

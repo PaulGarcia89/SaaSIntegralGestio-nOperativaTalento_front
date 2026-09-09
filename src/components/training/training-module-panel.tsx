@@ -16,11 +16,14 @@ import {
   StatusTileRow,
 } from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { fetchTrainingAdminAssignments, fetchTrainingOverview } from "@/lib/backend";
+import { BarChart, ChartCard, ChartSkeleton } from "@/components/chart";
+import { URGENCY_COLOR_CLASS } from "@/components/dashboard/operational-widgets";
+import { fetchTrainingAdminAssignments, fetchTrainingAnalytics, fetchTrainingOverview } from "@/lib/backend";
 import type { TrainingAssignmentDto } from "@/lib/contracts";
 import { formatMinutes } from "@/lib/training-labels";
 import { selectTrainingNextAssignment } from "@/lib/training-ux";
 import { useLocale } from "@/components/locale-provider";
+import { useAppStore } from "@/store/app-store";
 
 /* ==========================================================================
    PANEL DEL MÓDULO DE APRENDIZAJE
@@ -64,6 +67,22 @@ export function LearnerTrainingPanel() {
   const vencidos = datos?.overdueAssignments ?? [];
   const nuevos = datos?.newAssignments ?? [];
   const completados = datos?.completedAssignments ?? [];
+  // La cabecera de la pantalla prometía «qué vence pronto» y no estaba en
+  // ninguna parte: `upcomingDue` venía en la respuesta sin usarse. Se quitan
+  // los que ya están vencidos, que tienen su propia cifra y su propio color.
+  const porVencer = (datos?.upcomingDue ?? []).filter(
+    (asignacion) => (asignacion.effectiveStatus ?? asignacion.status) !== "OVERDUE",
+  );
+
+  /**
+   * Intercala las cuatro categorías conservando la prioridad.
+   *
+   * Concatenarlas y cortar dejaba fuera categorías enteras. Repartir en
+   * rondas —uno de cada, empezando por lo más urgente— garantiza que las
+   * primeras fichas representen todo lo que hay, sin dejar de poner delante
+   * lo vencido.
+   */
+  const porCompletar = intercalar([vencidos, porVencer, enProgreso, nuevos]);
 
   if (overview.isLoading) return <SkeletonRows rows={4} label={t("training.panel.loading")} />;
   if (overview.isError) {
@@ -100,7 +119,7 @@ export function LearnerTrainingPanel() {
         />
       )}
 
-      <StatusTileRow label={t("training.panel.myTilesLabel")}>
+      <StatusTileRow label={t("training.panel.myTilesLabel")} className="xl:grid-cols-5">
         <li className="min-w-0">
           <StatusTile
             title={t("training.panel.inProgress")}
@@ -113,6 +132,16 @@ export function LearnerTrainingPanel() {
             title={t("training.panel.toStart")}
             value={cifra(nuevos.length)}
             context={t("training.panel.toStartContext")}
+          />
+        </li>
+        <li className="min-w-0">
+          <StatusTile
+            title={t("training.panel.dueSoon")}
+            value={cifra(porVencer.length)}
+            context={t("training.panel.dueSoonContext")}
+            status={
+              porVencer.length > 0 ? { label: t("training.panel.watch"), tone: "warning" as const } : undefined
+            }
           />
         </li>
         <li className="min-w-0">
@@ -136,16 +165,28 @@ export function LearnerTrainingPanel() {
         </li>
       </StatusTileRow>
 
-      {/* Lo que debo completar. Vencidos primero: son los únicos que tienen
-          consecuencia, y mezclarlos con el resto los esconde. */}
-      {vencidos.length + enProgreso.length + nuevos.length > 0 ? (
+      {/* Lo que debo completar.
+          Antes se concatenaban vencidos, en curso y nuevos y se cortaba a
+          cuatro: con tres vencidos y cinco en curso no aparecía ni un solo
+          curso por empezar, aunque el rótulo dijera que estaban. Ahora se
+          reparte el sitio: primero un vencido, luego uno por vencer, luego
+          uno empezado, luego uno nuevo, y se vuelve a empezar. Lo urgente
+          sigue yendo antes, pero ninguna categoría desaparece. */}
+      {porCompletar.length > 0 ? (
         <PageSection
           title={t("training.panel.mustCompleteTitle")}
           description={t("training.panel.mustCompleteHelp")}
           id="por-completar"
+          actions={
+            porCompletar.length > MAX_FICHAS ? (
+              <Button asChild variant="secondary">
+                <Link href="/training">{t("training.panel.seeAllMine")}</Link>
+              </Button>
+            ) : undefined
+          }
         >
           <EntityCardList label={t("training.panel.mustCompleteTitle")} columns={2}>
-            {[...vencidos, ...enProgreso, ...nuevos].slice(0, MAX_FICHAS).map((asignacion) => (
+            {porCompletar.slice(0, MAX_FICHAS).map((asignacion) => (
               <li key={asignacion.id}>
                 <TrainingAssignmentCard assignment={asignacion} />
               </li>
@@ -214,29 +255,91 @@ export function TrainingAssignmentCard({ assignment }: { assignment: TrainingAss
   );
 }
 
-/* ==================== Panel de quien administra ========================= */
+/* ==================== Panel de quien administra =========================
+   Antes era una fila de cuatro tarjetas y nada más: ni acción recomendada, ni
+   gráfico, ni lista. Decía cuántas personas iban tarde, pero no EN QUÉ CURSO,
+   que es lo único que permite hacer algo al respecto.
+
+   Ahora consulta también `/training/admin/analytics/overview`, que ya existía
+   y no se pedía desde aquí. De ahí salen el progreso medio, la tasa de
+   aprobación y —lo importante— `byCourse`: el reparto por curso con sus
+   vencidos. Es una petición más, y es la única fuente de todo eso.
+
+   Los tablones profundos —matriz de cumplimiento, rendimiento por curso
+   ordenable, efectividad— se quedan en Resultados. Aquí solo va lo que hace
+   falta para decidir a quién perseguir hoy.
+   ======================================================================== */
+
+/** Cuántos cursos se dibujan antes de que las barras dejen de compararse. */
+const MAX_CURSOS = 6;
 
 export function AdminTrainingPanel() {
   const { t } = useLocale();
+  const { currentBranch } = useAppStore();
+  const branchId = currentBranch?.id;
 
   // `pageSize: 1`: el resumen lo calcula el servidor y el navegador no recibe
   // asignaciones que no va a mostrar. La lista completa vive en su pestaña.
   const resumen = useQuery({
-    queryKey: ["training-admin-summary"],
-    queryFn: () => fetchTrainingAdminAssignments({ page: 1, pageSize: 1 }),
+    queryKey: ["training-admin-summary", branchId ?? null],
+    queryFn: () => fetchTrainingAdminAssignments({ page: 1, pageSize: 1, branchId }),
     staleTime: 60_000,
   });
 
+  const analitica = useQuery({
+    queryKey: ["training-analytics", "module-dashboard", branchId ?? null],
+    queryFn: () => fetchTrainingAnalytics({ branchId }),
+    staleTime: 300_000,
+  });
+
   const datos = resumen.data?.summary;
+  const programa = analitica.data?.summary;
 
   /** `undefined` mientras carga · `null` si el servidor no entrega el resumen. */
   const cifra = (valor?: number) =>
     resumen.isError ? null : resumen.isLoading ? undefined : datos ? (valor ?? 0) : null;
+  const cifraPrograma = (valor?: number) =>
+    analitica.isError ? null : analitica.isLoading ? undefined : programa ? (valor ?? 0) : null;
 
   // Tasa de finalización: solo si hay denominador. Un «0 %» sobre cero
   // asignaciones no informa de nada.
   const tasa =
     datos && datos.total > 0 ? `${Math.round((datos.completed / datos.total) * 100)} %` : null;
+
+  const alcance = currentBranch ? currentBranch.name : t("common.allBranches");
+
+  /*
+   * Reparto por estado.
+   *
+   * Las cuatro cifras de arriba suman el total de asignaciones: son un reparto
+   * de un todo, y como cuatro números sueltos no se ve la proporción. En
+   * barras sí, y el color dice urgencia —rojo lo vencido, ámbar lo que ni
+   * siquiera se ha abierto— en vez de tratar los cuatro estados como
+   * intercambiables.
+   */
+  const reparto = datos
+    ? [
+        { id: "overdue", label: t("training.panel.adminOverdue"), value: datos.overdue, color: URGENCY_COLOR_CLASS.danger },
+        { id: "notStarted", label: t("training.panel.adminNotStarted"), value: datos.notStarted, color: URGENCY_COLOR_CLASS.warning },
+        { id: "inProgress", label: t("training.panel.adminInProgress"), value: datos.inProgress, color: URGENCY_COLOR_CLASS.info },
+        { id: "completed", label: t("training.panel.adminCompletedShort"), value: datos.completed, color: URGENCY_COLOR_CLASS.neutral },
+      ]
+    : [];
+  const hayReparto = reparto.some((entrada) => entrada.value > 0);
+
+  /*
+   * Dónde se atasca la formación.
+   *
+   * Los cursos con gente fuera de plazo, de más a menos. Es la respuesta a
+   * «¿a quién persigo?»: sin esto el panel decía que hay doce personas tarde
+   * y dejaba al lector abrir Resultados para averiguar en qué.
+   */
+  const cursos = [...(analitica.data?.byCourse ?? [])]
+    .filter((curso) => curso.overdue > 0)
+    .sort((a, b) => b.overdue - a.overdue || a.title.localeCompare(b.title))
+    .slice(0, MAX_CURSOS);
+
+  const peor = cursos[0];
 
   return (
     <div className="space-y-6">
@@ -244,9 +347,31 @@ export function AdminTrainingPanel() {
 
       {resumen.isError ? (
         <ErrorState title={t("training.panel.adminErrorTitle")} onRetry={() => void resumen.refetch()} />
+      ) : peor ? (
+        <NextAction
+          label={t("training.panel.needsAction")}
+          title={t("training.panel.chaseCourse", { title: peor.title })}
+          detail={t("training.panel.chaseDetail", {
+            overdue: peor.overdue,
+            assigned: peor.assigned,
+            progress: Math.round(peor.averageProgress),
+          })}
+          href="/training/results"
+          actionLabel={t("training.panel.seeResults")}
+          tone="danger"
+        />
+      ) : datos && datos.total > 0 ? (
+        <NextAction
+          label={t("training.panel.onTrackLabel")}
+          title={t("training.panel.onTrackTitle")}
+          detail={t("training.panel.adminCompletionContext", { done: datos.completed, total: datos.total })}
+          href="/training/results"
+          actionLabel={t("training.panel.seeResults")}
+          tone="progress"
+        />
       ) : null}
 
-      <StatusTileRow label={t("training.panel.adminTilesLabel")}>
+      <StatusTileRow label={t("training.panel.adminTilesLabel")} className="xl:grid-cols-3">
         <li className="min-w-0">
           <StatusTile
             title={t("training.panel.adminOverdue")}
@@ -257,6 +382,7 @@ export function AdminTrainingPanel() {
                 ? { label: t("training.panel.needsAction"), tone: "danger" as const }
                 : undefined
             }
+            scope={alcance}
             href="/training/results"
             actionLabel={t("training.panel.review")}
           />
@@ -266,6 +392,7 @@ export function AdminTrainingPanel() {
             title={t("training.panel.adminNotStarted")}
             value={cifra(datos?.notStarted)}
             context={t("training.panel.adminNotStartedContext")}
+            scope={alcance}
           />
         </li>
         <li className="min-w-0">
@@ -273,6 +400,7 @@ export function AdminTrainingPanel() {
             title={t("training.panel.adminInProgress")}
             value={cifra(datos?.inProgress)}
             context={t("training.panel.adminInProgressContext")}
+            scope={alcance}
           />
         </li>
         <li className="min-w-0">
@@ -284,16 +412,121 @@ export function AdminTrainingPanel() {
                 ? t("training.panel.adminCompletionContext", { done: datos.completed, total: datos.total })
                 : t("training.panel.adminCompletionNoBase")
             }
+            scope={alcance}
             href="/training/results"
             actionLabel={t("training.panel.seeResults")}
           />
         </li>
+        <li className="min-w-0">
+          <StatusTile
+            title={t("training.panel.averageProgress")}
+            value={
+              analitica.isLoading
+                ? undefined
+                : programa
+                  ? t("training.panel.percentValue", { n: Math.round(programa.averageProgress) })
+                  : null
+            }
+            context={t("training.panel.averageProgressContext")}
+            scope={alcance}
+            href="/training/results"
+            actionLabel={t("training.panel.seeResults")}
+          />
+        </li>
+        <li className="min-w-0">
+          <StatusTile
+            title={t("training.panel.passRate")}
+            value={
+              analitica.isLoading
+                ? undefined
+                : programa
+                  ? t("training.panel.percentValue", { n: Math.round(programa.passRate) })
+                  : null
+            }
+            context={t("training.panel.passRateContext", { learners: cifraPrograma(programa?.uniqueLearners) ?? 0 })}
+            scope={alcance}
+            href="/training/evaluations"
+            actionLabel={t("training.panel.seeEvaluations")}
+          />
+        </li>
       </StatusTileRow>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title={t("training.panel.mixTitle")}
+          subtitle={t("training.panel.mixSubtitle")}
+          period={alcance}
+        >
+          {resumen.isLoading ? (
+            <ChartSkeleton label={t("training.panel.adminLoading")} />
+          ) : !hayReparto ? (
+            <BarChart categories={[]} series={[]} emptyReason="sin-registros" />
+          ) : (
+            <BarChart
+              orientation="horizontal"
+              categories={reparto.map((entrada) => entrada.label)}
+              series={[{ id: "estado", name: t("training.panel.assignments"), values: reparto.map((e) => e.value) }]}
+              // El color dice urgencia, no identidad: cada estado lleva su
+              // nombre escrito al lado en el eje.
+              categoryColorClasses={reparto.map((entrada) => entrada.color)}
+              caption={t("training.panel.mixCaption")}
+              categoryLabel={t("training.panel.state")}
+              formatValue={(valor) => String(valor)}
+            />
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title={t("training.panel.stuckTitle")}
+          subtitle={t("training.panel.stuckSubtitle")}
+          period={alcance}
+        >
+          {analitica.isLoading ? (
+            <ChartSkeleton label={t("training.panel.adminLoading")} />
+          ) : analitica.isError || cursos.length === 0 ? (
+            <BarChart categories={[]} series={[]} emptyReason="sin-registros" />
+          ) : (
+            <>
+              <BarChart
+                orientation="horizontal"
+                categories={cursos.map((curso) => curso.title)}
+                series={[{ id: "vencidos", name: t("training.panel.overdue"), values: cursos.map((c) => c.overdue) }]}
+                caption={t("training.panel.stuckCaption")}
+                categoryLabel={t("training.panel.course")}
+                formatValue={(valor) => String(valor)}
+              />
+              {/* Cuántos hay asignados en total detrás de cada barra: tres
+                  vencidos sobre cuatro asignados y tres sobre trescientos no
+                  son el mismo problema. */}
+              <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-2xs text-ink-3">
+                {cursos.map((curso) => (
+                  <li key={curso.courseId}>
+                    {curso.title} · {t("training.panel.ofAssigned", { n: curso.assigned })}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </ChartCard>
+      </div>
     </div>
   );
 }
 
 /* ============================== Auxiliares ============================== */
+
+/** Reparte por rondas: uno de cada lista, en orden, hasta agotarlas. */
+export function intercalar<T>(listas: readonly (readonly T[])[]): T[] {
+  const salida: T[] = [];
+  const maximo = Math.max(0, ...listas.map((lista) => lista.length));
+  for (let ronda = 0; ronda < maximo; ronda += 1) {
+    for (const lista of listas) {
+      const elemento = lista[ronda];
+      if (elemento !== undefined) salida.push(elemento);
+    }
+  }
+  return salida;
+}
 
 function detalleDeAsignacion(
   asignacion: TrainingAssignmentDto,

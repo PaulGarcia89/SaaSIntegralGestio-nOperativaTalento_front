@@ -5,7 +5,7 @@ import { useUiText } from "@/components/ui-copy";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronRight, Play, RefreshCw, Sparkles } from "lucide-react";
 import {
   createProductivityDemoEvent,
   fetchProductivityAlerts,
@@ -37,18 +37,34 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { BarChart, ChartCard } from "@/components/chart";
+import { useLocale } from "@/components/locale-provider";
 
 function formatMinutes(seconds: number) {
   return `${Math.max(0, Math.round(seconds / 60))} min`;
 }
 
-function formatTime(iso?: string | null) {
-  if (!iso) return "Sin actividad";
-  return new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }).format(new Date(iso));
+/**
+ * Fecha y hora en el idioma activo.
+ *
+ * Antes estaba fijado a `"es"`, así que en inglés la pantalla seguía diciendo
+ * «14 sept». El idioma es un argumento, no una constante.
+ */
+function formatTime(iso: string | null | undefined, locale: string, sinDato: string) {
+  if (!iso) return sinDato;
+  const fecha = new Date(iso);
+  if (Number.isNaN(fecha.getTime())) return sinDato;
+  return new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "short",
+  }).format(fecha);
 }
 
 function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
   const uiText = useUiText();
+  const { locale } = useLocale();
   const summary = summarizeDemoSession(session);
   const activeEvent = summary.latestEvent;
 
@@ -60,7 +76,7 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
             <p className="text-sm font-medium text-brand">{uiText("Demo en vivo")}</p>
             <h2 className="text-xl font-semibold">{uiText("Grabación simulada de cámaras")}</h2>
           </div>
-          <Badge variant={session.running ? "success" : "secondary"}>{session.running ? "Simulación activa" : "Pausada"}</Badge>
+          <Badge variant={session.running ? "success" : "secondary"}>{session.running ? uiText("Simulación activa") : uiText("Pausada")}</Badge>
         </div>
         <div className="relative min-h-[360px] overflow-hidden rounded-3xl border border-border-default bg-surface-dark-1">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(38_94%_52%_/_0.26),transparent_28%),radial-gradient(circle_at_top_right,hsl(158_62%_45%_/_0.2),transparent_24%),linear-gradient(180deg,hsl(213_40%_10%_/_0.55),hsl(213_44%_7%_/_0.9))]" />
@@ -77,7 +93,7 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
                 <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr]">
                   <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
                     <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">{uiText("Zona activa")}</p>
-                    <p className="mt-2 text-2xl font-semibold">{activeEvent?.zoneName ?? "Sin eventos registrados"}</p>
+                    <p className="mt-2 text-2xl font-semibold">{activeEvent?.zoneName ?? uiText("Sin eventos registrados")}</p>
                     <p className="mt-2 text-sm text-surface-dark-ink/80">{uiText("La cámara está registrando ocupación, flujo y tiempos de permanencia para generar productividad demo.")}</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Badge variant="secondary" className="border-surface-dark-ink/15 bg-surface-dark-ink/10 text-surface-dark-ink">{uiText("Personas ")}{activeEvent?.peopleDetected ?? 0}</Badge>
@@ -89,11 +105,11 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
                     <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
                       <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">{uiText("Estado")}</p>
                       <p className="mt-2 text-lg font-semibold">{uiText("Flujo operativo controlado")}</p>
-                      <p className="text-sm text-surface-dark-ink/80">{activeEvent?.note ?? "El demo simula capturas continuas con zonas activas."}</p>
+                      <p className="text-sm text-surface-dark-ink/80">{activeEvent?.note ?? uiText("El demo simula capturas continuas con zonas activas.")}</p>
                     </div>
                     <div className="rounded-2xl border border-surface-dark-ink/10 bg-black/30 p-4 backdrop-blur-sm">
                       <p className="text-xs uppercase tracking-[0.3em] text-surface-dark-ink/60">{uiText("Última marca")}</p>
-                      <p className="mt-2 text-lg font-semibold">{formatTime(summary.latestEvent?.occurredAt)}</p>
+                      <p className="mt-2 text-lg font-semibold">{formatTime(summary.latestEvent?.occurredAt, locale, uiText("Sin actividad"))}</p>
                       <p className="text-sm text-surface-dark-ink/80">{uiText("La simulación avanza automáticamente mientras esté activa.")}</p>
                     </div>
                   </div>
@@ -109,6 +125,7 @@ function DemoCameraPreview({ session }: { session: ProductivityDemoSession }) {
 
 export default function ProductivityPage() {
   const uiText = useUiText();
+  const { locale } = useLocale();
   const { currentBranch } = useAppStore();
   const branchId = currentBranch?.id;
   const queryClient = useQueryClient();
@@ -224,17 +241,39 @@ export default function ProductivityPage() {
   const overviewData = overview.data!;
 
   const visibleAlerts = alerts.data ?? [];
-  const visibleZones = insights.data?.zones?.length
-    ? insights.data.zones
-    : sessionSummary.byZone.map((item) => ({
-        zone: { id: item.zone.id, name: item.zone.name },
-        events: item.events,
-        activeSeconds: item.activeSeconds,
-        idleSeconds: item.idleSeconds,
-        confidence: item.confidence,
-      }));
+
+  /*
+   * Procedencia de las zonas.
+   *
+   * Cuando el servidor no devuelve zonas medidas, esta pantalla caía a las de
+   * la SIMULACIÓN y las pintaba bajo el mismo título, con el mismo aspecto y
+   * sin ninguna marca: quien mirara no tenía forma de saber que estaba viendo
+   * eventos inventados. Todo el cuidado de la sección de demostración —el
+   * aviso, el arranque en pausa, la etiqueta DEMO— se perdía justo aquí.
+   *
+   * Se conserva la caída, porque enseñar la forma del módulo con datos de
+   * ejemplo es útil, pero ahora la sección dice de dónde salen.
+   */
+  const zonasMedidas = insights.data?.zones ?? [];
+  const zonasSimuladas = sessionSummary.byZone.map((item) => ({
+    zone: { id: item.zone.id, name: item.zone.name },
+    events: item.events,
+    activeSeconds: item.activeSeconds,
+    idleSeconds: item.idleSeconds,
+    confidence: item.confidence,
+  }));
+  const zonasSonSimuladas = zonasMedidas.length === 0 && zonasSimuladas.length > 0;
+  const visibleZones = zonasMedidas.length ? zonasMedidas : zonasSimuladas;
 
   const sinCamaras = session.cameras.length === 0;
+
+  // Proporción de tiempo con actividad. Sin denominador no hay porcentaje:
+  // un «0 %» sobre cero segundos medidos diría algo que no se sabe.
+  const tiempoMedido = overviewData.activeSeconds + overviewData.idleSeconds;
+  const usoPorcentaje = tiempoMedido > 0 ? Math.round((overviewData.activeSeconds / tiempoMedido) * 100) : null;
+  const periodo = insights.data
+    ? uiText("Del {{from}} al {{to}}", { from: insights.data.period.from, to: insights.data.period.to })
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -264,7 +303,7 @@ export default function ProductivityPage() {
                     <StatusBadge size="sm" tone="warning" label={alert.status} />
                   </div>
                   <p className="text-sm text-ink-2">{alert.description}</p>
-                  <p className="mt-auto text-2xs text-ink-3">{formatTime(alert.createdAt)}</p>
+                  <p className="mt-auto text-2xs text-ink-3">{formatTime(alert.createdAt, locale, uiText("Sin actividad"))}</p>
                 </article>
               </li>
             ))}
@@ -280,11 +319,16 @@ export default function ProductivityPage() {
         <li className="min-w-0">
           <StatusTile
             title={uiText("Cámaras en línea")}
-            value={overviewData.camerasOnline}
-            context="Registrando ahora mismo en esta sucursal."
+            // «3» no dice nada sin saber de cuántas. El total está en la misma
+            // respuesta que la pantalla ya descarga.
+            value={uiText("{{online}} de {{total}}", {
+              online: overviewData.camerasOnline,
+              total: session.cameras.length,
+            })}
+            context={uiText("Registrando ahora mismo en esta sucursal.")}
             status={
               overviewData.camerasOnline === 0
-                ? { label: "Ninguna activa", tone: "warning" as const }
+                ? { label: uiText("Ninguna activa"), tone: "warning" as const }
                 : undefined
             }
             href="/productivity/cameras"
@@ -295,7 +339,7 @@ export default function ProductivityPage() {
           <StatusTile
             title={uiText("Zonas con actividad")}
             value={overviewData.zonesActive}
-            context="Zonas que registraron movimiento en el periodo."
+            context={uiText("Zonas que registraron movimiento en el periodo.")}
             href="/productivity/cameras"
             actionLabel={uiText("Ver zonas")}
           />
@@ -304,7 +348,7 @@ export default function ProductivityPage() {
           <StatusTile
             title={uiText("Alertas abiertas")}
             value={overviewData.alertsOpen}
-            context="Sin revisar o sin resolver."
+            context={uiText("Sin revisar o sin resolver.")}
             status={
               overviewData.alertsOpen > 0
                 ? { label: uiText("Requieren revisión"), tone: "warning" as const }
@@ -314,44 +358,105 @@ export default function ProductivityPage() {
         </li>
         <li className="min-w-0">
           <StatusTile
-            title={uiText("Tiempo activo")}
-            value={formatMinutes(overviewData.activeSeconds)}
-            context={`Frente a ${formatMinutes(overviewData.idleSeconds)} sin actividad.`}
-            scope={insights.data ? `Del ${insights.data.period.from} al ${insights.data.period.to}` : undefined}
+            title={uiText("Uso de la sucursal")}
+            value={uiText("{{n}} %", { n: usoPorcentaje ?? 0 })}
+            context={uiText("Del tiempo medido, cuánto hubo actividad.")}
+            scope={periodo}
           />
         </li>
       </StatusTileRow>
 
-      {/* ---- 3. Reparto por zona ---------------------------------------- */}
-      {visibleZones.length > 0 ? (
-        <PageSection
-          title={uiText("Actividad por zona")}
-          description={uiText("Cuánto tiempo estuvo activa cada zona y con qué confianza lo midió la cámara.")}
-          id="zonas"
+      {/* ---- 2.bis Cuánto tiempo hubo actividad -------------------------
+          «45 min activos frente a 12 min sin actividad» era una proporción
+          escrita en prosa. Es la medida que da nombre al módulo, así que se
+          dibuja. */}
+      {overviewData.activeSeconds + overviewData.idleSeconds > 0 ? (
+        <ChartCard
+          title={uiText("Tiempo medido en la sucursal")}
+          subtitle={uiText("Cuánto de lo observado por las cámaras fue actividad")}
+          period={periodo}
         >
-          <ul className="space-y-1">
+          {/* Apilado y con las MISMAS dos series que el reparto por zona: son
+              el mismo par de conceptos, y codificarlos de dos maneras en la
+              misma pantalla obliga a aprender dos leyendas para una idea. */}
+          <BarChart
+            orientation="horizontal"
+            mode="stacked"
+            categories={[currentBranch?.name ?? uiText("Sucursal")]}
+            series={[
+              {
+                id: "activo",
+                name: uiText("Con actividad"),
+                values: [Math.round(overviewData.activeSeconds / 60)],
+              },
+              {
+                id: "inactivo",
+                name: uiText("Sin actividad"),
+                values: [Math.round(overviewData.idleSeconds / 60)],
+              },
+            ]}
+            caption={uiText("Tiempo con y sin actividad en el periodo medido")}
+            categoryLabel={uiText("Alcance")}
+            formatValue={(valor) => uiText("{{n}} min", { n: valor })}
+          />
+        </ChartCard>
+      ) : null}
+
+      {/* ---- 3. Reparto por zona ----------------------------------------
+          Era una lista donde había que comparar seis pares de minutos
+          leyéndolos. Apiladas, activo sobre inactivo, la zona que peor está
+          se ve sin contar. La confianza sigue al lado de cada medida: sin
+          ella, el dato de una cámara mal calibrada se lee igual que uno
+          fiable. */}
+      {visibleZones.length > 0 ? (
+        <ChartCard
+          title={uiText("Actividad por zona")}
+          subtitle={uiText("Cuánto tiempo estuvo activa cada zona")}
+          period={zonasSonSimuladas ? undefined : periodo}
+        >
+          {/* La procedencia va DENTRO de la sección y antes del gráfico: si
+              lo que se enseña sale de la simulación, hay que saberlo antes de
+              leerlo, no después. */}
+          {zonasSonSimuladas ? (
+            <InlineNote tone="warning" title={uiText("Estas zonas salen de la simulación")} className="mb-4">
+              {uiText("El servidor todavía no ha medido zonas en esta sucursal, así que se enseña la forma del módulo con los eventos de demostración. No son mediciones reales.")}
+            </InlineNote>
+          ) : null}
+
+          <BarChart
+            orientation="horizontal"
+            mode="stacked"
+            categories={visibleZones.slice(0, 6).map((item) => item.zone.name)}
+            series={[
+              {
+                id: "activo",
+                name: uiText("Con actividad"),
+                values: visibleZones.slice(0, 6).map((item) => Math.round(item.activeSeconds / 60)),
+              },
+              {
+                id: "inactivo",
+                name: uiText("Sin actividad"),
+                values: visibleZones.slice(0, 6).map((item) => Math.round(item.idleSeconds / 60)),
+              },
+            ]}
+            caption={uiText("Minutos con y sin actividad en cada zona")}
+            categoryLabel={uiText("Zona")}
+            formatValue={(valor) => uiText("{{n}} min", { n: valor })}
+          />
+
+          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-3">
             {visibleZones.slice(0, 6).map((item) => (
-              <li
-                key={item.zone.id}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface-1 px-4 py-3"
-              >
-                <span className="min-w-0 flex-1 basis-40">
-                  <span className="block break-words text-sm font-medium text-ink-1">{item.zone.name}</span>
-                  <span className="block truncate text-xs text-ink-3">
-                    {item.events} {uiText(" eventos · ")}{formatMinutes(item.activeSeconds)} {uiText(" activos · ")}{formatMinutes(item.idleSeconds)} {uiText("inactivos")}</span>
-                </span>
-                {/* La confianza acompaña siempre a la medida: sin ella, un
-                    porcentaje de una cámara mal calibrada se lee igual que
-                    uno fiable. */}
+              <li key={item.zone.id} className="flex items-center gap-2 text-2xs text-ink-3">
+                <span className="truncate">{item.zone.name}</span>
                 <StatusBadge
                   size="sm"
                   tone={item.confidence >= 70 ? "success" : item.confidence >= 40 ? "warning" : "danger"}
-                  label={`Confianza ${item.confidence} %`}
+                  label={uiText("Confianza {{n}} %", { n: item.confidence })}
                 />
               </li>
             ))}
           </ul>
-        </PageSection>
+        </ChartCard>
       ) : null}
 
       {/* ---- 4. Recomendaciones ----------------------------------------- */}
@@ -389,7 +494,7 @@ export default function ProductivityPage() {
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setRunning((current) => !current)} disabled={sinCamaras}>
               {running ? <RefreshCw className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-              {running ? "Detener simulación" : "Iniciar simulación"}
+              {running ? uiText("Detener simulación") : uiText("Iniciar simulación")}
             </Button>
             <Button
               variant="secondary"
@@ -400,7 +505,7 @@ export default function ProductivityPage() {
               disabled={sinCamaras || createEvent.isPending}
             >
               <Sparkles className="size-4" aria-hidden="true" />
-              {createEvent.isPending ? uiText("Guardando…") : "Generar un evento"}
+              {createEvent.isPending ? uiText("Guardando…") : uiText("Generar un evento")}
             </Button>
           </div>
         }
@@ -424,13 +529,28 @@ export default function ProductivityPage() {
 
           {createEvent.isError ? (
             <InlineNote tone="danger" title={uiText("El evento no pudo almacenarse")}>
-              {createEvent.error instanceof Error ? createEvent.error.message : "El backend rechazó el registro."}
+              {createEvent.error instanceof Error ? createEvent.error.message : uiText("El backend rechazó el registro.")}
             </InlineNote>
           ) : null}
 
           {!sinCamaras ? (
             <>
-              <DemoCameraPreview session={session} />
+              {/* El recuadro de cámara falsa medía 360 px y, con sus cifras y
+                  su línea de tiempo, ocupaba más pantalla que TODO lo real.
+                  Sigue estando —enseña de un vistazo qué mide el módulo— pero
+                  plegado: quien vaya a hacer una demostración lo abre. */}
+              <details className="group rounded-lg border border-line bg-surface-1">
+                <summary className="flex min-h-[var(--control-h-touch)] cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium text-ink-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+                  <ChevronRight
+                    className="size-4 shrink-0 text-ink-3 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+                    aria-hidden="true"
+                  />
+                  {uiText("Ver la vista previa de la cámara simulada")}
+                </summary>
+                <div className="border-t border-line p-4">
+                  <DemoCameraPreview session={session} />
+                </div>
+              </details>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <DemoFigure label={uiText("Productividad media")} value={`${Math.round(sessionSummary.averageProductivity)} %`} />
@@ -445,7 +565,7 @@ export default function ProductivityPage() {
                     id: event.id,
                     title: event.label,
                     detail: `${event.cameraName} · ${event.zoneName} · ${event.peopleDetected} personas · ${event.productivityScore} % productividad`,
-                    when: formatTime(event.occurredAt),
+                    when: formatTime(event.occurredAt, locale, uiText("Sin actividad")),
                   }))}
                 />
               ) : (

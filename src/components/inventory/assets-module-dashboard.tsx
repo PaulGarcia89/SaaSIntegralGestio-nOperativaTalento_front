@@ -22,6 +22,8 @@ import {
   StatusTileRow,
 } from "@/components/system";
 import { Button } from "@/components/ui/button";
+import { BarChart, ChartCard, ChartSkeleton } from "@/components/chart";
+import { URGENCY_COLOR_CLASS } from "@/components/dashboard/operational-widgets";
 
 /**
  * Dashboard del inventario de activos: primera pantalla del módulo.
@@ -69,6 +71,50 @@ export function AssetsModuleDashboard() {
     analytics.isError ? null : analytics.isLoading ? undefined : resumen ? (valor ?? 0) : null;
   const porAtender = resumen ? resumen.assets.returnPending + resumen.assets.maintenance : undefined;
 
+  /*
+   * Reparto de activos por estado.
+   *
+   * El servidor cuenta `total` sobre TODOS los estados con un `groupBy`, pero
+   * solo desglosa cuatro. Lo que sobra —retirados, perdidos, reservados— no
+   * aparecía en ninguna tarjeta y nadie lo notaba. Aquí se calcula el resto y
+   * se dibuja solo si existe: una barra «Otros» de cero sería ruido, pero
+   * ocultar veinte activos que no están en ninguna parte es peor.
+   */
+  const desglosado = resumen
+    ? resumen.assets.available + resumen.assets.assigned + resumen.assets.maintenance + resumen.assets.returnPending
+    : 0;
+  const otrosEstados = resumen ? Math.max(0, resumen.assets.total - desglosado) : 0;
+  const repartoActivos = resumen
+    ? [
+        { id: "AVAILABLE", label: uiText("Disponibles"), value: resumen.assets.available, color: "text-series-2", href: "/inventory/assets?status=AVAILABLE" },
+        { id: "ASSIGNED", label: uiText("En custodia"), value: resumen.assets.assigned, color: "text-series-2/50", href: "/inventory/assets?status=ASSIGNED" },
+        { id: "RETURN_PENDING", label: uiText("Devolución pendiente"), value: resumen.assets.returnPending, color: URGENCY_COLOR_CLASS.warning, href: "/inventory/assets?status=RETURN_PENDING" },
+        { id: "MAINTENANCE", label: uiText("En mantenimiento"), value: resumen.assets.maintenance, color: URGENCY_COLOR_CLASS.danger, href: "/inventory/assets?status=MAINTENANCE" },
+        ...(otrosEstados > 0
+          ? [{ id: "OTHER", label: uiText("Otros estados"), value: otrosEstados, color: URGENCY_COLOR_CLASS.neutral, href: "/inventory/assets" }]
+          : []),
+      ]
+    : [];
+  const hayReparto = repartoActivos.some((fila) => fila.value > 0);
+
+  /*
+   * Estado del almacén.
+   *
+   * `belowMinimum` (qty < mínimo) y `reorder` (qty <= punto de pedido) se
+   * calculan con DOS umbrales distintos sobre la misma referencia, así que no
+   * son conjuntos excluyentes y NO se pueden apilar como si repartieran el
+   * total. Van como dos medidas contra el mismo denominador, y el denominador
+   * se dice en el subtítulo.
+   */
+  const almacen = resumen
+    ? [
+        { id: "below", label: uiText("Bajo mínimo"), value: resumen.stock.belowMinimum, color: URGENCY_COLOR_CLASS.danger },
+        { id: "reorder", label: uiText("En punto de pedido"), value: resumen.stock.reorder, color: URGENCY_COLOR_CLASS.warning },
+      ]
+    : [];
+  const hayAlmacen = almacen.some((fila) => fila.value > 0);
+  const alcance = currentBranch ? currentBranch.name : uiText("Todas las sucursales");
+
   const cambiosRecientes = [...(recientes.data ?? [])]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, RECIENTES);
@@ -77,7 +123,7 @@ export function AssetsModuleDashboard() {
   const hoy = new Date().toISOString();
   const ordenesVencidas = ordenesAbiertas.filter((orden) => orden.dueAt && orden.dueAt < hoy);
 
-  const accion = siguienteAccion({ resumen, ordenesVencidas: ordenesVencidas.length, canManage });
+  const accion = siguienteAccion({ resumen, ordenesVencidas: ordenesVencidas.length, canManage, uiText });
 
   return (
     <div className="space-y-6">
@@ -115,54 +161,133 @@ export function AssetsModuleDashboard() {
         </InlineNote>
       ) : null}
 
-      <StatusTileRow label={uiText("Estado del inventario de activos")}>
+      {/* Cifras que NO están en los gráficos de abajo: el total, lo que pide
+          acción y lo que hay en curso con proveedores. «Disponibles» y «En
+          custodia» eran tarjetas y ahora son barras del reparto, que dice lo
+          mismo y además enseña la proporción. */}
+      <StatusTileRow label={uiText("Estado del inventario de activos")} className="xl:grid-cols-3">
         <li className="min-w-0">
           <StatusTile
-            title={uiText("Disponibles")}
-            value={cifra(resumen?.assets.available)}
-            context="Listos para entregar a alguien."
-            scope={currentBranch ? currentBranch.name : uiText("Todas las sucursales")}
-            href="/inventory/assets?status=AVAILABLE"
-            actionLabel={uiText("Ver disponibles")}
-          />
-        </li>
-        <li className="min-w-0">
-          <StatusTile
-            title={uiText("En custodia")}
-            value={cifra(resumen?.assets.assigned)}
-            context="Entregados y bajo la responsabilidad de una persona."
-            scope={currentBranch ? currentBranch.name : uiText("Todas las sucursales")}
-            href="/inventory/assets?status=ASSIGNED"
-            actionLabel={uiText("Ver en custodia")}
+            title={uiText("Activos registrados")}
+            value={cifra(resumen?.assets.total)}
+            context={uiText("Todos los equipos de la sucursal, en cualquier estado.")}
+            scope={alcance}
+            href="/inventory/assets"
+            actionLabel={uiText("Ver activos")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
             title={uiText("Requieren atención")}
             value={cifra(porAtender)}
-            context="Devoluciones pendientes y equipos en mantenimiento."
+            context={uiText("Devoluciones pendientes y equipos en mantenimiento.")}
             status={
               typeof porAtender === "number" && porAtender > 0
-                ? { label: "Hay pendientes", tone: "warning" as const }
+                ? { label: uiText("Hay pendientes"), tone: "warning" as const }
                 : undefined
             }
+            scope={alcance}
             href="/inventory/assets?status=RETURN_PENDING"
             actionLabel={uiText("Ver devoluciones")}
           />
         </li>
         <li className="min-w-0">
           <StatusTile
-            title={uiText("Existencias bajo mínimo")}
-            value={cifra(resumen?.stock.belowMinimum)}
-            context="Referencias del almacén por debajo de su mínimo."
-            status={
-              resumen && resumen.stock.belowMinimum > 0 ? { label: "Reponer", tone: "danger" as const } : undefined
-            }
-            href="/inventory/assets/warehouse"
-            actionLabel={uiText("Ver almacén")}
+            title={uiText("Compras en curso")}
+            // Venía en la misma respuesta y no se enseñaba en ninguna parte,
+            // aunque el módulo tiene su pantalla de compras.
+            value={cifra(resumen?.operations.purchaseOrdersInProgress)}
+            context={uiText("Órdenes de compra abiertas con proveedores.")}
+            scope={alcance}
+            href="/inventory/purchases"
+            actionLabel={uiText("Ver compras")}
           />
         </li>
       </StatusTileRow>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title={uiText("Dónde están los activos")}
+          subtitle={uiText("Cada estado abre el listado ya filtrado")}
+          period={alcance}
+        >
+          {analytics.isLoading ? (
+            <ChartSkeleton label={uiText("Estado del inventario de activos")} />
+          ) : !hayReparto ? (
+            <BarChart categories={[]} series={[]} emptyReason="sin-registros" />
+          ) : (
+            <>
+              <BarChart
+                orientation="horizontal"
+                categories={repartoActivos.map((fila) => fila.label)}
+                series={[
+                  { id: "estado", name: uiText("Activos"), values: repartoActivos.map((fila) => fila.value) },
+                ]}
+                categoryColorClasses={repartoActivos.map((fila) => fila.color)}
+                caption={uiText("Activos agrupados por su estado")}
+                categoryLabel={uiText("Estado")}
+                formatValue={(valor) => String(valor)}
+              />
+              <ul className="mt-4 flex flex-wrap gap-1.5">
+                {repartoActivos.map((fila) => (
+                  <li key={fila.id}>
+                    <Link
+                      href={fila.href}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface-1 px-3 text-sm text-ink-2 transition-colors hover:border-line-strong hover:text-ink-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                    >
+                      <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-sm bg-current ${fila.color}`} />
+                      <span className="truncate">{fila.label}</span>
+                      <span className="font-mono text-2xs tabular-figures text-ink-3">{fila.value}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title={uiText("Qué falta en el almacén")}
+          subtitle={
+            resumen
+              ? uiText("Sobre {{n}} referencias. Bajo mínimo y punto de pedido se miden con umbrales distintos, así que se solapan", { n: resumen.stock.references })
+              : uiText("Referencias por debajo de sus umbrales")
+          }
+          period={alcance}
+        >
+          {analytics.isLoading ? (
+            <ChartSkeleton label={uiText("Qué falta en el almacén")} />
+          ) : !hayAlmacen ? (
+            <EmptyState
+              reason="no-records"
+              title={uiText("Nada por reponer")}
+              description={uiText("Ninguna referencia está por debajo de su mínimo ni ha llegado a su punto de pedido.")}
+              action={
+                <Button asChild variant="outline">
+                  <Link href="/inventory/warehouse">{uiText("Ver almacén")}</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <>
+              <BarChart
+                orientation="horizontal"
+                categories={almacen.map((fila) => fila.label)}
+                series={[
+                  { id: "almacen", name: uiText("Referencias"), values: almacen.map((fila) => fila.value) },
+                ]}
+                categoryColorClasses={almacen.map((fila) => fila.color)}
+                caption={uiText("Referencias por debajo de sus umbrales de reposición")}
+                categoryLabel={uiText("Umbral")}
+                formatValue={(valor) => String(valor)}
+              />
+              <p className="mt-4 border-t border-line pt-3 text-2xs leading-5 text-ink-3">
+                {uiText("«Bajo mínimo» es lo que ya está en falta. «En punto de pedido» es lo que todavía se puede reponer a tiempo, e incluye lo anterior cuando el punto de pedido está por encima del mínimo.")}
+              </p>
+            </>
+          )}
+        </ChartCard>
+      </div>
 
       <PageSection title={uiText("Operaciones")} description={uiText("Las cuatro tareas del día, con icono y texto.")}>
         <ul className="grid gap-3 [&>li]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
@@ -170,7 +295,7 @@ export function AssetsModuleDashboard() {
             href="/inventory/deliveries"
             icon={<ArrowRightLeft className="size-5" aria-hidden="true" />}
             title={uiText("Entregar equipo")}
-            detail="Reservas esperando confirmación de entrega."
+            detail={uiText("Reservas esperando confirmación de entrega.")}
           />
           <QuickAction
             href="/inventory/returns"
@@ -178,25 +303,25 @@ export function AssetsModuleDashboard() {
             title={uiText("Recibir devolución")}
             detail={
               resumen
-                ? `${resumen.assets.returnPending} ${resumen.assets.returnPending === 1 ? "devolución pendiente" : "devoluciones pendientes"}.`
-                : "Equipos que vuelven y hay que validar."
+                ? uiText("{{n}} devoluciones pendientes.", { n: resumen.assets.returnPending })
+                : uiText("Equipos que vuelven y hay que validar.")
             }
           />
           <QuickAction
-            href="/inventory/assets/maintenance"
+            href="/inventory/maintenance"
             icon={<Wrench className="size-5" aria-hidden="true" />}
             title={uiText("Mantenimiento")}
             detail={
               resumen
-                ? `${resumen.operations.openMaintenance} ${resumen.operations.openMaintenance === 1 ? "orden abierta" : "órdenes abiertas"}.`
-                : "Órdenes de mantenimiento."
+                ? uiText("{{n}} órdenes abiertas.", { n: resumen.operations.openMaintenance })
+                : uiText("Órdenes de mantenimiento.")
             }
           />
           <QuickAction
             href="/inventory/scan"
             icon={<QrCode className="size-5" aria-hidden="true" />}
             title={uiText("Escanear activo")}
-            detail="Abre la ficha leyendo su etiqueta."
+            detail={uiText("Abre la ficha leyendo su etiqueta.")}
           />
         </ul>
       </PageSection>
@@ -242,7 +367,7 @@ export function AssetsModuleDashboard() {
                     </Link>
                     <p className="truncate text-sm text-ink-2">
                       <span className="font-mono text-2xs text-ink-3">{asset.assetTag}</span>
-                      {asset.employee ? ` · ${asset.employee.name}` : " · Sin asignar"}
+                      {asset.employee ? ` · ${asset.employee.name}` : ` · ${uiText("Sin asignar")}`}
                     </p>
                     <p className="font-mono text-2xs text-ink-3 tabular-figures">{formatDateTime(asset.updatedAt)}</p>
                   </div>
@@ -274,12 +399,12 @@ export function AssetsModuleDashboard() {
               title={uiText("Nada atrasado")}
               description={
                 ordenesAbiertas.length > 0
-                  ? `${ordenesAbiertas.length} ${ordenesAbiertas.length === 1 ? "orden abierta" : "órdenes abiertas"}, todas dentro de plazo.`
-                  : "No hay órdenes de mantenimiento abiertas."
+                  ? uiText("{{n}} órdenes abiertas, todas dentro de plazo.", { n: ordenesAbiertas.length })
+                  : uiText("No hay órdenes de mantenimiento abiertas.")
               }
               action={
                 <Button asChild variant="outline">
-                  <Link href="/inventory/assets/maintenance">{uiText("Ver mantenimiento")}</Link>
+                  <Link href="/inventory/maintenance">{uiText("Ver mantenimiento")}</Link>
                 </Button>
               }
             />
@@ -312,53 +437,63 @@ export function AssetsModuleDashboard() {
   );
 }
 
+/**
+ * La acción recomendada.
+ *
+ * Devolvía sus rótulos, títulos, detalles y hasta el texto del botón como
+ * literales en español, así que el elemento más prominente de la pantalla se
+ * quedaba sin traducir de principio a fin. Ahora recibe el traductor y no
+ * escribe ni una palabra por su cuenta.
+ */
 function siguienteAccion({
   resumen,
   ordenesVencidas,
   canManage,
+  uiText,
 }: {
   resumen?: Awaited<ReturnType<typeof fetchInventoryAnalytics>>;
   ordenesVencidas: number;
   canManage: boolean;
+  uiText: (source: string, params?: Record<string, string | number>) => string;
 }) {
   if (!resumen) return null;
   if (resumen.stock.belowMinimum > 0 && canManage) {
     return {
-      label: "Lo más urgente",
-      title: "Reponer las existencias bajo mínimo",
-      detail: `${resumen.stock.belowMinimum} ${resumen.stock.belowMinimum === 1 ? "referencia está" : "referencias están"} por debajo del mínimo definido.`,
+      label: uiText("Lo más urgente"),
+      title: uiText("Reponer las existencias bajo mínimo"),
+      detail: uiText("{{n}} referencias están por debajo del mínimo definido.", { n: resumen.stock.belowMinimum }),
       tone: "danger" as const,
-      href: "/inventory/assets/warehouse",
-      actionLabel: "Ver almacén",
+      href: "/inventory/warehouse",
+      actionLabel: uiText("Ver almacén"),
     };
   }
   if (ordenesVencidas > 0) {
     return {
-      label: "Lo más urgente",
-      title: "Resolver el mantenimiento atrasado",
-      detail: `${ordenesVencidas} ${ordenesVencidas === 1 ? "orden pasó" : "órdenes pasaron"} su fecha límite.`,
+      label: uiText("Lo más urgente"),
+      title: uiText("Resolver el mantenimiento atrasado"),
+      detail: uiText("{{n}} órdenes pasaron su fecha límite.", { n: ordenesVencidas }),
       tone: "warning" as const,
-      href: "/inventory/assets/maintenance",
-      actionLabel: "Ver mantenimiento",
+      href: "/inventory/maintenance",
+      actionLabel: uiText("Ver mantenimiento"),
     };
   }
   if (resumen.assets.returnPending > 0) {
     return {
-      label: "Lo siguiente",
-      title: "Recibir y validar las devoluciones",
-      detail: `${resumen.assets.returnPending} ${resumen.assets.returnPending === 1 ? "activo espera" : "activos esperan"} a que alguien los reciba.`,
+      label: uiText("Lo siguiente"),
+      title: uiText("Recibir y validar las devoluciones"),
+      detail: uiText("{{n}} activos esperan a que alguien los reciba.", { n: resumen.assets.returnPending }),
       tone: "warning" as const,
       href: "/inventory/returns",
-      actionLabel: "Ver devoluciones",
+      actionLabel: uiText("Ver devoluciones"),
     };
   }
   return {
-    label: "Todo al día",
-    title: "No hay pendientes en el inventario",
-    detail: `${resumen.assets.total} ${resumen.assets.total === 1 ? "activo registrado" : "activos registrados"} en la sucursal.`,
+    label: uiText("Todo al día"),
+    title: uiText("No hay pendientes en el inventario"),
+    detail: uiText("{{n}} activos registrados en la sucursal.", { n: resumen.assets.total }),
     tone: "progress" as const,
     href: "/inventory/assets",
-    actionLabel: "Ver activos",
+    actionLabel: uiText("Ver activos"),
   };
 }
 

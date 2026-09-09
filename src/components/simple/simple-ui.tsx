@@ -106,7 +106,12 @@ export function TaskCard({ title, who, detail, when, urgent, href, actionLabel }
           href={href}
           className={cn(
             TAP_TARGET,
-            "mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-action px-5 font-medium text-on-action shadow-e1 transition-colors hover:bg-action/90 sm:w-auto",
+            // `inline-flex`, no `flex`: un elemento de BLOQUE con `width:auto`
+            // ocupa todo el ancho disponible, así que el `sm:w-auto` de al lado
+            // no encogía nada y en escritorio salían tres botones oscuros a
+            // todo el ancho, compitiendo entre ellos y con la acción
+            // recomendada de arriba.
+            "mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-action px-5 font-medium text-on-action shadow-e1 transition-colors hover:bg-action/90 sm:w-auto",
           )}
         >
           {actionLabel}

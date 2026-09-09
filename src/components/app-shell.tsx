@@ -31,7 +31,6 @@ import {
   GraduationCap,
   Landmark,
   LogOut,
-  MapPin,
   Menu,
   Network,
   Search,
@@ -164,15 +163,42 @@ type SidebarContentProps = {
 };
 
 /**
- * Rótulo y valor del bloque de contexto.
+ * Un dato del bloque de contexto: marca, rótulo y valor.
  *
  * La jerarquía es la del propio dato: el rótulo es una marca de 10px en
- * versalitas —dice de qué se trata y se lee una vez—, y el valor va a 14px y
+ * versalitas —dice de qué se trata y se lee una vez—, y el valor va a 14px con
  * seminegrita, en su propia línea completa. Antes ambos medían 12px con el
  * mismo peso y competían entre sí.
+ *
+ * La marca es un punto de 8px, no un icono: a este tamaño un icono de mapa o de
+ * edificio es una mancha que no se identifica y que además compite con los
+ * iconos del menú, que sí significan algo. Un punto solo dice «este es el
+ * elemento», y encendido dice «este es el que está activo».
  */
-const ROTULO_CONTEXTO = "text-2xs font-medium uppercase tracking-[0.12em] text-sidebar-foreground/55";
-const VALOR_CONTEXTO = "mt-1 flex items-start gap-2 text-sm font-semibold leading-snug";
+function ContextoDato({ rotulo, valor, activo = false }: { rotulo: string; valor: string; activo?: boolean }) {
+  return (
+    <div>
+      <dt className="pl-[1.125rem] text-2xs font-medium uppercase tracking-[0.12em] text-sidebar-foreground/55">
+        {rotulo}
+      </dt>
+      {/* El punto va DENTRO del valor y posicionado, no como tercer hijo del
+          contenedor: una `dl` solo admite `dt`/`dd` (o un `div` que los
+          agrupe), así que un `span` suelto entre medias sería marcado
+          inválido. Posicionado además se alinea con la PRIMERA línea del
+          valor aunque el nombre ocupe dos. */}
+      <dd className="relative mt-1 break-words pl-[1.125rem] text-sm font-semibold leading-snug tracking-tight">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute left-0 top-[0.4rem] size-2 rounded-full",
+            activo ? "bg-sidebar-primary ring-4 ring-sidebar-primary/20" : "ring-1 ring-inset ring-sidebar-foreground/40",
+          )}
+        />
+        {valor}
+      </dd>
+    </div>
+  );
+}
 
 function localizedNavLabel(label: string, t: (key: string) => string) {
   const translated = t(`nav.${label}`);
@@ -292,71 +318,74 @@ function SidebarContent({
     <div className="flex min-h-full flex-col overflow-hidden rounded-xl border border-sidebar-border bg-sidebar text-sidebar-foreground xl:h-full">
       {/* ---- Marca y contexto ------------------------------------------- */}
       <div className="shrink-0 space-y-3 border-b border-sidebar-border p-4">
-        <div className="sidebar-row flex items-center gap-3">
+        {/* ---- Identidad de la empresa ---------------------------------- */}
+        <div className="sidebar-row flex items-start gap-3">
           <span
             aria-hidden="true"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-surface-dark-ink"
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl font-display text-base font-bold text-surface-dark-ink shadow-e2 ring-1 ring-inset ring-white/20"
             style={{ backgroundColor: brandAccent }}
           >
             {brandName.charAt(0).toUpperCase()}
           </span>
-          <div className="sidebar-collapsible min-w-0">
-            <p className="line-clamp-2 break-words font-display text-sm font-semibold leading-tight">{brandName}</p>
-            <p className="truncate text-2xs text-sidebar-foreground/60">
+          <div className="sidebar-collapsible min-w-0 pt-0.5">
+            <p className="line-clamp-2 break-words font-display text-sm font-semibold leading-tight tracking-tight">
+              {brandName}
+            </p>
+            {/* El plan pasa de texto gris suelto a distintivo. Es un dato
+                categórico —a qué contrato pertenece esta empresa—, y un dato
+                categórico dibujado como prosa se lee como pie de foto. */}
+            <span className="mt-1.5 inline-flex items-center rounded-sm bg-sidebar-foreground/10 px-1.5 py-px text-2xs font-medium uppercase tracking-[0.08em] text-sidebar-foreground/65">
               {currentTenantPlan === "global"
                 ? t("plan.global")
                 : localizedPlanLabel(currentTenantPlan, t)}
-            </p>
+            </span>
           </div>
         </div>
 
-        {/* Contexto permanente: dónde estás trabajando y quién eres. Es lo que
-            el encargo pedía tener siempre a la vista, y vive SOLO aquí.
+        {/* ---- Dónde trabajas y quién eres --------------------------------
 
-            Antes eran tres filas idénticas de 12px con rótulo a la izquierda y
-            valor a la derecha, todas del mismo peso: nada destacaba, el ojo
-            tenía que cruzar el hueco en cada fila y los valores se recortaban
-            en media línea. Ahora el rótulo es una marca pequeña ENCIMA y el
-            valor ocupa la línea entera, más grande y más pesado: el dato se lee
-            de un golpe y ya no se corta.
+            Es lo que el encargo pedía tener siempre a la vista, y vive SOLO
+            aquí.
+
+            El panel se dibuja con LUZ, no con borde. `--sidebar-accent` (14% de
+            luminosidad) sobre `--sidebar` (8%) es una diferencia que casi no se
+            ve, así que el borde acababa haciendo todo el trabajo y el bloque se
+            leía como un recuadro dibujado encima. Un velo de blanco al 6% con
+            un filo interior al 8% levanta el panel de verdad: se ve una
+            superficie por encima de la barra, no una caja.
 
             La fila «Empresa» solo aparece cuando el nombre de la empresa NO es
-            el que ya se lee arriba en la cabecera. Repetirlo dos líneas más
-            abajo, con el mismo texto, gastaba el sitio del bloque en decir algo
-            que estaba a 40px de distancia. */}
-        <div className="sidebar-collapsible space-y-3 rounded-lg border border-sidebar-border bg-sidebar-accent p-3">
-          <dl className="space-y-2.5">
+            el que ya se lee arriba. Repetirlo dos líneas más abajo, con el
+            mismo texto, gastaba el sitio del bloque en decir algo que estaba a
+            40px de distancia. */}
+        <div className="sidebar-collapsible rounded-xl bg-sidebar-foreground/[0.06] p-3.5 ring-1 ring-inset ring-sidebar-foreground/[0.09]">
+          <dl className="space-y-3">
             {currentTenantName !== brandName ? (
-              <div>
-                <dt className={ROTULO_CONTEXTO}>{t("branches.company")}</dt>
-                <dd className={VALOR_CONTEXTO}>
-                  <Building2 className="mt-px size-4 shrink-0 text-sidebar-foreground/45" aria-hidden="true" />
-                  <span className="min-w-0 break-words">{currentTenantName}</span>
-                </dd>
-              </div>
+              <ContextoDato rotulo={t("branches.company")} valor={currentTenantName} />
             ) : null}
-            <div>
-              <dt className={ROTULO_CONTEXTO}>{t("workspace.activeBranch")}</dt>
-              <dd className={VALOR_CONTEXTO}>
-                <MapPin className="mt-px size-4 shrink-0 text-sidebar-foreground/45" aria-hidden="true" />
-                <span className="min-w-0 break-words">{currentBranch}</span>
-              </dd>
-            </div>
+            {/* Un punto encendido, no un icono de mapa: el dato no es «un
+                sitio», es «el sitio en el que estás trabajando ahora». El
+                halo es el mismo ámbar que marca la sección activa del menú,
+                de modo que en toda la barra el ámbar significa una sola
+                cosa: aquí estás. */}
+            <ContextoDato rotulo={t("workspace.activeBranch")} valor={currentBranch} activo />
           </dl>
 
-          {/* El rol era el RÓTULO y el nombre el valor, o sea que la persona
+          {/* El cargo era el RÓTULO y el nombre el valor, o sea que la persona
               aparecía como definición de su cargo. Aquí la persona es lo que se
               lee y el cargo la matiza debajo. */}
-          <div className="flex items-center gap-2.5 border-t border-sidebar-border pt-3">
+          <div className="mt-3.5 flex items-center gap-3 border-t border-sidebar-foreground/10 pt-3.5">
             <span
               aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar text-2xs font-semibold text-sidebar-foreground/80"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar text-2xs font-semibold tracking-wide text-sidebar-foreground/85 ring-1 ring-inset ring-sidebar-foreground/15"
             >
               {initialsOf(currentUserName)}
             </span>
             <div className="min-w-0">
-              <p className="line-clamp-2 break-words text-sm font-medium leading-tight">{currentUserName}</p>
-              <p className="truncate text-2xs leading-tight text-sidebar-foreground/60">{currentRoleLabel}</p>
+              <p className="line-clamp-2 break-words text-sm font-semibold leading-tight tracking-tight">
+                {currentUserName}
+              </p>
+              <p className="mt-0.5 line-clamp-2 break-words text-2xs leading-tight text-sidebar-foreground/60">{currentRoleLabel}</p>
             </div>
           </div>
         </div>

@@ -769,11 +769,32 @@ El nombre de la empresa en la cabecera pasa de `truncate` a dos líneas: al deja
 de repetirse abajo, la cabecera es su ÚNICO sitio y recortado quedaba ilegible
 («DATALINK TECH CO…»).
 
-Contraste comprobado por cálculo sobre los tokens —el medidor automático no sabe
+### Segunda pasada: el panel se dibuja con luz, no con borde (2026-09-09)
+
+La primera versión ordenaba bien la información pero seguía leyéndose barata, y
+la causa era el fondo: `--sidebar-accent` es 14% de luminosidad sobre un
+`--sidebar` de 8%. Seis puntos de diferencia no se ven, así que el borde acababa
+haciendo todo el trabajo y el bloque parecía un recuadro dibujado encima de la
+barra en lugar de una superficie por encima de ella.
+
+| Cambio | Motivo |
+|---|---|
+| `bg-sidebar-accent` + `border` → velo de blanco al 6% con filo interior al 8%, `rounded-xl`, `p-3.5` | El panel se levanta de verdad; sin borde duro que compita con el de la propia barra |
+| Iconos `MapPin` / `Building2` → **punto de 8px**, encendido en ámbar con halo para la sucursal activa y hueco para la empresa | A 16px un icono de mapa es una mancha que no se identifica, y competía con los iconos del menú, que sí significan algo. El ámbar es el mismo que marca la sección activa: en toda la barra significa una sola cosa, «aquí estás» |
+| Plan en texto gris suelto → **distintivo** | Es un dato categórico, y un dato categórico dibujado como prosa se lee como pie de foto |
+| Cuadro de marca 36px `rounded-lg` → 40px `rounded-xl` con filo interior y sombra | Era el único elemento con color de la zona y estaba dibujado plano |
+| Nombre de la persona `font-medium` → `font-semibold`, cargo con dos líneas | El cargo se recortaba («Administrador de empr…») |
+
+El punto vive DENTRO del `<dd>`, posicionado, y no como tercer hijo del
+contenedor: una `<dl>` solo admite `dt`/`dd` —o un `div` que los agrupe—, así
+que un `span` suelto entre medias sería marcado inválido. Posicionado, además,
+se alinea con la PRIMERA línea del valor aunque este ocupe dos.
+
+Contraste recalculado sobre los tokens nuevos —el medidor automático no sabe
 leer `color-mix`, que es en lo que Tailwind v4 resuelve los modificadores de
-opacidad—: rótulos a 10px, `sidebar-foreground/55` sobre `sidebar-accent`, 5,34:1
-(AA pide 4,5:1); valores, 14,5:1. Verificado a 264px en el caso normal y en el de
-marca blanca con nombres largos.
+opacidad—: rótulos de 10px, 5,41:1; distintivo del plan, 6,45:1; valores,
+14,5:1. AA pide 4,5:1.
+
 
 ## 3. Componentes nuevos del sistema
 

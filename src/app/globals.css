@@ -878,3 +878,91 @@ input, select, textarea {
 /* El interletraje del sistema para `tracking-tight` se define en `@theme`,
    no reescribiendo la clase: así hay UNA definición y las utilidades siguen
    pudiendo ganarla donde haga falta. */
+
+/* ==========================================================================
+   BARRA LATERAL CONTRAÍBLE (solo escritorio, ≥ xl)
+   ==========================================================================
+
+   El estado vive en `html[data-nav]`, que escribe el script de arranque antes
+   del primer pintado. Se hace así, y no con clases calculadas en React, por
+   una razón concreta: el servidor no puede saber qué eligió el usuario, de
+   modo que cualquier clase que dependiera de la preferencia haría que el
+   marcado del servidor y el del cliente discreparan en la hidratación. Un
+   atributo del documento queda FUERA del árbol de React, así que no discrepa
+   y además acierta el primer frame: la barra no se ve ancha y salta a
+   estrecha.
+
+   El marcado es EL MISMO en los dos estados. Contraída no se renderiza otra
+   barra: se ocultan los rótulos. `display:none` los saca también del árbol de
+   accesibilidad y del orden de tabulación, que es justo lo que debe pasar con
+   algo que no está a la vista.
+
+   `[data-peek="true"]` es el asomo: al apuntar la barra o al llevarle el foco,
+   vuelve a comportarse como expandida, pero FLOTANDO sobre el contenido en vez
+   de empujarlo. Así se llega a cualquier pantalla sin desplegar la barra y sin
+   que el contenido salte de sitio a cada paso del puntero.
+   -------------------------------------------------------------------------- */
+
+.app-sidebar {
+  width: 264px;
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar {
+    transition: none;
+  }
+}
+
+html[data-nav="collapsed"] .app-sidebar {
+  width: 68px;
+}
+
+/* Rótulos, contexto, panel de sección abierta y correo de soporte: fuera del
+   carril. */
+html[data-nav="collapsed"] .app-sidebar:not([data-peek="true"]) .sidebar-collapsible {
+  display: none;
+}
+
+/* Marca, secciones y enlaces se centran sobre el icono. */
+html[data-nav="collapsed"] .app-sidebar:not([data-peek="true"]) .sidebar-row {
+  justify-content: center;
+  padding-inline: 0.5rem;
+  gap: 0;
+}
+
+/* El asomo desborda el carril hacia la derecha en lugar de empujar el
+   contenido: el `aside` sigue midiendo 68px, así que la columna de contenido no
+   se recoloca a cada paso del puntero. El panel conserva su `sticky`, que es lo
+   que mantiene la lista a la vista al desplazar la página. */
+.app-sidebar-panel {
+  width: 100%;
+}
+
+html[data-nav="collapsed"] .app-sidebar[data-peek="true"] .app-sidebar-panel {
+  width: 264px;
+  z-index: var(--z-popover);
+  box-shadow: var(--shadow-e4);
+}
+
+/* Contraída, la sección donde estás es lo único que ubica, y sin rótulo el
+   color del icono por sí solo es un cambio de tono sobre fondo oscuro. Se le
+   añade el MISMO filo ámbar que ya marca el enlace activo, para no inventar un
+   segundo lenguaje de «aquí estás».
+
+   El filo es un elemento con su propia utilidad de color, y aquí solo se
+   decide si se ve: pintar el fondo desde esta hoja sin capa habría anulado
+   cualquier utilidad de fondo sobre ese botón. */
+.sidebar-rail-mark {
+  display: none;
+}
+
+html[data-nav="collapsed"] .app-sidebar:not([data-peek="true"]) .sidebar-rail-mark {
+  display: block;
+}
+
+/* Empresa · sucursal · rol salen de la barra al contraerla, así que vuelven a
+   la franja superior, donde ya viven en móvil. */
+html[data-nav="collapsed"] .app-context-line {
+  display: block;
+}

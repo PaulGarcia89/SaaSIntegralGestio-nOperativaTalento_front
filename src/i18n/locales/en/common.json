@@ -3419,5 +3419,7 @@
   "moduleReports.tasks": "Recorded tasks",
   "moduleReports.cameras": "Cameras online",
   "moduleReports.zones": "Active zones",
-  "moduleReports.alerts": "Open alerts"
+  "moduleReports.alerts": "Open alerts",
+  "workspace.collapseNav": "Collapse the side menu",
+  "workspace.expandNav": "Expand the side menu"
 }

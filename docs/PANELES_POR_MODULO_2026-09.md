@@ -630,6 +630,123 @@ pantalla.
 Verificado a 390, 768 y 1440 px sin desbordes, sobre una maqueta que renderiza
 los componentes de verdad con el CSS compilado del proyecto.
 
+## 2.septdecies Panel de Inventario de restaurante (2026-09-09)
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| Existencias y movimientos como cifras sueltas; `waste` y `periodConsumption` llegaban en la respuesta y se descartaban | **«A dónde va el producto»**: consumo del periodo frente a merma, en el mismo gráfico | Son las dos salidas del inventario: por separado no se puede juzgar si la merma es tolerable |
+| — | Tarjetas de **merma** y **consumo del periodo** | Los datos ya viajaban; no aparecían en ninguna pantalla |
+| Fechas e importes formateados con literales fijos | `fechaCorta(valor, locale)`, `formatoMoneda(valor, locale)`, `formatoNumero(valor, locale)` | En inglés se leían fechas y separadores en formato español |
+
+**Código muerto retirado.** `restaurant-inventory-shell.tsx` conservaba
+`DashboardScreen`, `RecentList`, `StockScreen` y `MovementsScreen`: pantallas
+completas que ninguna ruta montaba desde el rediseño, con sus importaciones.
+Se eliminan junto con los importes que solo ellas usaban.
+
+Verificado a 390, 768 y 1440 px sin desbordes.
+
+## 2.octodecies El selector de idioma (2026-09-09)
+
+Era el único control de la aplicación que no salía del sistema de diseño: un
+`<select>` nativo con tokens heredados (`border-border`, `bg-background`,
+`text-foreground`, `focus:ring-primary`, `rounded-lg`). En cualquier pantalla
+—y de forma llamativa sobre el hero grafito de `/jobs`— se leía como un widget
+del sistema operativo pegado entre los botones: galón del navegador, radio
+distinto, fondo blanco donde todo lo demás era oscuro.
+
+| Antes | Ahora |
+|---|---|
+| El `<select>` nativo se dibujaba a sí mismo | El `<select>` va **transparente sobre una superficie propia**: icono `Languages`, etiqueta y galón `ChevronDown` los dibuja el componente |
+| `rounded-lg`, altura fija `--control-h-touch` | `shape="control"` (por defecto) copia `Button variant="secondary"`: `rounded-md` y alturas `--control-h-touch` / `sm:--control-h-base`; `shape="pill"` copia las píldoras de `CandidateNav` |
+| `focus:ring-primary` | `focus-within:outline-2 outline-offset-2` sobre `outline-focus` (claro) o `accent-fill` (oscuro), el mismo anillo que el resto |
+
+**El elemento sigue siendo un `<select>` nativo**, con las mismas opciones, el
+mismo `setLocale`, el mismo `aria-label` y el mismo selector a pantalla
+completa en iOS. Solo deja de imponer su aspecto. El `<select>` se extiende
+con `-inset-px` para cubrir también el borde: con `inset-0` quedaba 2 px más
+bajo que el control y el área tocable no llegaba a los 44 px.
+
+Llamadas corregidas:
+
+- `candidate-nav.tsx` pasa `shape="pill"` y **propaga su propio `tone`**. Era
+  el fallo visible en `/jobs`: la barra se pintaba oscura y el selector se
+  quedaba blanco.
+- `landing-header.tsx` pasa `tone="dark"` en la cabecera y en el menú móvil
+  —los dos van sobre grafito—, y en el menú `w-full justify-start` para que la
+  fila ocupe el ancho como las demás.
+- `login`, `profile`, `forgot-password` y las dos de `app-shell` no cambian de
+  llamada: heredan la forma «control», que es la de sus vecinos.
+
+Verificado con maqueta de los componentes reales a 390, 768 y 1440 px: sin
+desbordes, ningún objetivo por debajo de 44 px, y alturas idénticas a las de
+`Button` (56 px en móvil, 44 px desde `sm`).
+
+## 2.novodecies Barra lateral contraíble (2026-09-09)
+
+Contraída, la barra pasa de 264 px a un carril de 68 px con los iconos de
+sección; la columna de contenido gana los 196 px por sí sola, porque ya era
+`flex-1` dentro de la misma fila.
+
+### Por qué el estado vive en `html[data-nav]` y no en clases de React
+
+El servidor no puede saber qué eligió el usuario. Cualquier clase calculada a
+partir de la preferencia haría que el marcado del servidor y el del cliente
+discreparan en la hidratación, y además se vería la barra ancha saltando a
+estrecha en cuanto React tomara el control. El atributo lo escribe
+`APPEARANCE_BOOT_SCRIPT` antes del primer pintado y queda FUERA del árbol de
+React: ni discrepa ni parpadea. Es el mismo camino que ya seguían el tema y la
+densidad.
+
+**El marcado es el mismo en los dos estados.** Contraída no se renderiza otra
+barra: se ocultan los rótulos con `display:none`, que además los saca del árbol
+de accesibilidad y del orden de tabulación —justo lo que debe pasar con algo que
+no está a la vista—.
+
+### El asomo
+
+Un carril de iconos sin más obliga a expandir y volver a contraer para cada
+salto de pantalla. Al apuntar la barra, al llevarle el foco o al pulsar una
+sección, vuelve a su forma completa **desbordando hacia la derecha**: el
+`aside` conserva sus 68 px, así que el contenido no se recoloca a cada paso del
+puntero. Se cierra con Esc, al salir el puntero, al salir el foco y al navegar.
+
+Se abre también con foco y con pulsación, no solo al pasar por encima: un asomo
+que dependiera del ratón dejaría el carril inservible con teclado. Al cerrarlo
+con Esc el foco vuelve al conmutador, porque lo que lo tenía acaba de ocultarse
+y si no el foco cae al documento.
+
+### Accesibilidad
+
+| Riesgo | Respuesta |
+|---|---|
+| Sin rótulo visible, el botón de sección se queda sin nombre | `aria-label` permanente con el mismo texto que el rótulo visible (cumple «etiqueta en el nombre») |
+| «Aquí estás» solo por color de icono | Se añade el MISMO filo ámbar que ya marca el enlace activo, para no inventar un segundo lenguaje |
+| Empresa · sucursal · rol salen de la barra | Vuelven a la franja superior, donde ya viven en móvil (`.app-context-line`) |
+| Estado del conmutador | `aria-pressed`, `aria-controls="app-sidebar"` y etiqueta que dice la acción, no el estado |
+| Movimiento | La transición de ancho se anula bajo `prefers-reduced-motion` |
+
+Los objetivos del carril siguen en 44 px (`--control-h-base`), y por debajo de
+`xl` no cambia nada: allí la barra es un cajón y una franja inferior.
+
+### Persistencia — sin cambios de contrato
+
+La preferencia va al almacén genérico de preferencias que ya existe
+(`PUT /auth/preferences/:namespace`, tabla clave/valor sin lista blanca) bajo el
+espacio de nombres `ui-nav`, con espejo en `localStorage` para acertar el primer
+pintado. **Sin migración, sin endpoint nuevo, sin permiso nuevo.**
+
+### Nota sobre la hoja de estilos
+
+La marca de sección activa se pinta con un elemento propio y su utilidad de
+color, no con `background-color` desde `globals.css`: `globals.layers.test.ts`
+lo rechaza, y con razón —una regla sin capa anula en silencio todas las
+utilidades que toquen esa propiedad—.
+
+Verificado a 1440 px en los tres estados sobre una maqueta que renderiza la
+barra real con el CSS compilado: expandida 264/264 px, contraída 68/68 px con
+cero enlaces en el árbol y las 10 secciones presentes, asomo 68 px de carril con
+panel de 264 px. Sin desbordes horizontales.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

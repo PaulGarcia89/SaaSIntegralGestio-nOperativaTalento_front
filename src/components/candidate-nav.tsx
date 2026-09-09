@@ -69,7 +69,7 @@ export function CandidateNav({
           );
         })}
       <span className="ml-auto shrink-0">
-        <LanguageSelector compact />
+        <LanguageSelector compact shape="pill" tone={tone} />
       </span>
     </nav>
   );

@@ -3419,5 +3419,7 @@
   "moduleReports.tasks": "Tareas registradas",
   "moduleReports.cameras": "Cámaras conectadas",
   "moduleReports.zones": "Zonas activas",
-  "moduleReports.alerts": "Alertas abiertas"
+  "moduleReports.alerts": "Alertas abiertas",
+  "workspace.collapseNav": "Contraer el menú lateral",
+  "workspace.expandNav": "Expandir el menú lateral"
 }

@@ -57,6 +57,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DensityToggle, ThemeToggle } from "@/components/theme-toggle";
+import { SidebarToggle } from "@/components/sidebar-toggle";
 import { AppBreadcrumb } from "@/components/breadcrumb";
 import { AccessDenied, AccessLoading } from "@/components/access-state";
 import {
@@ -278,7 +279,7 @@ function SidebarContent({
     <div className="flex min-h-full flex-col overflow-hidden rounded-xl border border-sidebar-border bg-sidebar text-sidebar-foreground xl:h-full">
       {/* ---- Marca y contexto ------------------------------------------- */}
       <div className="shrink-0 space-y-3 border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
+        <div className="sidebar-row flex items-center gap-3">
           <span
             aria-hidden="true"
             className="flex size-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-surface-dark-ink"
@@ -286,7 +287,7 @@ function SidebarContent({
           >
             {brandName.charAt(0).toUpperCase()}
           </span>
-          <div className="min-w-0">
+          <div className="sidebar-collapsible min-w-0">
             <p className="truncate font-display text-sm font-semibold">{brandName}</p>
             <p className="truncate text-2xs text-sidebar-foreground/60">
               {currentTenantPlan === "global"
@@ -298,7 +299,7 @@ function SidebarContent({
 
         {/* Contexto permanente: empresa, sucursal y quién eres. Es lo que el
             encargo pedía tener siempre a la vista, y ahora vive SOLO aquí. */}
-        <dl className="space-y-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/60 p-3 text-xs">
+        <dl className="sidebar-collapsible space-y-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/60 p-3 text-xs">
           <div className="flex items-baseline justify-between gap-2">
             <dt className="shrink-0 text-sidebar-foreground/55">{t("branches.company")}</dt>
             <dd className="min-w-0 truncate text-right font-medium">{currentTenantName}</dd>
@@ -349,7 +350,13 @@ function SidebarContent({
                     onClick={() => setPinnedSection(open && sectionId !== activeSection ? null : open ? "inicio" : sectionId)}
                     aria-expanded={open}
                     aria-controls={panelId}
+                    // Contraída, el rótulo visible desaparece: sin un nombre
+                    // accesible explícito el botón se quedaría sin nombre. En
+                    // expandida el nombre coincide palabra por palabra con el
+                    // texto visible, como exige «etiqueta en el nombre».
+                    aria-label={localizedSection(sectionId, meta.label, t)}
                     className={cn(
+                      "sidebar-row relative",
                       // Misma altura mínima que los enlaces: el título de sección es
                       // el control que se pulsa para abrirla, y en móvil medía 32px.
                       "flex min-h-[var(--control-h-base)] w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-semibold transition-colors",
@@ -358,18 +365,24 @@ function SidebarContent({
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                     )}
                   >
+                    {containsActive ? (
+                      <span
+                        aria-hidden="true"
+                        className="sidebar-rail-mark absolute inset-y-1 left-0 w-0.5 rounded-full bg-sidebar-primary"
+                      />
+                    ) : null}
                     <SectionIcon className="size-4 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate uppercase tracking-[0.1em]">
+                    <span className="sidebar-collapsible min-w-0 flex-1 truncate uppercase tracking-[0.1em]">
                       {localizedSection(sectionId, meta.label, t)}
                     </span>
                     <ChevronRight
-                      className={cn("size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-90")}
+                      className={cn("sidebar-collapsible size-3.5 shrink-0 transition-transform motion-reduce:transition-none", open && "rotate-90")}
                       aria-hidden="true"
                     />
                   </button>
 
                   {open ? (
-                    <div id={panelId} className="mt-1 space-y-3 pb-2 pl-2">
+                    <div id={panelId} className="sidebar-collapsible mt-1 space-y-3 pb-2 pl-2">
                       {/* Un área sin elementos no se rotula: el encabezado
                           salía de `group.items` y la lista de una versión
                           filtrada, así que un área cuyos elementos se filtraban
@@ -415,7 +428,7 @@ function SidebarContent({
       </nav>
 
       {supportEmail ? (
-        <p className="shrink-0 truncate border-t border-sidebar-border px-4 py-3 text-2xs text-sidebar-foreground/50">
+        <p className="sidebar-collapsible shrink-0 truncate border-t border-sidebar-border px-4 py-3 text-2xs text-sidebar-foreground/50">
           {supportEmail}
         </p>
       ) : null}
@@ -543,6 +556,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // RBAC and enabled-module checks have already been applied in allowedNav.
   const navigationForContext = allowedNav;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  /** Asomo de la barra contraída. Sin efecto mientras está expandida. */
+  const [sidebarPeek, setSidebarPeek] = useState(false);
+  const sidebarToggleRef = useRef<HTMLButtonElement>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -701,9 +717,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="mx-auto flex min-h-svh max-w-[1680px] gap-4 p-3 sm:p-4 xl:p-5">
         {/* ---- Barra lateral de escritorio -------------------------------- */}
-        <aside className="hidden w-[264px] shrink-0 xl:block">
-          <div className="sticky top-5 h-[calc(100svh-2.5rem)]">
+        {/* El asomo: contraída, apuntar la barra o llevarle el foco la
+            devuelve a su forma completa SIN desplegarla ni mover el contenido.
+            Es lo que permite llegar a cualquier pantalla desde el carril sin
+            tener que expandir y volver a contraer.
+
+            Se abre con el puntero, con el foco de teclado y al pulsar una
+            sección, no solo al pasar por encima: un asomo que dependiera del
+            ratón dejaría el carril inservible con teclado. Se cierra con Esc,
+            al salir el puntero, al salir el foco y al navegar. */}
+        <aside
+          id="app-sidebar"
+          className="app-sidebar relative hidden shrink-0 xl:block"
+          data-peek={sidebarPeek || undefined}
+          onPointerEnter={(event) => {
+            if (event.pointerType === "mouse") setSidebarPeek(true);
+          }}
+          onPointerLeave={() => setSidebarPeek(false)}
+          onFocusCapture={() => setSidebarPeek(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSidebarPeek(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            // Cerrar el asomo oculta lo que tenía el foco. Sin devolverlo a
+            // algún sitio, el foco cae al documento y la siguiente tabulación
+            // empieza desde el principio de la página.
+            setSidebarPeek(false);
+            sidebarToggleRef.current?.focus();
+          }}
+        >
+          <div className="app-sidebar-panel sticky top-5 h-[calc(100svh-2.5rem)]">
             <SidebarContent
+              onNavigate={() => setSidebarPeek(false)}
               currentBranch={workspaceBranch}
               brandName={isGlobalView ? "TalentOS" : currentTenant.branding.productName ?? currentTenant.name}
               brandAccent={tenantTheme.hex}
@@ -736,11 +782,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Menu className="size-4" aria-hidden="true" />
               </Button>
 
+              {/* Mismo sitio que el botón de menú de móvil: en escritorio no
+                  hay cajón que abrir, hay barra que contraer. */}
+              <SidebarToggle ref={sidebarToggleRef} controls="app-sidebar" className="hidden shrink-0 xl:inline-flex" />
+
               <div className="min-w-0 flex-1">
                 <AppBreadcrumb pathname={pathname} />
                 {/* En móvil no hay migas útiles ni barra lateral a la vista, así
                     que el contexto de empresa y sucursal se muestra aquí. */}
-                <p className="truncate text-2xs text-ink-3 xl:hidden">
+                <p className="app-context-line truncate text-2xs text-ink-3 xl:hidden">
                   {isGlobalView ? t("workspace.globalContext") : `${workspaceName} · ${workspaceBranch}`}
                 </p>
               </div>

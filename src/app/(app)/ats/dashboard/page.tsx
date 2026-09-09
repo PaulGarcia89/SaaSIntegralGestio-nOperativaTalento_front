@@ -556,7 +556,7 @@ export default function TodayPage() {
           }
           id="pendientes"
         >
-          <div className="space-y-2">
+          <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3 [&>article]:min-w-0 [&>article]:break-words">
             {rest.map((item) => (
               <TaskCard
                 key={item.id}

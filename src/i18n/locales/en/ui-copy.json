@@ -5400,5 +5400,6 @@
   "{{n}} órdenes pasaron su fecha límite.": "{{n}} orders are past their deadline.",
   "«Bajo mínimo» es lo que ya está en falta. «En punto de pedido» es lo que todavía se puede reponer a tiempo, e incluye lo anterior cuando el punto de pedido está por encima del mínimo.": "“Below minimum” is what is already short. “At reorder point” is what can still be restocked in time, and it includes the former whenever the reorder point sits above the minimum.",
   "Órdenes de compra abiertas con proveedores.": "Open purchase orders with suppliers.",
-  "Órdenes de mantenimiento.": "Maintenance orders."
+  "Órdenes de mantenimiento.": "Maintenance orders.",
+  "Introduce la contraseña de la cuenta para guardar la configuración.": "Enter the account password to save the settings."
 }

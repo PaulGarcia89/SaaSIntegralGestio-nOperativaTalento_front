@@ -409,6 +409,7 @@ type RequestOptions = {
   retryOnUnauthorized?: boolean;
   tenantId?: string;
   responseType?: "json" | "blob";
+  allowEmptyJson?: boolean;
   retrySafe?: boolean;
   timeoutMs?: number;
   idempotencyKey?: string;
@@ -1370,6 +1371,11 @@ async function request<T>(path: string, init: RequestInit = {}, options: Request
 
   if (options.responseType === "blob") {
     return (await response.blob()) as T;
+  }
+
+  if (options.allowEmptyJson) {
+    const body = await response.text();
+    return (body.trim() ? JSON.parse(body) : null) as T;
   }
 
   return (await response.json()) as T;
@@ -3169,7 +3175,7 @@ export type CompanyEmailSettings = {
   lastTestError: string | null;
   updatedAt: string;
 };
-export function fetchCompanyEmailSettings() { return request<CompanyEmailSettings | null>("/company/email-settings"); }
+export function fetchCompanyEmailSettings() { return request<CompanyEmailSettings | null>("/company/email-settings", {}, { allowEmptyJson: true }); }
 export function saveCompanyEmailSettings(input: { smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpUsername: string; smtpPassword?: string; fromName: string; fromEmail: string; enabled: boolean }) { return request<CompanyEmailSettings>("/company/email-settings", { method: "PUT", body: JSON.stringify(input) }); }
 export function testCompanyEmailSettings(recipient: string) { return request<{ success: boolean; messageId: string; recipient: string }>("/company/email-settings/test", { method: "POST", body: JSON.stringify({ recipient }) }); }
 export function fetchCommunicationInbox(filters: { page?: number; pageSize?: number; search?: string } = {}) { const query = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => value != null && value !== "" && query.set(key, String(value))); return request<{ data: AtsMessageDto[]; meta: { page: number; pageSize: number; total: number; totalPages: number } }>(`/ats/communications/inbox?${query}`); }

@@ -747,6 +747,34 @@ barra real con el CSS compilado: expandida 264/264 px, contraída 68/68 px con
 cero enlaces en el árbol y las 10 secciones presentes, asomo 68 px de carril con
 panel de 264 px. Sin desbordes horizontales.
 
+### 2.novodecies.bis El bloque de contexto de la barra (2026-09-09)
+
+Eran tres filas idénticas de 12px, rótulo a la izquierda y valor a la derecha,
+todas del mismo peso. Nada destacaba, el ojo cruzaba el hueco en cada fila y los
+valores se recortaban en media línea.
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| «Empresa: DATALINK TECH CORP» dos líneas debajo de «DATALINK TECH CORP» en la cabecera | La fila **solo aparece cuando el nombre de la empresa NO es el de la cabecera** (marca blanca) | El bloque gastaba su primera línea en repetir algo que estaba a 40px |
+| Rótulo y valor al mismo tamaño y peso | Rótulo de 10px en versalitas **encima**; valor de 14px seminegrita en línea completa | Es la jerarquía del propio dato: el rótulo se lee una vez, el valor cada vez |
+| `truncate` en media columna | Línea entera con `break-words` | «Sucursal Coral Way — Salón principal» se cortaba a la mitad |
+| «Activa» como rótulo | `workspace.activeBranch` («Sucursal activa») | Suelto, «Activa» es un adjetivo sin sustantivo; además `branches.active` es el ESTADO de una sucursal en su tabla, otro significado |
+| El cargo era el `dt` y la persona el `dd` | La persona es lo que se lee, con iniciales, y el cargo la matiza debajo | La persona aparecía como definición de su cargo |
+| `bg-sidebar-accent/60` | `bg-sidebar-accent` | El bloque tenía que separarse del fondo de la barra, no fundirse con él |
+
+Las iniciales salen de `initialsOf`, que ya existía para las tarjetas de
+entidad; no se ha escrito una segunda versión.
+
+El nombre de la empresa en la cabecera pasa de `truncate` a dos líneas: al dejar
+de repetirse abajo, la cabecera es su ÚNICO sitio y recortado quedaba ilegible
+(«DATALINK TECH CO…»).
+
+Contraste comprobado por cálculo sobre los tokens —el medidor automático no sabe
+leer `color-mix`, que es en lo que Tailwind v4 resuelve los modificadores de
+opacidad—: rótulos a 10px, `sidebar-foreground/55` sobre `sidebar-accent`, 5,34:1
+(AA pide 4,5:1); valores, 14,5:1. Verificado a 264px en el caso normal y en el de
+marca blanca con nombres largos.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

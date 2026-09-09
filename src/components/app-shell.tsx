@@ -31,6 +31,7 @@ import {
   GraduationCap,
   Landmark,
   LogOut,
+  MapPin,
   Menu,
   Network,
   Search,
@@ -49,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
 import { AccessibleCommandPalette, MobileDrawer } from "@/components/design-system";
+import { initialsOf } from "@/components/system/entity-card";
 import {
   Select,
   SelectContent,
@@ -160,6 +162,17 @@ type SidebarContentProps = {
   onNavigate?: () => void;
   mobile?: boolean;
 };
+
+/**
+ * Rótulo y valor del bloque de contexto.
+ *
+ * La jerarquía es la del propio dato: el rótulo es una marca de 10px en
+ * versalitas —dice de qué se trata y se lee una vez—, y el valor va a 14px y
+ * seminegrita, en su propia línea completa. Antes ambos medían 12px con el
+ * mismo peso y competían entre sí.
+ */
+const ROTULO_CONTEXTO = "text-2xs font-medium uppercase tracking-[0.12em] text-sidebar-foreground/55";
+const VALOR_CONTEXTO = "mt-1 flex items-start gap-2 text-sm font-semibold leading-snug";
 
 function localizedNavLabel(label: string, t: (key: string) => string) {
   const translated = t(`nav.${label}`);
@@ -288,7 +301,7 @@ function SidebarContent({
             {brandName.charAt(0).toUpperCase()}
           </span>
           <div className="sidebar-collapsible min-w-0">
-            <p className="truncate font-display text-sm font-semibold">{brandName}</p>
+            <p className="line-clamp-2 break-words font-display text-sm font-semibold leading-tight">{brandName}</p>
             <p className="truncate text-2xs text-sidebar-foreground/60">
               {currentTenantPlan === "global"
                 ? t("plan.global")
@@ -297,22 +310,56 @@ function SidebarContent({
           </div>
         </div>
 
-        {/* Contexto permanente: empresa, sucursal y quién eres. Es lo que el
-            encargo pedía tener siempre a la vista, y ahora vive SOLO aquí. */}
-        <dl className="sidebar-collapsible space-y-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/60 p-3 text-xs">
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-sidebar-foreground/55">{t("branches.company")}</dt>
-            <dd className="min-w-0 truncate text-right font-medium">{currentTenantName}</dd>
+        {/* Contexto permanente: dónde estás trabajando y quién eres. Es lo que
+            el encargo pedía tener siempre a la vista, y vive SOLO aquí.
+
+            Antes eran tres filas idénticas de 12px con rótulo a la izquierda y
+            valor a la derecha, todas del mismo peso: nada destacaba, el ojo
+            tenía que cruzar el hueco en cada fila y los valores se recortaban
+            en media línea. Ahora el rótulo es una marca pequeña ENCIMA y el
+            valor ocupa la línea entera, más grande y más pesado: el dato se lee
+            de un golpe y ya no se corta.
+
+            La fila «Empresa» solo aparece cuando el nombre de la empresa NO es
+            el que ya se lee arriba en la cabecera. Repetirlo dos líneas más
+            abajo, con el mismo texto, gastaba el sitio del bloque en decir algo
+            que estaba a 40px de distancia. */}
+        <div className="sidebar-collapsible space-y-3 rounded-lg border border-sidebar-border bg-sidebar-accent p-3">
+          <dl className="space-y-2.5">
+            {currentTenantName !== brandName ? (
+              <div>
+                <dt className={ROTULO_CONTEXTO}>{t("branches.company")}</dt>
+                <dd className={VALOR_CONTEXTO}>
+                  <Building2 className="mt-px size-4 shrink-0 text-sidebar-foreground/45" aria-hidden="true" />
+                  <span className="min-w-0 break-words">{currentTenantName}</span>
+                </dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className={ROTULO_CONTEXTO}>{t("workspace.activeBranch")}</dt>
+              <dd className={VALOR_CONTEXTO}>
+                <MapPin className="mt-px size-4 shrink-0 text-sidebar-foreground/45" aria-hidden="true" />
+                <span className="min-w-0 break-words">{currentBranch}</span>
+              </dd>
+            </div>
+          </dl>
+
+          {/* El rol era el RÓTULO y el nombre el valor, o sea que la persona
+              aparecía como definición de su cargo. Aquí la persona es lo que se
+              lee y el cargo la matiza debajo. */}
+          <div className="flex items-center gap-2.5 border-t border-sidebar-border pt-3">
+            <span
+              aria-hidden="true"
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar text-2xs font-semibold text-sidebar-foreground/80"
+            >
+              {initialsOf(currentUserName)}
+            </span>
+            <div className="min-w-0">
+              <p className="line-clamp-2 break-words text-sm font-medium leading-tight">{currentUserName}</p>
+              <p className="truncate text-2xs leading-tight text-sidebar-foreground/60">{currentRoleLabel}</p>
+            </div>
           </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-sidebar-foreground/55">{t("branches.active")}</dt>
-            <dd className="min-w-0 truncate text-right font-medium">{currentBranch}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-2 border-t border-sidebar-border pt-1.5">
-            <dt className="shrink-0 text-sidebar-foreground/55">{currentRoleLabel}</dt>
-            <dd className="min-w-0 truncate text-right font-medium">{currentUserName}</dd>
-          </div>
-        </dl>
+        </div>
       </div>
 
       {/* ---- Navegación --------------------------------------------------

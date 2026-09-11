@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, FileText, Mail, MapPin, Phone, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/simple/reason-dialog";
 import { MobileActionBar, SimpleSection } from "@/components/simple/simple-ui";
@@ -29,6 +29,7 @@ import {
   groupByPhase,
   recruitmentPhase,
   recruitmentPhaseOf,
+  splitRejection,
   stageMovesFor,
   waitingLabel,
   type RecruitmentPhaseId,
@@ -97,7 +98,7 @@ const SELECT_CLASS = cn(
 
 function PersonRow({ application, moves, onMove, onReject, busy }: {
   application: VacancyApplicationDto;
-  moves: { primary: StageMove | null; others: StageMove[] };
+  moves: { primary: StageMove | null; reject: StageMove | null; others: StageMove[] };
   onMove: (move: StageMove) => void;
   onReject: (move: StageMove) => void;
   busy: boolean;
@@ -120,6 +121,31 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
           <div className="min-w-0">
             <h3 className="truncate font-semibold text-ink-1">{name}</h3>
             <p className="truncate text-sm text-ink-2">{application.vacancy.title}</p>
+            {/* La fila enseñaba nombre, puesto, sucursal y espera. Correo,
+                teléfono, ciudad y si hay currículum ya venían en la misma
+                respuesta y no se dibujaban: para saber si alguien había dejado
+                teléfono había que entrar a su ficha, una por una. */}
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-3">
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Mail className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{application.candidate.email}</span>
+              </span>
+              {application.candidate.phone ? (
+                <span className="inline-flex items-center gap-1">
+                  <Phone className="size-3.5 shrink-0" aria-hidden="true" />{application.candidate.phone}
+                </span>
+              ) : null}
+              {application.candidate.city ? (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="size-3.5 shrink-0" aria-hidden="true" />{application.candidate.city}
+                </span>
+              ) : null}
+              {application.candidate.resumeAvailable ? (
+                <span className="inline-flex items-center gap-1">
+                  <FileText className="size-3.5 shrink-0" aria-hidden="true" />{t("people.hasResume")}
+                </span>
+              ) : null}
+            </p>
             <p className="truncate text-xs text-ink-3 md:hidden">
               {application.vacancy.branch?.name ?? t("people.noBranch")} · {waitingLabel(application.appliedAt)}
             </p>
@@ -130,7 +156,10 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
             mostró bajo el nombre, así que aquí se oculta. */}
         <div className="hidden w-40 shrink-0 md:block">
           <p className="truncate text-sm text-ink-2">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
-          <p className="truncate font-mono text-xs text-ink-3 tabular-figures">{waitingLabel(application.appliedAt)}</p>
+          <p className={cn("truncate font-mono text-xs tabular-figures", application.isStageOverdue ? "font-semibold text-status-warning" : "text-ink-3")}>
+            {waitingLabel(application.appliedAt)}
+          </p>
+          {application.isStageOverdue ? <p className="truncate text-xs text-status-warning">{t("people.overdue")}</p> : null}
         </div>
 
         <div className="shrink-0 md:w-36">
@@ -145,6 +174,12 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
           {moves.primary ? (
             <Button type="button" disabled={busy} onClick={() => onMove(moves.primary!)}>
               {moves.primary.label}
+            </Button>
+          ) : null}
+          {moves.reject ? (
+            <Button type="button" variant="destructive" disabled={busy} onClick={() => onReject(moves.reject!)}>
+              <UserX className="size-4" aria-hidden="true" />
+              {t("people.discard")}
             </Button>
           ) : null}
           <Button asChild variant="secondary">
@@ -253,7 +288,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
     <PersonRow
       key={application.id}
       application={application}
-      moves={stageMovesFor(application, stages)}
+      moves={splitRejection(stageMovesFor(application, stages))}
       busy={move.isPending}
       onMove={(selected) => move.mutate({ application, stage: selected.stage })}
       onReject={(selected) => setRejecting({ application, move: selected })}

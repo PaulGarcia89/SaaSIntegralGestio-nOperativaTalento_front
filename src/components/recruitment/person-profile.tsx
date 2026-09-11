@@ -5,11 +5,12 @@ import { useUiText } from "@/components/ui-copy";
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight, FileText, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, ChevronRight, ExternalLink, FileText, Globe, Mail, MapPin, Phone, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/simple/reason-dialog";
 import { SimpleSection } from "@/components/simple/simple-ui";
 import { RecruitmentPhaseRail } from "@/components/recruitment/phase-rail";
+import { ScheduleInterviewPanel } from "@/components/recruitment/schedule-interview";
 import { ErrorState, SkeletonRows, StatusBadge, Timeline, type TimelineEntry } from "@/components/system";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,7 @@ import {
   firstNameOf,
   recruitmentPhase,
   recruitmentPhaseOf,
+  splitRejection,
   stageMovesFor,
   waitingLabel,
   type StageMove,
@@ -84,11 +86,12 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
   const client = useQueryClient();
   const { can } = useAppStore();
   const canUpdate = can("applications.update");
+  const canSchedule = can("interviews.schedule");
   const [notes, setNotes] = useState(application.notes ?? "");
   const [rejecting, setRejecting] = useState<StageMove | null>(null);
 
   const stages: VacancyStageDto[] = application.vacancy.stages ?? [];
-  const moves = stageMovesFor(application, stages);
+  const moves = splitRejection(stageMovesFor(application, stages));
   const phase = recruitmentPhase(recruitmentPhaseOf(application.status));
   const name = application.candidate.fullName;
   const firstName = firstNameOf(name);
@@ -241,6 +244,45 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
           </div>
         </dl>
 
+        {/* LinkedIn, portafolio y las fechas del expediente ya venían en la
+            respuesta y no se dibujaban en ninguna parte: la ficha enseñaba
+            correo, teléfono y ciudad, y nada más. */}
+        {application.candidate.linkedinUrl || application.candidate.portfolioUrl ? (
+          <div className="mt-4 flex flex-wrap gap-4 border-t border-line pt-4 text-sm">
+            {application.candidate.linkedinUrl ? (
+              <a href={application.candidate.linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-ink-1 underline underline-offset-4">
+                <ExternalLink className="size-4 shrink-0 text-ink-3" aria-hidden="true" />LinkedIn
+              </a>
+            ) : null}
+            {application.candidate.portfolioUrl ? (
+              <a href={application.candidate.portfolioUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 text-ink-1 underline underline-offset-4">
+                <Globe className="size-4 shrink-0 text-ink-3" aria-hidden="true" />{uiText("Portafolio")}
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+
+        <dl className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-3">
+          <DataRow label={uiText("Se postuló el")} value={formatApplicationDate(application.appliedAt)} />
+          <DataRow
+            label={uiText("En esta fase desde")}
+            value={application.stageEnteredAt ? formatApplicationDate(application.stageEnteredAt) : uiText("Sin registro")}
+          />
+          <DataRow
+            label={uiText("Responsable")}
+            value={application.assignedRecruiter ? `${application.assignedRecruiter.firstName} ${application.assignedRecruiter.lastName}` : t("profile.unassigned")}
+          />
+        </dl>
+
+        {/* El retraso lo calcula el servidor (`isStageOverdue`) y no se
+            mostraba: la ficha no distinguía a quien lleva dos días de quien
+            lleva doce fuera de plazo. */}
+        {application.isStageOverdue ? (
+          <p className="mt-3 rounded-lg border border-status-warning/40 bg-status-warning/10 px-3 py-2 text-sm text-ink-1">
+            {uiText("Esta fase lleva más tiempo del previsto.")}
+          </p>
+        ) : null}
+
         {application.candidate.resumeAvailable ? (
           <Button
             type="button"
@@ -300,6 +342,33 @@ function PersonProfile({ application }: { application: VacancyApplicationDto }) 
           ) : (
             <p className="mt-2 text-sm text-ink-2">{t("profile.nothingPending", { name: firstName })}</p>
           )}
+
+          {/* Descartar deja de vivir dentro de «Otras opciones», que iba
+              plegado y no lo nombraba. La plantilla por defecto permite el
+              descarte desde TODAS las etapas no terminales, así que la acción
+              estaba disponible siempre y no se veía nunca. Va al lado de la
+              principal, en rojo y con su verbo. */}
+          {canUpdate && moves.reject ? (
+            <Button
+              type="button"
+              variant="destructive"
+              className="mt-3 w-full sm:ml-3 sm:mt-4 sm:w-auto"
+              disabled={move.isPending}
+              onClick={() => setRejecting(moves.reject!)}
+            >
+              <UserX className="size-4" aria-hidden="true" />
+              {uiText("Descartar a {{nombre}}", { nombre: firstName })}
+            </Button>
+          ) : null}
+
+          {/* En la fase de entrevista, el paso siguiente NO es mover de etapa:
+              es acordar día y hora. Esa herramienta existía solo en la ficha
+              avanzada, así que desde aquí había que salir de la pantalla para
+              dar el paso que esta misma pantalla acaba de pedir. Ahora se
+              agenda aquí, contra el mismo endpoint. */}
+          {phase.id === "CONOCIENDO" ? (
+            <ScheduleInterviewPanel application={application} canSchedule={canSchedule} />
+          ) : null}
 
           {canUpdate && moves.others.length ? (
             <div className="mt-4">

@@ -23,7 +23,6 @@ import {
   Plus,
   Send,
   Trash2,
-  Users,
   Video,
   Award,
   ClipboardCheck,
@@ -58,7 +57,6 @@ import {
 import { FormErrorSummary } from "@/components/form-error-summary";
 import { TrainingCourseFoundation } from "@/components/training-course-foundation";
 import { contenidoEsEditable, salidaDelBloqueo } from "@/lib/training-course-status";
-import { AssignCourseDialog } from "@/components/training-assign-course-dialog";
 import { LIMITE_VIDEO_BYTES, megabytes, revisarVideo } from "@/lib/training-video-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -196,7 +194,6 @@ export function TrainingCourseManager() {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TrainingCourseDto | null>(null);
-  const [assignTarget, setAssignTarget] = useState<TrainingCourseDto | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => setPreviewId(null));
@@ -250,15 +247,25 @@ export function TrainingCourseManager() {
     <div className="space-y-6">
       <PageHeader
         eyebrow={uiText("Aprendizaje")}
-        title={uiText("Gestión de cursos")}
-        description={uiText("Diseña, revisa y publica experiencias formativas con trazabilidad editorial.")}
+        title={uiText("Crear y editar cursos")}
+        description={uiText("Aquí se arman los cursos que después hacen las personas: contenido, evaluación y publicación.")}
         actions={
           canCreate ? (
-            <Button asChild type="button">
-              <Link href="/training/content/new">
-                <Plus className="size-4" aria-hidden="true" />
-                {uiText("Nuevo curso")}</Link>
-            </Button>
+            <>
+              {/* El caso frecuente —«tengo un video y quiero que lo vean»— tenía
+                  un solo camino: el asistente de siete pasos. Ahora se ofrece
+                  antes de entrar, no escondido dentro del asistente. */}
+              <Button asChild type="button" variant="secondary">
+                <Link href="/training/content/new/rapido">
+                  <Video className="size-4" aria-hidden="true" />
+                  {uiText("Subir un video como curso")}</Link>
+              </Button>
+              <Button asChild type="button">
+                <Link href="/training/content/new">
+                  <Plus className="size-4" aria-hidden="true" />
+                  {uiText("Nuevo curso")}</Link>
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -372,7 +379,6 @@ export function TrainingCourseManager() {
                   if (coursesQuery.data?.items.some((item) => item.id === courseId)) setPreviewId(courseId);
                 }}
                 onDelete={setDeleteTarget}
-                onAssign={setAssignTarget}
               />
             )}
           />
@@ -399,12 +405,6 @@ export function TrainingCourseManager() {
         courseId={previewId}
         open={Boolean(previewId)}
         onOpenChange={(open) => !open && setPreviewId(null)}
-      />
-      <AssignCourseDialog
-        open={Boolean(assignTarget)}
-        onOpenChange={(open) => !open && setAssignTarget(null)}
-        courseId={assignTarget?.id}
-        courseTitle={assignTarget?.title}
       />
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
@@ -561,7 +561,6 @@ type CourseActionsProps = {
   onEdit: (id: string) => void;
   onPreview: (id: string) => void;
   onDelete: (course: TrainingCourseDto) => void;
-  onAssign: (course: TrainingCourseDto) => void;
 };
 
 function CourseActions(props: CourseActionsProps) {
@@ -577,16 +576,6 @@ function CourseActions(props: CourseActionsProps) {
   });
   return (
     <div className="flex flex-wrap gap-2">
-      {/* Publicar un curso no lo pone en manos de nadie: hay que asignarlo, y
-          la asignación vivía en OTRA entrada del menú («Cursos»), dentro de la
-          tercera pestaña, donde había que volver a elegir en un desplegable el
-          curso recién publicado. Nada lo decía. Aquí el botón está donde está
-          el curso, es la acción principal de la fila y abre el diálogo con el
-          curso ya elegido. */}
-      {props.course.status === "PUBLISHED" ? (
-        <Button type="button" size="sm" onClick={() => props.onAssign(props.course)}>
-          <Users className="size-4" />{uiText("Asignar")}</Button>
-      ) : null}
       <Button type="button" size="sm" variant="secondary" onClick={() => props.onPreview(props.course.id)}>
         <Eye className="size-4" />{uiText("Vista previa")}</Button>
       {props.canEdit ? (
@@ -666,6 +655,12 @@ export function TrainingCourseCreatePage() {
       description={uiText("Empieza con lo esencial. Podrás añadir contenido, evaluaciones, certificación y configuración avanzada en el editor.")}
       actions={<Button asChild variant="secondary"><Link href="/training/content"><ArrowLeft className="size-4" />{uiText("Volver a cursos")}</Link></Button>}
     />
+    <InlineFeedback
+      tone="info"
+      title={uiText("¿Solo quieres subir un video?")}
+      action={<Button asChild variant="secondary" size="sm"><Link href="/training/content/new/rapido"><Video className="size-4" aria-hidden="true" />{uiText("Ir al camino rápido")}</Link></Button>}
+    >
+      {uiText("Hay un camino corto: ocho preguntas y el archivo, y el curso queda listo para enviar a revisión sin recorrer el asistente.")}</InlineFeedback>
     <Card level={2}>
       <CardHeader><CardTitle>{uiText("Información inicial")}</CardTitle></CardHeader>
       <CardContent>
@@ -882,15 +877,9 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
       toast.success(`Curso: ${statusLabels[course.status]}`);
       await refresh();
       setScheduleOpen(false);
-      // Publicar no pone el curso en manos de nadie: hasta que se asigna, no
-      // aparece en «Mis cursos» de ninguna persona. El asistente terminaba sin
-      // decirlo y sin llevar a ninguna parte, así que el paso siguiente se
-      // ofrece aquí mismo, con el curso ya elegido.
-      if (course.status === "PUBLISHED") setAsignarTrasPublicar(true);
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar el estado.")),
   });
-  const [asignarTrasPublicar, setAsignarTrasPublicar] = useState(false);
   const contenidoEditable = Boolean(query.data) && can("courses.update") && contenidoEsEditable(query.data!.status);
   const wizard = query.data ? getTrainingCourseWizardState(query.data, design.data, previewed) : null;
   const currentIndex = TRAINING_COURSE_WIZARD_STEPS.findIndex((item) => item.id === step);
@@ -912,12 +901,6 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
         Ahora: el estado del curso, el paso a paso gráfico compartido con el
         resto del producto y, si falta algo para publicar, una sola frase.
       */}
-      <AssignCourseDialog
-        open={asignarTrasPublicar}
-        onOpenChange={setAsignarTrasPublicar}
-        courseId={query.data?.id}
-        courseTitle={query.data?.title}
-      />
       <section className="overflow-hidden rounded-lg border border-line bg-surface-1 shadow-e1">
         <header className="space-y-4 border-b border-line p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1066,8 +1049,19 @@ function AssessmentWizardStep({ course, onContinue }: { course: TrainingCourseDt
           <InlineFeedback tone="info" title={uiText("Evaluación recomendada")}>
             {uiText("El curso todavía no tiene una evaluación. Puedes continuar, pero una evaluación permitirá comprobar los objetivos en la fase de medición.")}</InlineFeedback>
         )}
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button asChild variant="secondary"><Link href={`/training/evaluations?courseId=${encodeURIComponent(course.id)}`}>{uiText("Gestionar evaluaciones")}</Link></Button>
+        {/* El botón lleva a otra pantalla, así que dice a qué se va y qué se
+            va a encontrar. Antes decía «Gestionar evaluaciones» y aterrizaba
+            en la lista de TODAS las de la empresa, con un diálogo abriéndose
+            solo encima. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <p className="mr-auto text-sm text-ink-2">
+            {uiText("Una evaluación pertenece a un solo curso; se crea desde aquí y vuelves a este paso.")}
+          </p>
+          <Button asChild variant="secondary">
+            <Link href={`/training/evaluations?courseId=${encodeURIComponent(course.id)}`}>
+              {course.quizzes?.length ? uiText("Ver y editar la evaluación") : uiText("Crear la evaluación")}
+            </Link>
+          </Button>
           <Button type="button" onClick={onContinue}>{uiText("Continuar")}</Button>
         </div>
       </CardContent>

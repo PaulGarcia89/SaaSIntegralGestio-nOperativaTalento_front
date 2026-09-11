@@ -3,7 +3,7 @@
 import { useUiText } from "@/components/ui-copy";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Award, CheckCircle2, ClipboardCheck, Library, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Award, CheckCircle2, ClipboardCheck, Library, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -84,7 +84,25 @@ function AssessmentBuilder() {
   const uiText = useUiText();
   const queryClient = useQueryClient();
   const courseId = useSearchParams().get("courseId") ?? undefined;
-  const [createOpen, setCreateOpen] = useState(Boolean(courseId));
+  /*
+   * Llegar aquí desde el asistente de un curso dejaba a la persona perdida:
+   *
+   * 1. `courseId` solo servía para ABRIR SOLO el diálogo de nueva evaluación.
+   *    La lista de debajo seguía siendo la de TODAS las evaluaciones de la
+   *    empresa, así que al cerrar el diálogo no había forma de saber cuál de
+   *    las cinco pertenecía al curso del que se venía.
+   * 2. No había vuelta al curso. Ni botón, ni miga de pan: la miga lleva a
+   *    «Cursos», que es otra pantalla.
+   *
+   * Ahora, cuando se llega con un curso, la pantalla se centra en ese curso:
+   * lista filtrada, título que lo nombra y botón para volver. El diálogo ya no
+   * se abre solo —un modal que aparece sin que lo pidas es justo lo que hace
+   * sentir que la pantalla te lleva a ti y no al revés—, pero la acción
+   * principal queda a la vista y, si el curso no tiene ninguna, el estado
+   * vacío la ofrece.
+   */
+  const [verTodas, setVerTodas] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [questionQuiz, setQuestionQuiz] = useState<TrainingQuizDto | null>(null);
   const [configureQuiz, setConfigureQuiz] = useState<TrainingQuizDto | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string; attempts: number } | null>(null);
@@ -118,22 +136,54 @@ function AssessmentBuilder() {
     reorder.mutate({ quizId: quiz.id, entityIds: next.map((question) => question.id) });
   };
 
+  const todas = query.data?.items ?? [];
+  const delCurso = courseId ? todas.filter((quiz) => quiz.courseId === courseId) : todas;
+  const enfocado = Boolean(courseId) && !verTodas;
+  const visibles = enfocado ? delCurso : todas;
+  const nombreCurso = delCurso[0]?.course?.title;
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow={uiText("Aprendizaje")}
-        title={uiText("Evaluaciones")}
-        description={uiText("Diseña instrumentos de evaluación, configura intentos y controla el criterio de aprobación.")}
-        actions={<Button onClick={() => setCreateOpen(true)}><Plus />{uiText("Nueva evaluación")}</Button>}
+        title={enfocado && nombreCurso ? uiText("Evaluaciones de «{{curso}}»", { curso: nombreCurso }) : uiText("Evaluaciones")}
+        description={
+          enfocado
+            ? uiText("Una evaluación pertenece a un solo curso. Aquí están las de este.")
+            : uiText("Diseña instrumentos de evaluación, configura intentos y controla el criterio de aprobación.")
+        }
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {/* La vuelta al curso. Sin esto, quien llegaba desde el asistente
+                se quedaba aquí: la miga de pan lleva a «Cursos», que es otra
+                pantalla, y el asistente se perdía. */}
+            {courseId ? (
+              <Button asChild variant="secondary">
+                <Link href={`/training/content/${encodeURIComponent(courseId)}`}>
+                  <ArrowLeft className="size-4" aria-hidden="true" />{uiText("Volver al curso")}
+                </Link>
+              </Button>
+            ) : null}
+            <Button onClick={() => setCreateOpen(true)}><Plus />{uiText("Nueva evaluación")}</Button>
+          </div>
+        }
       />
+      {courseId ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-ink-2">
+          <span>{enfocado ? uiText("Viendo solo las de este curso.") : uiText("Viendo todas las evaluaciones de la empresa.")}</span>
+          <button type="button" className="min-h-11 underline hover:text-ink-1" onClick={() => setVerTodas(!verTodas)}>
+            {enfocado ? uiText("Ver todas") : uiText("Ver solo las de este curso")}
+          </button>
+        </div>
+      ) : null}
       {query.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando las evaluaciones")} /> : null}
       {query.isError ? (
         <ErrorState title={uiText("No fue posible cargar las evaluaciones")} detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))} onRetry={() => void query.refetch()} />
       ) : null}
-      {query.data ? <AssessmentBuilderSummary assessments={query.data.items} /> : null}
-      {query.data?.items.length ? (
+      {query.data ? <AssessmentBuilderSummary assessments={visibles} /> : null}
+      {visibles.length ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          {query.data.items.map((quiz) => (
+          {visibles.map((quiz) => (
             <Card key={quiz.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
@@ -173,7 +223,14 @@ function AssessmentBuilder() {
             </Card>
           ))}
         </div>
-      ) : query.isSuccess ? <EmptyState reason="no-records" title={uiText("Aún no hay evaluaciones")} description={uiText("Una evaluación mide lo aprendido y decide si alguien aprueba el curso.")} action={<Button onClick={() => setCreateOpen(true)}>{uiText("Crear la primera evaluación")}</Button>} /> : null}
+      ) : query.isSuccess ? (
+        <EmptyState
+          reason="no-records"
+          title={enfocado ? uiText("Este curso todavía no tiene evaluación") : uiText("Aún no hay evaluaciones")}
+          description={uiText("Una evaluación mide lo aprendido y decide si alguien aprueba el curso.")}
+          action={<Button onClick={() => setCreateOpen(true)}>{enfocado ? uiText("Crear la evaluación del curso") : uiText("Crear la primera evaluación")}</Button>}
+        />
+      ) : null}
       <CreateAssessmentDialog open={createOpen} onOpenChange={setCreateOpen} initialCourseId={courseId} />
       <ConfigureAssessmentDialog quiz={configureQuiz} onClose={() => setConfigureQuiz(null)} />
       <CreateQuestionDialog quiz={questionQuiz} onClose={() => setQuestionQuiz(null)} />

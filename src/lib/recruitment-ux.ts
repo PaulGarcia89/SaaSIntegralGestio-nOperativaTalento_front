@@ -325,6 +325,32 @@ export function stageMovesFor(
   return { primary, others: moves.filter((move) => move !== primary) };
 }
 
+/**
+ * Separa el descarte del resto de movimientos.
+ *
+ * Descartar estaba disponible desde TODAS las etapas —la plantilla por defecto
+ * incluye `REJECTED` en `allowedNextStageCodes` de cada etapa no terminal—,
+ * pero se dibujaba dentro de «Otras opciones», una sección PLEGADA. La acción
+ * existía, era legal en cualquier punto del proceso y estaba a un clic de
+ * distancia detrás de un rótulo que no la nombraba. Quien la buscaba concluía,
+ * razonablemente, que no estaba.
+ *
+ * Separarla aquí permite que las dos pantallas la saquen a la vista sin
+ * duplicar el criterio de cuál de los movimientos es el descarte.
+ */
+export function splitRejection(moves: { primary: StageMove | null; others: StageMove[] }): {
+  primary: StageMove | null;
+  reject: StageMove | null;
+  others: StageMove[];
+} {
+  const reject = moves.others.find((move) => move.needsReason) ?? (moves.primary?.needsReason ? moves.primary : null);
+  return {
+    primary: moves.primary && moves.primary !== reject ? moves.primary : null,
+    reject: reject ?? null,
+    others: moves.others.filter((move) => move !== reject),
+  };
+}
+
 /** Agrupa personas por la fase visible, conservando el orden de llegada. */
 export function groupByPhase(applications: VacancyApplicationDto[]): Record<RecruitmentPhaseId, VacancyApplicationDto[]> {
   const groups = { POSTULARON: [], CONOCIENDO: [], DECIDIDO: [], TRABAJANDO: [], DESCARTADOS: [] } as Record<RecruitmentPhaseId, VacancyApplicationDto[]>;

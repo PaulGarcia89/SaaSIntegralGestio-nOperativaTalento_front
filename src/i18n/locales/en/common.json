@@ -1324,12 +1324,10 @@
   "nav.Entrevistas": "Interviews",
   "nav.Analítica ATS": "Recruiting analytics",
   "nav.Evaluaciones de entrevista": "Interview scorecards",
-  "nav.Cursos": "Courses",
   "nav.Evaluaciones": "Assessments",
   "nav.Resultados": "Results",
   "nav.Inteligencia": "Insights",
   "nav.Certificados": "Certificates",
-  "nav.Gestionar cursos": "Manage courses",
   "nav.Rutas y cumplimiento": "Paths and compliance",
   "nav.Integraciones formativas": "Training integrations",
   "nav.Productividad": "Productivity",
@@ -3421,5 +3419,10 @@
   "moduleReports.zones": "Active zones",
   "moduleReports.alerts": "Open alerts",
   "workspace.collapseNav": "Collapse the side menu",
-  "workspace.expandNav": "Expand the side menu"
+  "workspace.expandNav": "Expand the side menu",
+  "people.hasResume": "Has CV",
+  "people.overdue": "Overdue",
+  "people.discard": "Discard",
+  "nav.Mis cursos": "My courses",
+  "nav.Crear y editar cursos": "Create and edit courses"
 }

@@ -1144,68 +1144,274 @@ courses/:courseId/duplicate`), que devuelve una copia en borrador.
 16 pruebas en la suite del servicio, 695 en el frontend, `nest build` y
 `next build` EXIT 0.
 
-## 2.sexvicies Asignar un curso a personas (2026-09-11)
+## 2.septvicies El paso de evaluación dejaba a la persona tirada (2026-09-11)
 
-### El agujero del flujo
+Desde el asistente del curso, «Gestionar evaluaciones» llevaba a
+`/training/evaluations?courseId=…`. A partir de ahí el flujo se rompía por tres
+sitios a la vez:
 
-Publicar un curso **no lo pone en manos de nadie**. Hasta que se asigna, no
-aparece en «Mis cursos» de ninguna persona. Y la asignación vivía aquí:
-
-> Menú → **Cursos** → pestaña **Asignaciones** (la tercera de cinco) → botón
-> «Asignar curso» → desplegable donde hay que **volver a elegir** el curso
-> recién publicado.
-
-Es decir, en una entrada del menú DISTINTA de «Gestionar cursos», que es donde
-se crea y se publica. Nada en el asistente de publicación lo decía: terminaba
-con un «Curso: Publicado» y ahí acababa. Quien no supiera de antemano que
-«Cursos» y «Gestionar cursos» son cosas distintas —y la diferencia no está
-escrita en ninguna parte— no tenía forma de encontrarlo.
-
-### El arreglo: el botón donde está el curso
-
-`AssignCourseDialog` sale de `training-learning-hub.tsx` a su propio archivo y
-acepta un curso preseleccionado. Con eso:
-
-- **En la lista de cursos**, cada curso publicado tiene **«Asignar»** como
-  acción principal de su fila.
-- **Al publicar**, el diálogo se abre solo, con el curso ya elegido. El paso
-  siguiente deja de ser algo que haya que adivinar.
-- En «Cursos → Asignaciones» sigue estando, ahora sin curso preseleccionado.
-
-### El diálogo, reescrito para quien no es técnico
-
-| Antes | Ahora |
+| Fallo | Consecuencia |
 |---|---|
-| «Audiencia» en un desplegable: USERS · ROLES · BRANCHES · TENANT | **«¿Quién debe hacerlo?»** con las cuatro opciones a la vista y explicadas: «Personas concretas · Las eliges una a una» |
-| Cajón de casillas de 224px **sin buscador** | Buscador por nombre o correo, lista de 12px por fila con el correo debajo, contador «N seleccionadas» y «Quitar todas» |
-| Botón «Crear asignaciones» | **«Asignar a 3»** — dice lo que va a pasar antes de pulsar |
-| Fechas con hora (`datetime-local`) | Fecha sola, con la regla escrita: «Si lo dejas vacío, desde hoy» / «sin vencimiento» |
-| «3 asignaciones creadas» | «Asignado a 3 personas. 2 ya lo tenían.» — `skipped` venía en la respuesta y se descartaba, así que asignar dos veces parecía no hacer nada |
-| Si no hay cursos publicados, desplegable vacío sin explicación | Aviso que dice por qué y dónde publicarlo |
+| `courseId` **solo servía para abrir solo el diálogo** de nueva evaluación | Un modal aparecía sin que nadie lo pidiera |
+| La lista de debajo era la de **TODAS** las evaluaciones de la empresa, sin filtrar | Al cerrar el diálogo, cinco evaluaciones de cinco cursos distintos y ninguna pista de cuál era la del curso del que se venía |
+| **No había vuelta al curso** | Ni botón ni miga: la miga lleva a «Cursos», que es otra pantalla. El asistente de siete pasos se perdía |
 
-Las fechas se envían a mediodía (`T12:00:00`) para que el huso horario no mueva
-un vencimiento al día anterior.
+### Ahora
 
-De paso se retira `CoursePlayer` de `training-learning-hub.tsx`: 47 líneas de
-código muerto desde que el reproductor se movió a `/training/learn/[courseId]`.
+Al llegar con un curso, la pantalla se centra en ese curso: el título dice
+**«Evaluaciones de «X»»**, la lista trae solo las suyas, hay un conmutador
+explícito «Ver todas / Ver solo las de este curso», y un botón **«Volver al
+curso»** que devuelve al asistente.
 
-30 cadenas nuevas en el diccionario inglés. 695 pruebas, `next build` EXIT 0.
+El diálogo **ya no se abre solo**. Un modal que aparece sin que lo pidas es
+justo lo que hace sentir que la pantalla te lleva a ti y no al revés; la acción
+principal queda a la vista y, si el curso no tiene ninguna evaluación, el estado
+vacío la ofrece con su propio texto: «Este curso todavía no tiene evaluación →
+Crear la evaluación del curso».
 
-### Lo que queda propuesto y no ejecutado
+En el paso del asistente, el botón dice a qué se va —«Crear la evaluación» o
+«Ver y editar la evaluación», según haya o no— y una línea aclara el modelo:
+**una evaluación pertenece a un solo curso**.
 
-**Los nombres del menú.** «Cursos» y «Gestionar cursos» no se distinguen por su
-nombre, y son dos mundos: el primero es dónde se asigna y se cursa, el segundo
-dónde se crea. Algo como «Mi aprendizaje» y «Catálogo de cursos» —o unificar
-ambas— resolvería la confusión de raíz, pero toca navegación, permisos y rutas
-de toda la sección.
+### Sobre «asignar una evaluación ya creada»
 
-**El asistente de siete pasos.** Para publicar un curso hay que recorrer
-Información, Fundamento, Estructura, Evaluación, Certificación, Vista previa y
-Revisión, y además aprobar cuatro gates de calidad. Es un proceso editorial
-serio y está bien que exista para una empresa que lo necesite, pero para quien
-solo quiere subir un video y asignarlo es desproporcionado. Un «modo simple»
-—título, contenido, publicar— que deje el circuito completo como opción
-avanzada es un cambio de producto, no de pantalla, y merece decidirse aparte.
+No se puede, y no es un fallo: en el modelo una evaluación **nace unida a un
+curso** (`POST assessments/:courseId`) y su DTO de actualización no admite
+`courseId`, así que no hay forma de moverla a otro. Lo que fallaba no era la
+falta de esa función, sino que la pantalla no dejaba ver cuáles eran las del
+curso ni permitía volver. Si en algún momento se quisiera reutilizar una
+evaluación entre cursos, habría que decidirlo en el backend —sería un cambio de
+modelo, no de pantalla.
+
+El filtro es del lado del cliente: `GET /training/admin/assessments` devuelve
+todas y no admite parámetro de curso. Con volúmenes de decenas es correcto; si
+un inquilino llega a centenares, convendría filtrar en el servidor.
+
+11 cadenas nuevas en el diccionario inglés. 695 pruebas, `next build` EXIT 0.
+
+## 2.octovicies El selector de modalidad no mostraba lo elegido (2026-09-11)
+
+Síntoma: en el editor de vacantes, «Modalidad de trabajo» se elegía y el campo
+quedaba en blanco. El selector de al lado, «Tipo de contrato», funcionaba.
+
+### La causa: se ataba a la ETIQUETA, no al valor
+
+```tsx
+<Select value={technicalLabel(form.workMode)} …>
+  <SelectItem value="REMOTE">…
+```
+
+`technicalLabel("HYBRID")` devuelve «Híbrido», que no es el `value` de ninguna
+opción. Radix no encuentra coincidencia y **no pinta nada**. Es decir: la
+elección SÍ se guardaba —`update("workMode", …)` recibía el valor correcto— y lo
+único roto era lo que se veía. Por eso el campo de al lado funcionaba: se ata a
+`form.employmentType` a secas.
+
+El arreglo es una palabra: `value={form.workMode}`. Se añade además un
+`placeholder` en `SelectValue`, que antes no había: si algún día vuelve a haber
+un desajuste, el control lo enseñará en vez de quedarse mudo.
+
+### Lo que NO estaba roto
+
+El `SelectItem` usa `ONSITE` mientras el enum del backend es `ON_SITE`, lo que
+parece un segundo fallo pero no lo es: `lib/backend.ts` traduce en los dos
+sentidos al crear y al actualizar, y la carga de una vacante existente hace la
+conversión inversa. Comprobado antes de tocarlo.
+
+### Prueba de regresión
+
+El fallo es invisible para TypeScript —etiqueta y valor son ambos `string`— y
+para una prueba de render, porque el estado sí cambia. Así que se vigila en el
+código, como ya se hace con las capas de CSS y con las traducciones:
+`select-value-binding.test.ts` recorre `src/app` y `src/components` y falla ante
+cualquier `<Select value={algoLabel(...)}>`. Verificado que la expresión detecta
+el código anterior y no molesta al nuevo.
+
+697 pruebas, `next build` EXIT 0.
+
+## 2.novemvicies Flujo de contratación: lo que había y no se veía (2026-09-11)
+
+Tres de los cuatro problemas señalados no eran funciones que faltaran, sino
+funciones existentes que la pantalla no dejaba encontrar. El cuarto sí era un
+hueco real.
+
+### 1. Descartar SÍ estaba disponible, y en todas las etapas
+
+La plantilla por defecto (`initialStages`) incluye `REJECTED` en
+`allowedNextStageCodes` de las cuatro etapas no terminales, y el backend acepta
+esa transición desde cualquiera de ellas. Pero `stageMovesFor` lo devolvía
+dentro de `others`, y `others` se dibujaba en una sección **plegada** titulada
+«Otras opciones · 1 disponible». La acción estaba disponible siempre, a un clic
+de distancia, detrás de un rótulo que no la nombraba.
+
+`splitRejection` separa ese movimiento del resto para que las dos pantallas lo
+saquen a la vista sin duplicar el criterio. En la ficha va en rojo junto a la
+acción principal —«Descartar a Paul»—; en la lista, como botón propio de cada
+fila. 4 pruebas nuevas cubren el reparto, incluido el caso en que el descarte es
+el ÚNICO movimiento posible: ahí no debe convertirse en la acción principal.
+
+### 2. La ficha enseñaba tres datos de los que tenía
+
+`ApplicationCandidateDto` trae `linkedinUrl`, `portfolioUrl`, `resumeAvailable`,
+y la postulación trae `stageEnteredAt`, `isStageOverdue` y `assignedRecruiter`.
+Se dibujaban correo, teléfono y ciudad; lo demás viajaba en cada respuesta y no
+aparecía en ninguna parte. Ahora se muestran los enlaces cuando existen, las
+fechas de postulación y de entrada a la fase, el responsable, y un aviso cuando
+el servidor marca la fase como fuera de plazo —un dato que ya calculaba y que la
+ficha ignoraba, de modo que no distinguía a quien lleva dos días de quien lleva
+doce.
+
+### 3. La lista, igual
+
+Cada fila mostraba nombre, puesto, sucursal y espera. Ahora también correo,
+teléfono, ciudad y si hay currículum —todo de la misma respuesta—, y marca en
+ámbar las que están fuera de plazo. Saber quién dejó teléfono ya no obliga a
+entrar ficha por ficha.
+
+### 4. Agendar entrevista: este sí era un hueco
+
+En la fase de entrevista, el paso siguiente no es mover de etapa: es acordar día
+y hora. La herramienta existe —la ficha avanzada tiene su tarjeta de entrevistas
+con el diálogo de agendado— pero desde la ficha simple no se llegaba a ella. Se
+añade el acceso directo, anclado a esa tarjeta, con una línea que explica qué
+hacer al volver.
+
+**Queda pendiente de decidir:** llevar el agendado completo —fecha, hora,
+entrevistadores, sala, tipo— a la ficha simple, en vez de enviar a la avanzada.
+Es lo correcto a medio plazo, pero es mover un formulario grande con sus
+dependencias (agenda, conflictos, participantes), no un enlace.
+
+Todo lo anterior es **solo frontend**: ni un contrato, ni un permiso, ni una
+transición nueva. 701 pruebas, `next build` EXIT 0.
+
+## 2.vicies-semel Agendado en la ficha simple y vídeo por flujo (2026-09-11)
+
+Cierra las dos cosas que la sección anterior dejó propuestas y no ejecutadas.
+
+### 1. El agendado completo baja a la ficha simple
+
+Lo anterior era un enlace a `/ats/candidates/[id]/avanzado#entrevistas`: la
+pantalla que dice cuál es el paso siguiente obligaba a salir de sí misma para
+darlo, aterrizando en una página con diez bloques más.
+
+`ScheduleInterviewPanel` (`src/components/recruitment/schedule-interview.tsx`)
+trae el formulario a la ficha: nombre, día, hora, duración, modalidad, quién
+entrevista, y enlace o lugar según la modalidad. Contra el **mismo** endpoint
+que la ficha avanzada —`POST /recruitment/interviews`, vía
+`scheduleRecruitmentInterview`— con el mismo contrato: no hay un segundo camino
+con reglas propias. El panel también lista las entrevistas ya agendadas, que la
+ficha simple no mostraba en ninguna parte.
+
+Decisiones de detalle:
+
+| | |
+|---|---|
+| Permiso | `interviews.schedule` (mapeado a `applications.update`); sin él, el panel solo muestra lo ya agendado |
+| Controles | Campos nativos (`date`, `time`, `select`) con `TAP_TARGET` y texto de 16 px: se rellena con una mano en un teléfono, que es donde se agenda justo después de hablar con la persona |
+| Fecha por defecto | Mañana a las 10:00 local, no «dentro de 60 minutos» |
+| Fecha pasada | Se avisa, no se bloquea: la validación de negocio sigue siendo del backend |
+| Zona horaria | La del navegador, enviada explícita en `timezone` |
+
+### 2. El vídeo deja de leerse entero en memoria
+
+Los dos endpoints de vídeo (`GET training/admin/courses/:courseId/lessons/:lessonId/video`
+y `GET training/video/assignments/:assignmentId/lessons/:lessonId/file`) leían el
+objeto completo en un `Buffer` y devolvían un recorte con `subarray`. Un vídeo de
+500 MB reservaba 500 MB por petición, y un navegador emite varias peticiones
+`Range` por reproducción —una al abrir y otra por cada salto en la barra de
+tiempo—: bastaban dos o tres personas viendo un curso a la vez para agotar la
+memoria del proceso.
+
+`TrainingObjectStorageService` gana `statKey` (tamaño vía `HeadObjectCommand` o
+`stat`) y `streamKeyRange` (tramo vía `Range` en S3 o `createReadStream` con
+`start`/`end` en disco), ambos con `resolveKey` comprobando que la clave no se
+escapa de la raíz configurada. `enviarVideo`
+(`src/training/training-video-stream.ts`) consulta solo el tamaño y transmite el
+tramo pedido, así que la memoria usada ya no depende del tamaño del vídeo.
+
+Los contratos HTTP no cambian: mismos encabezados `Content-Type`,
+`Accept-Ranges`, `Content-Length` y `Content-Range`, mismos 200/206 y mismo 404
+cuando el archivo falta del almacén. Se corrige además un caso que antes daba un
+rango imposible: un objeto de 0 bytes calculaba `end = -1`; ahora responde 200
+sin cuerpo y no pide ningún tramo. Un fallo a mitad de transmisión, cuando los
+encabezados ya salieron, corta la conexión en vez de intentar un 500 con cuerpo
+JSON que el navegador no leería.
+
+8 pruebas nuevas en `training-video-stream.spec.ts` cubren el reparto de rangos y
+que el tramo se pide al almacén en lugar de recortarse en memoria.
+
+Frontend: 701 pruebas, `tsc` limpio, `next build` EXIT 0. Backend: 553 pruebas,
+`nest build` EXIT 0; sigue fallando `test/architecture/tenant-scope.spec.ts`
+(líneas base de `employees`/`vacancies`), fallo previo que se reproduce igual
+sin estos cambios.
+
+## 2.vicies-bis Cursos: cómo se llaman y un camino corto para crear (2026-09-11)
+
+Los dos cambios de forma que quedaron esperando aprobación.
+
+### 1. El menú decía «Cursos» en dos sitios distintos
+
+`/training` (lo que una persona tiene que estudiar) se llamaba **Cursos** y
+`/training/content` (donde se arman) **Gestionar cursos**. Dos entradas casi
+iguales, una al lado de la otra, y la que más se confundía era la primera: quien
+entraba a «Cursos» buscando crear uno no encontraba ningún botón de crear.
+
+Ahora dicen lo que son: **Mis cursos** y **Crear y editar cursos**. El
+encabezado de la segunda pantalla se alinea («Gestión de cursos» → «Crear y
+editar cursos»). Solo cambian las etiquetas y sus claves de traducción: mismas
+rutas, mismos permisos, mismos roles. `navigation-i18n.test.ts` obliga a que
+cada etiqueta tenga clave en los dos idiomas, así que el renombrado trae las
+suyas y se retiran las dos que quedaron sin uso.
+
+### 2. Camino rápido: un video, ocho preguntas, un curso
+
+**El problema medido.** Para que el servidor considere publicable un curso hacen
+falta, como mínimo: título, resumen, descripción y duración mayor que cero
+(paso GENERAL); necesidad del negocio, resultado esperado, KPI, audiencia, una
+competencia y un objetivo (FOUNDATION); y un módulo con una lección que tenga
+duración y al menos un bloque (STRUCTURE). El asistente reparte eso en siete
+pasos y varias pantallas con diálogos anidados, sin decir cuáles son
+obligatorios. Quien solo quiere subir un video los recorre todos a ciegas.
+
+**`/training/content/new/rapido`** pide esa lista en una pantalla, con ocho
+preguntas en lenguaje llano, y encadena tres llamadas que ya existían:
+
+| Paso | Llamada | Qué deja hecho |
+|---|---|---|
+| 1 | `POST /training/admin/courses` | el curso en borrador, con la duración tomada del propio archivo |
+| 2 | `POST /training/admin/courses/:id/video` | módulo, lección, bloque de video y el archivo subido |
+| 3 | `PUT /training/admin/courses/:id/design` | necesidad, resultado, KPI, audiencia, competencia y objetivo |
+
+El paso 2 hace solo el trabajo de tres porque el endpoint ya creaba el módulo,
+la lección y el bloque cuando no se le manda `lessonId`; el cliente lo enviaba
+siempre. Ahora es opcional (el editor completo sigue mandando la lección
+concreta que edita).
+
+Decisiones que importan:
+
+- **No se inventa contenido.** Cada campo del servidor sale de algo que la
+  persona escribió. Un mismo texto alimenta dos campos —lo que se aprende es a
+  la vez la descripción y el enunciado del objetivo— y eso se dice en pantalla,
+  en vez de rellenarlo por detrás con texto fabricado.
+- **La duración no se pregunta**: se lee del archivo de video.
+- **La competencia se elige o se escribe**; si se escribe, se crea en el
+  catálogo de la empresa con un código derivado del nombre. Nunca se crea sin
+  que la persona la haya escrito.
+- **Si un paso falla, los anteriores ya ocurrieron.** La pantalla dice en cuál
+  se quedó y reintenta desde ahí: repetir desde el principio crearía un curso
+  duplicado en cada intento.
+- **Ni un endpoint, permiso o estado nuevo.** El curso termina en BORRADOR,
+  igual que por el camino largo, y la publicación sigue pasando por las
+  revisiones de calidad de siempre. El asistente completo no se toca.
+
+La entrada está en los dos sitios donde se decide: un botón junto a «Nuevo
+curso» en la lista, y un aviso al principio del asistente para quien ya entró.
+
+13 pruebas nuevas en `training-simple-course.test.ts` cubren la validación
+—devuelve TODOS los huecos, no el primero—, el código de competencia y el mapeo
+al contrato de diseño. Verificado con specimen del componente real a 390 y
+1440 px: sin desbordamiento horizontal, los 13 controles por encima de 44 px,
+texto base de 17 px. 714 pruebas, `tsc` limpio, `next build` EXIT 0.
 
 ## 3. Componentes nuevos del sistema
 

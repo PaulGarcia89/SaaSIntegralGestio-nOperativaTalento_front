@@ -3879,13 +3879,21 @@ export function updateTrainingLesson(
   );
 }
 
+/*
+ * `lessonId` es opcional a propósito.
+ *
+ * El endpoint ya admite que no venga: en ese caso crea el módulo, la lección y
+ * el bloque de contenido de video por su cuenta. El camino rápido de creación
+ * lo aprovecha para no encadenar tres llamadas más desde el navegador; el
+ * editor completo sigue mandando la lección concreta que está editando.
+ */
 export function uploadTrainingVideo(
   courseId: string,
-  input: { file: File; lessonId: string; title: string; description?: string; durationSeconds: number; requiredCompletionPercentage?: number; isMandatory?: boolean },
+  input: { file: File; lessonId?: string; title: string; description?: string; durationSeconds: number; requiredCompletionPercentage?: number; isMandatory?: boolean },
 ) {
   const body = new FormData();
   body.append("file", input.file);
-  body.append("lessonId", input.lessonId);
+  if (input.lessonId) body.append("lessonId", input.lessonId);
   body.append("title", input.title);
   body.append("durationSeconds", String(input.durationSeconds));
   if (input.requiredCompletionPercentage !== undefined) body.append("requiredCompletionPercentage", String(input.requiredCompletionPercentage));

@@ -861,6 +861,7 @@
   "sys.recordAnother": "Registrar otra",
   "sys.notRecorded": "Lo que no se pudo registrar",
   "sys.actions": "Acciones",
+  "sys.view": "Ver",
   "sys.removeFilters": "Quitar filtros",
   "sys.pagination": "Paginación",
   "sys.previousPage": "Página anterior",
@@ -1594,8 +1595,8 @@
   "ats.today.allApplications": "Ver todas las postulaciones",
   "vacancies.eyebrow": "Reclutamiento / Vacantes",
   "vacancies.listDescription": "Crea borradores, revisa el contenido y publica únicamente después de validar el resumen.",
-  "vacancies.editDescription": "Actualiza contenido, condiciones, ubicaciones, pipeline y responsables.",
-  "vacancies.createDescription": "Completa la información, revisa el proceso y guarda un borrador o publica cuando esté listo.",
+  "vacancies.editDescription": "Edita los datos del puesto y sus condiciones. El proceso de selección ya está configurado.",
+  "vacancies.createDescription": "Define el puesto y sus condiciones. Nosotros preparamos las etapas de selección.",
   "vacancies.noArea": "Sin área",
   "vacancies.noWorkMode": "Sin modalidad",
   "vacancies.noLocation": "Sin ubicación",
@@ -3425,5 +3426,12 @@
   "people.discard": "Descartar",
   "nav.Mis cursos": "Mis cursos",
   "nav.Crear y editar cursos": "Crear y editar cursos",
-  "people.scheduleFirst": "Agendar entrevista"
+  "people.scheduleFirst": "Agendar entrevista",
+  "nav.Transferir productos": "Transferir productos",
+  "nav.Registrar merma": "Registrar merma",
+  "nav.Diferencias de consumo": "Diferencias de consumo",
+  "nav.Pérdidas sin explicar": "Pérdidas sin explicar",
+  "nav.Entradas y salidas": "Entradas y salidas",
+  "nav.Compras": "Compras",
+  "nav.Conteos y control": "Conteos y control"
 }

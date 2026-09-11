@@ -4,31 +4,10 @@ import { useUiText } from "@/components/ui-copy";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ClipboardList, Eye, Plus } from "lucide-react";
-import {
-  cancelRestaurantReceipt, confirmRestaurantReceipt, createRestaurantConsumption,
-  createRestaurantWaste, fetchRestaurantIngredients,
-  fetchRestaurantReceipts,
-  fetchRestaurantRecipes, previewRestaurantConsumption,
-  getApiErrorMessage,
-} from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { ModuleRouteGuard } from "@/components/module-route-guard";
 import { InlineFeedback } from "@/components/design-system";
-import {
-  ErrorState,
-  PageHeader,
-  SkeletonRows,
-} from "@/components/system";
-import { Badge } from "@/components/ui/badge";
-import { RowTable } from "@/components/row-table";
-import { confirmAction } from "@/components/confirm-action";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/system";
 import { RestaurantPhase2View } from "@/components/restaurant-inventory-phase2";
 import { RestaurantSalesImport } from "@/components/restaurant-sales-import";
 import { RestaurantReportsView } from "@/components/restaurant-reports";
@@ -37,7 +16,7 @@ import { RestaurantReceiptsScreen } from "@/components/restaurant-receipts";
 import { RestaurantOperations } from "@/components/restaurant-operations";
 import { RestaurantRecipesWorkspace } from "@/components/restaurant-recipes-workspace";
 import { RestaurantInventoryContextBar, RestaurantInventoryContextProvider, useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
-import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
+import { RestaurantActionBar } from "@/components/restaurant/restaurant-actions";
 import { RestaurantModulePanel } from "@/components/restaurant/restaurant-module-panel";
 import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
 import { RestaurantPurchasingWorkspace } from "@/components/restaurant-purchasing-workspace";
@@ -53,11 +32,10 @@ export function RestaurantInventoryShell() {
 }
 
 function RestaurantInventoryInner() {
-  const uiText = useUiText();
   const pathname = usePathname();
   const router = useRouter();
   const section = pathname.includes("/recipes") ? "recipes" : taskGroups.flatMap((task) => task.items).find((item) => item.key !== "dashboard" && pathname.endsWith(`/${item.key}`))?.key ?? "dashboard";
-  const { currentBranch, currentUser, can } = useAppStore();
+  const { currentUser, can } = useAppStore();
   const { t } = useLocale();
   const label = (value: string) => { const key = `nav.${value}`; const translated = t(key); return translated === key ? value : translated; };
   const { warehouseId, warehouseName, compactMode } = useRestaurantInventoryContext();
@@ -66,7 +44,13 @@ function RestaurantInventoryInner() {
   const task = visibleTasks.find((item) => item.key === activeTask) ?? visibleTasks[0];
   const currentItem = task?.items.find((item) => item.key === section);
   if (!currentItem) return <InlineFeedback tone="warning" title={t("restaurant.accessDenied")} />;
-  return <div className={compactMode ? "space-y-4 text-sm" : "space-y-6"} data-compact={compactMode ? "true" : "false"}>
+  /*
+   * El «modo cocina» APRETABA el texto a 14 px (`text-sm`), que es lo contrario
+   * de lo que hace falta en una cocina: se mira de lejos, de pie y a veces con
+   * guantes. Ahora reduce la separación entre bloques —gana altura útil— y
+   * agranda los objetivos táctiles, sin tocar el tamaño de la letra.
+   */
+  return <div className={compactMode ? "space-y-3" : "space-y-6"} data-compact={compactMode ? "true" : "false"}>
     {/*
       Una sola capa de navegación dentro de la página.
 
@@ -82,17 +66,19 @@ function RestaurantInventoryInner() {
 
       El filtro por permiso (`can(item.permission)`) se conserva intacto.
     */}
-    <PageHeader
-      eyebrow={label(task?.label ?? "Inventario de restaurante")}
-      title={label(currentItem?.label ?? "Inventario de restaurante")}
+    {/*
+      Un solo título por pantalla.
 
-      meta={
-        <>
-          <span>{currentBranch?.name ?? "Sin sucursal"}</span>
-          <span>{uiText("Almacén: ")}{warehouseName}</span>
-        </>
-      }
-    />
+      Aquí se pintaba un `PageHeader` con «Inventario / Existencias» y justo
+      debajo la pantalla pintaba el suyo con «Control / Existencias»: el mismo
+      título dos veces, y entre ambos la tarjeta de contexto. En 390 px eso era
+      la pantalla entera antes del primer dato. El título lo pone cada pantalla,
+      que es la única que sabe su descripción y sus acciones; las dos pantallas
+      del armazón que no traían el suyo —el panel y la portada de configuración—
+      lo llevan ahora dentro.
+    */}
+
+    <RestaurantInventoryContextBar />
 
     {task && task.items.length > 1 ? (
       <nav aria-label={label(task.label)} className="min-w-0">
@@ -114,7 +100,7 @@ function RestaurantInventoryInner() {
       </nav>
     ) : null}
 
-    <RestaurantInventoryContextBar />
+    <RestaurantActionBar />
 
     {/*
       Un panel, no tres pantallas apiladas.
@@ -162,34 +148,33 @@ function RestaurantInventoryInner() {
 }
 
 function RestaurantInventorySettings() {
+  const uiText = useUiText();
   const { t } = useLocale();
   const pages = taskGroups.find(group => group.key === "settings")!.items.filter(item => item.key !== "settings");
-  return <div className="grid gap-4 md:grid-cols-3">{pages.map(page =>
+  return <div className="space-y-5"><PageHeader
+    eyebrow={uiText("Inventario de restaurante")}
+    title={uiText("Configuración")}
+    description={uiText("Los catálogos que el resto del módulo usa: categorías, unidades y almacenes.")}
+  /><div className="grid gap-4 md:grid-cols-3">{pages.map(page =>
     <Link key={page.key} href={page.href} className="rounded-xl border border-line bg-surface-1 p-5 text-ink-1 transition hover:border-accent-line">
       <h2 className="font-semibold">{t(`nav.${page.label}`)}</h2>
       <p className="mt-2 text-sm text-ink-2">{t(`restaurant.settings.${page.key}`)}</p>
     </Link>
-  )}</div>;
+  )}</div></div>;
 }
 
-function QueryState({ loading, error, retry, children }: { loading: boolean; error: unknown; retry: () => void; children: ReactNode }) {
-  const uiText = useUiText();
-  if (loading) return <SkeletonRows rows={5} label={uiText("Cargando información")} />;
-  if (error) return <ErrorState title={uiText("No fue posible cargar la información")} detail={getApiErrorMessage(error, "No fue posible consultar el inventario de restaurante.")} onRetry={() => { void (retry)(); }} />;
-  return <>{children}</>;
-}
-
-export function ReceiptsScreen({ branchId }: { branchId?: string }) {
-  const uiText = useUiText(); const qc = useQueryClient(); const query = useQuery({ queryKey: ["restaurant-receipts", branchId], queryFn: () => fetchRestaurantReceipts({ branchId }) }); const action = useMutation({ mutationFn: ({ id, type }: { id: string; type: "confirm" | "cancel" }) => type === "confirm" ? confirmRestaurantReceipt(id) : cancelRestaurantReceipt(id, "Cancelación solicitada por el usuario"), onSuccess: () => void qc.invalidateQueries({ queryKey: ["restaurant-receipts"] }) }); return <div className="space-y-4"><PageHeader eyebrow={uiText("Abastecimiento")} title={uiText("Entradas de mercancía")} description={uiText("Confirma únicamente después de revisar el resumen. Un documento confirmado no puede editarse.")} actions={<Button><Plus className="size-4" />{uiText("Nueva entrada")}</Button>} /><QueryState loading={query.isLoading} error={query.error} retry={() => void query.refetch()}><ResponsiveTable headers={["Referencia", "Fecha", "Proveedor", "Total", "Estado", "Acciones"]}>{(query.data ?? []).map((item) => <tr key={item.id}><td>{item.reference}</td><td>{item.date}</td><td>{item.supplierName ?? "Sin proveedor"}</td><td>${item.total.toFixed(2)}</td><td><RestaurantStatusBadge status={item.status} /></td><td>{item.status === "DRAFT" ? <span className="flex flex-wrap gap-2"><Button size="sm" onClick={() => { void confirmAction({ title: "¿Confirmar la entrada?", description: "La mercancía entra al almacén y el documento deja de poder editarse.", consequence: "Las existencias suben y el costo promedio se recalcula con lo que entra.", confirmLabel: "Confirmar la entrada", irreversible: true }).then((ok) => ok && action.mutate({ id: item.id, type: "confirm" })); }}><Check className="size-4" />{uiText("Confirmar")}</Button><Button size="sm" variant="secondary" onClick={() => action.mutate({ id: item.id, type: "cancel" })}>{uiText("Cancelar")}</Button></span> : <Button size="sm" variant="ghost"><Eye className="size-4" />{uiText("Consultar")}</Button>}</td></tr>)}</ResponsiveTable></QueryState></div>; }
-
-export function RecipesScreen() {
-  const uiText = useUiText(); const query = useQuery({ queryKey: ["restaurant-recipes"], queryFn: () => fetchRestaurantRecipes() }); return <div className="space-y-4"><PageHeader eyebrow={uiText("Producción")} title={uiText("Recetas")} description={uiText("El costo total, costo por porción y margen estimado son calculados por el backend.")} actions={<Button><Plus className="size-4" />{uiText("Nueva receta")}</Button>} /><QueryState loading={query.isLoading} error={query.error} retry={() => void query.refetch()}><div className="grid gap-4 lg:grid-cols-2">{(query.data ?? []).map((recipe) => <Card key={recipe.id} level={2}><CardContent className="space-y-3 p-5"><div className="flex justify-between gap-3"><div><p className="text-sm text-text-secondary">{recipe.code}</p><h2 className="font-semibold">{recipe.name}</h2></div><Badge>{recipe.status}</Badge></div><p className="text-sm text-text-secondary">{recipe.lines.length} {uiText(" ingredientes · rendimiento ")}{recipe.yieldQuantity}</p><div className="grid grid-cols-3 gap-2 text-sm"><span>{uiText("Costo")}<br /><strong>${recipe.totalCost.toFixed(2)}</strong></span><span>{uiText("Porción")}<br /><strong>${recipe.costPerPortion.toFixed(2)}</strong></span><span>{uiText("Margen")}<br /><strong>{recipe.estimatedMargin ?? "-"}%</strong></span></div></CardContent></Card>)}</div></QueryState></div>; }
-
-export function ConsumptionScreen({ branchId }: { branchId?: string }) {
-  const uiText = useUiText(); const [recipeId, setRecipeId] = useState(""); const [quantity, setQuantity] = useState("1"); const recipes = useQuery({ queryKey: ["restaurant-recipes"], queryFn: () => fetchRestaurantRecipes() }); const preview = useMutation({ mutationFn: () => previewRestaurantConsumption({ branchId, lines: [{ recipeId, quantity: Number(quantity) }] }) }); const confirm = useMutation({ mutationFn: () => createRestaurantConsumption({ branchId, lines: [{ recipeId, quantity: Number(quantity) }], previewToken: (preview.data as { previewToken?: string } | undefined)?.previewToken }), onSuccess: () => preview.reset() }); return <div className="space-y-4"><PageHeader eyebrow={uiText("Operación")} title={uiText("Registro de consumo")} description={uiText("Calcula el consumo con la vista previa del backend antes de confirmar.")} /><Card level={2}><CardContent className="grid gap-3 p-5 sm:grid-cols-[1fr_160px_auto] sm:items-end"><div><Label htmlFor="consumption-recipe">{uiText("Receta")}</Label><select id="consumption-recipe" className="field" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">{uiText("Seleccionar receta")}</option>{(recipes.data ?? []).map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}</select></div><div><Label htmlFor="consumption-quantity">{uiText("Cantidad vendida")}</Label><Input id="consumption-quantity" type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div><Button disabled={!recipeId || preview.isPending} onClick={() => preview.mutate()}>{preview.isPending ? "Calculando…" : "Calcular consumo"}</Button></CardContent></Card>{preview.error ? <InlineFeedback tone="danger" title={uiText("No se pudo calcular")}>{getApiErrorMessage(preview.error, "El backend no pudo generar la vista previa.")}</InlineFeedback> : null}{preview.data ? <Card level={2}><CardContent className="space-y-4 p-5"><h2 className="font-semibold">{uiText("Vista previa del consumo")}</h2><ResponsiveTable headers={["Ingrediente", "Existencia actual", "Requerido", "Resultante", "Disponibilidad"]}>{preview.data.ingredients.map((item) => <tr key={item.ingredientId}><td>{item.ingredientName}</td><td>{item.currentStock} {item.unit}</td><td>{item.requiredQuantity} {item.unit}</td><td>{item.resultingStock} {item.unit}</td><td><Badge variant={item.sufficient ? "default" : "destructive"}>{item.sufficient ? uiText("Disponible") : "Insuficiente"}</Badge></td></tr>)}</ResponsiveTable>{preview.data.insufficientIngredients.length ? <InlineFeedback tone="warning" title={uiText("Inventario insuficiente")}>{preview.data.insufficientIngredients.join(", ")}</InlineFeedback> : null}<p className="font-semibold">{uiText("Costo total: $")}{preview.data.totalCost.toFixed(2)}</p><Button disabled={Boolean(preview.data.insufficientIngredients.length) || confirm.isPending} onClick={() => confirm.mutate()}><ClipboardList className="size-4" />{uiText("Confirmar consumo")}</Button></CardContent></Card> : null}</div>; }
-
-export function WasteScreen({ branchId }: { branchId?: string }) {
-  const uiText = useUiText(); const mutation = useMutation({ mutationFn: (input: Record<string, unknown>) => createRestaurantWaste(input) }); const ingredients = useQuery({ queryKey: ["restaurant-waste-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) }); const [reason, setReason] = useState(""); const [ingredientId, setIngredientId] = useState(""); const [quantity, setQuantity] = useState(""); return <div className="space-y-4"><PageHeader eyebrow="Control" title={uiText("Desperdicios")} description={uiText("Registra la merma con motivo, cantidad, unidad y observaciones.")} /><Card level={2}><CardContent className="grid gap-3 p-5 sm:grid-cols-2"><div><Label htmlFor="waste-reason">{uiText("Motivo")}</Label><Input id="waste-reason" value={reason} onChange={(event) => setReason(event.target.value)} required /></div><div><Label htmlFor="waste-ingredient">{uiText("Ingrediente")}</Label><select id="waste-ingredient" className="field" value={ingredientId} onChange={(event) => setIngredientId(event.target.value)} required><option value="">{uiText("Seleccionar ingrediente")}</option>{(ingredients.data?.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.sku} · {item.name}</option>)}</select></div><div><Label htmlFor="waste-quantity">{uiText("Cantidad")}</Label><Input id="waste-quantity" type="number" min="0" value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></div><div className="sm:col-span-2"><Button disabled={mutation.isPending || ingredients.isLoading || !reason || !ingredientId || !quantity} onClick={() => mutation.mutate({ branchId, reason, lines: [{ ingredientId, quantity: Number(quantity) }] })}>{mutation.isPending ? uiText("Registrando…") : uiText("Registrar desperdicio")}</Button></div></CardContent></Card>{mutation.error ? <InlineFeedback tone="danger" title={uiText("No se pudo registrar")}>{getApiErrorMessage(mutation.error, "Revisa la información.")}</InlineFeedback> : null}{mutation.isSuccess ? <InlineFeedback tone="success" title={uiText("Desperdicio registrado")}>{uiText("El backend confirmó el movimiento.")}</InlineFeedback> : null}</div>; }
-
-function ResponsiveTable({ headers, children }: { headers: string[]; children: ReactNode }) {
-  const uiText = useUiText(); return <RowTable caption={uiText("Registros")} headers={headers}>{children}</RowTable>; }
+/*
+ * Aquí vivían cuatro pantallas muertas: `ReceiptsScreen`, `RecipesScreen`,
+ * `ConsumptionScreen` y `WasteScreen`. Ninguna se importaba desde ningún
+ * sitio —el armazón enruta a `RestaurantReceiptsScreen`,
+ * `RestaurantRecipesWorkspace` y `RestaurantOperations`— y eran versiones
+ * anteriores que se quedaron al migrar.
+ *
+ * No eran inertes. `RecipesScreen` pintaba `recipe.lines.length` y
+ * `/restaurant-inventory/recipes` no incluye las líneas de la receta: el día
+ * que alguien volviera a enrutar ese componente, la pantalla reventaría al
+ * leer `.length` de `undefined`. Y las cuatro enseñaban importes —costo de
+ * receta, total de la entrada, costo del consumo— sin comprobar
+ * `restaurant_inventory.commercial.view`, que es justo el permiso que las
+ * pantallas vivas respetan.
+ */

@@ -861,6 +861,7 @@
   "sys.recordAnother": "Record another",
   "sys.notRecorded": "What could not be recorded",
   "sys.actions": "Actions",
+  "sys.view": "View",
   "sys.removeFilters": "Remove filters",
   "sys.pagination": "Pagination",
   "sys.previousPage": "Previous page",
@@ -1594,8 +1595,8 @@
   "ats.today.allApplications": "See all applications",
   "vacancies.eyebrow": "Recruiting / Jobs",
   "vacancies.listDescription": "Create drafts, review the content, and publish only after checking the summary.",
-  "vacancies.editDescription": "Update content, conditions, locations, pipeline, and owners.",
-  "vacancies.createDescription": "Fill in the information, review the process, and save a draft or publish when it's ready.",
+  "vacancies.editDescription": "Edit role details and conditions. The selection process is already configured.",
+  "vacancies.createDescription": "Define the role and its conditions. We set up the selection stages for you.",
   "vacancies.noArea": "No area",
   "vacancies.noWorkMode": "No work mode",
   "vacancies.noLocation": "No location",
@@ -3425,5 +3426,12 @@
   "people.discard": "Discard",
   "nav.Mis cursos": "My courses",
   "nav.Crear y editar cursos": "Create and edit courses",
-  "people.scheduleFirst": "Schedule interview"
+  "people.scheduleFirst": "Schedule interview",
+  "nav.Transferir productos": "Transfer stock",
+  "nav.Registrar merma": "Record waste",
+  "nav.Diferencias de consumo": "Consumption differences",
+  "nav.Pérdidas sin explicar": "Unexplained losses",
+  "nav.Entradas y salidas": "Incoming and outgoing",
+  "nav.Compras": "Purchasing",
+  "nav.Conteos y control": "Counts and control"
 }

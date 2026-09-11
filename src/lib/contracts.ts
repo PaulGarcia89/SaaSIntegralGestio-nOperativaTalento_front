@@ -2133,6 +2133,9 @@ export interface RecruitmentInterviewListDto {
 }
 
 export interface ScheduleInterviewInput {
+  reminderMinutes?: number;
+  additionalAttendees?: string[];
+  clientRequestId?: string;
   applicationId: string;
   stageId?: string;
   interviewerUserId: string;
@@ -3564,6 +3567,13 @@ export interface RestaurantLotDto {
   cost: number;
   warehouseName: string;
   status: "AVAILABLE" | "EXPIRED" | "BLOCKED" | "DEPLETED";
+  /**
+   * Días hasta el vencimiento. Negativo si ya venció, `null` si el lote no
+   * caduca. El servidor lo entrega desde `mapLotForUx`; no estaba declarado,
+   * así que la pantalla no podía ordenar ni filtrar por urgencia aunque el
+   * dato viniera en cada fila.
+   */
+  daysRemaining: number | null;
 }
 
 export interface RestaurantProductionDto {
@@ -3579,11 +3589,22 @@ export interface RestaurantProductionDto {
 
 export interface RestaurantStockCountDto {
   id: string;
+  /** Número del documento, p. ej. «CNT-0004». Es lo que identifica un conteo. */
+  countNumber: string;
+  /** Vacío mientras `stockCounts()` no enriquezca la fila con el almacén. */
   warehouseName: string;
   createdAt: string;
   status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "CANCELLED";
   blind: boolean;
-  differences: number;
+  /**
+   * Cuántas líneas salieron distintas de lo que decía el sistema.
+   *
+   * `null` mientras el conteo no está aprobado: el backend calcula las
+   * varianzas EN la aprobación y hasta entonces las oculta, porque un conteo a
+   * ciegas no debe enseñar la existencia teórica de antemano. Antes esto era
+   * `number` y la pantalla imprimía «undefined diferencias».
+   */
+  differences: number | null;
   lines: Array<{ ingredientId: string; ingredientName: string; theoreticalQuantity?: number | null; physicalQuantity?: number | null; difference?: number | null; reason?: string | null; unit: string }>;
 }
 

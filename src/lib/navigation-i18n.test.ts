@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import esCommon from "@/i18n/locales/es/common.json";
 import enCommon from "@/i18n/locales/en/common.json";
-import { navSections } from "@/lib/navigation";
+import { appNavigation, navSections } from "@/lib/navigation";
+import { restaurantSections } from "@/lib/restaurant-navigation";
 
 /**
  * El menú lateral está en las 108 pantallas: si una entrada no tiene clave, la
@@ -40,6 +41,22 @@ describe("el menú lateral está traducido", () => {
   it("cada entrada tiene clave en los dos idiomas", () => {
     expect(etiquetas.filter((label) => !(`nav.${label}` in es))).toEqual([]);
     expect(etiquetas.filter((label) => !(`nav.${label}` in en))).toEqual([]);
+  });
+
+  /**
+   * Leer el fuente no basta desde que el inventario de restaurante impone su
+   * propio rótulo sobre `appNavigation`: en el archivo sigue escrito
+   * «Desperdicios» y en pantalla se lee «Registrar merma», así que la clave
+   * que hace falta es la del segundo. Aquí se comprueban las etiquetas que el
+   * usuario ve de verdad, incluidas las de la navegación dentro del módulo.
+   */
+  it("cada etiqueta efectiva, no solo la escrita en el fuente, tiene clave", () => {
+    const efectivas = [...new Set([
+      ...appNavigation.map((item) => item.label),
+      ...restaurantSections.flatMap((section) => [section.label, ...section.items.map((item) => item.label)]),
+    ])];
+    expect(efectivas.filter((label) => !(`nav.${label}` in es))).toEqual([]);
+    expect(efectivas.filter((label) => !(`nav.${label}` in en))).toEqual([]);
   });
 
   it("cada área tiene clave en los dos idiomas", () => {

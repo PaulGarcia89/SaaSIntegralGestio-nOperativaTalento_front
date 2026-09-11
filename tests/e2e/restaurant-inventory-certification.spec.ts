@@ -20,12 +20,12 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
   }
 
   const routes = [
-    ["Dashboard", "/inventory/restaurant"],
-    ["Entradas", "/inventory/restaurant/receipts"],
-    ["Consumo", "/inventory/restaurant/consumption"],
-    ["Producción", "/inventory/restaurant/production"],
-    ["Conteo físico", "/inventory/restaurant/stock-counts"],
-    ["Transferencias", "/inventory/restaurant/transfers"],
+    ["Resumen", "/inventory/restaurant"],
+    ["Recibir productos", "/inventory/restaurant/receipts"],
+    ["Registrar consumo", "/inventory/restaurant/consumption"],
+    ["Registrar producción", "/inventory/restaurant/production"],
+    ["Realizar conteo", "/inventory/restaurant/stock-counts"],
+    ["Transferir productos", "/inventory/restaurant/transfers"],
     ["Importar ventas", "/inventory/restaurant/sales-import"],
     ["Reportes", "/inventory/restaurant/reports"],
   ] as const;
@@ -48,15 +48,48 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
     expect(result.violations).toEqual([]);
   });
 
-  test("el modo compacto cocina se conserva al cambiar de pantalla", async ({ page }) => {
+  /**
+   * El modo cocina dejó de ser un botón permanente en la barra de contexto.
+   *
+   * Esa barra se pinta en las 38 pantallas del módulo, y el modo cocina es una
+   * preferencia de quien mira, no un contexto de trabajo: tenía el mismo peso
+   * visual que los selectores de sucursal y almacén. Ahora vive en el diálogo
+   * que abre «Cambiar», junto a esos dos selectores.
+   */
+  const abrirContexto = async (page: import("@playwright/test").Page) => {
+    await page.getByRole("button", { name: "Cambiar" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  };
+
+  test("el modo cocina se conserva al cambiar de pantalla", async ({ page }) => {
     await login(page);
     await page.goto("/inventory/restaurant/production");
-    const compact = page.getByRole("button", { name: /Modo compacto cocina|Modo compacto activo/i });
-    await expect(compact).toBeVisible();
-    await compact.click();
-    await expect(page.getByRole("button", { name: /Modo compacto activo/i })).toBeVisible();
+    await abrirContexto(page);
+    await page.getByRole("button", { name: /Activar modo cocina|Modo cocina activo/i }).click();
+    await expect(page.getByRole("button", { name: /Modo cocina activo/i })).toBeVisible();
+    await page.keyboard.press("Escape");
+
     await page.goto("/inventory/restaurant/waste");
-    await expect(page.getByRole("button", { name: /Modo compacto activo/i })).toBeVisible();
+    await abrirContexto(page);
+    await expect(page.getByRole("button", { name: /Modo cocina activo/i })).toBeVisible();
+  });
+
+  /**
+   * La barra de operaciones viaja con el módulo.
+   *
+   * Las cinco operaciones vivían sólo dentro del panel de la primera pantalla:
+   * quien entraba por «Existencias» —la entrada natural desde la barra lateral
+   * y desde cualquier enlace de alerta— no las veía nunca. Esta prueba fija
+   * que estén en una pantalla que NO es el panel.
+   */
+  test("las operaciones del módulo están en todas sus pantallas", async ({ page }) => {
+    await login(page);
+    await page.goto("/inventory/restaurant/stock");
+    const barra = page.getByRole("navigation", { name: /Operaciones del inventario/i });
+    await expect(barra).toBeVisible();
+    for (const accion of ["Recibir", "Salida", "Merma", "Contar", "Transferir"]) {
+      await expect(barra.getByRole("link", { name: accion, exact: true })).toBeVisible();
+    }
   });
 
   for (const width of [320, 375, 768, 1024]) {
@@ -115,14 +148,21 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
     await login(page);
     await page.setViewportSize({ width: 375, height: 844 });
     await page.goto("/inventory/restaurant");
-    await expect(page.getByLabel("Sección de inventario")).toBeVisible();
+    // «Sección de inventario» e «Iniciar conteo» no existen en el producto:
+    // el panel no lleva navegación entre hermanas —«Resumen» es su única
+    // pantalla— y la operación se llama «Contar» en la barra. La barra de
+    // operaciones es lo que responde «qué puedo hacer» en el teléfono.
     await expect(page.getByRole("button", { name: "Actualizar" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Registrar consumo/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Iniciar conteo/i })).toBeVisible();
-    const compact = page.getByRole("button", { name: /Modo compacto cocina|Modo compacto activo/i });
-    await compact.click();
+    const barra = page.getByRole("navigation", { name: /Operaciones del inventario/i });
+    await expect(barra.getByRole("link", { name: "Salida", exact: true })).toBeVisible();
+    await expect(barra.getByRole("link", { name: "Contar", exact: true })).toBeVisible();
+
+    await abrirContexto(page);
+    await page.getByRole("button", { name: /Activar modo cocina/i }).click();
+    await page.keyboard.press("Escape");
     await page.goto("/inventory/restaurant/receipts");
-    await expect(page.getByRole("button", { name: /Modo compacto activo/i })).toBeVisible();
+    await abrirContexto(page);
+    await expect(page.getByRole("button", { name: /Modo cocina activo/i })).toBeVisible();
     await page.getByRole("button", { name: /Nueva entrada/i }).click();
     await expect(page.getByRole("list", { name: "Pasos de la entrada" })).toBeVisible();
     await expect(page.getByText("Proveedor y almacén")).toBeVisible();
@@ -142,11 +182,27 @@ test.describe("certificación E2E de Inventario de restaurante", () => {
     await expect(page.locator('a[href="/inventory/restaurant/stock?filter=LOW"]')).toBeVisible();
     await page.locator('a[href="/inventory/restaurant/stock?filter=LOW"]').click();
     await expect(page).toHaveURL(/\/inventory\/restaurant\/stock\?filter=LOW/);
-    await expect(page.getByLabel("Alertas")).toHaveValue("LOW");
+    /*
+     * El filtro dejó de ser un desplegable «Alertas» y pasó a ser una fila de
+     * atajos con su cifra al lado: el desplegable obligaba a elegir una opción
+     * para descubrir si devolvía algo. Se comprueba el atajo PULSADO, que es
+     * lo que dice que el enlace conservó su filtro.
+     */
+    const alertas = page.getByRole("navigation", { name: "Alertas" });
+    await expect(alertas.getByRole("button", { name: /Bajo mínimo/ })).toHaveAttribute("aria-pressed", "true");
+
     await page.goto("/inventory/restaurant");
     await expect(page.locator('a[href="/inventory/restaurant/lots?filter=7"]')).toBeVisible();
     await page.locator('a[href="/inventory/restaurant/lots?filter=7"]').click();
     await expect(page).toHaveURL(/\/inventory\/restaurant\/lots\?filter=7/);
+    /*
+     * Este atajo NO filtraba. Se mandaba al servidor como `?expiry=…` y el
+     * controlador de `/lots` no lee ese parámetro, así que las cuatro opciones
+     * devolvían la lista entera. Ahora se resuelve en el cliente, y esta línea
+     * es la que impide que vuelva a quedarse en decorativo.
+     */
+    const vencimientos = page.getByRole("navigation", { name: /Filtrar por vencimiento/i });
+    await expect(vencimientos.getByRole("button", { name: /Vence en 7 días/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("redirige a login cuando expira la sesión", async ({ page }) => {

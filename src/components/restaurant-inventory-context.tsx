@@ -3,15 +3,15 @@
 import { useUiText } from "@/components/ui-copy";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { Rows3 } from "lucide-react";
+import { MapPin, Rows3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchRestaurantWarehouses, getApiErrorMessage } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { confirmAction } from "@/components/confirm-action";
 import { InlineFeedback } from "@/components/design-system";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Warehouse = { id: string; branchId?: string; code?: string; name?: string; location?: string; address?: string; city?: string; state?: string };
 type InventoryContextValue = {
@@ -84,10 +84,30 @@ export function useRestaurantInventoryContext() {
   return value;
 }
 
+/**
+ * Dónde estoy, en una línea.
+ *
+ * Era una tarjeta de tres columnas, pegada arriba y presente en las 38
+ * pantallas del módulo: un rótulo «CONTEXTO OPERATIVO», la frase «Sucursal ·
+ * Almacén» repetida, los dos desplegables completos y un botón de modo cocina
+ * con el mismo peso visual que ellos. Ocupaba alto permanente para una
+ * decisión que se toma una vez al día, y en 390 px empujaba el primer dato
+ * fuera de la pantalla.
+ *
+ * Ahora es una línea que responde «dónde estoy» y un botón que abre el cambio
+ * cuando hace falta. La ubicación del almacén se escribe UNA vez: antes salía
+ * dentro de cada `<option>` y otra vez en un párrafo debajo, así que
+ * «Ubicación no registrada» aparecía dos veces seguidas en pantalla.
+ *
+ * Se conserva íntegra la guarda de cambios sin guardar: cambiar de sucursal o
+ * de almacén en mitad de un registro sigue avisando de lo que se descarta.
+ */
 export function RestaurantInventoryContextBar() {
   const uiText = useUiText();
   const { currentBranch, tenantBranches, setCurrentBranchId } = useAppStore();
   const { warehouseId, warehouses, setWarehouseId, hasPendingChanges, setHasPendingChanges, warehouseName, compactMode, toggleCompactMode, isLoading, error } = useRestaurantInventoryContext();
+  const [abierto, setAbierto] = useState(false);
+
   /**
    * Cambiar de sucursal o de almacén descarta lo que se esté registrando.
    *
@@ -126,20 +146,66 @@ export function RestaurantInventoryContextBar() {
       setWarehouseId(id);
     });
   };
-  const location = (warehouse: Warehouse) => warehouse.location ?? warehouse.address ?? ([warehouse.city, warehouse.state].filter(Boolean).join(", ") || uiText("Ubicación no registrada"));
-  return <div className="sticky top-2 z-20 space-y-3">
-    <Card level={1}><CardContent className={`grid gap-3 p-3 md:grid-cols-[1fr_1fr_auto] ${compactMode ? "md:items-end" : "md:gap-4 md:p-4"}`}>
-      <div className="md:col-span-2"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">{uiText("Contexto operativo")}</p><p className="mt-1 text-sm font-medium text-text-primary" aria-live="polite">{currentBranch?.name ?? "Sin sucursal"} · {warehouseName}{hasPendingChanges ? " · Cambios pendientes" : ""}</p></div>
-      <div><Label htmlFor="restaurant-global-branch">{uiText("Sucursal activa")}</Label><select id="restaurant-global-branch" className="field mt-1" value={currentBranch?.id ?? ""} onChange={(event) => changeBranch(event.target.value)}><option value="">{uiText("Seleccionar sucursal")}</option>{tenantBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div>
-      <div><Label htmlFor="restaurant-global-warehouse">{uiText("Almacén activo")}</Label><select id="restaurant-global-warehouse" className="field mt-1" value={warehouseId} onChange={(event) => changeWarehouse(event.target.value)} disabled={isLoading || !currentBranch}><option value="">{uiText("Seleccionar almacén")}</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{`${warehouse.code ? `${warehouse.code} · ` : ""}${warehouse.name ?? "Almacén"} · ${location(warehouse)}`}</option>)}</select><p className="mt-1 text-xs text-text-secondary">{selectedLocation(warehouses, warehouseId, uiText("Ubicación no registrada"))}</p></div>
-      <Button type="button" size="sm" variant={compactMode ? "default" : "secondary"} className="min-h-11 whitespace-nowrap" onClick={toggleCompactMode}><Rows3 className="size-4" />{compactMode ? uiText("Modo compacto activo") : uiText("Modo compacto cocina")}</Button>
-    </CardContent></Card>
+  const location = (warehouse: Warehouse) => warehouse.location ?? warehouse.address ?? ([warehouse.city, warehouse.state].filter(Boolean).join(", ") || "");
+  const ubicacion = location(warehouses.find((item) => item.id === warehouseId) ?? {} as Warehouse);
+
+  return <div className="sticky top-2 z-20 space-y-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface-1 px-3 py-2 shadow-e1">
+      <MapPin className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+      <p className="min-w-0 flex-1 basis-40 truncate text-sm text-ink-2" aria-live="polite">
+        <span className="font-medium text-ink-1">{currentBranch?.name ?? uiText("Sin sucursal")}</span>
+        {" · "}{warehouseName}
+        {ubicacion ? <span className="text-ink-3">{" · "}{ubicacion}</span> : null}
+      </p>
+      {hasPendingChanges ? <span className="shrink-0 rounded-md border border-line bg-surface-2 px-2 py-0.5 text-2xs font-medium text-ink-2">{uiText("Cambios pendientes")}</span> : null}
+      <Button type="button" size="sm" variant="secondary" className="shrink-0" onClick={() => setAbierto(true)}>
+        {uiText("Cambiar")}
+      </Button>
+    </div>
+
     {error ? <InlineFeedback tone="danger" title={uiText("No se pudieron cargar los almacenes")}>{getApiErrorMessage(error, "Revisa la conexión e inténtalo de nuevo.")}</InlineFeedback> : null}
     {!isLoading && currentBranch && !warehouses.length ? <InlineFeedback tone="warning" title={uiText("Sin almacenes disponibles")}>{uiText("La sucursal actual no tiene un almacén activo asignado.")}</InlineFeedback> : null}
-  </div>;
-}
 
-function selectedLocation(warehouses: Warehouse[], warehouseId: string, fallback: string) {
-  const warehouse = warehouses.find((item) => item.id === warehouseId);
-  return warehouse?.location ?? warehouse?.address ?? ([warehouse?.city, warehouse?.state].filter(Boolean).join(", ") || fallback);
+    <Dialog open={abierto} onOpenChange={setAbierto}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{uiText("Dónde estás trabajando")}</DialogTitle>
+          <DialogDescription>{uiText("Todo lo que registres y todo lo que veas pertenece a esta sucursal y a este almacén.")}</DialogDescription>
+        </DialogHeader>
+        <div className="mt-4 space-y-4">
+          <div>
+            <Label htmlFor="restaurant-global-branch">{uiText("Sucursal activa")}</Label>
+            <select id="restaurant-global-branch" className="field mt-1" value={currentBranch?.id ?? ""} onChange={(event) => changeBranch(event.target.value)}>
+              <option value="">{uiText("Seleccionar sucursal")}</option>
+              {tenantBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="restaurant-global-warehouse">{uiText("Almacén activo")}</Label>
+            <select id="restaurant-global-warehouse" className="field mt-1" value={warehouseId} onChange={(event) => changeWarehouse(event.target.value)} disabled={isLoading || !currentBranch}>
+              <option value="">{uiText("Seleccionar almacén")}</option>
+              {warehouses.map((warehouse) => {
+                const donde = location(warehouse);
+                return <option key={warehouse.id} value={warehouse.id}>{`${warehouse.code ? `${warehouse.code} · ` : ""}${warehouse.name ?? "Almacén"}${donde ? ` · ${donde}` : ""}`}</option>;
+              })}
+            </select>
+          </div>
+          {/*
+            El modo cocina es una preferencia de quien mira, no un contexto de
+            trabajo: tenía el mismo peso visual que los dos selectores y se
+            confundía con ellos. Y ya no encoge la letra —lo contrario de lo
+            que hace falta a un metro de la pantalla—: gana altura juntando los
+            bloques y agranda los objetivos táctiles.
+          */}
+          <div className="rounded-xl border border-line bg-surface-2 p-3">
+            <Button type="button" variant={compactMode ? "default" : "secondary"} className="w-full min-h-[var(--control-h-touch)]" onClick={toggleCompactMode}>
+              <Rows3 className="size-4" aria-hidden="true" />
+              {compactMode ? uiText("Modo cocina activo") : uiText("Activar modo cocina")}
+            </Button>
+            <p className="mt-2 text-sm text-ink-2">{uiText("Botones más grandes y menos espacio entre bloques, para usar el módulo de pie y con las manos ocupadas.")}</p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </div>;
 }

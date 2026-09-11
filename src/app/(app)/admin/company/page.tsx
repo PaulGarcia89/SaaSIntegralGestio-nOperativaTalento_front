@@ -3,39 +3,42 @@
 import { useUiText } from "@/components/ui-copy";
 
 import Link from "next/link";
-import { ArrowRight, Building2, CreditCard, Mail, Megaphone, ShieldCheck, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchBranches, fetchTenantUsers } from "@/lib/backend";
+import { ArrowRight, Building2, CalendarDays, CreditCard, Mail, Megaphone, ShieldCheck, Users } from "lucide-react";
 import { Metric, MetricRow, PageHeader, PageSection } from "@/components/system";
 import { Button } from "@/components/ui/button";
-import { CompanyEmailSettings } from "@/components/company-email-settings";
 import { moduleLabels } from "@/lib/ui-labels";
 import { planTierLabel, tenantStatusInfo } from "@/lib/platform-labels";
 import { useAppStore } from "@/store/app-store";
 
-/**
- * Configuración de la empresa.
- *
- * Esta pantalla mostraba tres cifras —«2 dominios», «14 plantillas», «5
- * integraciones»— escritas a mano en el propio archivo. No venían de ninguna
- * consulta: eran constantes. La pantalla presentaba números inventados como si
- * fueran datos de la empresa, que es la peor cosa que puede hacer un panel de
- * administración. Ahora las cifras salen de la empresa activa (sucursales,
- * personas, módulos habilitados) o no se muestran.
- *
- * El resto era prosa estática dentro de dos `InfoList`: seis párrafos que
- * describían conceptos («separación por sucursal», «políticas de acceso») sin
- * llevar a ninguna parte, con una insignia que decía «RBAC» —un acrónimo de
- * documentación técnica—. Se sustituyen por accesos a las pantallas que sí
- * existen y hacen ese trabajo.
- *
- * Lo único con función real de la pantalla anterior, la configuración de
- * correo saliente, se conserva intacta.
- */
+/** Ajustes de empresa con accesos a cada pantalla de configuración. */
 
 export default function CompanySettingsPage() {
   const uiText = useUiText();
   const { currentTenant, can } = useAppStore();
+  const canViewBranches = can("branches.view");
+  const canViewUsers = can("users.view");
+  // Share the dashboard queries so both screens show the same live totals.
+  const branches = useQuery({
+    queryKey: ["branches", currentTenant.id],
+    queryFn: () => fetchBranches(currentTenant.id),
+    enabled: canViewBranches && Boolean(currentTenant.id),
+    staleTime: 60_000,
+  });
+  const users = useQuery({
+    queryKey: ["tenant-users", currentTenant.id],
+    queryFn: () => fetchTenantUsers(currentTenant.id),
+    enabled: canViewUsers && Boolean(currentTenant.id),
+    staleTime: 60_000,
+  });
+  const activeBranches = canViewBranches && !branches.isError ? branches.data?.filter((branch) => branch.status === "active").length : undefined;
+  const activeUsers = canViewUsers && !users.isError ? users.data?.filter((user) => user.status === "active").length : undefined;
+
 
   const destinations = [
+    { href: "/admin/company/smtp", icon: Mail, title: uiText("Correo saliente (SMTP)"), detail: uiText("Configura el remitente de la empresa, el servidor SMTP y los envíos de prueba."), visible: can("admin.company") },
+    { href: "/admin/company/calendar", icon: CalendarDays, title: "Calendarios y entrevistas", detail: "Conecta Google o Microsoft para agendar entrevistas y crear enlaces de reunión.", visible: can("admin.company") },
     {
       href: "/admin/company/career-portal",
       icon: Megaphone,
@@ -91,8 +94,8 @@ export default function CompanySettingsPage() {
       <MetricRow>
         <Metric label={uiText("Estado")} value={status.label} detail={status.detail} />
         <Metric label="Plan" value={planTierLabel(currentTenant.plan)} />
-        <Metric label={uiText("Sucursales")} value={String(currentTenant.branchCount ?? 0)} />
-        <Metric label={uiText("Personas")} value={String(currentTenant.employeeCount ?? 0)} />
+        <Metric label={uiText("Sucursales activas")} value={activeBranches === undefined ? "—" : String(activeBranches)} detail={!canViewBranches ? uiText("Sin permiso para consultar") : branches.isError ? uiText("No se pudo cargar el conteo") : branches.isLoading ? uiText("Cargando...") : undefined} />
+        <Metric label={uiText("Usuarios activos")} value={activeUsers === undefined ? "—" : String(activeUsers)} detail={!canViewUsers ? uiText("Sin permiso para consultar") : users.isError ? uiText("No se pudo cargar el conteo") : users.isLoading ? uiText("Cargando...") : undefined} />
       </MetricRow>
 
       <PageSection title={uiText("Ajustes de la empresa")} description={uiText("Cada uno abre la pantalla donde se cambia de verdad.")}>
@@ -143,19 +146,7 @@ export default function CompanySettingsPage() {
         )}
       </PageSection>
 
-      <PageSection
-        title={uiText("Correo saliente")}
-        description={uiText("Desde qué dirección salen las invitaciones, las ofertas y los recordatorios de la empresa.")}
-      >
-        <div className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-4 text-sm text-ink-2">
-          <Mail className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden="true" />
-          <p>
-            {uiText("Si no se configura, el producto envía desde su remitente por defecto y quien recibe el correo no reconoce a la empresa.")}</p>
-        </div>
-        <div className="mt-4">
-          <CompanyEmailSettings />
-        </div>
-      </PageSection>
+
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useUiText } from "@/components/ui-copy";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Send, Trash2, Truck } from "lucide-react";
-import { cancelRestaurantTransfer, createRestaurantAdjustment, createRestaurantTransfer, fetchRestaurantIngredients, fetchRestaurantPhase2Dashboard, fetchRestaurantTransfers, fetchRestaurantWarehouses, getApiErrorMessage, receiveRestaurantTransfer, sendRestaurantTransfer, submitRestaurantStockCount } from "@/lib/backend";
+import { fetchRestaurantLots, cancelRestaurantTransfer, createRestaurantAdjustment, createRestaurantTransfer, fetchRestaurantIngredients, fetchRestaurantPhase2Dashboard, fetchRestaurantTransfers, fetchRestaurantWarehouses, getApiErrorMessage, receiveRestaurantTransfer, sendRestaurantTransfer } from "@/lib/backend";
 import { useAppStore } from "@/store/app-store";
 import { InlineFeedback, PageHeader } from "@/components/design-system";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { RestaurantStockCountWorkflow } from "@/components/restaurant-stock-count-workflow";
 import { RestaurantStockControlWorkspace } from "@/components/restaurant-stock-control-workspace";
 import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
+import { formatQuantity } from "@/lib/restaurant-operation";
+import { formatDate } from "@/lib/platform-labels";
 
 type Line = { ingredientId: string; quantity: string; lotId?: string; reason?: string };
 
@@ -42,20 +44,163 @@ function QueryState({ loading, error, retry, children }: { loading: boolean; err
 function transferNextAction(value: unknown) { const labels: Record<string, string> = { confirm_operation: "Revisar y confirmar", send_transfer: "Lista para enviar", receive_transfer: "Pendiente de recepción", cancel_transfer: "Puede cancelarse", resolve_stock_shortage: "Resolver el bloqueo de inventario" }; return labels[String(value)] ?? String(value ?? ""); }
 function SecureTransfersScreen({ branchId }: { branchId: string }) {
   const uiText = useUiText();
-  const qc = useQueryClient(); const catalog = Catalog({ branchId }); const [source, setSource] = useState(""); const [destination, setDestination] = useState(""); const [lines, setLines] = useState<Line[]>([{ ingredientId: "", quantity: "", lotId: "" }]); const [reviewing, setReviewing] = useState(false); const [created, setCreated] = useState(false);
+  const qc = useQueryClient();
+  const catalog = Catalog({ branchId });
+  const [source, setSource] = useState("");
+  const [destination, setDestination] = useState("");
+  const [lines, setLines] = useState<Line[]>([{ ingredientId: "", quantity: "", lotId: "" }]);
+  const [reviewing, setReviewing] = useState(false);
+  const [created, setCreated] = useState(false);
   const q = useQuery({ queryKey: ["restaurant-transfers", branchId], queryFn: () => fetchRestaurantTransfers({ branchId }) });
-  const refreshAfterTransfer = async (type: "send" | "receive" | "cancel") => { const keys = [qc.invalidateQueries({ queryKey: ["restaurant-transfers"] })]; if (type === "receive") keys.push(qc.invalidateQueries({ queryKey: ["restaurant-stock"] }), qc.invalidateQueries({ queryKey: ["restaurant-movements"] }), qc.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), qc.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] }), qc.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] })); await Promise.all(keys); };
-  const create = useMutation({ mutationFn: () => createRestaurantTransfer({ sourceBranchId: branchId, sourceWarehouseId: source, destinationBranchId: branchId, destinationWarehouseId: destination, items: lines.map((line) => ({ ingredientId: line.ingredientId, quantity: Number(line.quantity), ...(line.lotId ? { lotId: line.lotId } : {}) })) }), onSuccess: () => { setCreated(true); setReviewing(false); setLines([{ ingredientId: "", quantity: "", lotId: "" }]); void qc.invalidateQueries({ queryKey: ["restaurant-transfers"] }); } });
-  const action = useMutation({ mutationFn: ({ id, type }: { id: string; type: "send" | "receive" | "cancel" }) => type === "send" ? sendRestaurantTransfer(id) : type === "receive" ? receiveRestaurantTransfer(id) : cancelRestaurantTransfer(id, "Cancelación solicitada por el usuario"), onSuccess: (_, variables) => void refreshAfterTransfer(variables.type) });
+
+  /*
+   * Los lotes del almacén de origen.
+   *
+   * El campo «Lote (opcional)» era una caja de texto libre cuyo valor se
+   * mandaba al backend como `lotId`: se le pedía a quien está en la bodega que
+   * escribiera un UUID de memoria. Cualquier cosa que escribiera distinta del
+   * identificador exacto hacía fallar la transferencia con un error del
+   * servidor, y dejarlo en blanco era la única forma fiable de usarlo.
+   *
+   * Ahora es una lista de los lotes que ese almacén tiene de ESE ingrediente,
+   * con su código y su vencimiento, para poder sacar primero lo que caduca
+   * antes.
+   */
+  const lots = useQuery({
+    queryKey: ["restaurant-lots", branchId, source],
+    queryFn: () => fetchRestaurantLots({ branchId, warehouseId: source }),
+    enabled: Boolean(source),
+  });
+  const lotesDe = (ingredientId: string) =>
+    (lots.data ?? [])
+      .filter((lote) => String((lote as unknown as Record<string, unknown>).ingredientId ?? "") === ingredientId)
+      .filter((lote) => lote.remainingQuantity > 0)
+      .map((lote) => ({
+        id: lote.id,
+        label: `${lote.lotCode || uiText("Sin número de lote")} · ${formatQuantity(lote.remainingQuantity)} ${lote.unit}${lote.expiresAt ? ` · ${uiText("vence")} ${formatDate(lote.expiresAt)}` : ""}`,
+      }));
+
+  const refreshAfterTransfer = async (type: "send" | "receive" | "cancel") => {
+    const keys = [qc.invalidateQueries({ queryKey: ["restaurant-transfers"] })];
+    if (type === "receive") keys.push(qc.invalidateQueries({ queryKey: ["restaurant-stock"] }), qc.invalidateQueries({ queryKey: ["restaurant-movements"] }), qc.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), qc.invalidateQueries({ queryKey: ["restaurant-decision-dashboard"] }), qc.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] }));
+    await Promise.all(keys);
+  };
+  const create = useMutation({
+    mutationFn: () => createRestaurantTransfer({ sourceBranchId: branchId, sourceWarehouseId: source, destinationBranchId: branchId, destinationWarehouseId: destination, items: lines.map((line) => ({ ingredientId: line.ingredientId, quantity: Number(line.quantity), ...(line.lotId ? { lotId: line.lotId } : {}) })) }),
+    onSuccess: () => { setCreated(true); setReviewing(false); setLines([{ ingredientId: "", quantity: "", lotId: "" }]); void qc.invalidateQueries({ queryKey: ["restaurant-transfers"] }); },
+  });
+  const action = useMutation({
+    mutationFn: ({ id, type }: { id: string; type: "send" | "receive" | "cancel" }) => type === "send" ? sendRestaurantTransfer(id) : type === "receive" ? receiveRestaurantTransfer(id) : cancelRestaurantTransfer(id, "Cancelación solicitada por el usuario"),
+    onSuccess: (_, variables) => void refreshAfterTransfer(variables.type),
+  });
   const invalid = !source || !destination || source === destination || lines.some((line) => !line.ingredientId || Number(line.quantity) <= 0);
-  return <div className="space-y-4"><PageHeader eyebrow={uiText("Operación diaria")} title={uiText("Transferencias")} description={uiText("Selecciona origen y destino, revisa el impacto y registra el envío.")} />{catalog.error || create.error || action.error ? <InlineFeedback tone="danger" title={uiText("No se pudo completar la transferencia")}>{getApiErrorMessage(catalog.error ?? create.error ?? action.error, "Revisa los datos y vuelve a intentarlo.")}</InlineFeedback> : null}{created ? <InlineFeedback tone="success" title={uiText("Transferencia registrada")}>{uiText("El borrador fue creado. La siguiente acción es enviarlo desde la lista.")}</InlineFeedback> : null}<Card level={2}><CardContent className="space-y-4 p-5"><div className="flex items-center gap-2 text-sm font-semibold"><Badge variant={!reviewing ? "default" : "secondary"}>{uiText("1 Registrar")}</Badge><span>→</span><Badge variant={reviewing ? "default" : "secondary"}>{uiText("2 Revisar impacto")}</Badge><span>→</span><Badge variant={created ? "default" : "secondary"}>{uiText("3 Resultado")}</Badge></div>{!reviewing ? <><div className="grid gap-3 sm:grid-cols-2"><Select id="transfer-source" label={uiText("Almacén origen")} value={source} options={catalog.warehouses.map((item) => ({ id: item.id, label: item.name }))} onChange={setSource} /><Select id="transfer-destination" label={uiText("Almacén destino")} value={destination} options={catalog.warehouses.map((item) => ({ id: item.id, label: item.name }))} onChange={setDestination} /></div>{source && source === destination ? <InlineFeedback tone="danger" title={uiText("Ubicaciones iguales")}>{uiText("Selecciona un almacén destino diferente al origen.")}</InlineFeedback> : null}<Lines title={uiText("Productos transferidos")} lines={lines} options={catalog.ingredients.map((item) => ({ id: item.id, label: `${item.sku} · ${item.name}` }))} onChange={setLines} showLot /><p className="text-xs text-text-secondary">{uiText("Las cantidades se expresan en la unidad de inventario configurada para cada producto.")}</p><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setLines([...lines, { ingredientId: "", quantity: "", lotId: "" }])}><Plus className="size-4" />{uiText("Agregar línea")}</Button><Button disabled={invalid} onClick={() => setReviewing(true)}>{uiText("Revisar impacto")}</Button></div></> : <><h2 className="font-semibold">{uiText("Revisar impacto")}</h2><p className="text-sm text-text-secondary">{source} → {destination}{uiText(". Se registrarán ")}{lines.length} {uiText(" línea(s) como borrador. La existencia sólo cambiará al recibir.")}</p><div className="rounded-xl border border-border-default p-3 text-sm"><p className="font-medium">{uiText("Resumen")}</p><p className="mt-1 text-text-secondary">{lines.map((line) => `${line.quantity} unidades de inventario`).join(", ")}</p></div><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setReviewing(false)}>{uiText("Corregir transferencia")}</Button><Button disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? uiText("Registrando…") : "Registrar transferencia"}</Button></div></>}</CardContent></Card><QueryState loading={q.isLoading || catalog.loading} error={q.error} retry={() => { void q.refetch(); catalog.retry(); }}><Table headers={["Origen", "Destino", "Detalle", "Estado", "Siguiente acción"]}>{(q.data ?? []).map((item) => { const row = item as unknown as Record<string, unknown>; const status = String(row.status); const nextAction = transferNextAction(row.nextActionLabel ?? row.nextAction); return <tr key={String(row.id)}><td>{String(row.originWarehouse ?? row.sourceWarehouseId)}</td><td>{String(row.destinationWarehouse ?? row.destinationWarehouseId)}</td><td>{Array.isArray(row.lines) ? row.lines.map((line: Record<string, unknown>) => `${String(line.ingredientName ?? line.ingredientId)} (${String(line.quantity)} unidades de inventario)`).join(", ") : "-"}</td><td><RestaurantStatusBadge status={status} />{nextAction ? <p className="mt-1 text-xs text-text-secondary">{nextAction}</p> : null}</td><td className="flex flex-wrap gap-2">{status === "DRAFT" ? <Button size="sm" onClick={() => action.mutate({ id: String(row.id), type: "send" })}><Send className="size-4" />{uiText("Enviar transferencia")}</Button> : null}{["SENT", "IN_TRANSIT"].includes(status) ? <Button size="sm" onClick={() => { void confirmAction({ title: "¿Confirmar la recepción de la transferencia?", description: "Da por recibida la mercancía en el almacén de destino.", consequence: "Se descuenta del almacén de origen y se suma al de destino.", confirmLabel: "Confirmar la recepción", irreversible: true }).then((ok) => ok && action.mutate({ id: String(row.id), type: "receive" })); }}><Truck className="size-4" />{uiText("Confirmar recepción")}</Button> : null}{["DRAFT", "SENT"].includes(status) ? <Button size="sm" variant="secondary" onClick={() => { void confirmAction({ title: "¿Cancelar la transferencia?", description: "La transferencia queda anulada y deja de poder enviarse ni recibirse.", consequence: "Si ya se había enviado, la mercancía no vuelve sola al origen: hay que registrar el movimiento de vuelta.", confirmLabel: "Cancelar la transferencia", cancelLabel: "Conservarla", irreversible: true }).then((ok) => ok && action.mutate({ id: String(row.id), type: "cancel" })); }}>{uiText("Cancelar transferencia")}</Button> : null}</td></tr>; })}</Table></QueryState></div>;
+
+  /*
+   * La revisión decía «3f2a1b9c-… → 8d4e7f21-…».
+   *
+   * El paso previo a crear la transferencia interpolaba los identificadores de
+   * los selectores, y el resumen listaba «5 unidades de inventario, 12
+   * unidades de inventario» sin decir DE QUÉ. Es decir: el único momento en
+   * que se le pide a alguien que compruebe lo que va a registrar era el que
+   * menos información daba de toda la pantalla.
+   */
+  const nombreDeAlmacen = (id: string) => catalog.warehouses.find((item) => item.id === id)?.name ?? id;
+  const nombreDeIngrediente = (id: string) => {
+    const ingrediente = catalog.ingredients.find((item) => item.id === id);
+    return ingrediente ? ingrediente.name : id;
+  };
+
+  return <div className="space-y-4">
+    <PageHeader eyebrow={uiText("Operación diaria")} title={uiText("Transferir productos")} description={uiText("Selecciona origen y destino, revisa el impacto y registra el envío.")} />
+    {catalog.error || create.error || action.error ? <InlineFeedback tone="danger" title={uiText("No se pudo completar la transferencia")}>{getApiErrorMessage(catalog.error ?? create.error ?? action.error, "Revisa los datos y vuelve a intentarlo.")}</InlineFeedback> : null}
+    {created ? <InlineFeedback tone="success" title={uiText("Transferencia registrada")}>{uiText("El borrador fue creado. La siguiente acción es enviarlo desde la lista.")}</InlineFeedback> : null}
+    <Card level={2}><CardContent className="space-y-4 p-5">
+      <div className="flex items-center gap-2 text-sm font-semibold"><Badge variant={!reviewing ? "default" : "secondary"}>{uiText("1 Registrar")}</Badge><span>→</span><Badge variant={reviewing ? "default" : "secondary"}>{uiText("2 Revisar impacto")}</Badge><span>→</span><Badge variant={created ? "default" : "secondary"}>{uiText("3 Resultado")}</Badge></div>
+      {!reviewing ? <>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select id="transfer-source" label={uiText("Almacén origen")} value={source} options={catalog.warehouses.map((item) => ({ id: item.id, label: item.name }))} onChange={setSource} />
+          <Select id="transfer-destination" label={uiText("Almacén destino")} value={destination} options={catalog.warehouses.map((item) => ({ id: item.id, label: item.name }))} onChange={setDestination} />
+        </div>
+        {source && source === destination ? <InlineFeedback tone="danger" title={uiText("Ubicaciones iguales")}>{uiText("Selecciona un almacén destino diferente al origen.")}</InlineFeedback> : null}
+        <Lines title={uiText("Productos transferidos")} lines={lines} options={catalog.ingredients.map((item) => ({ id: item.id, label: `${item.sku} · ${item.name}` }))} onChange={setLines} lotOptions={source ? lotesDe : undefined} />
+        <p className="text-sm text-ink-2">{uiText("Las cantidades se expresan en la unidad de inventario configurada para cada producto.")}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setLines([...lines, { ingredientId: "", quantity: "", lotId: "" }])}><Plus className="size-4" />{uiText("Agregar línea")}</Button>
+          <Button disabled={invalid} onClick={() => setReviewing(true)}>{uiText("Revisar impacto")}</Button>
+        </div>
+      </> : <>
+        <h2 className="font-semibold">{uiText("Revisar impacto")}</h2>
+        <p className="text-sm text-ink-2">
+          <strong className="text-ink-1">{nombreDeAlmacen(source)}</strong> → <strong className="text-ink-1">{nombreDeAlmacen(destination)}</strong>
+          {uiText(". La existencia sólo cambiará cuando el destino confirme la recepción.")}
+        </p>
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {lines.map((line, index) => (
+            <li key={index} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+              <span className="min-w-0 flex-1 basis-40 truncate text-sm font-medium text-ink-1">{nombreDeIngrediente(line.ingredientId)}</span>
+              <span className="shrink-0 font-mono text-sm tabular-figures text-ink-1">{line.quantity}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setReviewing(false)}>{uiText("Corregir transferencia")}</Button>
+          <Button disabled={create.isPending} onClick={() => create.mutate()}>{create.isPending ? uiText("Registrando…") : "Registrar transferencia"}</Button>
+        </div>
+      </>}
+    </CardContent></Card>
+    <QueryState loading={q.isLoading || catalog.loading} error={q.error} retry={() => { void q.refetch(); catalog.retry(); }}>
+      <Table headers={["Origen", "Destino", "Detalle", "Estado", "Siguiente acción"]}>{(q.data ?? []).map((item) => {
+        const row = item as unknown as Record<string, unknown>;
+        const status = String(row.status);
+        const nextAction = transferNextAction(row.nextActionLabel ?? row.nextAction);
+        const detalle = Array.isArray(row.lines) ? (row.lines as Array<{ ingredientName: string; quantity: number; unit: string }>) : [];
+        return <tr key={String(row.id)}>
+          <td>{String(row.originWarehouse ?? "")}</td>
+          <td>{String(row.destinationWarehouse ?? "")}</td>
+          {/* Buscaba `lines` donde el servidor manda `items`, así que esta
+              celda era un guion en TODAS las filas: la tabla de
+              transferencias no decía qué se transfería. */}
+          <td>{detalle.length ? detalle.map((linea) => `${linea.ingredientName} (${linea.quantity}${linea.unit ? ` ${linea.unit}` : ""})`).join(", ") : "—"}</td>
+          <td><RestaurantStatusBadge status={status} />{nextAction ? <p className="mt-1 text-xs text-ink-2">{nextAction}</p> : null}</td>
+          <td className="flex flex-wrap gap-2">
+            {status === "DRAFT" ? <Button size="sm" onClick={() => action.mutate({ id: String(row.id), type: "send" })}><Send className="size-4" />{uiText("Enviar transferencia")}</Button> : null}
+            {["SENT", "IN_TRANSIT"].includes(status) ? <Button size="sm" onClick={() => { void confirmAction({ title: "¿Confirmar la recepción de la transferencia?", description: "Da por recibida la mercancía en el almacén de destino.", consequence: "Se descuenta del almacén de origen y se suma al de destino.", confirmLabel: "Confirmar la recepción", irreversible: true }).then((ok) => ok && action.mutate({ id: String(row.id), type: "receive" })); }}><Truck className="size-4" />{uiText("Confirmar recepción")}</Button> : null}
+            {["DRAFT", "SENT"].includes(status) ? <Button size="sm" variant="secondary" onClick={() => { void confirmAction({ title: "¿Cancelar la transferencia?", description: "La transferencia queda anulada y deja de poder enviarse ni recibirse.", consequence: "Si ya se había enviado, la mercancía no vuelve sola al origen: hay que registrar el movimiento de vuelta.", confirmLabel: "Cancelar la transferencia", cancelLabel: "Conservarla", irreversible: true }).then((ok) => ok && action.mutate({ id: String(row.id), type: "cancel" })); }}>{uiText("Cancelar transferencia")}</Button> : null}
+          </td>
+        </tr>;
+      })}</Table>
+    </QueryState>
+  </div>;
 }
 function Phase2Dashboard({ branchId }: { branchId: string }) { const q = useQuery({ queryKey: ["restaurant-phase2-dashboard", branchId], queryFn: () => fetchRestaurantPhase2Dashboard({ branchId }) }); const d = q.data; return <QueryState loading={q.isLoading} error={q.error} retry={() => void q.refetch()}><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[["Vencidos", d?.expiredProducts], ["Por vencer", d?.expiringSoon], ["Conteos pendientes", d?.pendingCounts], ["Diferencias", d?.inventoryDifferences], ["Transferencias en tránsito", d?.transfersInTransit]].map(([label, value]) => <Card key={String(label)} level={2}><CardContent className="p-5"><p className="text-sm text-text-secondary">{label}</p><p className="mt-2 text-2xl font-semibold">{value ?? 0}</p></CardContent></Card>)}</div></QueryState>; }
 function Catalog({ branchId }: { branchId: string }) { const ingredients = useQuery({ queryKey: ["phase2-ingredients"], queryFn: () => fetchRestaurantIngredients({ status: "ACTIVE", pageSize: 200 }) }); const warehouses = useQuery({ queryKey: ["phase2-warehouses", branchId], queryFn: () => fetchRestaurantWarehouses({ status: "ACTIVE", pageSize: 200 }) }); return { ingredients: ingredients.data?.data ?? [], warehouses: (warehouses.data?.data ?? []).filter((item) => item.branchId === branchId), loading: ingredients.isLoading || warehouses.isLoading, error: ingredients.error ?? warehouses.error, retry: () => { void ingredients.refetch(); void warehouses.refetch(); } }; }
 function AdjustmentsScreen({ branchId }: { branchId: string }) {
-  const uiText = useUiText(); const catalog = Catalog({ branchId }); const qc = useQueryClient(); const [warehouseId, setWarehouseId] = useState(""); const [ingredientId, setIngredientId] = useState(""); const [quantity, setQuantity] = useState(""); const [reason, setReason] = useState(""); const [reviewing, setReviewing] = useState(false); const save = useMutation({ mutationFn: () => createRestaurantAdjustment({ branchId, warehouseId, ingredientId, quantity: Number(quantity), reason }), onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ["restaurant-stock"] }), qc.invalidateQueries({ queryKey: ["restaurant-movements"] }), qc.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), qc.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] })]); } }); const invalid = !warehouseId || !ingredientId || !reason.trim() || !Number.isFinite(Number(quantity)) || Number(quantity) === 0; return <div className="space-y-4"><PageHeader eyebrow="Control" title={uiText("Ajustes")} description={uiText("Registra la diferencia, revisa el saldo resultante y confirma el movimiento.")} />{catalog.error || save.error ? <InlineFeedback tone="danger" title={uiText("No se pudo aplicar el ajuste")}>{getApiErrorMessage(catalog.error ?? save.error, "Revisa los datos y vuelve a intentarlo.")}</InlineFeedback> : null}<Card level={2}><CardContent className="space-y-4 p-5">{!reviewing ? <><div className="grid gap-3 sm:grid-cols-2"><Select id="adjustment-warehouse" label={uiText("Almacén")} value={warehouseId} options={catalog.warehouses.map((item) => ({ id: item.id, label: item.name }))} onChange={setWarehouseId} /><Select id="adjustment-ingredient" label={uiText("Ingrediente")} value={ingredientId} options={catalog.ingredients.map((item) => ({ id: item.id, label: `${item.sku} · ${item.name}` }))} onChange={setIngredientId} /><Field id="adjustment-quantity" label={uiText("Diferencia (+ / -)")} type="number" value={quantity} onChange={setQuantity} /><Field id="adjustment-reason" label={uiText("Motivo")} value={reason} onChange={setReason} /></div><Button disabled={invalid} onClick={() => setReviewing(true)}>{uiText("Revisar impacto")}</Button></> : <><h2 className="font-semibold">{uiText("Revisar impacto")}</h2><p className="text-sm text-text-secondary">{ingredientId} {uiText(" · diferencia de ")}{quantity} {uiText(" unidades de inventario en ")}{warehouseId}.</p><InlineFeedback tone="warning" title={uiText("Confirmación irreversible")}>{uiText("El ajuste modificará existencias y creará un movimiento auditable.")}</InlineFeedback><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setReviewing(false)}>{uiText("Corregir ajuste")}</Button><Button disabled={save.isPending} onClick={() => { void confirmAction({ title: "¿Aplicar el ajuste?", description: "Cambia la existencia registrada del ingrediente.", consequence: "Queda como movimiento en el Kardex, a tu nombre.", confirmLabel: "Aplicar el ajuste", irreversible: true }).then((ok) => ok && save.mutate()); }}>{save.isPending ? uiText("Aplicando…") : "Confirmar ajuste"}</Button></div></>}{save.isSuccess ? <InlineFeedback tone="success" title={uiText("Ajuste aplicado")}>{uiText("El movimiento fue creado y existencias, movimientos y métricas ya fueron actualizados.")}</InlineFeedback> : null}</CardContent></Card></div>; }
-function Lines({ title, lines, options, onChange, showReason, showLot }: { title: string; lines: Line[]; options: Array<{ id: string; label: string }>; onChange: (lines: Line[]) => void; showReason?: boolean; showLot?: boolean }) {
-  const uiText = useUiText(); return <div className="space-y-3"><h2 className="font-semibold">{title}</h2>{lines.map((line, index) => <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 sm:grid-cols-[2fr_1fr_1.5fr_auto]"><Select id={`line-ingredient-${index}`} label={uiText("Ingrediente")} value={line.ingredientId} options={options} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, ingredientId: value } : item))} /><Field id={`line-quantity-${index}`} label={showReason ? "Cantidad física" : uiText("Cantidad")} type="number" value={line.quantity} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, quantity: value } : item))} />{showReason ? <Field id={`line-reason-${index}`} label={uiText("Motivo")} value={line.reason ?? ""} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, reason: value } : item))} /> : showLot ? <Field id={`line-lot-${index}`} label={uiText("Lote (opcional)")} value={line.lotId ?? ""} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, lotId: value } : item))} /> : <span />}{lines.length > 1 ? <Button variant="ghost" size="sm" className="self-end" aria-label={uiText("Eliminar línea")} onClick={() => onChange(lines.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button> : null}</div>)}</div>; }
+  const uiText = useUiText(); const catalog = Catalog({ branchId }); const qc = useQueryClient(); const [warehouseId, setWarehouseId] = useState(""); const [ingredientId, setIngredientId] = useState(""); const [quantity, setQuantity] = useState(""); const [reason, setReason] = useState(""); const [reviewing, setReviewing] = useState(false); const save = useMutation({ mutationFn: () => createRestaurantAdjustment({ branchId, warehouseId, ingredientId, quantity: Number(quantity), reason }), onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ["restaurant-stock"] }), qc.invalidateQueries({ queryKey: ["restaurant-movements"] }), qc.invalidateQueries({ queryKey: ["restaurant-dashboard"] }), qc.invalidateQueries({ queryKey: ["restaurant-phase2-dashboard"] })]); } }); const invalid = !warehouseId || !ingredientId || !reason.trim() || !Number.isFinite(Number(quantity)) || Number(quantity) === 0; return <div className="space-y-4"><PageHeader eyebrow="Control" title={uiText("Ajustes")} description={uiText("Registra la diferencia, revisa el saldo resultante y confirma el movimiento.")} />{catalog.error || save.error ? <InlineFeedback tone="danger" title={uiText("No se pudo aplicar el ajuste")}>{getApiErrorMessage(catalog.error ?? save.error, "Revisa los datos y vuelve a intentarlo.")}</InlineFeedback> : null}<Card level={2}><CardContent className="space-y-4 p-5">{!reviewing ? <><div className="grid gap-3 sm:grid-cols-2"><Select id="adjustment-warehouse" label={uiText("Almacén")} value={warehouseId} options={catalog.warehouses.map((item) => ({ id: item.id, label: item.name }))} onChange={setWarehouseId} /><Select id="adjustment-ingredient" label={uiText("Ingrediente")} value={ingredientId} options={catalog.ingredients.map((item) => ({ id: item.id, label: `${item.sku} · ${item.name}` }))} onChange={setIngredientId} /><Field id="adjustment-quantity" label={uiText("Diferencia (+ / -)")} type="number" value={quantity} onChange={setQuantity} /><Field id="adjustment-reason" label={uiText("Motivo")} value={reason} onChange={setReason} /></div><Button disabled={invalid} onClick={() => setReviewing(true)}>{uiText("Revisar impacto")}</Button></> : <><h2 className="font-semibold">{uiText("Revisar impacto")}</h2>{/*
+      Decía «3f2a1b9c-… · diferencia de -4 unidades de inventario en
+      8d4e7f21-…»: el paso que existe para que alguien COMPRUEBE lo que va a
+      registrar interpolaba los identificadores de los selectores en vez de los
+      nombres que se acababan de elegir.
+    */}<p className="text-sm text-ink-2"><strong className="text-ink-1">{catalog.ingredients.find((item) => item.id === ingredientId)?.name ?? ingredientId}</strong>{uiText(" · diferencia de ")}<strong className="text-ink-1">{Number(quantity) > 0 ? `+${quantity}` : quantity}</strong>{uiText(" unidades de inventario en ")}<strong className="text-ink-1">{catalog.warehouses.find((item) => item.id === warehouseId)?.name ?? warehouseId}</strong>.</p><InlineFeedback tone="warning" title={uiText("Confirmación irreversible")}>{uiText("El ajuste modificará existencias y creará un movimiento auditable.")}</InlineFeedback><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setReviewing(false)}>{uiText("Corregir ajuste")}</Button><Button disabled={save.isPending} onClick={() => { void confirmAction({ title: "¿Aplicar el ajuste?", description: "Cambia la existencia registrada del ingrediente.", consequence: "Queda como movimiento en el Kardex, a tu nombre.", confirmLabel: "Aplicar el ajuste", irreversible: true }).then((ok) => ok && save.mutate()); }}>{save.isPending ? uiText("Aplicando…") : "Confirmar ajuste"}</Button></div></>}{save.isSuccess ? <InlineFeedback tone="success" title={uiText("Ajuste aplicado")}>{uiText("El movimiento fue creado y existencias, movimientos y métricas ya fueron actualizados.")}</InlineFeedback> : null}</CardContent></Card></div>; }
+/**
+ * Las líneas de una operación.
+ *
+ * El campo del lote era una caja de texto libre que se mandaba al backend como
+ * `lotId`. Ahora recibe los lotes reales del almacén de origen para ese
+ * ingrediente, con código, cantidad y vencimiento, de modo que se pueda sacar
+ * primero lo que caduca antes en vez de escribir un identificador a mano.
+ */
+function Lines({ title, lines, options, onChange, showReason, lotOptions }: { title: string; lines: Line[]; options: Array<{ id: string; label: string }>; onChange: (lines: Line[]) => void; showReason?: boolean; lotOptions?: (ingredientId: string) => Array<{ id: string; label: string }> }) {
+  const uiText = useUiText();
+  return <div className="space-y-3"><h2 className="font-semibold">{title}</h2>{lines.map((line, index) => <div key={index} className="grid gap-2 rounded-xl border border-line p-3 sm:grid-cols-[2fr_1fr_1.5fr_auto]">
+    <Select id={`line-ingredient-${index}`} label={uiText("Ingrediente")} value={line.ingredientId} options={options} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, ingredientId: value, lotId: "" } : item))} />
+    <Field id={`line-quantity-${index}`} label={showReason ? "Cantidad física" : uiText("Cantidad")} type="number" value={line.quantity} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, quantity: value } : item))} />
+    {showReason
+      ? <Field id={`line-reason-${index}`} label={uiText("Motivo")} value={line.reason ?? ""} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, reason: value } : item))} />
+      : lotOptions
+        ? <Select id={`line-lot-${index}`} label={uiText("Lote (opcional)")} value={line.lotId ?? ""} options={line.ingredientId ? lotOptions(line.ingredientId) : []} onChange={(value) => onChange(lines.map((item, i) => i === index ? { ...item, lotId: value } : item))} />
+        : <span />}
+    {lines.length > 1 ? <Button variant="ghost" size="sm" className="self-end" aria-label={uiText("Eliminar línea")} onClick={() => onChange(lines.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button> : null}
+  </div>)}</div>; }
 function Select({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Array<{ id: string; label: string }>; onChange: (value: string) => void }) {
   const uiText = useUiText(); return <div><Label htmlFor={id}>{label}</Label><select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-2xl border border-border-default bg-surface-elevated px-3"><option value="">{uiText("Seleccionar")}</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>; }
 function Field({ id, label, value, onChange, type = "text" }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string }) { return <div><Label htmlFor={id}>{label}</Label><Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} /></div>; }

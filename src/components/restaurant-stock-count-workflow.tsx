@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { formatQuantity } from "@/lib/restaurant-operation";
+import { formatDateTime } from "@/lib/platform-labels";
 import {
   initialOperationState,
   type OperationImpact,
@@ -500,11 +501,26 @@ function PendingCounts({ counts }: { counts: RestaurantStockCountDto[] }) {
         <ul className="divide-y divide-line">
           {pending.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+              {/*
+                Aquí se leía el nombre del almacén —que `stockCounts()` no
+                entrega, porque es el único listado del módulo que no enriquece
+                la fila— sobre una fecha `createdAt` inexistente y un recuento
+                de diferencias que el backend oculta hasta aprobar. En pantalla
+                salía una línea vacía, «Invalid Date» y «undefined diferencias».
+
+                Un conteo pendiente se identifica por su número y su fecha, y
+                lo único que se sabe de él es cuántas líneas tiene: las
+                diferencias no existen todavía, y escribir «0» sería afirmar un
+                resultado que aún no se ha calculado.
+              */}
               <div className="min-w-0">
-                <p className="truncate font-medium text-ink-1">{item.warehouseName}</p>
+                <p className="truncate font-medium text-ink-1">
+                  {item.countNumber || uiText("Conteo sin número")}
+                  {item.warehouseName ? <span className="font-normal text-ink-2">{" · "}{item.warehouseName}</span> : null}
+                </p>
                 <p className="font-mono text-2xs text-ink-3 tabular-figures">
-                  {new Date(item.createdAt).toLocaleString()} ·{" "}
-                  {item.differences === 1 ? "1 diferencia" : `${item.differences} diferencias`}
+                  {item.createdAt ? formatDateTime(item.createdAt) : uiText("Sin fecha")}
+                  {item.lines?.length ? ` · ${item.lines.length} ${uiText("líneas contadas")}` : ""}
                 </p>
               </div>
               <RestaurantStatusBadge status={item.status} size="sm" />

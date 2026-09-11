@@ -17,6 +17,7 @@ import {
   SkeletonRows,
   StatusBadge,
 } from "@/components/system";
+import { cn } from "@/lib/utils";
 import { questionDifficultyLabel } from "@/lib/training-labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -159,18 +160,11 @@ function AssessmentBuilder() {
             {/* La vuelta al curso. Sin esto, quien llegaba desde el asistente
                 se quedaba aquí: la miga de pan lleva a «Cursos», que es otra
                 pantalla, y el asistente se perdía. */}
-            {/* Quien llega desde el asistente viene a hacer UNA evaluación y
-                volver. La acción principal es la vuelta, no crear otra: antes
-                el botón de volver era secundario y competía con «Nueva
-                evaluación», que es lo que menos falta hace en ese momento. */}
-            {courseId ? (
-              <Button asChild>
-                <Link href={`/training/content/${encodeURIComponent(courseId)}`}>
-                  <ArrowLeft className="size-4" aria-hidden="true" />{uiText("Volver al curso")}
-                </Link>
-              </Button>
-            ) : null}
-            <Button variant={courseId ? "secondary" : "default"} onClick={() => setCreateOpen(true)}><Plus />{uiText("Nueva evaluación")}</Button>
+            {/* La vuelta al curso NO vive aquí: estaba en la cabecera, lejos
+                de donde se termina el trabajo, compitiendo con «Nueva
+                evaluación». Vive en la barra de debajo, que además dice en qué
+                estado está el recado. */}
+            <Button onClick={() => setCreateOpen(true)}><Plus />{uiText("Nueva evaluación")}</Button>
           </div>
         }
       />
@@ -184,24 +178,36 @@ function AssessmentBuilder() {
       ) : null}
       {/* El final del recado.
           Se llega aquí desde el asistente del curso, que exige una evaluación.
-          Al crearla, la pantalla no decía nada: la persona se quedaba mirando
-          una lista, sin saber que el curso seguía a medias esperándola. En
-          cuanto hay una evaluación lista para usarse, esto lo dice y ofrece la
-          vuelta como acción destacada. */}
-      {courseId && listaParaVolver ? (
-        <section className="flex flex-col gap-3 rounded-xl border border-status-success/40 bg-status-success/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          Esta barra es la única vuelta al curso —antes había un botón arriba,
+          lejos de donde se termina el trabajo— y dice en qué estado está lo que
+          se vino a hacer: si ya hay una evaluación utilizable, invita a volver;
+          si todavía no, lo recuerda sin cerrar la puerta. */}
+      {courseId ? (
+        <section
+          className={cn(
+            "flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5",
+            listaParaVolver ? "border-status-success/40 bg-status-success/5" : "border-line bg-surface-2",
+          )}
+        >
           <div className="flex min-w-0 items-start gap-3">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-status-success" aria-hidden="true" />
+            {listaParaVolver
+              ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-status-success" aria-hidden="true" />
+              : <ClipboardCheck className="mt-0.5 size-5 shrink-0 text-ink-3" aria-hidden="true" />}
             <div className="min-w-0">
-              <p className="font-semibold text-ink-1">{uiText("La evaluación ya está lista")}</p>
+              <p className="font-semibold text-ink-1">
+                {listaParaVolver ? uiText("La evaluación ya está lista") : uiText("El curso te espera para terminar")}
+              </p>
               <p className="mt-0.5 text-sm text-ink-2">
-                {uiText("Vuelve al curso para seguir donde lo dejaste: el paso de evaluación ya queda cubierto.")}
+                {listaParaVolver
+                  ? uiText("Vuelve al curso para seguir donde lo dejaste: el paso de evaluación ya queda cubierto.")
+                  : uiText("Crea una evaluación con al menos una pregunta y vuelve al curso para continuar.")}
               </p>
             </div>
           </div>
-          <Button asChild className="shrink-0">
+          <Button asChild variant={listaParaVolver ? "default" : "secondary"} className="shrink-0">
             <Link href={`/training/content/${encodeURIComponent(courseId)}`}>
-              <ArrowLeft className="size-4" aria-hidden="true" />{uiText("Volver al curso y continuar")}
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              {listaParaVolver ? uiText("Volver al curso y continuar") : uiText("Volver al curso")}
             </Link>
           </Button>
         </section>

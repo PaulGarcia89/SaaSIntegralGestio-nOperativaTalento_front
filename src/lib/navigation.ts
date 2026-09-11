@@ -1,4 +1,4 @@
-import { restaurantSections } from "./restaurant-navigation";
+import { restaurantLabelByHref, restaurantSections } from "./restaurant-navigation";
 import type { ModuleKey, PermissionKey, RoleKey, SubscriptionAccessState } from "@/lib/contracts";
 
 export type NavGroup = "Inicio" | "Personas" | "Productividad" | "Reclutamiento" | "Aprendizaje" | "Operaciones" | "Inventario de activos" | "Inventario de restaurante" | "Analítica" | "Administración" | "Gobierno de plataforma";
@@ -238,6 +238,18 @@ const unavailableRouteHrefs = new Set(["/admin/settings"]);
 
 export const appNavigation: NavItem[] = configuredNavigation.map((item) => ({
   ...item,
+  /*
+   * Un solo nombre por pantalla.
+   *
+   * El buscador (⌘K) y el menú rápido del móvil leen ESTE rótulo, y la
+   * navegación dentro del módulo de restaurante leía el suyo: la misma
+   * pantalla se llamaba «Desperdicios» en uno y «Registrar desperdicio» en la
+   * otra, mientras «Merma» nombraba una pantalla DISTINTA —el listado de
+   * pérdidas sin explicar—, así que buscar «merma» llevaba al informe y no a
+   * la operación. Donde el módulo tiene un nombre propio para la ruta, manda
+   * el suyo; el resto de módulos no se toca.
+   */
+  label: restaurantLabelByHref.get(item.href) ?? item.label,
   section: sectionForNavItem(item),
   requiredPermissions: [item.permission],
   featureFlag: `module.${item.module}`,

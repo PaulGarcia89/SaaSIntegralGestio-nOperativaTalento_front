@@ -218,7 +218,14 @@ export function DataView<T>({
                   </th>
                 );
               })}
-              {rowActions ? (
+              {/*
+                `onRowAction` solo existía en el móvil: en el escritorio la
+                misma tabla no se podía abrir por ninguna parte, así que una
+                pantalla que ofrecía el detalle al tocar la ficha en el
+                teléfono lo escondía por completo en el ordenador. Ahora la
+                acción de fila tiene su columna aquí también.
+              */}
+              {rowActions || onRowAction ? (
                 <th scope="col" className="px-4 py-3 text-right text-2xs font-semibold uppercase tracking-[0.08em] text-ink-2">
                   <span className="sr-only">{t("sys.actions")}</span>
                 </th>
@@ -263,7 +270,22 @@ export function DataView<T>({
                       {column.render(row)}
                     </td>
                   ))}
-                  {rowActions ? <td className="px-4 text-right">{rowActions(row)}</td> : null}
+                  {rowActions || onRowAction ? (
+                    <td className="px-4 text-right">
+                      {rowActions ? rowActions(row) : null}
+                      {onRowAction ? (
+                        <button
+                          type="button"
+                          onClick={() => onRowAction(row)}
+                          aria-label={rowActionLabel?.(row)}
+                          className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-1 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                        >
+                          {t("sys.view")}
+                          <ChevronRight className="size-4" aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}

@@ -27,10 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
-import {
-  formatMoney,
-  restaurantOperationImpact,
-} from "@/lib/restaurant-operation";
+import { formatMoney, restaurantOperationImpact } from "@/lib/restaurant-operation";
+import { formatDate } from "@/lib/platform-labels";
 import {
   initialOperationState,
   type OperationOutcome,
@@ -455,8 +453,16 @@ function PendingWasteInbox({ query }: { query: ReturnType<typeof useQuery<Record
         {query.data.map((item) => (
           <li key={String(item.id)} className="flex items-baseline justify-between gap-3 py-2 text-sm">
             <span className="min-w-0 truncate text-ink-1">{String(item.reason ?? "Sin motivo")}</span>
-            <span className="shrink-0 font-mono text-ink-2 tabular-figures">
-              {formatMoney(Number(item.totalCost ?? item.wasteCost ?? 0))}
+            {/*
+              Este importe salía «USD 0,00» en todas las mermas pendientes: el
+              costo vive en cada línea (`unitCostSnapshot`) y el listado no lo
+              agregaba, así que la pantalla leía un `totalCost` que no existía.
+              Ahora `wastes()` lo suma en el servidor. Se acompaña de la fecha
+              porque una merma sin cuándo no se puede rastrear.
+            */}
+            <span className="shrink-0 text-right">
+              <span className="block font-mono text-ink-1 tabular-figures">{formatMoney(Number(item.totalCost ?? 0))}</span>
+              {item.wasteDate ? <span className="block font-mono text-2xs text-ink-3 tabular-figures">{formatDate(String(item.wasteDate))}</span> : null}
             </span>
           </li>
         ))}

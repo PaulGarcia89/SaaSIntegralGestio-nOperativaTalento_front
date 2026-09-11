@@ -5,21 +5,15 @@ import { useUiText } from "@/components/ui-copy";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowRightLeft,
-  ClipboardList,
   Download,
-  PackagePlus,
   RefreshCw,
-  Trash2,
-  Truck,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import {
-  ActiveContext,
   EmptyState,
   ErrorState,
   InlineNote,
   NextAction,
+  PageHeader,
   PageSection,
   SkeletonRows,
   StatusBadge,
@@ -36,9 +30,9 @@ import {
   fetchRestaurantStock,
   getApiErrorMessage,
 } from "@/lib/backend";
-import type { PermissionKey } from "@/lib/contracts";
 import { useAppStore } from "@/store/app-store";
 import { useRestaurantInventoryContext } from "@/components/restaurant-inventory-context";
+import { estaBajoMinimo, porUrgencia } from "@/lib/restaurant-stock-rows";
 
 /* ==========================================================================
    PANEL DEL INVENTARIO DE RESTAURANTE
@@ -63,59 +57,7 @@ import { useRestaurantInventoryContext } from "@/components/restaurant-inventory
    la ubicación es el almacén activo, escrito arriba.
    ========================================================================== */
 
-type Operacion = {
-  key: string;
-  /** Se traducen al pintarlas: la lista es una constante de módulo y no
-   *  alcanza al traductor. */
-  label: string;
-  detail: string;
-  href: string;
-  icon: ReactNode;
-  permissions: PermissionKey[];
-};
 
-const OPERACIONES: Operacion[] = [
-  {
-    key: "receipts",
-    label: "Recibir productos",
-    detail: "Registra una entrada de mercancía.",
-    href: "/inventory/restaurant/receipts",
-    icon: <Truck className="size-5" aria-hidden="true" />,
-    permissions: ["restaurant_inventory.manage", "restaurant_inventory.receipts.create"],
-  },
-  {
-    key: "consumption",
-    label: "Registrar salida",
-    detail: "Descuenta consumo o producción.",
-    href: "/inventory/restaurant/consumption",
-    icon: <PackagePlus className="size-5" aria-hidden="true" />,
-    permissions: ["restaurant_inventory.manage", "restaurant_inventory.operations.create"],
-  },
-  {
-    key: "waste",
-    label: "Registrar merma",
-    detail: "Producto perdido o dañado.",
-    href: "/inventory/restaurant/waste",
-    icon: <Trash2 className="size-5" aria-hidden="true" />,
-    permissions: ["restaurant_inventory.manage", "restaurant_inventory.operations.create"],
-  },
-  {
-    key: "transfers",
-    label: "Transferir productos",
-    detail: "Mueve existencias entre almacenes.",
-    href: "/inventory/restaurant/transfers",
-    icon: <ArrowRightLeft className="size-5" aria-hidden="true" />,
-    permissions: ["restaurant_inventory.manage", "restaurant_inventory.transfers.manage"],
-  },
-  {
-    key: "stock-counts",
-    label: "Realizar conteo",
-    detail: "Compara existencia física y teórica.",
-    href: "/inventory/restaurant/stock-counts",
-    icon: <ClipboardList className="size-5" aria-hidden="true" />,
-    permissions: ["restaurant_inventory.manage", "restaurant_inventory.counts.approve"],
-  },
-];
 
 /** Cuántas filas de alerta caben antes de que la lista deje de leerse. */
 const MAX_ALERTAS = 5;
@@ -123,7 +65,7 @@ const MAX_ALERTAS = 5;
 export function RestaurantModulePanel() {
   const uiText = useUiText();
   const { locale } = useLocale();
-  const { currentBranch, can, canAny } = useAppStore();
+  const { currentBranch, can } = useAppStore();
   const { warehouseId, warehouseName } = useRestaurantInventoryContext();
 
   // Ver dinero es una decisión de permiso, no de diseño. Sin
@@ -159,9 +101,17 @@ export function RestaurantModulePanel() {
   const tendencia = agruparPorDia(datos?.consumptionTrend ?? [], locale);
   const entradasBorrador = basico.data?.recentReceipts.filter((item) => item.status === "DRAFT").length;
 
-  const bajoMinimo = (existencias.data ?? [])
-    .filter((item) => item.stock < item.minimumStock)
-    .sort((izq, der) => izq.stock / Math.max(1, izq.minimumStock) - der.stock / Math.max(1, der.minimumStock));
+  /*
+   * Faltantes.
+   *
+   * La comparación vivía aquí escrita a mano y comparaba `undefined` contra un
+   * número —el endpoint de saldos nunca entregó `stock`—, así que daba `false`
+   * siempre y esta lista salía vacía en todos los almacenes. El panel decía
+   * «no hay nada urgente» con la cocina sin producto. Ahora el dato llega
+   * normalizado desde `fetchRestaurantStock` y la regla es la misma función
+   * que usa la pantalla «Existencias», para que no puedan volver a discrepar.
+   */
+  const bajoMinimo = porUrgencia((existencias.data ?? []).filter(estaBajoMinimo));
 
   const vencimientos = datos?.upcomingExpirations ?? [];
 
@@ -185,7 +135,6 @@ export function RestaurantModulePanel() {
         { id: "merma", label: uiText("Merma"), value: datos.waste, color: URGENCY_COLOR_CLASS.danger },
       ]
     : [];
-  const operaciones = OPERACIONES.filter((operacion) => canAny(operacion.permissions));
 
   /** `undefined` mientras carga · `null` si el servidor no lo entrega. */
   const cifra = (valor: number | undefined, consulta: { isError: boolean; isLoading: boolean }) =>
@@ -248,7 +197,12 @@ export function RestaurantModulePanel() {
 
   return (
     <div className="space-y-6">
-      <ActiveContext extra={uiText("Almacén: {{name}}", { name: warehouseName })} />
+      <PageHeader
+        eyebrow={uiText("Inventario de restaurante")}
+        title={uiText("Resumen")}
+        description={uiText("Lo urgente primero, luego cómo va el almacén y a dónde se está yendo el producto.")}
+        meta={<span>{warehouseName}</span>}
+      />
 
       {/* ---- 1. Qué hago ahora ------------------------------------------ */}
       {recomendada ? (
@@ -389,7 +343,7 @@ export function RestaurantModulePanel() {
                     {item.stock} {item.inventoryUnit}
                   </span>
                   <span className="block font-mono text-2xs text-ink-3 tabular-figures">
-                    {uiText("mínimo")}{item.minimumStock} {item.inventoryUnit}
+                    {uiText("mínimo ")}{item.minimumStock} {item.inventoryUnit}
                   </span>
                 </span>
                 <StatusBadge size="sm" tone="danger" label={uiText("Bajo mínimo")} />
@@ -428,29 +382,11 @@ export function RestaurantModulePanel() {
         </PageSection>
       ) : null}
 
-      {/* ---- 4. Las operaciones del día --------------------------------- */}
-      {operaciones.length > 0 ? (
-        <PageSection title={uiText("Operaciones del día")} id="operaciones">
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {operaciones.map((operacion) => (
-              <li key={operacion.key} className="min-w-0">
-                <Link
-                  href={operacion.href}
-                  className="group flex h-full min-w-0 items-start gap-3 rounded-lg border border-line bg-surface-1 p-4 transition-colors hover:border-line-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink-2">
-                    {operacion.icon}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-ink-1">{uiText(operacion.label)}</span>
-                    <span className="mt-0.5 block text-sm text-ink-2">{uiText(operacion.detail)}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </PageSection>
-      ) : null}
+      {/* Las cinco operaciones del día vivían aquí, y SOLO aquí: quien entraba
+          por «Existencias» no las veía nunca. Ahora son la barra del módulo
+          (`restaurant-actions.tsx`), que se pinta encima de todas sus
+          pantallas. Repetirlas aquí volvería a apilar dos rejillas de lo
+          mismo en la primera pantalla. */}
 
       {/* ---- 5. A dónde va el producto ----------------------------------
           Solo si se puede ver dinero: sin `commercial.view` estas dos cifras

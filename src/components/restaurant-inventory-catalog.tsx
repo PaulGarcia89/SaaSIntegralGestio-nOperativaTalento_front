@@ -147,6 +147,7 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
           setSortOrder(direction);
         }}
         onEdit={openForm}
+        onCreate={() => openForm()}
         onDeactivate={setDeactivating}
         onClearFilters={
           search || status !== "ACTIVE"
@@ -212,6 +213,7 @@ function CatalogTable({
   sortOrder,
   onSort,
   onEdit,
+  onCreate,
   onDeactivate,
   onClearFilters,
 }: {
@@ -223,10 +225,13 @@ function CatalogTable({
   sortOrder: "asc" | "desc";
   onSort: (key: string, direction: "asc" | "desc") => void;
   onEdit: (item: RecordValue) => void;
+  onCreate: () => void;
   onDeactivate: (item: RecordValue) => void;
   onClearFilters?: () => void;
 }) {
   const uiText = useUiText();
+  const { tenantBranches } = useAppStore();
+  const nombreDeSucursal = (id: string) => tenantBranches.find((branch) => branch.id === id)?.name;
   const headers: Array<[string, string]> =
     kind === "categories"
       ? [["name", "Nombre"], ["description", "Descripción"]]
@@ -239,10 +244,20 @@ function CatalogTable({
             : [
                 ["sku", "SKU"],
                 ["name", "Nombre"],
-                ["category", "Categoría"],
-                ["inventoryUnit", "Unidad"],
+                /*
+                 * `category` e `inventoryUnit` no existen en la respuesta: el
+                 * servidor manda `categoryName` e `inventoryUnitName`, así que
+                 * estas dos columnas salían vacías en todos los ingredientes.
+                 *
+                 * Y «Costo promedio» se ha quitado: el costo de un ingrediente
+                 * depende del almacén —se calcula sobre el saldo, no sobre la
+                 * ficha—, de modo que en un catálogo global la columna no
+                 * podía tener valor y salía siempre en blanco. Donde sí
+                 * significa algo es en «Existencias», que es de donde se lee.
+                 */
+                ["categoryName", "Categoría"],
+                ["inventoryUnitName", "Unidad"],
                 ["minimumStock", "Stock mínimo"],
-                ["averageCost", "Costo promedio"],
               ];
 
   const displayValue = (item: RecordValue, key: string) =>
@@ -253,7 +268,10 @@ function CatalogTable({
             ([item.city, item.state].filter(Boolean).join(", ") || "Ubicación no registrada"),
         )
       : key === "branchName"
-        ? String(item.branchName ?? item.branchId ?? "—")
+        // `warehouses()` no enriquece la fila, así que `branchName` nunca
+        // llegaba y la columna «Sucursal» enseñaba el UUID. El nombre está en
+        // el propio navegador: las sucursales del tenant ya están cargadas.
+        ? String(item.branchName ?? nombreDeSucursal(String(item.branchId ?? "")) ?? "—")
         : String(item[key] ?? "—");
 
   const columns: Array<DataColumn<RecordValue>> = [
@@ -287,6 +305,11 @@ function CatalogTable({
       sort={{ key: sortBy, direction: sortOrder }}
       onSortChange={(next) => onSort(next?.key ?? "name", next?.direction ?? "asc")}
       emptyReason={onClearFilters ? "no-matches" : "no-records"}
+      // Un catálogo vacío es el principio de todo el módulo: sin ingredientes
+      // no hay existencias, ni recetas, ni consumo. Dejarlo sin salida
+      // obligaba a buscar el botón «Nuevo» del encabezado, que en el teléfono
+      // queda fuera de la pantalla cuando la tabla está vacía.
+      emptyAction={!onClearFilters && canManage ? <Button onClick={onCreate}><Plus className="size-4" aria-hidden="true" />{uiText("Crear el primero")}</Button> : undefined}
       onClearFilters={onClearFilters}
       rowActions={
         canManage

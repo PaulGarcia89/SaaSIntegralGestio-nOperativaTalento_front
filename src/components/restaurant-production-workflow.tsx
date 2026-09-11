@@ -495,6 +495,13 @@ export function RestaurantProductionWorkflow({
  * Antes el estado se mostraba con su código (`DRAFT`, `IN_PROGRESS`) y el
  * importe con un `$` fijo aunque el resto del módulo formatea la moneda.
  */
+/** Cómo se nombra una orden de producción cuando el listado no trae la receta. */
+function etiquetaDeOrden(item: RestaurantProductionDto) {
+  const fila = item as unknown as Record<string, unknown>;
+  const lote = String(fila.lotNumber ?? "");
+  return lote ? `Lote ${lote}` : String(fila.id ?? "");
+}
+
 function PendingProductionInbox({
   query,
 }: {
@@ -517,10 +524,26 @@ function PendingProductionInbox({
           <ul className="divide-y divide-line">
             {query.data.map((item) => (
               <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+                {/*
+                  `preparationName` y `consumedCost` los entrega la VISTA
+                  PREVIA de producción, que es una respuesta construida a mano;
+                  el listado devuelve la orden de Prisma, que sólo guarda
+                  `recipeId` y `lotNumber`. Así que el nombre salía vacío y el
+                  costo salía «USD 0,00» en todas las órdenes pendientes.
+
+                  Ahora `productions()` resuelve el nombre por `recipeId` y
+                  suma el costo de las líneas de salida. El respaldo por lote
+                  se conserva para una orden cuya receta se archivó: identifica
+                  la orden por lo que la etiqueta en la cocina en vez de dejar
+                  la fila sin nombre.
+                */}
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-ink-1">{item.preparationName}</p>
+                  <p className="truncate font-medium text-ink-1">
+                    {item.preparationName || etiquetaDeOrden(item)}
+                  </p>
                   <p className="font-mono text-2xs text-ink-3 tabular-figures">
-                    {formatQuantity(item.plannedQuantity)} {uiText(" planificadas · ")}{formatMoney(item.consumedCost)}
+                    {formatQuantity(item.plannedQuantity)}{uiText(" planificadas")}
+                    {` · ${formatMoney(Number(item.consumedCost ?? 0))}`}
                   </p>
                 </div>
                 <RestaurantStatusBadge status={item.status} size="sm" />

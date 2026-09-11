@@ -854,6 +854,296 @@ aparecen en las DOS partes del correo. `npx nest build` EXIT 0.
 `scripts/preview-notification-email.ts` genera los dos casos para revisarlos en
 un cliente real sin enviar nada.
 
+## 2.unvicies Los dibujos de la portada en pantalla pequeña (2026-09-10)
+
+Las dos ilustraciones animadas de la portada no existían por debajo de cierto
+ancho, y el fallo era distinto en cada una.
+
+### Ciclo de vida: la línea no estaba
+
+La línea que une las ocho etapas era `hidden lg:block`. En un teléfono quedaban
+ocho iconos sueltos en dos columnas —es decir, exactamente lo contrario de lo
+que dice la sección: ocho funciones inconexas en lugar de ocho etapas
+consecutivas de un mismo flujo—.
+
+Ahora, por debajo de `xl`, el mismo trazo se dibuja **en vertical**: un riel con
+los ocho nodos numerados en columna, con la misma animación de dibujado.
+
+**El corte pasa de `lg` a `xl`.** Entre 1024 y 1280 la lista era de cuatro
+columnas en DOS filas y la línea, que es una sola horizontal, solo cruzaba la
+primera: la segunda fila de etapas se quedaba igual de suelta que en el
+teléfono. La horizontal solo tiene sentido donde las ocho etapas caben en una
+fila.
+
+**El trazo ya no llega al borde.** Empieza en el centro del primer icono y
+termina en el del último; antes seguía más allá de «Productividad» hasta el
+margen, como si el flujo continuara.
+
+### Segunda pasada: tarjetas encadenadas, no un riel de iconos
+
+El riel vertical resolvía el problema —ya se veía el flujo— pero seguía siendo
+un gráfico de líneas: ocho iconos y ocho palabras colgando de un pelo de 1px,
+con media pantalla vacía a la derecha y nada donde apoyar la vista.
+
+| Antes | Ahora | Motivo |
+|---|---|---|
+| Renglón suelto: icono de 64px con distintivo numérico + palabra | **Tarjeta** a ancho completo: icono de 44px sobre tinte ámbar, rótulo «Etapa N» y nombre | La tarjeta ocupa el ancho y da sitio a la jerarquía rótulo/nombre. El icono deja de ser un cuadro blanco con borde que competía con la tarjeta que lo contiene |
+| Riel continuo de 1px cruzando los iconos | **Eslabón** de 2px entre tarjeta y tarjeta, en ámbar | Un trazo que atraviesa ocho cajas se lee como eje de un gráfico; un tramo corto entre piezas se lee como cadena. Y a 2px sobre la separación, se ve |
+| Una columna hasta `xl` | Dos columnas de `md` a `xl`, llenadas **por columnas** (1-4 · 5-8) | A ancho completo la tarjeta dejaba media pantalla vacía. `grid-flow-col` con cuatro filas mantiene la lectura hacia abajo, así que el eslabón sigue significando lo mismo; el de la quinta etapa se oculta en ese corte porque encabeza la segunda columna |
+| Animación: dibujado del riel | Cada eslabón crece de arriba abajo, escalonado tras su tarjeta | Se conserva el gesto del flujo y se reparte, en vez de concentrarlo en un trazo único |
+
+`landing.flow.stageBadge` («Etapa {{number}}» / «Stage {{number}}») ya estaba
+traducido en los dos idiomas y no lo usaba ningún componente: era una clave
+huérfana escrita justamente para esto.
+
+En escritorio no cambia nada: allí el número sigue sobre el icono y la tarjeta
+se desactiva entera (`xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none`).
+
+### Multisucursal: tres columnas de 85px
+
+Las tarjetas de sucursal eran `grid-cols-3` a cualquier ancho. A 390px medían
+85px: el nombre de la ciudad se recortaba a «Mia…» y cada elemento del alcance
+caía en tres líneas. Ahora se apilan por debajo de `sm` y el abanico se
+sustituye por un tronco vertical al costado, que dice lo mismo —cuelgan de la
+empresa— sin pedir tres columnas.
+
+**El abanico además no apuntaba a donde debía.** Su ancho estaba limitado a
+`max-w-md` y centrado, mientras que las tarjetas ocupaban todo el contenedor,
+así que las curvas exteriores no llegaban al centro de su tarjeta; y sus
+extremos estaban en el 15% y el 85% cuando los centros de tres columnas iguales
+están en 1/6 y 5/6. Con `preserveAspectRatio="none"` y ancho completo, el trazo
+se estira con el contenedor y aterriza donde debe a cualquier ancho;
+`vectorEffect="non-scaling-stroke"` evita que ese estirado deforme el grosor.
+
+### La trampa que se repitió tres veces
+
+Un `<svg>` con `viewBox` tiene **relación de aspecto intrínseca**. Colocado en
+absoluto con `top` y `bottom` (o `left` y `right`), la relación gana y la altura
+—o el ancho— se queda en la que dicta el viewBox: un riel de 2px de ancho con
+`viewBox="0 0 1 100"` medía 200px de alto en vez de estirarse los 560 que le
+tocaban, y la horizontal recortada se quedaba en 400px. La solución es la misma
+en los tres casos: el contenedor se coloca en absoluto y el `svg` solo lo
+rellena con `h-full w-full`.
+
+Verificado a 390, 768, 1100 y 1440 px sin desbordes horizontales, con las tres
+líneas midiendo lo que les corresponde en cada corte.
+
+## 2.duovicies No se podía editar un curso publicado (2026-09-11)
+
+Síntoma: en `/training/content/<id>`, el botón «Guardar fundación pedagógica»
+devolvía *«Existe un conflicto con la información actual. Course content cannot
+be edited in its current status»* —con la segunda mitad en inglés— después de
+haber rellenado el formulario entero.
+
+### No es un fallo del servidor
+
+`training-admin.service.ts` solo admite escribir contenido en cuatro estados
+(`editableStatuses`: DRAFT, IN_REVIEW, APPROVED, PAUSED). La regla es correcta:
+**el contenido de un curso publicado no puede cambiar bajo los pies de quien lo
+está cursando.**
+
+### El fallo estaba en la pantalla
+
+`editable={can("courses.update")}`: se comprobaba el PERMISO y nunca el ESTADO.
+Sobre un curso publicado, programado, archivado o retirado la pantalla dibujaba
+el formulario entero, habilitado, dejaba rellenarlo y fallaba al guardar. El
+mismo archivo ya tenía la lista correcta de estados unas líneas más abajo —el
+botón «Información» sí la usaba—, así que la información estaba y no se aplicaba
+donde importaba.
+
+| Antes | Ahora |
+|---|---|
+| El formulario se habilita con solo tener permiso | `contenidoEditable = permiso && contenidoEsEditable(status)`, con la lista en `lib/training-course-status.ts`, espejo de la del backend y con prueba que falla si divergen |
+| El bloqueo se descubre al guardar, en inglés a medias | Aviso **arriba** de los pasos «Fundamento» y «Estructura», antes de escribir nada |
+| No se dice qué hacer | El aviso trae la salida real y su botón |
+
+### Las salidas salen de la tabla de transiciones, no de una suposición
+
+`allowedTrainingCourseTransitions` admite PUBLISHED → PAUSED y SCHEDULED →
+DRAFT. Así que: publicado, se pausa, se edita y se vuelve a publicar —quien ya
+lo empezó conserva su avance—; programado, se devuelve a borrador. Archivado
+solo puede pasar a retirado y retirado no admite nada: ahí **no hay vuelta**, y
+el aviso lo dice en lugar de dejar a la persona buscando un botón que no existe.
+
+**Un curso programado estaba encerrado.** La acción `return-draft` de la barra
+editorial solo se ofrecía para IN_REVIEW aunque el backend la admite desde
+SCHEDULED: ni se podía editar ni devolver a borrador. Se añade SCHEDULED a esa
+acción.
+
+Si falta el permiso en vez del estado, el aviso lo dice con otras palabras
+(«Solo lectura») en vez de proponer una transición que tampoco se puede hacer;
+y si se puede editar pero no transicionar, el aviso pide que lo haga quien
+administre la capacitación.
+
+5 pruebas nuevas del módulo de estados y 11 cadenas nuevas en el diccionario
+inglés. 689 pruebas en verde, `next build` EXIT 0.
+
+## 2.tervicies El botón de guardar de los diálogos era invisible (2026-09-11)
+
+Síntoma: «Nueva evaluación» no tenía botón de guardar. Y la «✕» de cerrar
+aparecía en la esquina **inferior izquierda** del diálogo en vez de arriba a la
+derecha.
+
+Las dos cosas salían de la misma línea de `DialogContent`, un apaño para fijar
+al pie el último botón de un diálogo.
+
+### 1. El botón existía y era blanco sobre blanco
+
+`[&>form>button:last-child]:bg-card` repintaba el botón con el color de la
+tarjeta —blanco en tema claro— mientras su texto seguía siendo
+`text-on-action`, que también es blanco. **Contraste 1:1.** El selector de
+variante (`.clase > form > button:last-child`) gana en especificidad a la clase
+propia del botón, así que el botón no tenía forma de defenderse.
+
+Medido sobre la maqueta con los componentes reales:
+
+| | fondo | texto |
+|---|---|---|
+| Antes | `rgb(255,255,255)` | `rgb(255,255,255)` |
+| Ahora | `rgb(24,34,48)` | `rgb(255,255,255)` |
+
+Y `bg-card` **ni siquiera cumplía su función**: la franja que puede
+transparentarse al desplazar es la que queda POR DEBAJO del botón fijo, no el
+botón, que es opaco por sí mismo.
+
+### 2. El bloque `[&>button:last-child]` solo alcanzaba a la «✕»
+
+El último hijo directo de `DialogContent` es **siempre** el botón de cerrar,
+porque se renderiza después de `{children}`. De modo que ese bloque nunca llegó
+a un botón de contenido: lo único que hacía era imponerle `sticky bottom-0` a
+la «✕», que gana a su propio `absolute right-3 top-3` y la mandaba abajo a la
+izquierda. Se elimina entero.
+
+El comportamiento útil —el último botón del formulario fijo al pie— se conserva
+con `sticky bottom-0 z-10 py-3`, sin el repintado.
+
+`training-assessments.tsx` repetía el mismo apaño, con el mismo fallo, en tres
+diálogos más (nueva pregunta, reglas y banco de preguntas): eran copias
+redundantes de lo que ya hace `DialogContent`, así que se quitan. **El arreglo
+alcanza a todos los diálogos de la aplicación**, no solo al de evaluaciones.
+
+Verificado con maqueta antes/después de los componentes reales. 689 pruebas,
+`next build` EXIT 0.
+
+## 2.quatervicies Revisión del flujo de video en cursos (2026-09-11)
+
+### La causa probable: el proxy cortaba antes que la aplicación
+
+`deploy/nginx.self-hosted.conf` traía `client_max_body_size 50m` mientras el
+backend anuncia 500 MB (`TRAINING_VIDEO_MAX_UPLOAD_BYTES=524288000`). **Todo
+video de más de 50 MB —es decir, de más de dos o tres minutos a calidad
+razonable— lo rechazaba nginx con un 413 antes de que la petición llegara a
+Nest.** El límite real de la aplicación no se aplicaba nunca y el usuario solo
+veía «No fue posible cargar el video».
+
+El proxy pasa a 512m, deliberadamente POR ENCIMA del límite de la aplicación:
+así quien decide y explica el rechazo es Nest, con su mensaje, y no el proxy con
+un 413 sin contexto. Se añade además `proxy_request_buffering off` —sin él,
+nginx guarda el archivo entero en disco antes de hablar con Nest— y se suben
+`proxy_send_timeout` y `client_body_timeout` a 600s: una subida de cientos de
+megabytes por una línea doméstica supera de sobra los 60s por omisión.
+
+### El rechazo silencioso mandaba al sitio equivocado
+
+El `fileFilter` de multer descartaba el archivo con `callback(null, false)`, que
+lo tira **en silencio**. El controlador recibía entonces `file === undefined` y
+el servicio respondía *«A video file or an authorized video URL is required»*:
+«no enviaste archivo» a alguien que sí lo envió. Quien subía un `.mov`, o un
+`.mp4` que su equipo declara como `video/quicktime`, recibía un mensaje que
+apuntaba al sitio equivocado.
+
+Ahora rechaza con `BadRequestException('Only MP4 video files are supported')`. Y
+el tipo declarado por el navegador deja de ser decisivo: hay equipos donde un
+`.mp4` llega sin tipo o como `application/octet-stream`, así que manda la
+extensión y el tipo solo descarta cuando dice explícitamente otra cosa. El
+servicio vuelve a comprobarlo: no se relaja nada.
+
+### Lo que se puede saber al elegir el archivo, se dice al elegir el archivo
+
+No había ninguna comprobación en el navegador: se elegía un archivo de 800 MB,
+se esperaban varios minutos y se fallaba al final. `lib/training-video-upload.ts`
+revisa extensión, tipo y tamaño en el momento de elegirlo, con un mensaje que
+dice cuánto pesa y cuál es el máximo. Es cortesía y **no sustituye** a la
+comprobación del servidor, que sigue siendo la autoridad.
+
+### La copia local se escribía antes de que el servidor aceptara
+
+`saveLocalTrainingVideo` corría ANTES de `uploadTrainingVideo`. Si la subida
+fallaba, en ese navegador quedaba una copia de un video que nunca llegó al
+servidor: la lección se veía aquí y en ningún otro sitio. Ahora el servidor
+primero y la copia local después.
+
+6 pruebas nuevas. 695 pruebas en el frontend, `next build` EXIT 0;
+`npx nest build` EXIT 0 y la suite del backend igual que antes del cambio.
+
+### Pendiente de decidir: la reproducción carga el archivo ENTERO en memoria
+
+`readVideo` llama a `TrainingObjectStorageService.readKey`, que devuelve un
+`Buffer` completo —`readFile` en sistema de archivos, `Body.toArray()` en S3— y
+solo después recorta el rango pedido. Con el tope actual, **cada petición de
+rango de un video de 500 MB reserva 500 MB de RAM**, y un navegador emite varias
+por reproducción. Afecta por igual al endpoint del administrador
+(`/courses/:courseId/lessons/:lessonId/video`) y al del participante
+(`/video/assignments/:assignmentId/lessons/:lessonId/file`).
+
+Es el fallo más grave de los encontrados y el que tumbará el proceso en cuanto
+los cursos con video se usen de verdad, pero arreglarlo es reescribir los dos
+endpoints para transmitir por flujo (`createReadStream` con `start`/`end` en
+sistema de archivos, `Range` en la petición a S3) en vez de leer y recortar. No
+cambia contratos ni base de datos, pero sí es una reescritura con su propia
+verificación, así que queda propuesto y no ejecutado.
+
+## 2.quinvicies Un curso pausado quedaba encerrado para siempre (2026-09-11)
+
+Síntoma: curso en **Pausado**, requisitos editoriales completos, los cuatro
+gates de calidad en «No solicitada» y el botón **Publicar** fallando con
+*«Quality gates are incomplete: Falta aprobación de content; pedagogy;
+accessibility; compliance»*. Sin ninguna acción en pantalla que permitiera
+solicitarlos.
+
+### La cadena
+
+1. Publicar exige `assertQualityApproved(courseId, course.version)`: los cuatro
+   gates aprobados **para la versión actual**.
+2. Los gates solo se crean al entrar en `IN_REVIEW`, y `requestQualityReviews`
+   exige ese mismo estado.
+3. Editar la fundación pedagógica dispara `DESIGN_UPDATED`, que hace
+   `version: { increment: 1 }`. Las aprobaciones de la versión anterior dejan de
+   valer —la propia pantalla lo advierte: «Las aprobaciones anteriores no se
+   reutilizan cuando cambia la versión».
+4. `allowedTrainingCourseTransitions.PAUSED` era `[PUBLISHED, ARCHIVED,
+   RETIRED]`: **ninguna salida hacia el ciclo editorial.**
+
+Resultado: pausar un curso publicado, editarlo y querer volver a publicarlo
+dejaba el curso en un estado del que solo se salía archivando o retirando. El
+curso no se podía publicar **nunca más**. Y se llegaba ahí siguiendo las
+instrucciones de la propia pantalla, que recomienda pausar para editar.
+
+### El arreglo
+
+`PAUSED` admite ahora `IN_REVIEW` y `DRAFT`. Enviar a revisión desde pausado
+crea los cuatro gates de la versión actual con la lógica que ya existía; volver
+a borrador permite seguir editando. La barra editorial ofrece las dos acciones,
+y el panel de calidad explica en pausado por qué los gates están sin solicitar y
+qué hacer, en vez de mostrar cuatro «No solicitada» junto a un botón de publicar
+que falla.
+
+**Sin migración, sin esquema nuevo, sin permisos nuevos, sin endpoints nuevos:**
+`return-draft` y `submit-review` ya existían y siguen pidiendo
+`training.course.review`. Dos aserciones nuevas en
+`training-admin.service.spec.ts` fijan las dos salidas para que nadie las
+vuelva a cerrar sin darse cuenta.
+
+### Cómo salir de un curso ya encerrado
+
+Para un curso que llegó a este estado antes del arreglo, la ruta es la misma una
+vez desplegado: **Enviar a revisión → aprobar los cuatro gates → Publicar**. Sin
+el arreglo, la única salida era duplicar el curso (`POST
+courses/:courseId/duplicate`), que devuelve una copia en borrador.
+
+16 pruebas en la suite del servicio, 695 en el frontend, `nest build` y
+`next build` EXIT 0.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

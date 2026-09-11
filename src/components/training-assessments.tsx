@@ -297,7 +297,7 @@ function CreateAssessmentDialog({ open, onOpenChange, initialCourseId }: { open:
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="[&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
+      <DialogContent>
         <DialogHeader><DialogTitle>{uiText("Nueva evaluación")}</DialogTitle><DialogDescription>{uiText("Define las reglas generales. Después podrás agregar preguntas.")}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
           <div><Label htmlFor="assessment-course">{uiText("Curso")}</Label><Select name="courseId" defaultValue={initialCourseId} required><SelectTrigger id="assessment-course"><SelectValue placeholder={uiText("Selecciona un curso")} /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
@@ -359,7 +359,7 @@ function ConfigureAssessmentDialog({ quiz, onClose }: { quiz: TrainingQuizDto | 
   }
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto [&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>{uiText("Reglas de evaluación")}</DialogTitle><DialogDescription>{uiText("Controla disponibilidad, selección, intentos y retroalimentación.")}</DialogDescription></DialogHeader>
         {quiz ? <form className="space-y-4" onSubmit={submit}>
           <div><Label htmlFor="config-title">{uiText("Título")}</Label><Input id="config-title" name="title" defaultValue={quiz.title} required /></div>
@@ -434,7 +434,7 @@ function CreateQuestionDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null;
   }
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="[&>form>button:last-child]:sticky [&>form>button:last-child]:bottom-0 [&>form>button:last-child]:z-10 [&>form>button:last-child]:bg-card [&>form>button:last-child]:py-3">
+      <DialogContent>
         <DialogHeader><DialogTitle>{uiText("Agregar pregunta")}</DialogTitle><DialogDescription>{quiz?.title}</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
           <div><Label htmlFor="question-prompt">{uiText("Enunciado")}</Label><Input id="question-prompt" name="prompt" required /></div>
@@ -485,7 +485,7 @@ function QuestionBankDialog({ quiz, onClose }: { quiz: TrainingQuizDto | null; o
   });
   return (
     <Dialog open={Boolean(quiz)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto [&>button:last-child]:sticky [&>button:last-child]:bottom-0 [&>button:last-child]:z-10 [&>button:last-child]:bg-card [&>button:last-child]:py-3">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>{uiText("Banco de preguntas")}</DialogTitle><DialogDescription>{uiText("Selecciona preguntas validadas para copiarlas a ")}{quiz?.title}.</DialogDescription></DialogHeader>
         {query.isLoading ? <SkeletonRows rows={4} label={uiText("Cargando el banco de preguntas")} /> : null}
         {query.data?.items.length ? <div className="space-y-2">

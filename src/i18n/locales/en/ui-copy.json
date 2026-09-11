@@ -5439,5 +5439,20 @@
   "Ver mermas": "See waste",
   "Ver sugerencias de compra": "See purchase suggestions",
   "{{n}} entradas esperando confirmación": "{{n}} receipts waiting to be confirmed",
-  "{{n}} lotes próximos a vencer": "{{n}} lots close to expiring"
+  "{{n}} lotes próximos a vencer": "{{n}} lots close to expiring",
+  "Tu rol no incluye editar cursos. Puedes revisar el contenido, pero no modificarlo.": "Your role does not include editing courses. You can review the content, but not change it.",
+  "Este curso ya no se edita": "This course can no longer be edited",
+  "Un curso archivado se conserva como registro y solo puede retirarse. Para reutilizar su contenido, duplícalo desde la lista de cursos.": "An archived course is kept as a record and can only be retired. To reuse its content, duplicate it from the course list.",
+  "Un curso retirado es historial: su contenido queda tal como estaba. Para reutilizarlo, duplícalo desde la lista de cursos.": "A retired course is history: its content stays exactly as it was. To reuse it, duplicate it from the course list.",
+  "Pausar el curso": "Pause the course",
+  "Devolver a borrador": "Return to draft",
+  "El curso está publicado": "The course is published",
+  "El curso está programado": "The course is scheduled",
+  "Su contenido no puede cambiar mientras haya gente cursándolo. Púsalo en pausa, edítalo y vuelve a publicarlo: quien ya lo empezó conserva su avance.": "Its content cannot change while people are taking it. Pause it, edit it and publish it again: anyone who already started keeps their progress.",
+  "Su contenido no puede cambiar con la publicación ya agendada. Devuélvelo a borrador para editarlo y vuelve a programarlo.": "Its content cannot change once publication is scheduled. Return it to draft to edit it, then schedule it again.",
+  "Pídeselo a quien administre la capacitación: tu rol no incluye ese cambio de estado.": " Ask whoever administers training: your role does not include that status change.",
+  "Solo se admiten archivos MP4. Convierte el video a MP4 y vuelve a intentarlo.": "Only MP4 files are supported. Convert the video to MP4 and try again.",
+  "El archivo está vacío.": "The file is empty.",
+  "El video pesa {{peso}} MB y el máximo son {{limite}} MB. Comprímelo o divídelo en varias lecciones.": "The video is {{peso}} MB and the maximum is {{limite}} MB. Compress it or split it into several lessons.",
+  "Al editar el curso subió su versión editorial, y las aprobaciones de la versión anterior ya no valen. Envíalo a revisión: se crean los cuatro gates de esta versión y, una vez aprobados, podrás publicarlo.": "Editing the course raised its editorial version, so approvals from the previous version no longer count. Send it for review: the four gates for this version are created, and once approved you will be able to publish it."
 }

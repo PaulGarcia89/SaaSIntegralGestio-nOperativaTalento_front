@@ -60,8 +60,25 @@ export function EmployeeLifecycle() {
       <SectionHeading eyebrow={t("landing.flow.eyebrow")} title={t("landing.flow.title")} description={t("landing.flow.description")} />
 
       <div className="relative mt-12">
-        {/* Línea que se dibuja de izquierda a derecha (escritorio). */}
-        <svg aria-hidden="true" className="absolute left-0 right-0 top-8 hidden h-1 w-full lg:block" viewBox="0 0 100 1" preserveAspectRatio="none">
+        {/* Línea que se dibuja de izquierda a derecha (escritorio).
+
+            Por debajo de `lg` esta línea NO existía, y con ella se perdía lo
+            único que decía la sección: que son ocho etapas CONSECUTIVAS de un
+            mismo flujo. En un teléfono quedaban ocho iconos sueltos en dos
+            columnas, que es exactamente lo contrario —ocho funciones
+            inconexas—. Debajo se dibuja el mismo trazo en vertical.
+
+            El corte pasa de `lg` a `xl` porque entre 1024 y 1280 la lista era
+            de cuatro columnas en DOS filas y esta línea, que es una sola
+            horizontal, solo cruzaba la primera: la segunda fila de etapas se
+            quedaba igual de suelta que en el teléfono. La horizontal solo tiene
+            sentido donde las ocho etapas caben en una fila.
+
+            Y el trazo ya no llega al borde: empieza en el centro del primer
+            icono y termina en el del último. Antes seguía más allá de
+            «Productividad» hasta el margen, como si el flujo continuara. */}
+        <div aria-hidden="true" className="pointer-events-none absolute left-8 right-[calc(12.5%-2rem)] top-8 hidden h-1 xl:block">
+        <svg className="h-full w-full" viewBox="0 0 100 1" preserveAspectRatio="none">
           <line x1="0" y1="0.5" x2="100" y2="0.5" stroke="hsl(var(--line))" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           <motion.line
             x1="0"
@@ -77,16 +94,64 @@ export function EmployeeLifecycle() {
             transition={{ duration: 1.6, ease: "easeInOut" }}
           />
         </svg>
+        </div>
 
-        <RevealGroup as="ol" className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-8" stagger={0.07}>
+        {/* Por debajo de `xl` cada etapa es una TARJETA, no un renglón.
+
+            Un riel fino con ocho iconos y ocho palabras sueltas es un gráfico
+            de líneas, no una pieza de portada: deja media pantalla vacía a la
+            derecha y no tiene dónde apoyar la vista. La tarjeta ocupa el ancho,
+            da sitio al rótulo de etapa —`landing.flow.stageBadge`, que ya
+            estaba traducido en los dos idiomas y no lo usaba nadie— y convierte
+            el trazo en un eslabón corto entre piezas, que es lo que se lee como
+            cadena.
+
+            El tramo entre tarjetas crece de arriba abajo al entrar en pantalla,
+            uno detrás de otro: la animación del flujo se conserva, y ahora
+            además se ve, porque es ámbar sobre la separación y no un pelo de
+            1px cruzando iconos. */}
+        {/* De `md` a `xl` la tarjeta a ancho completo dejaba media pantalla
+            vacía a su derecha, así que ahí van dos columnas. Se llenan por
+            COLUMNAS (`grid-flow-col` con cuatro filas): 1-4 a la izquierda y
+            5-8 a la derecha, de modo que la cadena sigue leyéndose hacia abajo
+            y el eslabón entre tarjetas sigue significando lo que significa. */}
+        <RevealGroup
+          as="ol"
+          className="grid grid-cols-1 gap-4 md:grid-flow-col md:grid-cols-2 md:grid-rows-4 xl:grid-flow-row xl:grid-cols-8 xl:grid-rows-1"
+          stagger={0.07}
+        >
           {lifecycle.map(({ key, icon: Icon }, index) => (
             <RevealItem as="li" key={key} className="relative">
-              <div className="flex flex-col items-start gap-3">
-                <span className="relative z-10 flex size-16 shrink-0 items-center justify-center rounded-2xl border border-line bg-surface-1 text-accent-ink shadow-e2">
-                  <Icon className="size-6" aria-hidden="true" />
-                  <span className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full bg-accent-fill font-mono text-2xs font-semibold text-surface-dark-1">{index + 1}</span>
+              {index > 0 ? (
+                <motion.span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute -top-4 left-[2.375rem] h-4 w-0.5 origin-top -translate-x-1/2 rounded-full bg-accent-line/60 xl:hidden",
+                    // La quinta etapa encabeza la segunda columna: ahí no hay
+                    // nada encima con lo que encadenar.
+                    index === 4 && "md:hidden",
+                  )}
+                  initial={reduce ? { scaleY: 1 } : { scaleY: 0 }}
+                  whileInView={{ scaleY: 1 }}
+                  viewport={{ once: true, margin: "-15% 0px" }}
+                  transition={{ duration: 0.3, ease: "easeOut", delay: reduce ? 0 : 0.04 * index }}
+                />
+              ) : null}
+
+              <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface-1 px-4 py-3.5 shadow-e1 transition-colors hover:border-line-strong xl:block xl:rounded-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none xl:hover:border-0">
+                <span className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent-fill/15 text-accent-ink xl:size-16 xl:rounded-2xl xl:border xl:border-line xl:bg-surface-1 xl:shadow-e2">
+                  <Icon className="size-5 xl:size-6" aria-hidden="true" />
+                  {/* En escritorio el número vive sobre el icono; en tarjeta
+                      sería un segundo distintivo diciendo lo mismo que el
+                      rótulo «Etapa N», así que allí no se dibuja. */}
+                  <span className="absolute -right-1.5 -top-1.5 hidden size-6 items-center justify-center rounded-full bg-accent-fill font-mono text-2xs font-semibold text-surface-dark-1 xl:flex">{index + 1}</span>
                 </span>
-                <span className="text-base font-semibold text-ink-1">{t(`landing.lifecycle.${key}`)}</span>
+                <span className="min-w-0 flex-1 xl:mt-3 xl:block">
+                  <span className="block text-2xs font-medium uppercase tracking-[0.12em] text-ink-3 xl:hidden">
+                    {t("landing.flow.stageBadge", { number: index + 1 })}
+                  </span>
+                  <span className="mt-0.5 block text-base font-semibold text-ink-1 xl:mt-0">{t(`landing.lifecycle.${key}`)}</span>
+                </span>
               </div>
             </RevealItem>
           ))}
@@ -143,14 +208,25 @@ export function MultiBranchSection() {
                 <span className="ml-2 rounded-full bg-surface-dark-ink/10 px-2 py-0.5 text-2xs">{t("landing.branches.parentTag")}</span>
               </div>
 
-              <svg aria-hidden="true" className="mx-auto mt-2 h-14 w-full max-w-md" viewBox="0 0 400 56" fill="none">
-                {[60, 200, 340].map((x, index) => (
+              {/* Abanico, solo cuando las tres sucursales están en fila.
+
+                  Dos correcciones: el ancho estaba limitado a `max-w-md` y
+                  centrado mientras que las tarjetas ocupaban todo el
+                  contenedor, así que las curvas exteriores no llegaban al
+                  centro de su tarjeta; y los extremos estaban en el 15% y el
+                  85% cuando los centros de tres columnas iguales están en 1/6 y
+                  5/6. Con `preserveAspectRatio="none"` el trazo se estira con
+                  el contenedor y aterriza donde debe a cualquier ancho;
+                  `non-scaling-stroke` evita que ese estirado deforme el grosor. */}
+              <svg aria-hidden="true" className="mx-auto mt-2 hidden h-14 w-full sm:block" viewBox="0 0 400 56" fill="none" preserveAspectRatio="none">
+                {[200 / 3, 200, 1000 / 3].map((x, index) => (
                   <motion.path
                     key={x}
                     d={`M200 0 C200 28, ${x} 28, ${x} 56`}
                     stroke="hsl(var(--accent-line))"
                     strokeWidth="1.5"
                     strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
                     initial={reduce ? { pathLength: 1 } : { pathLength: 0 }}
                     whileInView={{ pathLength: 1 }}
                     viewport={{ once: true }}
@@ -159,7 +235,31 @@ export function MultiBranchSection() {
                 ))}
               </svg>
 
-              <RevealGroup as="ul" className="grid grid-cols-3 gap-3" stagger={0.12}>
+              {/* En teléfono las tres tarjetas se apilan: en tres columnas
+                  medían 85px, el nombre de la ciudad se recortaba a «Mia…» y
+                  cada elemento del alcance caía en tres líneas. El abanico se
+                  sustituye por un tronco vertical al costado, que dice lo
+                  mismo —cuelgan de la empresa— sin pedir tres columnas. */}
+              <div className="relative mt-4 pl-6 sm:mt-0 sm:pl-0">
+                <div aria-hidden="true" className="pointer-events-none absolute -top-4 bottom-6 left-1.5 w-0.5 sm:hidden">
+                <svg className="h-full w-full" viewBox="0 0 1 100" preserveAspectRatio="none">
+                  <motion.line
+                    x1="0.5"
+                    y1="0"
+                    x2="0.5"
+                    y2="100"
+                    stroke="hsl(var(--accent-line))"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                    initial={reduce ? { pathLength: 1 } : { pathLength: 0 }}
+                    whileInView={{ pathLength: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.9, ease: "easeInOut" }}
+                  />
+                </svg>
+                </div>
+                <RevealGroup as="ul" className="grid grid-cols-1 gap-3 sm:grid-cols-3" stagger={0.12}>
                 {branches.map((branch) => (
                   <RevealItem as="li" key={branch} className="min-w-0 rounded-xl border border-line bg-surface-1 p-3 shadow-e1 sm:p-4">
                     <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-1">
@@ -176,7 +276,8 @@ export function MultiBranchSection() {
                     </ul>
                   </RevealItem>
                 ))}
-              </RevealGroup>
+                </RevealGroup>
+              </div>
               <p className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-2">
                 <ShieldCheck className="size-4 text-status-success" aria-hidden="true" />
                 {t("landing.branches.branchNote")}

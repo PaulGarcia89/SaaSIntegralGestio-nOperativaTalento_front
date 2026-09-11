@@ -56,6 +56,8 @@ import {
 } from "@/components/design-system";
 import { FormErrorSummary } from "@/components/form-error-summary";
 import { TrainingCourseFoundation } from "@/components/training-course-foundation";
+import { contenidoEsEditable, salidaDelBloqueo } from "@/lib/training-course-status";
+import { LIMITE_VIDEO_BYTES, megabytes, revisarVideo } from "@/lib/training-video-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -862,6 +864,7 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar el estado.")),
   });
+  const contenidoEditable = Boolean(query.data) && can("courses.update") && contenidoEsEditable(query.data!.status);
   const wizard = query.data ? getTrainingCourseWizardState(query.data, design.data, previewed) : null;
   const currentIndex = TRAINING_COURSE_WIZARD_STEPS.findIndex((item) => item.id === step);
   const currentStep = TRAINING_COURSE_WIZARD_STEPS[currentIndex] ?? TRAINING_COURSE_WIZARD_STEPS[0];
@@ -922,18 +925,35 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
                   onSaved={async () => { await refresh(); selectStep("FOUNDATION"); }}
                 /></CardContent></Card>
               ) : null}
+              {/* El contenido se edita si HAY PERMISO y además el estado lo
+                  admite. Antes solo se miraba el permiso: sobre un curso
+                  publicado, programado, archivado o retirado la pantalla
+                  dibujaba el formulario entero, dejaba rellenarlo y fallaba al
+                  guardar con un 409 del servidor —«Course content cannot be
+                  edited in its current status», sin traducir— después de haber
+                  hecho el trabajo. El aviso va ARRIBA y dice qué hacer. */}
+              {(step === "FOUNDATION" || step === "STRUCTURE") && !contenidoEditable ? (
+                <AvisoContenidoBloqueado
+                  status={query.data.status}
+                  sinPermiso={!can("courses.update")}
+                  puedePublicar={can("courses.publish")}
+                  puedeRevisar={can("courses.review")}
+                  pending={transition.isPending}
+                  onTransition={(action) => transition.mutate({ action })}
+                />
+              ) : null}
               {step === "FOUNDATION" ? (
                 <TrainingCourseFoundation
                   courseId={query.data.id}
                   courseTenantId={query.data.tenantId}
-                  editable={can("courses.update")}
+                  editable={contenidoEditable}
                   onChanged={refresh}
                   onSaved={() => selectStep("STRUCTURE")}
                 />
               ) : null}
               {step === "STRUCTURE" ? (
                 <>
-                  <CourseStructure course={query.data} editable={can("courses.update")} onChanged={refresh} />
+                  <CourseStructure course={query.data} editable={contenidoEditable} onChanged={refresh} />
                   <WizardContinue onClick={() => selectStep("ASSESSMENT")} label={uiText("Continuar a evaluación")} />
                 </>
               ) : null}
@@ -1245,7 +1265,7 @@ function CourseQualityGate({ course, canApprove, onChanged }: { course: Training
           })}
         </div>
         {!quality.reviews.length && course.status === "IN_REVIEW" ? <Button type="button" variant="secondary" onClick={() => requestReviews.mutate()} disabled={requestReviews.isPending}>{uiText("Solicitar las cuatro revisiones")}</Button> : null}
-        {!quality.reviews.length && course.status === "DRAFT" ? <InlineFeedback tone="info" title={uiText("Primero envía el curso a revisión")}>{uiText("El envío abrirá una nueva versión editorial y creará automáticamente los cuatro gates.")}</InlineFeedback> : null}
+        {!quality.reviews.length && (course.status === "DRAFT" || course.status === "PAUSED") ? <InlineFeedback tone="info" title={uiText("Primero envía el curso a revisión")}>{course.status === "PAUSED" ? uiText("Al editar el curso subió su versión editorial, y las aprobaciones de la versión anterior ya no valen. Envíalo a revisión: se crean los cuatro gates de esta versión y, una vez aprobados, podrás publicarlo.") : uiText("El envío abrirá una nueva versión editorial y creará automáticamente los cuatro gates.")}</InlineFeedback> : null}
         <div className="border-t border-border-default pt-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold">{uiText("Piloto de la versión")}</h3><p className="text-sm text-text-secondary">{uiText("Opcional; si se crea, debe cumplir sus criterios antes del go-live.")}</p></div>{course.status === "IN_REVIEW" ? <Button type="button" variant="secondary" onClick={() => setPilotOpen(true)}><Plus className="size-4" />{uiText("Crear piloto")}</Button> : null}</div>
           {quality.pilots.length ? <div className="space-y-3">{quality.pilots.map((pilot) => (
@@ -1395,8 +1415,15 @@ function WorkflowActions({
 }) {
   const uiText = useUiText();
   const actions: Array<{ status: TrainingCourseStatus[]; permission: Parameters<typeof can>[0]; action: Parameters<typeof onTransition>[0]; label: string; icon: ReactNode }> = [
-    { status: ["DRAFT"], permission: "courses.review", action: "submit-review", label: "Enviar a revisión", icon: <Send className="size-4" /> },
-    { status: ["IN_REVIEW"], permission: "courses.review", action: "return-draft", label: "Devolver a borrador", icon: <Pencil className="size-4" /> },
+    // PAUSED entra aquí porque es el camino que la propia pantalla recomienda
+    // para editar un curso publicado: pausar, editar y volver a publicar. Sin
+    // esta acción, editar la fundación sube la versión, los gates de la versión
+    // anterior dejan de valer y el curso ya no se puede publicar nunca más.
+    { status: ["DRAFT", "PAUSED"], permission: "courses.review", action: "submit-review", label: "Enviar a revisión", icon: <Send className="size-4" /> },
+    // SCHEDULED estaba fuera de esta lista aunque la tabla de transiciones del
+    // backend lo admite: un curso programado no se podía editar NI devolver a
+    // borrador desde la pantalla, así que quedaba encerrado.
+    { status: ["IN_REVIEW", "SCHEDULED", "PAUSED"], permission: "courses.review", action: "return-draft", label: "Devolver a borrador", icon: <Pencil className="size-4" /> },
     { status: ["IN_REVIEW"], permission: "courses.approve", action: "approve", label: uiText("Aprobar"), icon: <CheckCircle2 className="size-4" /> },
     { status: ["APPROVED"], permission: "courses.publish", action: "schedule", label: "Programar", icon: <CalendarClock className="size-4" /> },
     { status: ["APPROVED", "PAUSED"], permission: "courses.publish", action: "publish", label: uiText("Publicar"), icon: <BookOpen className="size-4" /> },
@@ -1415,6 +1442,76 @@ function WorkflowActions({
         </Button>
       ))}
     </ActionBar>
+  );
+}
+
+/**
+ * Por qué no se puede editar el contenido, y qué hacer al respecto.
+ *
+ * La regla del servidor es correcta: el contenido de un curso publicado no
+ * puede cambiar bajo los pies de quien lo está cursando. Lo que faltaba era
+ * decirlo antes de que la persona rellenara el formulario, y ofrecer la
+ * salida en lugar de dejarla buscando un botón.
+ */
+function AvisoContenidoBloqueado({
+  status,
+  sinPermiso,
+  puedePublicar,
+  puedeRevisar,
+  pending,
+  onTransition,
+}: {
+  status: TrainingCourseStatus;
+  sinPermiso: boolean;
+  puedePublicar: boolean;
+  puedeRevisar: boolean;
+  pending: boolean;
+  onTransition: (action: Parameters<typeof transitionTrainingCourse>[1]) => void;
+}) {
+  const uiText = useUiText();
+
+  if (sinPermiso) {
+    return (
+      <InlineFeedback tone="info" title={uiText("Solo lectura")}>
+        {uiText("Tu rol no incluye editar cursos. Puedes revisar el contenido, pero no modificarlo.")}
+      </InlineFeedback>
+    );
+  }
+
+  const salida = salidaDelBloqueo(status);
+  if (!salida) return null;
+
+  if (salida.tipo === "sin-salida") {
+    return (
+      <InlineFeedback tone="warning" title={uiText("Este curso ya no se edita")}>
+        {status === "ARCHIVED"
+          ? uiText("Un curso archivado se conserva como registro y solo puede retirarse. Para reutilizar su contenido, duplícalo desde la lista de cursos.")
+          : uiText("Un curso retirado es historial: su contenido queda tal como estaba. Para reutilizarlo, duplícalo desde la lista de cursos.")}
+      </InlineFeedback>
+    );
+  }
+
+  const permitido = salida.accion === "pause" ? puedePublicar : puedeRevisar;
+  const etiqueta = salida.accion === "pause" ? uiText("Pausar el curso") : uiText("Devolver a borrador");
+
+  return (
+    <InlineFeedback
+      tone="warning"
+      title={status === "PUBLISHED" ? uiText("El curso está publicado") : uiText("El curso está programado")}
+      action={
+        permitido ? (
+          <Button type="button" variant="secondary" onClick={() => onTransition(salida.accion)} disabled={pending} data-loading={pending}>
+            {salida.accion === "pause" ? <CirclePause className="size-4" /> : <Pencil className="size-4" />}
+            {etiqueta}
+          </Button>
+        ) : undefined
+      }
+    >
+      {status === "PUBLISHED"
+        ? uiText("Su contenido no puede cambiar mientras haya gente cursándolo. Púsalo en pausa, edítalo y vuelve a publicarlo: quien ya lo empezó conserva su avance.")
+        : uiText("Su contenido no puede cambiar con la publicación ya agendada. Devuélvelo a borrador para editarlo y vuelve a programarlo.")}
+      {permitido ? null : <>{" "}{uiText("Pídeselo a quien administre la capacitación: tu rol no incluye ese cambio de estado.")}</>}
+    </InlineFeedback>
   );
 }
 
@@ -1529,9 +1626,11 @@ function LessonEditor({ courseId, lesson, index, total, editable, moving, onMove
   const upload = useMutation({
     mutationFn: async (file: File) => {
       const durationSeconds = await readVideoDuration(file);
-      const record = await saveLocalTrainingVideo({ courseId, lessonId: lesson.id, name: file.name, type: file.type, size: file.size, durationSeconds, blob: file });
+      // El servidor primero, la copia local después. Al revés, un fallo de
+      // subida dejaba en este navegador una copia de un video que NUNCA llegó
+      // al servidor: la lección se veía aquí y en ningún otro sitio.
       await uploadTrainingVideo(courseId, { file, lessonId: lesson.id, title, description: description || undefined, durationSeconds, requiredCompletionPercentage: completionPercentage, isMandatory: isRequired });
-      return record;
+      return saveLocalTrainingVideo({ courseId, lessonId: lesson.id, name: file.name, type: file.type, size: file.size, durationSeconds, blob: file });
     },
     onSuccess: (record) => {
       setLocalVideoUrl((current) => {
@@ -1558,7 +1657,7 @@ function LessonEditor({ courseId, lesson, index, total, editable, moving, onMove
       <div className="flex items-start gap-2">
         <Button type="button" size="icon" variant="ghost" aria-label={expanded ? "Contraer lección" : "Expandir lección"} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronDown /> : <ChevronRight />}</Button>
         <div className="min-w-0 flex-1">{editing ? <div className="grid gap-2 sm:grid-cols-[1fr_9rem]"><Input aria-label={uiText("Título de la lección")} value={title} onChange={(event) => setTitle(event.target.value)} /><Input aria-label={uiText("Duración estimada en minutos")} type="number" min={0} value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} /><textarea aria-label={uiText("Descripción de la lección")} className="field min-h-20 sm:col-span-2" placeholder={uiText("Objetivo y contexto de la lección")} value={description} onChange={(event) => setDescription(event.target.value)} /><label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={isRequired} onChange={(event) => setIsRequired(event.target.checked)} />{uiText("Lección obligatoria")}</label><label className="flex items-center gap-2 text-sm sm:col-span-2">{uiText("Porcentaje para completar video")}<input className="field w-24" type="number" min={1} max={100} value={completionPercentage} onChange={(event) => setCompletionPercentage(Math.min(100, Math.max(1, Number(event.target.value) || 1)))} />%</label></div> : <><p className="font-medium">{lesson.title}</p>{lesson.description ? <p className="text-sm text-text-secondary">{lesson.description}</p> : null}<p className="text-xs text-text-secondary">{lesson.estimatedMinutes || 0} min · {lesson.isRequired ? uiText("Obligatoria") : uiText("Opcional")} · {lesson.blocks.length} {uiText(" bloques · Video: ")}{lesson.requiredCompletionPercentage ?? 90}%</p></>}</div>
-        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>{uiText("Guardar")}</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<label className="inline-flex cursor-pointer items-center justify-center rounded-md px-2 text-sm hover:bg-muted" title={uiText("Cargar video MP4 local")}><Video className="size-4" /><input className="sr-only" type="file" accept="video/mp4,.mp4" disabled={upload.isPending} onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.currentTarget.value = ""; }} /></label><Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
+        {editable ? <div className="flex flex-wrap gap-1"><OrderButtons label={lesson.title} index={index} total={total} pending={moving} onMove={(direction) => onMove(lesson.id, direction)} />{editing ? <Button type="button" size="sm" onClick={() => update.mutate()} disabled={!title.trim() || update.isPending}>{uiText("Guardar")}</Button> : <Button type="button" size="icon" variant="ghost" aria-label={`Editar ${lesson.title}`} onClick={() => setEditing(true)}><Pencil className="size-4" /></Button>}<label className="inline-flex cursor-pointer items-center justify-center rounded-md px-2 text-sm hover:bg-muted" title={uiText("Cargar video MP4 local")}><Video className="size-4" /><input className="sr-only" type="file" accept="video/mp4,.mp4" disabled={upload.isPending} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; const problema = revisarVideo(file); if (problema === "tipo") { toast.error(uiText("Solo se admiten archivos MP4. Convierte el video a MP4 y vuelve a intentarlo.")); return; } if (problema === "vacio") { toast.error(uiText("El archivo está vacío.")); return; } if (problema === "tamano") { toast.error(uiText("El video pesa {{peso}} MB y el máximo son {{limite}} MB. Comprímelo o divídelo en varias lecciones.", { peso: megabytes(file.size), limite: megabytes(LIMITE_VIDEO_BYTES) })); return; } upload.mutate(file); }} /></label><Button type="button" size="icon" variant="ghost" aria-label={`Duplicar ${lesson.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Eliminar ${lesson.title}`} onClick={() => remove.mutate()}><Trash2 className="size-4 text-status-danger" /></Button></div> : null}
       </div>
       {expanded ? <div className="mt-3 space-y-2 pl-0 sm:pl-12">{localVideoUrl ? <div className="rounded-xl border border-primary/20 bg-card p-3"><p className="mb-2 text-xs font-medium text-brand">{uiText("Copia local de respaldo")}</p><p className="mb-3 text-xs text-text-secondary">{uiText("La copia local sirve para este navegador; la disponibilidad para participantes depende del archivo subido al servidor.")}</p><video className="aspect-video w-full rounded-lg bg-black" controls playsInline preload="metadata" src={localVideoUrl} aria-label={`Video local de ${lesson.title}`} /></div> : null}{lesson.blocks.map((block, blockIndex) => <BlockEditor key={block.id} block={block} index={blockIndex} total={lesson.blocks.length} editable={editable} moving={reorder.isPending} onMove={moveBlock} onChanged={onChanged} />)}{editable ? <Button type="button" size="sm" variant="secondary" onClick={() => setBlockOpen(true)}><Plus className="size-4" />{uiText("Agregar contenido")}</Button> : null}</div> : null}
       <BlockFormDialog lessonId={lesson.id} open={blockOpen} onOpenChange={setBlockOpen} onSaved={onChanged} />

@@ -23,6 +23,7 @@ import {
   Plus,
   Send,
   Trash2,
+  Users,
   Video,
   Award,
   ClipboardCheck,
@@ -57,6 +58,7 @@ import {
 import { FormErrorSummary } from "@/components/form-error-summary";
 import { TrainingCourseFoundation } from "@/components/training-course-foundation";
 import { contenidoEsEditable, salidaDelBloqueo } from "@/lib/training-course-status";
+import { AssignCourseDialog } from "@/components/training-assign-course-dialog";
 import { LIMITE_VIDEO_BYTES, megabytes, revisarVideo } from "@/lib/training-video-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -194,6 +196,7 @@ export function TrainingCourseManager() {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TrainingCourseDto | null>(null);
+  const [assignTarget, setAssignTarget] = useState<TrainingCourseDto | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => setPreviewId(null));
@@ -369,6 +372,7 @@ export function TrainingCourseManager() {
                   if (coursesQuery.data?.items.some((item) => item.id === courseId)) setPreviewId(courseId);
                 }}
                 onDelete={setDeleteTarget}
+                onAssign={setAssignTarget}
               />
             )}
           />
@@ -395,6 +399,12 @@ export function TrainingCourseManager() {
         courseId={previewId}
         open={Boolean(previewId)}
         onOpenChange={(open) => !open && setPreviewId(null)}
+      />
+      <AssignCourseDialog
+        open={Boolean(assignTarget)}
+        onOpenChange={(open) => !open && setAssignTarget(null)}
+        courseId={assignTarget?.id}
+        courseTitle={assignTarget?.title}
       />
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
@@ -551,6 +561,7 @@ type CourseActionsProps = {
   onEdit: (id: string) => void;
   onPreview: (id: string) => void;
   onDelete: (course: TrainingCourseDto) => void;
+  onAssign: (course: TrainingCourseDto) => void;
 };
 
 function CourseActions(props: CourseActionsProps) {
@@ -566,6 +577,16 @@ function CourseActions(props: CourseActionsProps) {
   });
   return (
     <div className="flex flex-wrap gap-2">
+      {/* Publicar un curso no lo pone en manos de nadie: hay que asignarlo, y
+          la asignación vivía en OTRA entrada del menú («Cursos»), dentro de la
+          tercera pestaña, donde había que volver a elegir en un desplegable el
+          curso recién publicado. Nada lo decía. Aquí el botón está donde está
+          el curso, es la acción principal de la fila y abre el diálogo con el
+          curso ya elegido. */}
+      {props.course.status === "PUBLISHED" ? (
+        <Button type="button" size="sm" onClick={() => props.onAssign(props.course)}>
+          <Users className="size-4" />{uiText("Asignar")}</Button>
+      ) : null}
       <Button type="button" size="sm" variant="secondary" onClick={() => props.onPreview(props.course.id)}>
         <Eye className="size-4" />{uiText("Vista previa")}</Button>
       {props.canEdit ? (
@@ -861,9 +882,15 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
       toast.success(`Curso: ${statusLabels[course.status]}`);
       await refresh();
       setScheduleOpen(false);
+      // Publicar no pone el curso en manos de nadie: hasta que se asigna, no
+      // aparece en «Mis cursos» de ninguna persona. El asistente terminaba sin
+      // decirlo y sin llevar a ninguna parte, así que el paso siguiente se
+      // ofrece aquí mismo, con el curso ya elegido.
+      if (course.status === "PUBLISHED") setAsignarTrasPublicar(true);
     },
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible cambiar el estado.")),
   });
+  const [asignarTrasPublicar, setAsignarTrasPublicar] = useState(false);
   const contenidoEditable = Boolean(query.data) && can("courses.update") && contenidoEsEditable(query.data!.status);
   const wizard = query.data ? getTrainingCourseWizardState(query.data, design.data, previewed) : null;
   const currentIndex = TRAINING_COURSE_WIZARD_STEPS.findIndex((item) => item.id === step);
@@ -885,6 +912,12 @@ export function TrainingCourseEditor({ courseId }: { courseId: string }) {
         Ahora: el estado del curso, el paso a paso gráfico compartido con el
         resto del producto y, si falta algo para publicar, una sola frase.
       */}
+      <AssignCourseDialog
+        open={asignarTrasPublicar}
+        onOpenChange={setAsignarTrasPublicar}
+        courseId={query.data?.id}
+        courseTitle={query.data?.title}
+      />
       <section className="overflow-hidden rounded-lg border border-line bg-surface-1 shadow-e1">
         <header className="space-y-4 border-b border-line p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">

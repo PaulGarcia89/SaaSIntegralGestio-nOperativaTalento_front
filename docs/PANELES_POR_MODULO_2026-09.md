@@ -1144,6 +1144,69 @@ courses/:courseId/duplicate`), que devuelve una copia en borrador.
 16 pruebas en la suite del servicio, 695 en el frontend, `nest build` y
 `next build` EXIT 0.
 
+## 2.sexvicies Asignar un curso a personas (2026-09-11)
+
+### El agujero del flujo
+
+Publicar un curso **no lo pone en manos de nadie**. Hasta que se asigna, no
+aparece en «Mis cursos» de ninguna persona. Y la asignación vivía aquí:
+
+> Menú → **Cursos** → pestaña **Asignaciones** (la tercera de cinco) → botón
+> «Asignar curso» → desplegable donde hay que **volver a elegir** el curso
+> recién publicado.
+
+Es decir, en una entrada del menú DISTINTA de «Gestionar cursos», que es donde
+se crea y se publica. Nada en el asistente de publicación lo decía: terminaba
+con un «Curso: Publicado» y ahí acababa. Quien no supiera de antemano que
+«Cursos» y «Gestionar cursos» son cosas distintas —y la diferencia no está
+escrita en ninguna parte— no tenía forma de encontrarlo.
+
+### El arreglo: el botón donde está el curso
+
+`AssignCourseDialog` sale de `training-learning-hub.tsx` a su propio archivo y
+acepta un curso preseleccionado. Con eso:
+
+- **En la lista de cursos**, cada curso publicado tiene **«Asignar»** como
+  acción principal de su fila.
+- **Al publicar**, el diálogo se abre solo, con el curso ya elegido. El paso
+  siguiente deja de ser algo que haya que adivinar.
+- En «Cursos → Asignaciones» sigue estando, ahora sin curso preseleccionado.
+
+### El diálogo, reescrito para quien no es técnico
+
+| Antes | Ahora |
+|---|---|
+| «Audiencia» en un desplegable: USERS · ROLES · BRANCHES · TENANT | **«¿Quién debe hacerlo?»** con las cuatro opciones a la vista y explicadas: «Personas concretas · Las eliges una a una» |
+| Cajón de casillas de 224px **sin buscador** | Buscador por nombre o correo, lista de 12px por fila con el correo debajo, contador «N seleccionadas» y «Quitar todas» |
+| Botón «Crear asignaciones» | **«Asignar a 3»** — dice lo que va a pasar antes de pulsar |
+| Fechas con hora (`datetime-local`) | Fecha sola, con la regla escrita: «Si lo dejas vacío, desde hoy» / «sin vencimiento» |
+| «3 asignaciones creadas» | «Asignado a 3 personas. 2 ya lo tenían.» — `skipped` venía en la respuesta y se descartaba, así que asignar dos veces parecía no hacer nada |
+| Si no hay cursos publicados, desplegable vacío sin explicación | Aviso que dice por qué y dónde publicarlo |
+
+Las fechas se envían a mediodía (`T12:00:00`) para que el huso horario no mueva
+un vencimiento al día anterior.
+
+De paso se retira `CoursePlayer` de `training-learning-hub.tsx`: 47 líneas de
+código muerto desde que el reproductor se movió a `/training/learn/[courseId]`.
+
+30 cadenas nuevas en el diccionario inglés. 695 pruebas, `next build` EXIT 0.
+
+### Lo que queda propuesto y no ejecutado
+
+**Los nombres del menú.** «Cursos» y «Gestionar cursos» no se distinguen por su
+nombre, y son dos mundos: el primero es dónde se asigna y se cursa, el segundo
+dónde se crea. Algo como «Mi aprendizaje» y «Catálogo de cursos» —o unificar
+ambas— resolvería la confusión de raíz, pero toca navegación, permisos y rutas
+de toda la sección.
+
+**El asistente de siete pasos.** Para publicar un curso hay que recorrer
+Información, Fundamento, Estructura, Evaluación, Certificación, Vista previa y
+Revisión, y además aprobar cuatro gates de calidad. Es un proceso editorial
+serio y está bien que exista para una empresa que lo necesite, pero para quien
+solo quiere subir un video y asignarlo es desproporcionado. Un «modo simple»
+—título, contenido, publicar— que deje el circuito completo como opción
+avanzada es un cambio de producto, no de pantalla, y merece decidirse aparte.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

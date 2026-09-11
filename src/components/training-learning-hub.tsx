@@ -3,6 +3,7 @@
 import { createPlaybackSessionId } from "@/lib/playback-session-id";
 
 import { useUiText } from "@/components/ui-copy";
+import { AssignCourseDialog } from "@/components/training-assign-course-dialog";
 
 import {
   AlertTriangle,
@@ -78,7 +79,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  createTrainingAssignments,
   createTrainingLaunch,
   deleteTrainingAssignment,
   deployTrainingLaunch,
@@ -1335,101 +1335,8 @@ function AssignmentManagement() {
         </DialogContent>
       </Dialog>
 
-      <CreateAssignmentDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <AssignCourseDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
-  );
-}
-
-function CreateAssignmentDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const uiText = useUiText();
-  const queryClient = useQueryClient();
-  const [courseId, setCourseId] = useState("");
-  const [audience, setAudience] = useState<"USERS" | "ROLES" | "BRANCHES" | "TENANT">("USERS");
-  const [targets, setTargets] = useState<string[]>([]);
-  const [startAt, setStartAt] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const courses = useQuery({ queryKey: ["published-training-courses"], queryFn: () => fetchTrainingCourses({ status: "PUBLISHED", pageSize: 100 }), enabled: open });
-  const users = useQuery({ queryKey: ["assignment-users"], queryFn: fetchUsers, enabled: open && audience === "USERS" });
-  const branches = useQuery({ queryKey: ["assignment-branches"], queryFn: () => fetchBranches(), enabled: open && audience === "BRANCHES" });
-  const mutation = useMutation({
-    mutationFn: createTrainingAssignments,
-    onSuccess: async (result) => {
-      toast.success(`${result.created} asignación${result.created === 1 ? "" : "es"} creada${result.created === 1 ? "" : "s"}`);
-      onOpenChange(false);
-      setTargets([]);
-      await queryClient.invalidateQueries({ queryKey: ["training-admin-assignments"] });
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible asignar el curso.")),
-  });
-
-  const options =
-    audience === "USERS" ? (users.data ?? []).map((item) => ({ id: item.id, label: `${item.fullName} · ${item.email}` })) :
-    audience === "BRANCHES" ? (branches.data ?? []).map((item) => ({ id: item.id, label: item.name })) :
-    audience === "ROLES" ? roleTargets : [];
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    mutation.mutate({
-      courseId,
-      audience,
-      targetIds: audience === "TENANT" ? undefined : targets,
-      startAt: startAt ? new Date(startAt).toISOString() : undefined,
-      dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
-      isRequired: true,
-    });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader><DialogTitle>{uiText("Asignar curso")}</DialogTitle><DialogDescription>{uiText("Define la audiencia y las fechas de cumplimiento.")}</DialogDescription></DialogHeader>
-        <form className="space-y-5" onSubmit={submit}>
-          <div><Label>{uiText("Curso publicado")}</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger><SelectValue placeholder={uiText("Selecciona un curso")} /></SelectTrigger><SelectContent>{courses.data?.items.map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label>{uiText("Audiencia")}</Label><Select value={audience} onValueChange={(value) => { setAudience(value as typeof audience); setTargets([]); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USERS">{uiText("Personas específicas")}</SelectItem><SelectItem value="ROLES">Roles</SelectItem><SelectItem value="BRANCHES">{uiText("Sucursales")}</SelectItem><SelectItem value="TENANT">{uiText("Toda la empresa")}</SelectItem></SelectContent></Select></div>
-          {audience !== "TENANT" ? <fieldset className="max-h-56 space-y-2 overflow-y-auto rounded-xl border p-3"><legend className="px-1 text-sm font-medium">{uiText("Selecciona destinatarios")}</legend>{options.map((option) => <label key={option.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-muted"><input type="checkbox" checked={targets.includes(option.id)} onChange={(event) => setTargets(event.target.checked ? [...targets, option.id] : targets.filter((id) => id !== option.id))}/><span>{option.label}</span></label>)}</fieldset> : <p className="rounded-xl bg-muted p-4 text-sm">{uiText("El curso se asignará a todas las personas activas de la empresa.")}</p>}
-          <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="assignment-start">{uiText("Disponible desde")}</Label><Input id="assignment-start" type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} /></div><div><Label htmlFor="assignment-due">{uiText("Fecha límite")}</Label><Input id="assignment-due" type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></div></div>
-          <div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>{uiText("Cancelar")}</Button><Button type="submit" disabled={!courseId || (audience !== "TENANT" && targets.length === 0) || mutation.isPending}>{mutation.isPending ? "Asignando…" : "Crear asignaciones"}</Button></div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CoursePlayer({ courseId, open, onOpenChange }: { courseId: string | null; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const uiText = useUiText();
-  const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ["learner-course", courseId], queryFn: () => fetchLearnerTrainingCourse(courseId!), enabled: Boolean(open && courseId) });
-  const mutation = useMutation({
-    mutationFn: async ({ event }: { event: VideoProgressEvent }) => {
-      let lastError: unknown;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          if (event.eventType === "PLAY") return await startTrainingVideo(event);
-          if (event.eventType === "HEARTBEAT") return await heartbeatTrainingVideo({ ...event, clientTimestamp: new Date().toISOString(), isPlaying: true });
-          if (event.eventType === "COMPLETED") return await updateTrainingLessonProgress(event.lessonId, true);
-          if (event.eventType === "PAUSE" || event.eventType === "SEEK" || event.eventType === "ENDED") return await recordTrainingVideoEvent(event.eventType === "ENDED" ? "ended" : "pause", event);
-          return null;
-        } catch (error) {
-          lastError = error;
-          if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
-        }
-      }
-      throw lastError;
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["my-training-assignments"] });
-      await queryClient.invalidateQueries({ queryKey: ["learner-course", courseId] });
-    },
-    onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible sincronizar tu avance.")),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader><DialogTitle>{query.data?.title ?? "Curso"}</DialogTitle><DialogDescription>{query.data?.summary ?? "Contenido y progreso del curso."}</DialogDescription></DialogHeader>
-        {query.isLoading ? <SkeletonRows rows={5} label={uiText("Cargando el contenido del curso")} /> : query.isError ? <ErrorState title={uiText("No fue posible cargar el curso")} detail={getApiErrorMessage(query.error, uiText("Reintenta la consulta para continuar."))} onRetry={() => void query.refetch()} /> : query.data ? <CourseContent course={query.data} onVideoProgress={(event) => mutation.mutateAsync({ event })} /> : null}
-      </DialogContent>
-    </Dialog>
   );
 }
 

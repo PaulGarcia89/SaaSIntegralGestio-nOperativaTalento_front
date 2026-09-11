@@ -3528,7 +3528,20 @@ export function submitCandidateApplication(
   antiFraud?: { website?: string; formStartedAt?: string },
 ) {
   const body = new FormData();
-  const candidateProfileOnlyKeys = new Set(["lastName", "address", "apartmentNumber", "state", "zipCode", "dateOfBirth", "socialSecurityNumber", "emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone"]);
+  /*
+   * Lo que NO viaja con la postulación.
+   *
+   * Antes se descartaban aquí también la dirección, la fecha de nacimiento y el
+   * contacto de emergencia: se guardaban solo en el perfil reutilizable de la
+   * persona, así que quien revisaba la postulación no podía verlos aunque los
+   * hubiera escrito. El servidor sí los acepta (`normalizeDynamicResponses`),
+   * de modo que ahora viajan y la ficha los enseña agrupados.
+   *
+   * El número de seguridad social se queda fuera, y no por descuido: el
+   * servidor lo descarta igualmente y la ficha se niega a pintarlo. Es el único
+   * dato del formulario que no debe circular con la postulación.
+   */
+  const candidateProfileOnlyKeys = new Set(["socialSecurityNumber"]);
   Object.entries(input).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "" || (key === "dynamicResponses" && typeof value === "object" && value !== null && !Array.isArray(value))) {
       if (key !== "dynamicResponses" || typeof value !== "object" || value === null || Array.isArray(value)) return;

@@ -3424,5 +3424,6 @@
   "people.overdue": "Fuera de plazo",
   "people.discard": "Descartar",
   "nav.Mis cursos": "Mis cursos",
-  "nav.Crear y editar cursos": "Crear y editar cursos"
+  "nav.Crear y editar cursos": "Crear y editar cursos",
+  "people.scheduleFirst": "Agendar entrevista"
 }

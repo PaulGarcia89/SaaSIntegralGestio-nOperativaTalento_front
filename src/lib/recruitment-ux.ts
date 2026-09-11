@@ -1,4 +1,4 @@
-import type { ApplicationStatusKey, OperationalDashboardItemDto, VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
+import type { ApplicationStatusKey, OperationalDashboardItemDto, RecruitmentInterviewStatus, VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import { currentApplicationStage } from "@/lib/applications";
 import { translateUiCopy } from "@/i18n/ui-copy";
 import { translate } from "@/i18n";
@@ -351,9 +351,44 @@ export function splitRejection(moves: { primary: StageMove | null; others: Stage
   };
 }
 
+/* ------------------------------------------------------------------------- *
+ * Entrevista antes de la etapa de entrevista
+ *
+ * Mover a alguien a la etapa de entrevistas sin haber acordado día y hora deja
+ * el proceso en un estado que no significa nada: la persona figura «en
+ * entrevista» y no hay entrevista. El candidato recibe el aviso de que avanzó,
+ * espera una fecha que nadie puso, y el retraso se cuenta contra una etapa en
+ * la que todavía no ha pasado nada.
+ *
+ * Por eso el paso a esa etapa exige que exista una entrevista agendada. No es
+ * una regla nueva del negocio: es el paso que ya había que dar, ejecutado en el
+ * momento en que se decide darlo en vez de quedar pendiente en la cabeza de
+ * quien contrata. Una entrevista CANCELADA no cuenta, porque no queda ninguna
+ * cita en pie.
+ * ------------------------------------------------------------------------- */
+
+export function entrevistasEnPie(interviews: Array<{ status?: RecruitmentInterviewStatus }> | undefined | null) {
+  return (interviews ?? []).filter((interview) => ["SCHEDULED", "CONFIRMED", "COMPLETED"].includes(interview.status ?? "")).length;
+}
+
+/** ¿Este movimiento exige agendar una entrevista antes de ejecutarse? */
+export function exigeAgendarEntrevista(
+  stage: VacancyStageDto,
+  interviews: Array<{ status?: RecruitmentInterviewStatus }> | undefined | null,
+) {
+  return stage.applicationStatus === "INTERVIEW" && entrevistasEnPie(interviews) === 0;
+}
+
 /** Agrupa personas por la fase visible, conservando el orden de llegada. */
 export function groupByPhase(applications: VacancyApplicationDto[]): Record<RecruitmentPhaseId, VacancyApplicationDto[]> {
   const groups = { POSTULARON: [], CONOCIENDO: [], DECIDIDO: [], TRABAJANDO: [], DESCARTADOS: [] } as Record<RecruitmentPhaseId, VacancyApplicationDto[]>;
   applications.forEach((application) => groups[recruitmentPhaseOf(application.status)].push(application));
   return groups;
+}
+
+/** La decisión requiere el resultado de la entrevista cuando forma parte del proceso. */
+export function pendingInterviewResult(application: VacancyApplicationDto, stage: VacancyStageDto, stages: VacancyStageDto[]) {
+  return stage.applicationStatus === "APPROVED"
+    && (application.status === "INTERVIEW" || stages.some((item) => item.applicationStatus === "INTERVIEW"))
+    && !(application.interviews ?? []).some((item) => item.status === "COMPLETED");
 }

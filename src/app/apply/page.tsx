@@ -224,6 +224,12 @@ function ApplyWizard() {
         {!receipt ? <div className="space-y-4"><p className="leading-7 text-muted-foreground">{vacancy.description || vacancy.summary || t("apply.reviewBeforeContinue")}</p>{vacancy.requirements ? <div><h2 className="font-semibold">{t("apply.requirements")}</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{vacancy.requirements}</p></div> : null}</div> : null}
         {!receipt ? <CandidateProfileFields form={form} onChange={(key, value) => { if (["fullName", "email", "phone", "city"].includes(key)) setField(key as keyof PublicApplicationInput, String(value)); else setResponse(key, value); }} /> : null}
         {!receipt ? <><DynamicQuestions fields={getApplicationFields(vacancy.applicationFormSchema).filter((field) => !builtInQuestionKeys.has(field.key) && !builtInQuestionLabels.has(normalizeQuestionLabel(field.label)))} responses={form.dynamicResponses ?? {}} onChange={setResponse} /><EmploymentAndReferenceQuestions responses={form.dynamicResponses ?? {}} onChange={setResponse} /></> : null}
+        {/* La carta de presentación existía de punta a punta —el contrato la
+            acepta, el servidor la guarda, la ficha la enseña y el asistente de
+            competencias la lee como fuente— menos aquí: no había dónde
+            escribirla. La ficha decía «No se adjuntó carta de presentación»
+            en TODAS las postulaciones, porque era imposible adjuntarla. */}
+        {!receipt ? <div className="space-y-4"><div><h2 className="font-semibold">{uiText("Carta de presentación")}</h2><p className="mt-1 text-sm text-muted-foreground">{uiText("Opcional. Cuéntanos en pocas líneas por qué te interesa este puesto y qué traes contigo.")}</p></div><TextAreaField label={uiText("Lo que quieras contarnos")} value={form.coverLetter ?? ""} onChange={(value) => setForm((current) => ({ ...current, coverLetter: value }))} /></div> : null}
         {!receipt ? <div className="space-y-4"><div><h2 className="font-semibold">{t("apply.resumeOptional")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("apply.resumeOptionalBody")}</p></div><FileUpload accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" maxFiles={1} maxSizeBytes={15 * 1024 * 1024} onFiles={(files) => { setResumeFile(files[0] ?? null); setParsedResume(null); setResumeBlockedByScanner(false); }} />{resumeFile ? <div className="space-y-3 rounded-xl border p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-3"><span>{resumeFile.name} · {(resumeFile.size / 1024 / 1024).toFixed(2)} MB</span><Button type="button" size="sm" variant="ghost" onClick={() => { setResumeFile(null); setParsedResume(null); setResumeBlockedByScanner(false); }}>{t("apply.remove")}</Button></div>{!getCandidateSession() ? <div className="space-y-3 border-t pt-3"><p className="text-muted-foreground">{t("apply.signInToAutofill")}</p><div className="flex gap-2"><Button type="button" size="sm" variant={accountMode === "login" ? "default" : "secondary"} onClick={() => setAccountMode("login")}>{t("apply.haveAccount")}</Button><Button type="button" size="sm" variant={accountMode === "register" ? "default" : "secondary"} onClick={() => setAccountMode("register")}>{t("apply.createAccount")}</Button></div><Field label={t("apply.portalPassword")} type="password" required value={candidatePassword} onChange={setCandidatePassword} /></div> : null}<Button type="button" variant="secondary" disabled={parseResume.isPending || (!getCandidateSession() && candidatePassword.length < 10)} onClick={() => parseResume.mutate()}>{parseResume.isPending ? t("apply.analyzing") : t("apply.autofillFromCv")}</Button></div> : null}{parsedResume ? <div role="status" className="space-y-3 rounded-xl bg-secondary/40 p-4"><p className="font-medium">{t("apply.detectedData", { confidence: parsedResume.confidence })}</p><dl className="grid gap-2 text-sm md:grid-cols-2"><div><dt className="text-muted-foreground">{t("apply.name")}</dt><dd>{parsedResume.fields.fullName || t("apply.notDetected")}</dd></div><div><dt className="text-muted-foreground">{t("apply.email")}</dt><dd>{parsedResume.fields.email || t("apply.notDetected")}</dd></div><div><dt className="text-muted-foreground">{t("apply.phone")}</dt><dd>{parsedResume.fields.phone || t("apply.notDetected")}</dd></div><div><dt className="text-muted-foreground">LinkedIn</dt><dd className="break-all">{parsedResume.fields.linkedinUrl || t("apply.notDetected")}</dd></div></dl><Button type="button" onClick={applyParsedResume}>{t("apply.fillEmptyOnly")}</Button></div> : null}</div> : null}
         {!receipt ? <div className="space-y-5"><input tabIndex={-1} aria-hidden="true" autoComplete="off" name="website" value={website} onChange={(event) => setWebsite(event.target.value)} className="absolute -left-[10000px] h-px w-px opacity-0" /><dl className="grid gap-3 rounded-xl bg-secondary/40 p-5 text-sm"><div><dt className="text-muted-foreground">{t("apply.name")}</dt><dd className="font-medium">{form.fullName}</dd></div><div><dt className="text-muted-foreground">{t("apply.email")}</dt><dd className="font-medium">{form.email}</dd></div><div><dt className="text-muted-foreground">{t("apply.vacancy")}</dt><dd className="font-medium">{vacancy.title}</dd></div>{resumeFile ? <div><dt className="text-muted-foreground">{uiText("CV privado")}</dt><dd className="font-medium">{resumeFile.name}</dd></div> : null}</dl><div className="rounded-xl border bg-muted/20 p-5 text-sm leading-7" aria-labelledby="application-disclaimer-title"><h2 id="application-disclaimer-title" className="font-semibold">{t("apply.whatYouAccept")}</h2><p className="mt-3">{t("apply.readCalmly")}</p><ul className="mt-3 list-disc space-y-3 pl-5"><li><strong>{t("apply.canVerify")}</strong> {uiText(" Autorizas a ")}{empresa} {uiText(" a verificar lo que escribiste aquí, y autorizas a tus empleadores anteriores y a las personas que indiques a darnos información sobre tu trabajo, tu preparación y tu idoneidad para el puesto.")}</li><li><strong>{t("apply.noOneLiable")}</strong> {uiText(" Liberas a ")}{empresa}{uiText(", a tus empleadores anteriores y a las personas consultadas de cualquier responsabilidad por habérnosla dado.")}</li><li><strong>{t("apply.mustBeTrue")}</strong> {t("apply.falseConsequences")}</li><li><strong>{t("apply.notAContract")}</strong> {uiText(" Enviar esta solicitud no garantiza que haya un puesto disponible ni obliga a ")}{empresa} {uiText(" a ofrecerte uno, y el empleo puede terminarse en cualquier momento.")}</li></ul></div><label className="flex min-h-14 items-start gap-3 rounded-xl border p-4"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 size-5" /><span className="text-base leading-7">{uiText("He leído lo anterior, confirmo que lo que escribí es cierto y autorizo que ")}{empresa} {uiText(" use mis datos para este proceso.")}</span></label></div> : null}
         {receipt ? <div className="space-y-5 text-center" role="status"><div className="mx-auto flex size-14 items-center justify-center rounded-full bg-status-success/15 text-status-success"><Check /></div><h2 className="text-2xl font-semibold">{t("apply.sent")}</h2><p className="text-muted-foreground">{t("apply.applicationNumber")} <strong className="text-foreground">{receipt.id}</strong></p><p className="text-sm text-muted-foreground">{t("apply.checkStatus")}</p><div className="flex flex-wrap justify-center gap-2"><Button asChild variant="secondary"><Link href={`/application-status?reference=${encodeURIComponent(receipt.id)}`}>{t("apply.goToTracking")}</Link></Button><Button asChild><Link href="/candidate/portal">{t("apply.openPortal")}</Link></Button></div></div> : null}
@@ -254,15 +260,16 @@ function TextAreaField({ label, value, onChange }: { label: string; value: strin
 /**
  * Datos de la persona.
  *
- * Se retiraron del formulario público: Seguro Social, fecha de nacimiento,
- * dirección con apartamento, estado, código postal y contacto de emergencia.
+ * El Seguro Social NO se pide y no se va a pedir: el backend lo descarta al
+ * postular, el cliente lo descarta antes de enviarlo y la ficha se niega a
+ * pintarlo. Cuando hace falta de verdad, el expediente del empleado lo recoge
+ * por su propia vía.
  *
- * No se pierde nada. El backend ya descartaba el Seguro Social al postular
- * (`applications.service.ts:241`), el expediente del empleado lo recoge por su
- * propia vía (`employees.service.ts:135`), y el resto se pide en la etapa de
- * Documentos de la contratación, que ya existe y ya funciona. Pedirlos antes de
- * una oferta alarga el formulario y amplía la superficie de datos sensibles de
- * personas que quizá nunca sean contratadas.
+ * Dirección, fecha de nacimiento y contacto de emergencia sí se piden aquí, por
+ * decisión del equipo: quien revisa una postulación quiere poder llamar a
+ * alguien y saber dónde vive la persona sin esperar a la contratación. Van en
+ * un bloque aparte y marcados como opcionales —salvo lo que la ley del puesto
+ * exija—, para que la falta de un dato no bloquee una postulación.
  */
 function CandidateProfileFields({ form, onChange }: { form: PublicApplicationInput; onChange: (key: string, value: unknown) => void }) {
   const uiText = useUiText();
@@ -276,6 +283,28 @@ function CandidateProfileFields({ form, onChange }: { form: PublicApplicationInp
       <Field label={t("apply.phone")} type="tel" value={form.phone || ""} onChange={(value) => onChange("phone", value)} />
       <Field label={t("apply.cityField")} value={form.city || ""} onChange={(value) => onChange("city", value)} />
     </div>
+
+    <fieldset className="space-y-4">
+      <legend className="text-base font-semibold">{uiText("Dónde vives")}</legend>
+      <p className="text-sm text-muted-foreground">{uiText("Opcional. Ayuda a saber si el traslado al puesto te queda cómodo.")}</p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label={uiText("Dirección")} value={response("address")} onChange={(value) => onChange("address", value)} />
+        <Field label={uiText("Apartamento o interior")} value={response("apartmentNumber")} onChange={(value) => onChange("apartmentNumber", value)} />
+        <Field label={uiText("Estado")} value={response("state")} onChange={(value) => onChange("state", value)} />
+        <Field label={uiText("Código postal")} value={response("zipCode")} onChange={(value) => onChange("zipCode", value)} />
+        <Field label={uiText("Fecha de nacimiento")} type="date" value={response("dateOfBirth")} onChange={(value) => onChange("dateOfBirth", value)} />
+      </div>
+    </fieldset>
+
+    <fieldset className="space-y-4">
+      <legend className="text-base font-semibold">{uiText("A quién avisamos si pasa algo")}</legend>
+      <p className="text-sm text-muted-foreground">{uiText("Opcional. Solo se usa en una emergencia mientras estés en nuestras instalaciones.")}</p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Field label={uiText("Nombre")} value={response("emergencyContactName")} onChange={(value) => onChange("emergencyContactName", value)} />
+        <Field label={uiText("Parentesco")} value={response("emergencyContactRelationship")} onChange={(value) => onChange("emergencyContactRelationship", value)} />
+        <Field label={uiText("Teléfono")} type="tel" value={response("emergencyContactPhone")} onChange={(value) => onChange("emergencyContactPhone", value)} />
+      </div>
+    </fieldset>
 
     <fieldset className="space-y-4">
       <legend className="text-base font-semibold">{t("apply.fiveQuickQuestions")}</legend>

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, FileText, Mail, MapPin, Phone, UserX } from "lucide-react";
+import { CalendarPlus, ChevronRight, FileText, Mail, MapPin, Phone, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/simple/reason-dialog";
 import { MobileActionBar, SimpleSection } from "@/components/simple/simple-ui";
@@ -23,8 +23,9 @@ import { Button } from "@/components/ui/button";
 import { fetchApplications, fetchRejectionReasons, fetchVacancies, fetchVacancySetup, undoApplicationTransition, updateApplication } from "@/lib/backend";
 import type { ApplicationStatusKey, VacancyApplicationDto, VacancyStageDto } from "@/lib/contracts";
 import {
-  MAIN_PHASES,
   RECRUITMENT_PHASES,
+  exigeAgendarEntrevista,
+  pendingInterviewResult,
   firstNameOf,
   groupByPhase,
   recruitmentPhase,
@@ -106,6 +107,7 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
   const { locale, t } = useLocale();
   const phase = recruitmentPhase(recruitmentPhaseOf(application.status));
   const name = application.candidate.fullName;
+  const faltaAgendar = Boolean(moves.primary && (exigeAgendarEntrevista(moves.primary.stage, application.interviews) || pendingInterviewResult(application, moves.primary.stage, application.vacancy.stages ?? [])));
 
   return (
     <article className="rounded-lg border border-line bg-surface-1 p-4">
@@ -119,8 +121,8 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
             {initials(name)}
           </span>
           <div className="min-w-0">
-            <h3 className="truncate font-semibold text-ink-1">{name}</h3>
-            <p className="truncate text-sm text-ink-2">{application.vacancy.title}</p>
+            <h3 className="break-words font-semibold text-ink-1">{name}</h3>
+            <p className="break-words text-sm text-ink-2">{application.vacancy.title}</p>
             {/* La fila enseñaba nombre, puesto, sucursal y espera. Correo,
                 teléfono, ciudad y si hay currículum ya venían en la misma
                 respuesta y no se dibujaban: para saber si alguien había dejado
@@ -128,7 +130,7 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-3">
               <span className="inline-flex min-w-0 items-center gap-1">
                 <Mail className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{application.candidate.email}</span>
+                <span className="break-all">{application.candidate.email}</span>
               </span>
               {application.candidate.phone ? (
                 <span className="inline-flex items-center gap-1">
@@ -147,7 +149,7 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
               ) : null}
             </p>
             <p className="truncate text-xs text-ink-3 md:hidden">
-              {application.vacancy.branch?.name ?? t("people.noBranch")} · {waitingLabel(application.appliedAt)}
+              {application.vacancy.branch?.name ?? t("people.noBranch")} · {waitingLabel(application.appliedAt, undefined, locale)}
             </p>
           </div>
         </div>
@@ -156,22 +158,33 @@ function PersonRow({ application, moves, onMove, onReject, busy }: {
             mostró bajo el nombre, así que aquí se oculta. */}
         <div className="hidden w-40 shrink-0 md:block">
           <p className="truncate text-sm text-ink-2">{application.vacancy.branch?.name ?? t("people.noBranch")}</p>
-          <p className={cn("truncate font-mono text-xs tabular-figures", application.isStageOverdue ? "font-semibold text-status-warning" : "text-ink-3")}>
-            {waitingLabel(application.appliedAt)}
+          <p className={cn("text-xs tabular-figures", application.isStageOverdue ? "font-semibold text-status-warning" : "text-ink-3")}>
+            {waitingLabel(application.appliedAt, undefined, locale)}
           </p>
           {application.isStageOverdue ? <p className="truncate text-xs text-status-warning">{t("people.overdue")}</p> : null}
         </div>
 
         <div className="shrink-0 md:w-36">
           <StatusBadge
-            label={phaseTitle(phase.id, locale)}
+            label={application.currentStage?.name ?? phaseTitle(phase.id, locale)}
             tone={phase.id === "DESCARTADOS" ? "neutral" : phase.id === "TRABAJANDO" ? "success" : "progress"}
           />
         </div>
 
         {/* Acciones: una principal y el enlace a la ficha. */}
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:justify-end">
-          {moves.primary ? (
+          {/* Pasar a entrevistas exige una entrevista agendada, y el agendado
+              vive en la ficha: desde la lista se lleva allí en vez de ofrecer
+              un botón que movería sin cita. Un bloqueo con puerta trasera no
+              es un bloqueo. */}
+          {moves.primary && faltaAgendar ? (
+            <Button asChild>
+              <Link href={`/ats/candidates/${application.id}`}>
+                <CalendarPlus className="size-4" aria-hidden="true" />
+                {t("people.scheduleFirst")}
+              </Link>
+            </Button>
+          ) : moves.primary ? (
             <Button type="button" disabled={busy} onClick={() => onMove(moves.primary!)}>
               {moves.primary.label}
             </Button>
@@ -288,7 +301,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
     <PersonRow
       key={application.id}
       application={application}
-      moves={splitRejection(stageMovesFor(application, stages))}
+      moves={splitRejection(stageMovesFor(application, stages, locale))}
       busy={move.isPending}
       onMove={(selected) => move.mutate({ application, stage: selected.stage })}
       onReject={(selected) => setRejecting({ application, move: selected })}
@@ -350,7 +363,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
           </select>
         </label>
 
-        <label className="min-w-0 flex-1 space-y-1.5 sm:max-w-48" htmlFor="people-phase">
+        <label className="min-w-0 flex-1 space-y-1.5 sm:max-w-64" htmlFor="people-phase">
           <span className="block text-xs font-medium text-ink-2">{t("people.phase")}</span>
           <select
             id="people-phase"
@@ -366,6 +379,25 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
           </select>
         </label>
       </FilterBar>
+
+      <section className="rounded-xl border border-line bg-surface-1 p-4" aria-label={locale === "en" ? "Hiring process" : "Proceso de contratación"}>
+        <h2 className="mb-3 font-semibold">{locale === "en" ? "Follow the process" : "Sigue el proceso"}</h2>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {(stages.length ? stages.filter((item) => !["REJECTED", "WITHDRAWN"].includes(item.applicationStatus)).sort((a, b) => a.position - b.position).map((item) => ({ id: item.code, title: item.name })) : [
+            { id: "application", title: locale === "en" ? "Application" : "Postulación" },
+            { id: "review", title: locale === "en" ? "Review" : "Revisión" },
+            { id: "interview", title: locale === "en" ? "Interview" : "Entrevista" },
+            { id: "decision", title: locale === "en" ? "Decision" : "Decisión" },
+            { id: "hiring", title: locale === "en" ? "Hiring" : "Contratación" },
+          ]).map((item, index) => (
+            <div key={item.id} className="min-w-32 flex-1 rounded-lg border border-line bg-surface-2 p-3">
+              <span className="mb-2 flex size-7 items-center justify-center rounded-full bg-action text-sm text-on-action">{index + 1}</span>
+              <p className="text-sm font-medium">{item.title}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-sm text-ink-2">{locale === "en" ? "Open an application to review its requirements, schedule interviews and continue. Select a job to see its configured stages." : "Abre una postulación para revisar sus requisitos, agendar entrevistas y continuar. Selecciona un puesto para ver sus etapas configuradas."}</p>
+      </section>
 
       {/* Sin vacante elegida no se sabe qué etapas tiene el proceso, así que no
           hay acción principal que ofrecer. Se dice, en vez de mostrar filas sin
@@ -400,17 +432,17 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
 
       {applications.isSuccess && items.length > 0 && view === "fases" ? (
         <div className="space-y-6">
-          {MAIN_PHASES.map((entry) => {
-            const people = groupByPhase(items)[entry.id];
+          {(stages.length ? stages.slice().sort((a, b) => a.position - b.position).map((stage) => ({ id: stage.code, step: stage.position + 1, stage })) : RECRUITMENT_PHASES.map((entry) => ({ ...entry, stage: null }))).map((entry) => {
+            const people = entry.stage ? items.filter((item) => item.currentStage?.code === entry.stage!.code) : groupByPhase(items)[entry.id as RecruitmentPhaseId];
             return (
               <section key={entry.id} aria-labelledby={`fase-${entry.id}`} className="space-y-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-2">
                   <div className="min-w-0">
                     <h2 id={`fase-${entry.id}`} className="text-base font-semibold text-ink-1">
                       <span className="font-mono text-ink-3 tabular-figures">{entry.step}.</span>{" "}
-                      {phaseTitle(entry.id, locale)}
+                      {entry.stage?.name ?? phaseTitle(entry.id as RecruitmentPhaseId, locale)}
                     </h2>
-                    <p className="text-sm text-ink-2">{phaseMeaning(entry.id, locale)}</p>
+                    <p className="text-sm text-ink-2">{entry.stage ? (locale === "en" ? "Applications on this page" : "Postulaciones de esta página") : phaseMeaning(entry.id as RecruitmentPhaseId, locale)}</p>
                   </div>
                   <span className="font-mono text-lg font-semibold text-ink-1 tabular-figures">{people.length}</span>
                 </div>

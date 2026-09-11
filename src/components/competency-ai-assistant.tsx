@@ -23,6 +23,34 @@ export function CompetencyAiAssistant({ applicationId, canManage }: { applicatio
   });
   const assessment = context.data?.assessment;
 
+  /*
+   * Sin análisis generado, esta tarjeta ocupaba media pantalla para decir
+   * cuatro veces «sin datos»: el aviso de gobernanza, las cuatro fuentes con
+   * su estado, la nota del CV y un párrafo explicativo. Mientras no haya nada
+   * que leer, se pliega en una línea con su botón; al desplegarla aparece
+   * entero. Lo que había sigue estando, pero deja de gritar.
+   */
+  if (!assessment && !context.isLoading) {
+    return <Card level={2}>
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <BrainCircuit className="mt-0.5 size-5 shrink-0 text-ink-3" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-medium text-ink-1">{uiText("Asistente de competencias")}</p>
+            <p className="mt-0.5 text-sm text-ink-2">{uiText("Lee las evidencias internas y sugiere preguntas. La decisión sigue siendo del equipo.")}</p>
+          </div>
+        </div>
+        {canManage ? (
+          <Button className="shrink-0" variant="secondary" onClick={() => generate.mutate()} disabled={generate.isPending}>
+            <Sparkles className="size-4" aria-hidden="true" />
+            {generate.isPending ? uiText("Analizando…") : uiText("Generar análisis")}
+          </Button>
+        ) : null}
+        {generate.isError ? <p className="text-sm text-status-danger sm:w-full">{generate.error instanceof Error ? generate.error.message : uiText("Verifica que la vacante tenga competencias configuradas.")}</p> : null}
+      </CardContent>
+    </Card>;
+  }
+
   return <Card level={2}>
     <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="flex items-center gap-2"><BrainCircuit className="size-5" />{uiText("Asistente de competencias")}</CardTitle>{assessment ? <Badge variant="secondary">{uiText("Versión ")}{assessment.version}</Badge> : null}</div></CardHeader>
     <CardContent className="space-y-5">

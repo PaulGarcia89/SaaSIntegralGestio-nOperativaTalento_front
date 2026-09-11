@@ -1413,6 +1413,446 @@ al contrato de diseño. Verificado con specimen del componente real a 390 y
 1440 px: sin desbordamiento horizontal, los 13 controles por encima de 44 px,
 texto base de 17 px. 714 pruebas, `tsc` limpio, `next build` EXIT 0.
 
+## 2.vicies-ter La ficha no enseñaba lo que la persona respondió (2026-09-11)
+
+El formulario público pide bastante más que nombre y correo: cinco preguntas de
+filtro (mayoría de edad, autorización de trabajo, si trabajó antes aquí, si
+tiene familiares en la empresa, condenas), el último empleo con su supervisor y
+motivo de salida, qué tipo de trabajo busca, hasta tres referencias con teléfono
+y una declaración firmada.
+
+Todo eso viajaba en **cada respuesta de la API** —`dynamicResponses` dentro de
+la postulación— y la ficha simple no dibujaba ni uno. Para saber si alguien dijo
+que puede trabajar legalmente había que abrir la ficha avanzada, donde aparecía
+así:
+
+    authorizedToWorkInUS   true
+    reference2Phone        3059876543
+
+Los nombres internos del programa, sin agrupar, sin orden y con `true` en vez de
+«Sí». La pregunta se hacía en el formulario en español y se leía en la ficha en
+código.
+
+`src/lib/application-answers.ts` traduce esas claves a las preguntas tal como se
+leyeron al postularse y las agrupa como estaban en el formulario: las cinco
+rápidas, qué busca, su último empleo, quién lo recomienda, su declaración. Tres
+decisiones:
+
+| | |
+|---|---|
+| `false` no es «sin responder» | Si un booleano falso se tratara como vacío, «¿Ha sido condenado? No» desaparecería y parecería que no contestó |
+| Lo vacío no se dibuja | Una fila con etiqueta y sin dato ocupa sitio y no dice nada |
+| Lo desconocido no se pierde | Las preguntas propias de una vacante caen en «Otras respuestas» con la clave humanizada: enseñarlas con un nombre imperfecto es mejor que callarlas |
+
+Cada referencia se junta en una sola fila —nombre, relación y teléfono— en vez
+de las tres filas sueltas de antes, y los teléfonos son enlaces `tel:` de 44 px:
+las referencias se revisan desde el teléfono, y copiar un número a mano es donde
+se pierde un dígito.
+
+Se aplica en los tres sitios que enseñaban lo mismo mal: la ficha simple (bloque
+nuevo «Lo que respondió al postularse», con el número de respuestas a la vista
+sin desplegar), la ficha avanzada (que pasa de claves crudas a preguntas
+agrupadas) y la vista rápida del candidato.
+
+Solo frontend: ni un contrato, ni un endpoint, ni un permiso. El dato ya venía.
+14 pruebas nuevas, 728 en total, `tsc` limpio, `next build` EXIT 0. Verificado
+con specimen de la ficha real a 390 px.
+
+## 2.vicies-quater El recorrido completo y la entrevista antes de la etapa (2026-09-11)
+
+### 1. El recorrido enseñaba cuatro fases de un proceso de cinco etapas
+
+La ficha dibujaba las cuatro fases resumidas —«Se postularon», «Los estoy
+conociendo», «Decidí contratar», «Ya trabaja aquí»—, pero el proceso real de la
+vacante tiene cinco pasos en el camino principal: Postulación, Revisión,
+Entrevistas, Decisión y Contratado. «Postulación» y «Revisión» se dibujaban
+como un solo punto, así que alguien parado en Revisión no veía su propia etapa
+en el recorrido, ni cuántas quedaban de verdad.
+
+`RecruitmentStageRail` dibuja las etapas tal como las configuró la empresa, con
+sus nombres y en su orden. El descarte se queda fuera del camino a propósito:
+no es un paso, es salirse, y a quien está descartado la ficha ya le enseña un
+texto en lugar de un recorrido con etapas que no va a recorrer. Si una vacante
+no trae etapas, se cae al recorrido de cuatro fases, que sigue existiendo.
+
+### 2. Se podía pasar a «Entrevistas» sin entrevista
+
+El botón movía de etapa y ya. La persona quedaba «en entrevista» sin que
+existiera ninguna: el candidato recibía el aviso de que había avanzado, esperaba
+una fecha que nadie puso, y el reloj de la etapa empezaba a contar retraso
+contra algo que no había ocurrido.
+
+Ahora ese movimiento exige una entrevista agendada, y el mismo botón la agenda:
+dice «Agendar entrevista y pasar a «Entrevistas»», abre el formulario y, al
+confirmar, mueve de etapa. Un solo gesto para el paso que siempre fueron dos.
+
+| | |
+|---|---|
+| Regla | `exigeAgendarEntrevista(etapa, entrevistas)`: solo etapas con `applicationStatus === "INTERVIEW"`, y solo si no queda ninguna entrevista en pie |
+| Cancelada no cuenta | Si la única entrevista se canceló no queda cita, así que volver a pasar vuelve a exigir acordar día y hora |
+| Sin permiso de agendar | El botón se desactiva y se explica por qué, en vez de fallar al pulsarlo |
+| Desde la lista | La fila lleva a la ficha con «Agendar entrevista» en lugar de mover: un bloqueo con puerta trasera no es un bloqueo |
+
+El bloqueo es de interfaz, no de backend: no se toca ninguna transición ni
+ningún contrato. El servidor sigue aceptando lo que aceptaba; lo que cambia es
+que la pantalla ya no ofrece dar un paso a medias.
+
+4 pruebas nuevas para la regla, 732 en total. `tsc` limpio, `next build`
+EXIT 0. Verificado con specimen de la ficha real a 390 y 1440 px: las cinco
+etapas caben sin desbordamiento y en móvil se rotula la actual.
+
+## 2.vicies-quinquies Auditoría del flujo de contratación en la ficha (2026-09-11)
+
+La ficha 360 quedó como único flujo de contratación. Esta es la auditoría de su
+pantalla principal y lo que se corrigió.
+
+### 1. La acción recomendada contradecía al texto que la acompañaba
+
+En pantalla: «Revisa el perfil y programa la entrevista» encima de un botón
+**«Preparar oferta»**. El texto recorría los pasos y tomaba el primero sin
+completar; el botón era una cadena de condiciones que cubría RECHAZADO,
+CONTRATADO y APROBADO y mandaba **todo lo demás** a un caso por omisión que
+ofrecía preparar la oferta. Como la mayoría de las postulaciones no están
+aprobadas, el botón principal proponía el penúltimo paso del proceso.
+
+`src/lib/hiring-next-step.ts` convierte la acción en una **propiedad del paso**:
+`planDeContratacion(entrada)` devuelve los pasos, cuál es el actual y su acción,
+y la pantalla lee el mismo objeto para el texto y para el botón. Una prueba
+recorre las 7 × 3 × 3 × 2 × 2 combinaciones de estado y comprueba que la acción
+devuelta es siempre la del paso actual: no se pueden volver a desalinear.
+
+### 2. Dos pasos no podían completarse nunca
+
+`Contratación` e `Incorporación` tenían ternarios con las dos ramas idénticas
+(`hiringComplete ? "pending" : "pending"`). La cadena prometía un final que su
+propio código no alcanzaba. Ahora `Contratación` se completa al contratar, y
+`Incorporación` usa un estado nuevo, **«en curso»**: esta pantalla no recibe el
+estado del plan de incorporación, y decir «hecho» sería inventarlo.
+
+### 3. «Enviar a contratación» con un expediente ya abierto devolvía 409
+
+El servidor responde «Ya existe una contratación activa… Abre la existente o
+cancélala», pero la pantalla no lo consultaba: ofrecía crear otra y el conflicto
+aparecía **después** de confirmar en un diálogo. Ahora se busca el expediente de
+la postulación y, si existe, la acción es **«Abrir la contratación»** hacia
+`/hiring/:id`. El endpoint de contrataciones no filtra por postulación, así que
+se busca por el nombre de la persona y se compara por `applicationId`, que sí
+viene en la respuesta —sin tocar el contrato del backend.
+
+### 4. El paso de contratación era código muerto
+
+El diálogo que formalizaba la contratación —cargo, fecha de inicio, supervisor,
+plantilla de incorporación y «Confirmar contratación y activar incorporación»—
+seguía en el archivo, pero **nada lo abría**: `setHireOpen(true)` no se llamaba
+en ninguna parte desde que se unificaron las dos fichas. Se retira junto con su
+estado y su mutación: el camino vivo es el expediente de `/hiring/:id`, que
+termina en `confirmHiringContract`. Mantener dos formas de contratar, una de
+ellas inalcanzable, es lo que produjo la confusión.
+
+### 5. La cadena se dibujaba dos veces y las pestañas movían el contenido
+
+Los siete pasos aparecían como fichas y otra vez como lista con el detalle de
+cada uno; el detalle vive ahora donde hace falta —el paso actual— y el resto lo
+lleva en su `title`. Y las cuatro pestañas pintaban en tres sitios distintos:
+«Revisar» y «Evaluar» en la columna ancha, «Decidir» en la columna estrecha y
+«Transferir» **encima** de las propias pestañas; elegir una pestaña movía el
+contenido de sitio y dejaba la columna ancha vacía. Ahora los cuatro paneles
+salen en el mismo sitio, y cada acción de la guía abre **su** pestaña (antes,
+todo lo que no fuera la oferta caía en «Revisar»).
+
+Además, los círculos vacíos de los pasos pendientes se leían como botones de
+radio —un grupo de cosas que se eligen— cuando son un recorrido: ahora cada paso
+pendiente lleva su número.
+
+### 6. Dos navegaciones para el mismo proceso: se queda una
+
+Debajo de la cadena de siete pasos había cuatro pestañas —Revisar, Evaluar,
+Decidir, Transferir o cerrar— que eran otra partición del mismo proceso con
+otros nombres. Dos mapas del mismo viaje, uno encima del otro.
+
+Las pestañas desaparecen y **la cadena pasa a ser la navegación**: cada paso es
+un botón que abre su propio contenido debajo. El paso que se está mirando lleva
+su cabecera —«Paso 3 de 7 · Decisión», la frase de qué hace falta— y **su propio
+botón para avanzarlo**; antes solo existía una acción, la del paso que tocaba, y
+las demás etapas no tenían ninguna.
+
+- Al abrir la ficha se mira el paso que toca, sin elegir nada.
+- El botón de la cabecera de la guía solo aparece cuando estás mirando OTRO
+  paso: es la vuelta a lo que toca. Si ya estás en él, su botón está justo
+  debajo y repetirlo sería decir lo mismo dos veces.
+- Contratación, Documentos e Incorporación no tienen contenido propio en esta
+  pantalla —viven en el expediente de contratación y en incorporación—: en vez
+  de un panel vacío, dicen dónde están y dejan el paso a mano.
+- La tira de contexto deja de calcular su propia «próxima acción» con otra
+  cadena de condiciones —decía «Revisar postulación» mientras la guía, a 300 px,
+  decía «programa la entrevista»— y la recibe del mismo plan.
+
+Solo frontend: ni un contrato, ni un endpoint, ni un permiso nuevo. 10 pruebas
+nuevas, 742 en total, `tsc` limpio, `next build` EXIT 0. Verificado con specimen
+del componente real.
+
+**Queda propuesto y no ejecutado:** unificar el vocabulario. La ficha habla de
+siete pasos, la tira de contexto dice «Etapa: Recibido» (la etapa de la vacante)
+y el módulo de contratación usa cinco nombres propios —Preparación, Oferta,
+Documentos, Revisión, Confirmación—. Son tres mapas del mismo viaje; reducirlos
+a uno es un cambio de forma del producto, no de código.
+
+## 2.vicies-sexies Cuatro pasos, con requisitos y sin saltos (2026-09-11)
+
+Tres cambios sobre la guía de contratación, en respuesta a lo que se veía en
+pantalla.
+
+### 1. De siete pasos a cuatro
+
+Oferta, expediente, documentos e incorporación eran cuatro casillas de esta
+cadena, y las cuatro ocurren de verdad en el módulo de contratación, con sus
+propios nombres. Siete casillas para un proceso que esta pantalla solo
+acompaña. Ahora son **Postulación · Evaluación · Decisión · Contratación**, y lo
+que antes eran cuatro pasos son los **requisitos** del último —oferta aceptada,
+expediente abierto, documentos firmados—, con la acción que avanza según el
+estado: preparar la oferta, enviar a contratación, abrir el expediente, enviar
+los documentos, abrir la incorporación.
+
+### 2. No se puede avanzar sin cumplir la etapa actual
+
+Cada paso declara sus requisitos comprobables y queda **bloqueado** mientras un
+paso anterior tenga alguno sin cumplir: su acción desaparece y el candado lo
+dice. Mirar no es avanzar —un paso bloqueado se puede abrir para ver qué
+traerá—, y entonces la cabecera enseña la lista de lo que falta, con enlace al
+paso donde se resuelve. El paso que toca nunca se bloquea a sí mismo.
+
+Antes, «Preparar la oferta» estaba disponible desde el primer día, sin haber
+entrevistado ni decidido nada: el orden del proceso lo sostenía la buena
+voluntad de quien lo usaba.
+
+### 3. Menos ruido y el estilo del sistema
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| Tira de contexto | Cinco datos, dos de ellos —«Etapa» y «Próxima acción»— repetían la cadena con otras palabras | Tres: vacante, responsable y última actividad |
+| Aviso de evaluación | Cuatro variantes; tres no pedían nada («Aún no hay entrevista», «Próxima entrevista», «Evaluaciones al día») y repetían la tarjeta de entrevistas de debajo | Solo la que pide algo: una entrevista hecha sin evaluación firmada |
+| Evaluaciones | Tarjeta fija, vacía la mayoría de las veces | Aparece cuando hay alguna |
+| Asistente de competencias | Media pantalla para decir cuatro veces «sin datos» | Una línea con su botón hasta que haya análisis |
+
+El recorrido pasa a los tokens del sistema —`surface-*`, `line`, `ink-*`,
+`action`, `shadow-e1`, `--dur-*`— en vez del juego antiguo (`border-default`,
+`surface-elevated`, `primary/10`), y gana lo gráfico que faltaba: **barra de
+avance** animada con «1 de 4», marca por estado (verde con marca, ámbar de
+atención, anillo latiendo en curso, número si está pendiente) y candado en los
+bloqueados. El seleccionado se marca con borde de acción y sombra, no con
+relleno ámbar: en este tema el acento es ámbar y una ficha ámbar se lee como
+advertencia.
+
+Solo frontend: ni un contrato, ni un endpoint, ni un permiso. 748 pruebas, `tsc`
+limpio, `next build` EXIT 0. Verificado con specimen del componente real a 390 y
+1440 px: sin desbordamiento horizontal y la cadena ocupa 100 px en móvil, no 380.
+
+## 2.vicies-septies Toda la postulación, siempre a la vista (2026-09-11)
+
+La ficha enseñaba correo, teléfono, ciudad y fecha, y el resto del formulario
+—cuando lo había— dentro del paso «Postulación». Quien revisa a alguien
+consulta esos datos a cada rato: no son un paso que se abre y se cierra.
+
+**Contacto y postulación salen de los pasos** y quedan siempre visibles, encima
+de los paneles; el paso 1 de la cadena lleva hasta ahí en vez de abrir un panel.
+El bloque de contacto gana el nombre completo —el apellido viaja en las
+respuestas del formulario y antes caía al final como «Last name», entre «Otras
+respuestas»—, y dice explícitamente cuándo no hay currículum en vez de callar.
+
+**Las preguntas propias de la vacante, con sus propias palabras.**
+`agruparRespuestas` acepta ahora el `applicationFormSchema` de la vacante: cada
+pregunta se lee **tal como se le hizo a la persona**, agrupada por la sección
+del formulario, en vez de con la clave humanizada. Y las que quedaron en blanco
+aparecen como «Sin responder»: el hueco es información, y no verlo hace pensar
+que nunca se preguntó.
+
+Lo que ya estaba y sigue: las cinco preguntas rápidas con su explicación, qué
+tipo de trabajo busca, el último empleo, las referencias en una fila cada una
+con el teléfono pulsable, y la declaración firmada.
+
+**Lo que esta pantalla no puede enseñar todavía.** Dirección, fecha de
+nacimiento, contacto de emergencia y número de seguridad social se guardan en el
+PERFIL de la persona candidata, no en la postulación —`submitCandidateApplication`
+los separa antes de enviar—, y el endpoint que la ficha consulta no los
+devuelve. Traerlos exige ampliar el contrato del backend; el de seguridad social,
+además, merece decidir antes quién debe poder verlo y si se enmascara.
+
+Solo frontend: ni un contrato, ni un endpoint, ni un permiso. 5 pruebas nuevas
+(19 en el módulo de respuestas), 753 en total, `tsc` limpio, `next build`
+EXIT 0. Verificado con specimen del componente real.
+
+## 2.vicies-octies Dirección, nacimiento y contacto de emergencia (2026-09-11)
+
+Corrección de lo que dije en § 2.vicies-septies: estos datos **no** estaban
+bloqueados por el contrato del backend. El servidor los acepta desde siempre
+(`normalizeDynamicResponses` los tiene en `fixedKeys`); quien los descartaba era
+el propio cliente, antes de enviarlos, y el formulario público había dejado de
+pedirlos en un cambio anterior.
+
+**Se vuelven a pedir al postular**, por decisión del equipo: quien revisa una
+postulación quiere poder llamar a alguien y saber dónde vive la persona sin
+esperar a la contratación. Van en dos bloques propios —«Dónde vives» y «A quién
+avisamos si pasa algo»—, marcados como opcionales, para que la falta de un dato
+no bloquee una postulación. El coste, que conviene recordar: se guardan datos
+sensibles de todas las personas que se postulan, no solo de las contratadas.
+
+**La ficha los enseña agrupados**: «Sus datos personales» (fecha de nacimiento,
+dirección, apartamento, estado, código postal) y «A quién avisar si pasa algo»
+(nombre, parentesco y teléfono pulsable en una sola fila).
+
+### El número de seguridad social no se enseña, venga como venga
+
+Tres cierres independientes, porque uno solo es un olvido a una refactorización
+de distancia:
+
+1. El formulario no lo pide.
+2. El cliente lo descarta antes de enviar (`candidateProfileOnlyKeys`, que ahora
+   contiene solo eso).
+3. La ficha se niega a pintarlo: cualquier clave que case con
+   `social security`, `ssn` o `seguro social` se descarta antes de llegar a
+   «Otras respuestas» —el cajón de lo desconocido—, así que un expediente
+   antiguo que lo trajera tampoco lo enseñaría.
+
+El servidor, por su parte, ya lo descartaba al postular.
+
+3 pruebas nuevas (22 en el módulo de respuestas), 756 en total, `tsc` limpio,
+`next build` EXIT 0.
+
+## 2.undetrigies La carta de presentación no se podía escribir (2026-09-11)
+
+La ficha decía «No se adjuntó carta de presentación» en TODAS las
+postulaciones. No era casualidad: la carta existía de punta a punta **menos en
+el sitio donde se escribe**.
+
+| Pieza | Estado |
+|---|---|
+| `PublicApplicationInput.coverLetter` | existía |
+| DTO del servidor (`create-public-application.dto.ts`) | la aceptaba |
+| Base de datos y respuesta de la postulación | la guardaba y la devolvía |
+| Ficha del candidato | la enseñaba |
+| Asistente de competencias | la leía como fuente de evidencia |
+| **Formulario público** | **nunca dibujó el campo** |
+
+`emptyForm` la inicializaba en cadena vacía y nada volvía a tocarla, así que el
+valor enviado era siempre `""`. Cinco piezas trabajando para un dato que no
+tenía puerta de entrada.
+
+Se añade el campo al formulario, opcional, junto al currículum: «Cuéntanos en
+pocas líneas por qué te interesa este puesto y qué traes contigo». Las
+postulaciones anteriores siguen sin carta —nunca hubo forma de escribirla—, y la
+ficha lo dirá con razón.
+
+756 pruebas, `tsc` limpio, `next build` EXIT 0.
+
+## 2.undetrigies-bis Un botón por paso, y el asistente fuera (2026-09-11)
+
+### El asistente de competencias sale de la ficha
+
+Por decisión del equipo. El componente (`competency-ai-assistant.tsx`) y su
+endpoint siguen existiendo: volver a colgarlo es una línea.
+
+### Dos botones a la vez, uno inerte
+
+En el paso de Evaluación convivían «Ir a la entrevista» (cabecera del paso) y
+«Programar entrevista» (tarjeta de entrevistas). No eran dos formas de hacer lo
+mismo: el primero **no hacía nada**. Su acción era de tipo *navegar*, con
+destino `#evaluar`, es decir, el panel que ya se estaba mirando.
+
+El origen fue el propio plan: la acción del paso se definió como «llévame a la
+sección de entrevistas», que tiene sentido desde otro paso y ninguno desde este.
+
+Ahora la acción del paso **agenda**: la cabecera abre el diálogo
+(`agendar-entrevista`, una operación más junto a `crear-contratacion` y
+`enviar-documentos`), y cuando ya hay una entrevista agendada pasa a decir
+«Registrar el resultado», que es lo siguiente de verdad. La tarjeta se queda con
+la lista y solo ofrece «Agendar otra» cuando ya existe alguna —ahí sí es una
+acción distinta que no compite con nada—. El estado del diálogo sube a la ficha,
+que es quien recibe la operación.
+
+Regla que queda asentada: **una acción por paso, y vive en la cabecera del
+paso**. 757 pruebas, `tsc` limpio, `next build` EXIT 0.
+
+## 2.undetrigies-ter El correo de la entrevista (2026-09-11)
+
+### El disparo ya existía
+
+Confirmar una entrevista ya encolaba un aviso: `recruitment.service.ts` llama a
+`enqueueEvent(INTERVIEW_SCHEDULED)` para el candidato y para los responsables,
+eso crea una entrega de correo en estado PENDING, y
+`NotificationDeliverySchedulerService` la procesa cada 30 s. No faltaba código
+de disparo.
+
+**Falta la configuración del proveedor.** `BackEnd/.env` no tiene ninguna de
+estas variables, así que cada envío falla con «SMTP_HOST, SMTP_USER and
+SMTP_PASSWORD are required» y la entrega queda en FAILED, visible solo si se
+abre «Mensajes» en la ficha:
+
+    EMAIL_PROVIDER=SMTP           # o RESEND
+    SMTP_HOST=…  SMTP_USER=…  SMTP_PASSWORD=…  SMTP_PORT=465
+    # o bien
+    RESEND_API_KEY=…
+
+(El trabajador se apaga con `NOTIFICATION_DELIVERY_WORKER_ENABLED=false`; por
+omisión está encendido.)
+
+### Lo que sí había que arreglar: el correo no decía nada
+
+El cuerpo era: «Hola {{candidateName}}, tu entrevista fue programada para
+{{interviewDate}}. {{interviewLocation}}», y `interviewDate` era
+`startsAt.toISOString()`. Es decir, la persona recibía
+**«2026-11-09T23:10:00.000Z»**: la marca de tiempo cruda, en UTC, sin día de la
+semana y sin decir en qué huso está. Quien la recibe tiene que traducirla
+mentalmente, y si se equivoca pierde la entrevista.
+
+Ahora el agendado manda los datos crudos —inicio en ISO, zona horaria, tipo,
+duración, entrevistador, enlace y lugar— y `enqueueEvent` los escribe **en el
+idioma de cada destinatario**, porque es quien lo conoce:
+
+    Cuándo: lunes, 9 de noviembre de 2026, 18:10 (hora de America/New_York)
+    Formato: Por videollamada
+    Duración: 60 minutos
+    Con: Paul Garcia
+    Enlace: https://meet.example.com/abc
+
+Lo que no se sabe no se escribe: sin dirección, no hay línea «Dónde». Una zona
+horaria inválida no tumba el aviso: se cae a UTC. El recordatorio de 24 h antes
+usa el mismo bloque.
+
+En la ficha, confirmar la entrevista ahora dice a quién se le avisó: «Entrevista
+agendada. Le avisamos por correo a ana@…». Si la entrega falla, sigue
+apareciendo en «Mensajes» con su error y su botón de reintento.
+
+5 pruebas nuevas en el backend (564 en total; el fallo de
+`test/architecture/tenant-scope.spec.ts` es previo y ajeno), 757 en el frontend,
+`tsc` limpio en ambos, `nest build` y `next build` EXIT 0.
+
+## 2.undetrigies-quater La vuelta al curso desde la evaluación (2026-09-11)
+
+El asistente del curso exige una evaluación y manda a `/training/evaluations`.
+Allí había un botón «Volver al curso», pero **secundario y arriba a la derecha**,
+compitiendo con «Nueva evaluación», que era el primario. Al terminar de crear la
+evaluación la pantalla no decía nada: quien acababa de hacer el recado se
+quedaba mirando una lista, sin señal de que el curso seguía a medias
+esperándole.
+
+Tres cambios, del más importante al más pequeño:
+
+1. **Un aviso al terminar.** En cuanto el curso tiene una evaluación *lista para
+   usarse*, aparece un bloque en verde: «La evaluación ya está lista — vuelve al
+   curso para seguir donde lo dejaste», con **«Volver al curso y continuar»**
+   como botón destacado. Es el final del recado, dicho donde se termina.
+2. **Se invierte la jerarquía de la cabecera.** Quien llega desde el asistente
+   viene a hacer UNA evaluación y volver: «Volver al curso» pasa a ser la acción
+   principal y «Nueva evaluación» la secundaria. Sin `courseId` —entrando por el
+   menú— todo sigue como estaba.
+3. **El aviso de creación dice qué falta.** Antes: «Evaluación creada». Ahora:
+   «Evaluación creada. Agrega al menos una pregunta y vuelve al curso», porque
+   una evaluación sin preguntas no cubre el paso y nada lo advertía.
+
+El aviso depende de `readiness.ready`, que ya calcula el servidor: no se
+inventa un criterio nuevo en el cliente. 757 pruebas, `tsc` limpio, `next build`
+EXIT 0. Verificado con specimen del componente real.
+
 ## 3. Componentes nuevos del sistema
 
 | Componente | Para qué |

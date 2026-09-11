@@ -3424,5 +3424,6 @@
   "people.overdue": "Overdue",
   "people.discard": "Discard",
   "nav.Mis cursos": "My courses",
-  "nav.Crear y editar cursos": "Create and edit courses"
+  "nav.Crear y editar cursos": "Create and edit courses",
+  "people.scheduleFirst": "Schedule interview"
 }

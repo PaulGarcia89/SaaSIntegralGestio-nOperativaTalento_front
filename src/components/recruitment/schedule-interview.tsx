@@ -41,14 +41,33 @@ function proximaFecha() {
   return { dia: local.slice(0, 10), hora: local.slice(11, 16) };
 }
 
-export function ScheduleInterviewPanel({ application, canSchedule }: { application: VacancyApplicationDto; canSchedule: boolean }) {
+export function ScheduleInterviewPanel({ application, canSchedule, targetStageId, variante = "panel", abiertoDesdeFuera, onAbierto, alAgendar }: {
+  application: VacancyApplicationDto;
+  canSchedule: boolean;
+  targetStageId?: string;
+  /**
+   * «dialogo» dibuja solo el formulario, sin la sección con la lista y el
+   * botón: lo usa el paso de etapa, que abre el agendado desde su propio
+   * botón porque no se puede pasar a entrevistas sin acordar día y hora.
+   */
+  variante?: "panel" | "dialogo";
+  abiertoDesdeFuera?: boolean;
+  onAbierto?: (abierto: boolean) => void;
+  alAgendar?: () => void;
+}) {
   const uiText = useUiText();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const client = useQueryClient();
   const [inicial] = useState(proximaFecha);
   const [ahora, setAhora] = useState(() => Date.now());
 
-  const [abierto, setAbierto] = useState(false);
+  const [abiertoPropio, setAbiertoPropio] = useState(false);
+  const controlado = abiertoDesdeFuera !== undefined;
+  const abierto = controlado ? abiertoDesdeFuera : abiertoPropio;
+  const setAbierto = (valor: boolean) => {
+    if (!controlado) setAbiertoPropio(valor);
+    onAbierto?.(valor);
+  };
   useEffect(() => {
     if (!abierto) return;
     const timer = window.setInterval(() => setAhora(Date.now()), 1000);
@@ -69,13 +88,19 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
   const agendadas = application.interviews ?? [];
   const inicio = useMemo(() => new Date(`${dia}T${hora}`), [dia, hora]);
   const enElPasado = Number.isFinite(inicio.getTime()) && inicio.getTime() < ahora;
-  const listo = Boolean(entrevistador) && titulo.trim().length > 0 && Number.isFinite(inicio.getTime());
+  const pendiente = !titulo.trim() ? (locale === "en" ? "Enter an interview name." : "Escribe el nombre de la entrevista.")
+    : !Number.isFinite(inicio.getTime()) ? (locale === "en" ? "Choose a date and time." : "Elige el día y la hora.")
+    : enElPasado ? uiText("Esa fecha y hora ya pasaron.")
+    : !entrevistador ? (locale === "en" ? "Select an interviewer to confirm." : "Selecciona quién entrevista para poder confirmar.") : null;
+  const listo = !pendiente && canSchedule && !entrevistadores.isError;
 
   const agendar = useMutation({
     mutationFn: () => {
+      if (!listo || inicio.getTime() <= Date.now()) throw new Error(uiText("Esa fecha y hora ya pasaron."));
       const fin = new Date(inicio.getTime() + Number(duracion) * 60_000);
       return scheduleRecruitmentInterview({
         applicationId: application.id,
+        stageId: targetStageId,
         interviewerUserId: entrevistador,
         title: titulo.trim(),
         type: tipo,
@@ -91,58 +116,61 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
       toast.success(uiText("Entrevista agendada."));
       await client.invalidateQueries({ queryKey: ["application", application.id] });
       await client.invalidateQueries({ queryKey: ["recruitment-interviews"] });
+      alAgendar?.();
     },
   });
 
   // Sin permiso y sin nada agendado no queda nada que enseñar: se evita
   // dibujar un separador que no separa nada.
-  if (!canSchedule && !agendadas.length) return null;
+  if (variante === "panel" && !canSchedule && !agendadas.length) return null;
 
-  return (
-    <div className="mt-4 border-t border-line pt-4">
-      {agendadas.length ? (
-        <ul className="mb-4 space-y-2">
-          {agendadas.map((entrevista) => (
-            <li key={entrevista.id} className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="font-medium text-ink-1">{entrevista.title}</p>
-              <p className="mt-0.5 text-sm text-ink-2">
-                {formatApplicationDate(entrevista.startsAt)} · {entrevista.timezone}
-              </p>
-              <p className="text-sm text-ink-2">
-                {uiText("Entrevista con {{persona}}", {
-                  persona: entrevista.interviewer ? `${entrevista.interviewer.firstName} ${entrevista.interviewer.lastName}` : t("profile.unassigned"),
-                })}
-              </p>
-              {entrevista.meetingUrl ? (
-                <a
-                  href={entrevista.meetingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-flex min-h-11 items-center gap-2 text-sm text-ink-1 underline underline-offset-4"
-                >
-                  <ExternalLink className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
-                  {uiText("Abrir la reunión")}
-                </a>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+  const cuerpo = (
+    <>
+        {agendadas.length ? (
+          <ul className="mb-4 space-y-2">
+            {agendadas.map((entrevista) => (
+              <li key={entrevista.id} className="rounded-xl border border-line bg-surface-2 p-3">
+                <p className="font-medium text-ink-1">{entrevista.title}</p>
+                <p className="mt-0.5 text-sm text-ink-2">
+                  {formatApplicationDate(entrevista.startsAt, locale)} · {entrevista.timezone}
+                </p>
+                <p className="text-sm text-ink-2">
+                  {uiText("Entrevista con {{persona}}", {
+                    persona: entrevista.interviewer ? `${entrevista.interviewer.firstName} ${entrevista.interviewer.lastName}` : t("profile.unassigned"),
+                  })}
+                </p>
+                {entrevista.meetingUrl ? (
+                  <a
+                    href={entrevista.meetingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex min-h-11 items-center gap-2 text-sm text-ink-1 underline underline-offset-4"
+                  >
+                    <ExternalLink className="size-4 shrink-0 text-ink-3" aria-hidden="true" />
+                    {uiText("Abrir la reunión")}
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {canSchedule ? (
+          <>
+            <Button type="button" variant="secondary" className={cn(TAP_TARGET, "w-full sm:w-auto")} onClick={() => setAbierto(true)}>
+              <CalendarPlus className="size-4" aria-hidden="true" />
+              {agendadas.length ? uiText("Agendar otra entrevista") : uiText("Agendar una entrevista")}
+            </Button>
+            <p className="mt-2 text-sm text-ink-2">
+              {uiText("Elige día, hora y quién entrevista. Al terminar, vuelve aquí para mover a la persona de fase.")}
+            </p>
+          </>
+        ) : null}
+    </>
+  );
 
-      {canSchedule ? (
-        <>
-          <Button type="button" variant="secondary" className={cn(TAP_TARGET, "w-full sm:w-auto")} onClick={() => setAbierto(true)}>
-            <CalendarPlus className="size-4" aria-hidden="true" />
-            {agendadas.length ? uiText("Agendar otra entrevista") : uiText("Agendar una entrevista")}
-          </Button>
-          <p className="mt-2 text-sm text-ink-2">
-            {uiText("Elige día, hora y quién entrevista. Al terminar, vuelve aquí para mover a la persona de fase.")}
-          </p>
-        </>
-      ) : null}
-
-      <Dialog open={abierto} onOpenChange={setAbierto}>
-        <DialogContent className="sm:max-w-xl">
+  const dialogo = (
+    <Dialog open={abierto} onOpenChange={setAbierto}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{uiText("Agendar una entrevista")}</DialogTitle>
             <DialogDescription>
@@ -151,6 +179,7 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
           </DialogHeader>
 
           <div className="space-y-4">
+            <p className="rounded-lg bg-surface-2 p-3 text-sm text-ink-2">{locale === "en" ? "Times are shown in" : "Los horarios se muestran en"} <strong>{zona}</strong>. {locale === "en" ? "Required: name, date, time and interviewer." : "Obligatorios: nombre, día, hora y entrevistador."}</p>
             <label className="block space-y-2 text-base font-medium text-ink-1" htmlFor="entrevista-titulo">
               {uiText("Nombre de la entrevista")}
               <input
@@ -238,6 +267,14 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
               </select>
             </label>
 
+            {entrevistadores.isError ? (
+              <div role="alert" className="rounded-lg border border-status-danger/30 p-3 text-sm">
+                <p>{locale === "en" ? "Interviewers could not be loaded." : "No se pudieron cargar los entrevistadores."}</p>
+                <Button type="button" variant="secondary" className="mt-2" onClick={() => void entrevistadores.refetch()}>{locale === "en" ? "Retry" : "Reintentar"}</Button>
+              </div>
+            ) : entrevistadores.isSuccess && !entrevistadores.data?.length ? (
+              <p role="status" className="text-sm text-ink-2">{locale === "en" ? "No interviewers are available. Ask your administrator to configure one." : "No hay entrevistadores disponibles. Pide al administrador que configure uno."}</p>
+            ) : null}
             {tipo === "VIRTUAL" ? (
               <label className="block space-y-2 text-base font-medium text-ink-1" htmlFor="entrevista-enlace">
                 {uiText("Enlace de la videollamada")}
@@ -271,7 +308,8 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
               </p>
             ) : null}
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            {pendiente ? <p id="interview-requirement" role="status" className="text-sm text-ink-2">{pendiente}</p> : null}
+            <div className="sticky -bottom-6 border-t border-line bg-surface-1 py-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="secondary" className={TAP_TARGET} onClick={() => setAbierto(false)}>
                 {t("reason.cancel")}
               </Button>
@@ -279,6 +317,7 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
                 type="button"
                 className={TAP_TARGET}
                 disabled={!listo}
+                aria-describedby={pendiente ? "interview-requirement" : undefined}
                 loading={agendar.isPending}
                 loadingLabel={uiText("Agendando…")}
                 onClick={() => agendar.mutate()}
@@ -288,7 +327,15 @@ export function ScheduleInterviewPanel({ application, canSchedule }: { applicati
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+    </Dialog>
+  );
+
+  if (variante === "dialogo") return dialogo;
+
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      {cuerpo}
+      {dialogo}
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { BriefcaseBusiness, Check, CircleCheck, Inbox, MessagesSquare, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, CircleCheck, Inbox, MessagesSquare, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MAIN_PHASES, phaseTitle, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
+import { MAIN_PHASES, phaseTitle, recruitmentPhaseOf, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
+import type { VacancyStageDto } from "@/lib/contracts";
 
 /** Mismo icono por fase en el dashboard, el perfil y las listas. */
 export const PHASE_ICONS: Partial<Record<RecruitmentPhaseId, LucideIcon>> = {
@@ -12,51 +13,87 @@ export const PHASE_ICONS: Partial<Record<RecruitmentPhaseId, LucideIcon>> = {
   TRABAJANDO: BriefcaseBusiness,
 };
 
-/**
- * Paso a paso de la persona en el proceso: círculos con icono unidos por una
- * línea que se rellena. Es el mismo dibujo que en Contratación, para que la
- * persona reconozca «dónde está» sin leer. Completada = verde con marca,
- * actual = relleno oscuro y título en negrita, pendiente = hueco. En móvil
- * solo se rotula la fase actual (las demás quedan para lectores de pantalla).
- */
-export function RecruitmentPhaseRail({ currentStep, locale }: { currentStep: number; locale: "es" | "en" }) {
+type Paso = { clave: string; titulo: string; icono: LucideIcon };
+
+/** Etapas en vertical en móvil y conectadas en escritorio. Las anteriores no implican aprobación. */
+function Recorrido({ pasos, actual, locale }: { pasos: Paso[]; actual: number; locale: "es" | "en" }) {
   return (
-    <ol className="flex items-start" aria-label={locale === "en" ? "Process stages" : "Fases del proceso"}>
-      {MAIN_PHASES.map((phase, index) => {
-        const step = phase.step ?? 0;
-        const done = step < currentStep;
-        const active = step === currentStep;
-        const Icon = PHASE_ICONS[phase.id] ?? CircleCheck;
-        const last = index === MAIN_PHASES.length - 1;
+    <ol className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-0 sm:overflow-x-auto sm:pb-3" aria-label={locale === "en" ? "Process stages" : "Etapas del proceso"}>
+      {pasos.map((paso, index) => {
+        const done = index < actual;
+        const active = index === actual;
+        const Icon = paso.icono;
+        const last = index === pasos.length - 1;
         return (
-          <li key={phase.id} aria-current={active ? "step" : undefined} className="relative flex min-w-0 flex-1 flex-col items-center">
+          <li key={paso.clave} aria-current={active ? "step" : undefined} className="relative flex min-w-0 items-center gap-3 sm:min-w-28 sm:flex-1 sm:flex-col sm:gap-0 sm:px-2">
             {!last ? (
-              <span aria-hidden="true" className={cn("absolute left-1/2 top-5 h-0.5 w-full", done ? "bg-status-success" : "bg-line")} />
+              <span aria-hidden="true" className={cn("absolute left-5 top-5 h-[calc(100%+0.75rem)] w-0.5 sm:left-1/2 sm:h-0.5 sm:w-full", done ? "bg-line-strong" : "bg-line")} />
             ) : null}
             <span
               aria-hidden="true"
               className={cn(
-                "relative z-10 flex size-10 items-center justify-center rounded-full border-2 bg-surface-1",
-                done && "border-status-success bg-status-success text-white",
+                "relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full border-2 bg-surface-1",
+                done && "border-line-strong bg-surface-2 text-ink-2",
                 active && "border-action bg-action text-on-action shadow-e2",
                 !done && !active && "border-line-strong text-ink-3",
               )}
             >
-              {done ? <Check className="size-4" strokeWidth={2.5} /> : <Icon className="size-4" strokeWidth={1.75} />}
+              {done ? <span className="text-sm">{index + 1}</span> : <Icon className="size-4" strokeWidth={1.75} />}
             </span>
             <span
               className={cn(
-                "mt-2 block max-w-[7rem] text-center text-sm leading-tight",
+                "block text-sm leading-snug sm:mt-2 sm:max-w-[7rem] sm:text-center",
                 active ? "font-semibold text-ink-1" : done ? "text-ink-1" : "text-ink-3",
-                !active && "sr-only sm:not-sr-only",
+
               )}
             >
-              {phaseTitle(phase.id, locale)}
-              <span className="sr-only">{done ? (locale === "en" ? ", done" : ", completada") : active ? (locale === "en" ? ", current" : ", actual") : locale === "en" ? ", pending" : ", pendiente"}</span>
+              {paso.titulo}
+              <span className="block text-xs font-normal text-ink-2">{done ? (locale === "en" ? "Previous" : "Anterior") : active ? (locale === "en" ? "Current stage" : "Etapa actual") : locale === "en" ? "Pending" : "Pendiente"}</span>
             </span>
           </li>
         );
       })}
     </ol>
   );
+}
+
+/** Recorrido por las cuatro fases resumidas. */
+export function RecruitmentPhaseRail({ currentStep, locale }: { currentStep: number; locale: "es" | "en" }) {
+  const pasos: Paso[] = MAIN_PHASES.map((phase) => ({
+    clave: phase.id,
+    titulo: phaseTitle(phase.id, locale),
+    icono: PHASE_ICONS[phase.id] ?? CircleCheck,
+  }));
+  return <Recorrido pasos={pasos} actual={Math.max(0, currentStep - 1)} locale={locale} />;
+}
+
+/**
+ * Recorrido por las etapas REALES de la vacante.
+ *
+ * El recorrido de cuatro fases resumía seis etapas en cuatro círculos:
+ * «Postulación» y «Revisión» se dibujaban como un solo punto, así que quien
+ * revisaba un expediente no veía la etapa en la que estaba —la suya no
+ * aparecía— ni cuántas quedaban de verdad. Aquí se dibuja el proceso tal como
+ * lo configuró la empresa, con sus nombres.
+ *
+ * El descarte se queda fuera a propósito: no es un paso del camino, es salirse
+ * de él, y a quien está descartado la ficha le enseña un texto en vez de un
+ * recorrido con etapas que ya no va a recorrer.
+ */
+export function RecruitmentStageRail({ stages, currentStageCode, locale }: { stages: VacancyStageDto[]; currentStageCode?: string | null; locale: "es" | "en" }) {
+  const camino = stages
+    .filter((stage) => stage.applicationStatus !== "REJECTED" && stage.applicationStatus !== "WITHDRAWN")
+    .sort((left, right) => left.position - right.position);
+
+  if (!camino.length) return null;
+
+  const actual = Math.max(0, camino.findIndex((stage) => stage.code === currentStageCode));
+  const pasos: Paso[] = camino.map((stage) => ({
+    clave: stage.code,
+    // `stage.name` lo escribió la empresa: se enseña tal cual, no se traduce.
+    titulo: stage.name,
+    icono: PHASE_ICONS[recruitmentPhaseOf(stage.applicationStatus)] ?? CircleCheck,
+  }));
+
+  return <Recorrido pasos={pasos} actual={actual} locale={locale} />;
 }

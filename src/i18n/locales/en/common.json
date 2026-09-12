@@ -3433,5 +3433,7 @@
   "nav.Pérdidas sin explicar": "Unexplained losses",
   "nav.Entradas y salidas": "Incoming and outgoing",
   "nav.Compras": "Purchasing",
-  "nav.Conteos y control": "Counts and control"
+  "nav.Conteos y control": "Counts and control",
+  "common.yes": "Yes",
+  "common.no": "No"
 }

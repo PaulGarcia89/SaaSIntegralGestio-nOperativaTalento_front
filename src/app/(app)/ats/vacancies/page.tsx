@@ -246,7 +246,7 @@ export function VacanciesPage({ createPage = false, editId }: { createPage?: boo
       <ActionBar label={t("vacancies.wizardActions")} sticky><Button variant="secondary" onClick={() => { setErrors([]); setStep((value) => Math.max(0, value - 1)); }} disabled={step === 0}>{t("vacancies.previous")}</Button>{step < VACANCY_STEPS.length - 1 ? <Button onClick={next}>{t("vacancies.continue")}</Button> : editingId ? <Button onClick={() => submit(form.status ?? "PAUSED")} disabled={save.isPending}>{save.isPending ? t("vacancies.saving") : t("vacancies.saveAllChanges")}</Button> : <><Button variant="secondary" onClick={() => submit("DRAFT")} disabled={save.isPending}>{t("vacancies.saveDraft")}</Button><Button onClick={() => submit("PUBLISHED")} disabled={save.isPending} data-loading={save.isPending}>{save.isPending ? t("vacancies.publishing") : t("vacancies.publish")}</Button></>}</ActionBar>
     </div></Wizard></VacancyWizardSurface> : null}
     <Dialog open={Boolean(archiveTarget)} onOpenChange={(value) => { if (!value) setArchiveTarget(null); }}><DialogContent><DialogHeader><DialogTitle>{t("vacancies.archiveTitle")}</DialogTitle><DialogDescription>{t("vacancies.archiveBody")}</DialogDescription></DialogHeader><TextArea label={t("vacancies.archiveReason")} value={archiveReason} onChange={setArchiveReason} /><Button variant="destructive" disabled={!archiveReason.trim() || archive.isPending} onClick={() => archive.mutate()}>{archive.isPending ? t("vacancies.archiving") : t("vacancies.confirmArchive")}</Button></DialogContent></Dialog>
-    <Dialog open={Boolean(historyId)} onOpenChange={(value) => { if (!value) setHistoryId(null); }}><DialogContent className="max-h-[80vh] overflow-y-auto"><DialogHeader><DialogTitle>{t("vacancies.historyTitle")}</DialogTitle><DialogDescription>{t("vacancies.historyBody")}</DialogDescription></DialogHeader>{history.isLoading ? <AsyncState state="loading" title={t("vacancies.historyLoading")} /> : history.data?.map((event) => <div key={event.id} className="rounded-xl border border-border-default p-4"><div className="flex items-center justify-between gap-3"><Badge variant="secondary">{event.type}</Badge><time className="text-xs text-text-secondary">{new Date(event.createdAt).toLocaleString()}</time></div><p className="mt-2 text-sm font-medium">{event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : t("vacancies.historySystem")}</p>{event.reason ? <p className="mt-1 text-sm text-text-secondary">{event.reason}</p> : null}</div>)}</DialogContent></Dialog>
+    <Dialog open={Boolean(historyId)} onOpenChange={(value) => { if (!value) setHistoryId(null); }}><DialogContent className="max-h-[80vh] overflow-y-auto"><DialogHeader><DialogTitle>{t("vacancies.historyTitle")}</DialogTitle><DialogDescription>{t("vacancies.historyBody")}</DialogDescription></DialogHeader>{history.isLoading ? <AsyncState state="loading" title={t("vacancies.historyLoading")} /> : history.data?.map((event) => <div key={event.id} className="rounded-xl border border-border-default p-4"><div className="flex items-center justify-between gap-3"><Badge variant="secondary">{event.type}</Badge><time className="text-xs text-text-secondary">{new Date(event.createdAt).toLocaleString(uiText.locale)}</time></div><p className="mt-2 text-sm font-medium">{event.actor ? `${event.actor.firstName} ${event.actor.lastName}` : t("vacancies.historySystem")}</p>{event.reason ? <p className="mt-1 text-sm text-text-secondary">{event.reason}</p> : null}</div>)}</DialogContent></Dialog>
   </div>;
 }
 
@@ -355,6 +355,7 @@ function VacancyList({
   onArchive: (vacancy: PublicVacancyDto) => void;
   onHistory: (id: string) => void;
 }) {
+  const uiText = useUiText();
   const { t } = useLocale();
 
   const columns: DataColumn<PublicVacancyDto>[] = [
@@ -388,7 +389,7 @@ function VacancyList({
         return (
           <StatusBadge
             size="sm"
-            label={technicalLabel(status)}
+            label={technicalLabel(status, uiText.locale)}
             tone={status === "PUBLISHED" ? "success" : status === "ARCHIVED" ? "neutral" : "progress"}
           />
         );

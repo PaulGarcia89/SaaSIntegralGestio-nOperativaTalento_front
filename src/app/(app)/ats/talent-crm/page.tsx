@@ -80,8 +80,8 @@ export default function TalentCrmPage() {
     <PageHeader eyebrow={uiText("Reclutamiento")} title={t("talent.title")} description={t("talent.description")} actions={<div className="flex gap-2"><Button variant="secondary" onClick={() => setTagOpen(true)}><Tags className="size-4" />{t("talent.newTag")}</Button><Button onClick={() => setPoolOpen(true)}><Plus className="size-4" />{t("talent.newList")}</Button></div>} />
     <section className="grid gap-4 md:grid-cols-3">
       <Metric icon={<UsersRound className="size-5" />} label={uiText("Talento visible")} value={meta?.total ?? "—"} detail={currentBranch?.name ?? "Alcance de empresa"} />
-      <Metric icon={<Tags className="size-5" />} label={uiText("Listas activas")} value={pools.data?.filter((item) => item.isActive).length ?? "—"} detail="Grupos que puedes reutilizar" />
-      <Metric icon={<UserRoundSearch className="size-5" />} label={uiText("Posibles duplicados")} value={duplicates.isLoading ? "…" : duplicates.data?.data.length ?? 0} detail={duplicates.isSuccess && !duplicates.data.data.length ? "No encontramos personas repetidas" : "Nunca se unen solas: tú decides"} />
+      <Metric icon={<Tags className="size-5" />} label={uiText("Listas activas")} value={pools.data?.filter((item) => item.isActive).length ?? "—"} detail={uiText("Grupos que puedes reutilizar")} />
+      <Metric icon={<UserRoundSearch className="size-5" />} label={uiText("Posibles duplicados")} value={duplicates.isLoading ? "…" : duplicates.data?.data.length ?? 0} detail={duplicates.isSuccess && !duplicates.data.data.length ? uiText("No encontramos personas repetidas") : uiText("Nunca se unen solas: tú decides")} />
     </section>
     <div className="flex w-fit rounded-xl border border-border-default bg-surface-elevated p-1">
       <Button variant={view === "crm" ? "default" : "ghost"} size="sm" onClick={() => setView("crm")}><UsersRound className="size-4" />{t("talent.title")}</Button>
@@ -100,7 +100,7 @@ export default function TalentCrmPage() {
       {candidates.isSuccess && !candidates.data.data.length ? (
         search || poolId !== ALL || tagId !== ALL
           ? <InlineFeedback tone="info" title={t("talent.noMatches")}>{t("talent.noMatchesHelp")}</InlineFeedback>
-          : <InlineFeedback tone="info" title={`Todavía no hay nadie en ${currentBranch?.name ?? "esta sucursal"}`}>{t("talent.emptyHelp")}</InlineFeedback>
+          : <InlineFeedback tone="info" title={uiText("Todavía no hay nadie en {{branch}}", { branch: currentBranch?.name ?? uiText("esta sucursal") })}>{t("talent.emptyHelp")}</InlineFeedback>
       ) : null}
       <div className="grid gap-4 xl:grid-cols-2">{candidates.data?.data.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} pools={pools.data ?? []} tags={tagsQuery.data ?? []} onAddPool={(selectedPoolId) => addPool.mutate({ candidateId: candidate.id, selectedPoolId })} onAddTag={(selectedTagId) => addTag.mutate({ candidateId: candidate.id, selectedTagId })} onActivity={() => setActivityCandidate(candidate)} />)}</div>
       {meta && meta.totalPages > 0 ? <Pagination page={meta.page - 1} totalPages={meta.totalPages} totalItems={meta.total} pageSize={meta.pageSize} onPageChange={(next) => setPage(next + 1)} /> : null}
@@ -183,7 +183,7 @@ function CreateTagDialog({ open, onOpenChange, onCreated }: { open: boolean; onO
   const { t } = useLocale();
   const [name, setName] = useState(""); const [color, setColor] = useState("hsl(205_80%_45%)");
   const mutation = useMutation({ mutationFn: () => createTalentTag({ name, color }), onSuccess: async () => { setName(""); onOpenChange(false); toast.success(t("talent.tagCreated")); await onCreated(); }, onError: (error: unknown) => showError(error, t("talent.operationFailed")) });
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>{t("talent.newTag")}</DialogTitle><DialogDescription>{t("talent.tagHelp")}</DialogDescription></DialogHeader><div className="space-y-4"><Input value={name} onChange={(event) => setName(event.target.value)} placeholder={uiText("Ej. Disponible inmediatamente")} /><label className="flex items-center gap-3 text-sm font-medium">Color<Input type="color" className="h-11 w-20 p-1" value={color} onChange={(event) => setColor(event.target.value)} /></label><Button className="w-full" disabled={name.trim().length < 2 || mutation.isPending} onClick={() => mutation.mutate()}>{uiText("Crear etiqueta")}</Button></div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>{t("talent.newTag")}</DialogTitle><DialogDescription>{t("talent.tagHelp")}</DialogDescription></DialogHeader><div className="space-y-4"><Input value={name} onChange={(event) => setName(event.target.value)} placeholder={uiText("Ej. Disponible inmediatamente")} /><label className="flex items-center gap-3 text-sm font-medium">{uiText("Color")}<Input type="color" className="h-11 w-20 p-1" value={color} onChange={(event) => setColor(event.target.value)} /></label><Button className="w-full" disabled={name.trim().length < 2 || mutation.isPending} onClick={() => mutation.mutate()}>{uiText("Crear etiqueta")}</Button></div></DialogContent></Dialog>;
 }
 
 function ActivityDialog({ candidate, onOpenChange, onCreated }: { candidate: TalentCandidateDto | null; onOpenChange: (open: boolean) => void; onCreated: () => Promise<void> }) {

@@ -123,11 +123,11 @@ export function RestaurantInventoryContextBar() {
       return;
     }
     void confirmAction({
-      title: "Tienes cambios sin guardar",
-      description: "Estás en mitad de un registro que todavía no se ha confirmado.",
-      consequence: "Si cambias de contexto ahora, lo que llevas escrito se descarta y hay que empezarlo de nuevo.",
-      confirmLabel: "Descartar y cambiar",
-      cancelLabel: "Seguir donde estoy",
+      title: uiText("Tienes cambios sin guardar"),
+      description: uiText("Estás en mitad de un registro que todavía no se ha confirmado."),
+      consequence: uiText("Si cambias de contexto ahora, lo que llevas escrito se descarta y hay que empezarlo de nuevo."),
+      confirmLabel: uiText("Descartar y cambiar"),
+      cancelLabel: uiText("Seguir donde estoy"),
     }).then((ok) => {
       if (ok) perform();
     });

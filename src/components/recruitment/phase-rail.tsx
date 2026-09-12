@@ -1,6 +1,7 @@
 "use client";
 
 import { BriefcaseBusiness, CircleCheck, Inbox, MessagesSquare, type LucideIcon } from "lucide-react";
+import { recruitmentStageLabel } from "@/lib/recruitment-stage-label";
 import { cn } from "@/lib/utils";
 import { MAIN_PHASES, phaseTitle, recruitmentPhaseOf, type RecruitmentPhaseId } from "@/lib/recruitment-ux";
 import type { VacancyStageDto } from "@/lib/contracts";
@@ -90,8 +91,8 @@ export function RecruitmentStageRail({ stages, currentStageCode, locale }: { sta
   const actual = Math.max(0, camino.findIndex((stage) => stage.code === currentStageCode));
   const pasos: Paso[] = camino.map((stage) => ({
     clave: stage.code,
-    // `stage.name` lo escribió la empresa: se enseña tal cual, no se traduce.
-    titulo: stage.name,
+    // Only standard stage names follow the interface language.
+    titulo: recruitmentStageLabel(stage, locale),
     icono: PHASE_ICONS[recruitmentPhaseOf(stage.applicationStatus)] ?? CircleCheck,
   }));
 

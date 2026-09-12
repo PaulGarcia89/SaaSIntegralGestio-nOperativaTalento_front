@@ -36,11 +36,11 @@ export function RestaurantCommercialIntelligenceWorkspace({ initialView = "forec
   const uiText = useUiText();
   const [view, setView] = useState<View>(initialView);
   const tabs: Array<{ id: View; label: string; icon: typeof TrendingUp }> = [
-    { id: "forecast", label: "Pronóstico", icon: TrendingUp },
+    { id: "forecast", label: uiText("Planificar demanda"), icon: TrendingUp },
     { id: "branches", label: uiText("Costos por sucursal"), icon: Building2 },
-    { id: "margins", label: uiText("Margen por receta"), icon: Calculator },
-    { id: "comparison", label: uiText("Comparativo multiunidad"), icon: BarChart3 },
-    { id: "commissary", label: uiText("Comisariato"), icon: Factory },
+    { id: "margins", label: uiText("Rentabilidad de recetas"), icon: Calculator },
+    { id: "comparison", label: uiText("Comparar sucursales"), icon: BarChart3 },
+    { id: "commissary", label: uiText("Cocina central"), icon: Factory },
     { id: "budget", label: uiText("Presupuesto de compras"), icon: Calculator },
   ];
   return <div className="space-y-5">{!hideNavigation ? <><PageHeader eyebrow={uiText("Inteligencia comercial")} title={uiText("Decisiones comerciales de inventario")} description={uiText("Pronostica demanda, controla costos, compara unidades y protege el presupuesto de compras.")} /><nav className="flex flex-wrap gap-2" aria-label={uiText("Inteligencia comercial")}>{tabs.map(({ id, label, icon: Icon }) => <Button key={id} variant={view === id ? "default" : "secondary"} onClick={() => setView(id)}><Icon className="size-4" />{label}</Button>)}</nav></> : null}{view === "forecast" ? <ForecastView /> : null}{view === "branches" ? <BranchCostsView /> : null}{view === "margins" ? <RecipeMarginsView /> : null}{view === "comparison" ? <UnitComparisonView /> : null}{view === "commissary" ? <CommissaryView /> : null}{view === "budget" ? <BudgetView /> : null}</div>;

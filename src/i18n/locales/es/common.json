@@ -3433,5 +3433,7 @@
   "nav.Pérdidas sin explicar": "Pérdidas sin explicar",
   "nav.Entradas y salidas": "Entradas y salidas",
   "nav.Compras": "Compras",
-  "nav.Conteos y control": "Conteos y control"
+  "nav.Conteos y control": "Conteos y control",
+  "common.yes": "Sí",
+  "common.no": "No"
 }

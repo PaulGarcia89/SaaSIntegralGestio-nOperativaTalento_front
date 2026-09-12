@@ -290,7 +290,7 @@ function PeopleContent({ defaultView }: { defaultView: "lista" | "fases" }) {
       }),
     onSuccess: async (updated, variables) => {
       await client.invalidateQueries({ queryKey: ["applications"] });
-      toast.success(`Listo. ${firstNameOf(variables.application.candidate.fullName)} pasó a ${variables.stage.name}.`, {
+      toast.success(uiText("Listo. {{name}} pasó a {{stage}}.", { name: firstNameOf(variables.application.candidate.fullName), stage: variables.stage.name }), {
         action: { label: uiText("Deshacer"), onClick: () => undo.mutate({ applicationId: updated.id, expectedUpdatedAt: updated.updatedAt }) },
       });
     },

@@ -97,6 +97,16 @@ export function restaurantStatusLabel(status: string): string {
   return LABELS[status.toUpperCase()] ?? status;
 }
 
+/**
+ * El distintivo traduce su rótulo.
+ *
+ * `restaurantStatusLabel` devuelve el término español del mapa de arriba y se
+ * pintaba tal cual: con la aplicación en inglés, «Disponible», «Aplicado» y
+ * «Esperando recepción» salían en español dentro de tablas cuyas cabeceras ya
+ * estaban traducidas. El mapa se conserva intacto —son los términos que la
+ * operación usa— y lo que cambia es que ahora pasa por el traductor.
+ */
 export function RestaurantStatusBadge({ status, size = "md" }: { status: string; size?: "sm" | "md" }) {
-  return <StatusBadge size={size} label={restaurantStatusLabel(status)} tone={restaurantStatusTone(status)} />;
+  const uiText = useUiText();
+  return <StatusBadge size={size} label={uiText(restaurantStatusLabel(status))} tone={restaurantStatusTone(status)} />;
 }

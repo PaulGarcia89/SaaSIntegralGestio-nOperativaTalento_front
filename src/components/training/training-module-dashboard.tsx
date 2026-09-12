@@ -56,7 +56,7 @@ export function TrainingModuleDashboard() {
     },
     {
       href: "/training/evaluations",
-      label: uiText("Evaluaciones"),
+      label: uiText("Evaluaciones", undefined, "capacitacion"),
       description: uiText("Pruebas pendientes y resultados de cada intento."),
       icon: ClipboardCheck,
       visible: can("training.view"),

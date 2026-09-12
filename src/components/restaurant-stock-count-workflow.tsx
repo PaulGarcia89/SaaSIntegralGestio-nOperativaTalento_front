@@ -149,20 +149,20 @@ export function RestaurantStockCountWorkflow({ branchId }: { branchId: string })
         type === "approve"
           ? {
               status: "success",
-              headline: "Conteo aprobado",
-              detail: "Las diferencias ya ajustaron las existencias y quedaron como movimientos auditables.",
-              nextAction: { label: "Ver los movimientos", href: "/inventory/restaurant/movements" },
+              headline: uiText("Conteo aprobado"),
+              detail: uiText("Las diferencias ya ajustaron las existencias y quedaron como movimientos auditables."),
+              nextAction: { label: uiText("Ver los movimientos"), href: "/inventory/restaurant/movements" },
             }
           : type === "submit"
             ? {
                 status: "success",
-                headline: "Conteo enviado a revisión",
-                detail: "Todavía no se ajustaron existencias: esperan la aprobación de quien supervisa el almacén.",
+                headline: uiText("Conteo enviado a revisión"),
+                detail: uiText("Todavía no se ajustaron existencias: esperan la aprobación de quien supervisa el almacén."),
               }
             : {
                 status: "success",
-                headline: "Conteo cancelado",
-                detail: "No se aplicó ningún ajuste al inventario.",
+                headline: uiText("Conteo cancelado"),
+                detail: uiText("No se aplicó ningún ajuste al inventario."),
               },
       );
       setStep("result");

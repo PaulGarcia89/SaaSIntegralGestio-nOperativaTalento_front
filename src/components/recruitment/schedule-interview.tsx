@@ -73,7 +73,7 @@ export function ScheduleInterviewPanel({ application, canSchedule, targetStageId
     const timer = window.setInterval(() => setAhora(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [abierto]);
-  const [titulo, setTitulo] = useState(`Entrevista · ${application.vacancy.title}`);
+  const [titulo, setTitulo] = useState(uiText("Entrevista · {{role}}", { role: application.vacancy.title }));
   const [tipo, setTipo] = useState<ApplicationInterviewType>("VIRTUAL");
   const [entrevistador, setEntrevistador] = useState("");
   const [dia, setDia] = useState(inicial.dia);

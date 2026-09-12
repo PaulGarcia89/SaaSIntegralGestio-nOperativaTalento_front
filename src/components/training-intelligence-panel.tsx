@@ -155,7 +155,7 @@ export function TrainingIntelligencePanel() {
         <>
           <MetricRow>
             <Metric label={uiText("Perfiles de competencia")} value={String(data.competencyProfiles)} />
-            <Metric label={uiText("Evaluaciones")} value={String(data.assessments)} />
+            <Metric label={uiText("Evaluaciones", undefined, "capacitacion")} value={String(data.assessments)} />
             <Metric label={uiText("Planes de carrera activos")} value={String(data.careerPlans.active)} detail={`de ${data.careerPlans.total} en total`} />
             <Metric label={uiText("Respuestas de feedback")} value={String(data.feedback.responses)} />
             <Metric

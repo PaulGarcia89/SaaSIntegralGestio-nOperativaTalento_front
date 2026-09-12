@@ -326,7 +326,7 @@ function AdminAttentionItem({
   href: string;
 }) {
   const uiText = useUiText();
-  return <div className="flex flex-col gap-3 rounded-xl border border-border-default p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant={tone === "danger" ? "destructive" : "secondary"}>{label}</Badge><span className="truncate font-medium">{title}</span></div><p className="mt-1 text-xs text-text-secondary">{detail}</p><p className="mt-1 text-xs text-text-secondary">{uiText("Responsable: ")}<strong className="font-medium text-foreground">{owner}</strong></p></div><Button asChild size="sm" variant="secondary" className="shrink-0"><Link href={href}>{action}<ArrowRight className="size-4" /></Link></Button></div>;
+  return <div className="flex flex-col gap-3 rounded-xl border border-border-default p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant={tone === "danger" ? "destructive" : "secondary"}>{uiText(label)}</Badge><span className="truncate font-medium">{title}</span></div><p className="mt-1 text-xs text-text-secondary">{detail}</p><p className="mt-1 text-xs text-text-secondary">{uiText("Responsable: ")}<strong className="font-medium text-foreground">{owner}</strong></p></div><Button asChild size="sm" variant="secondary" className="shrink-0"><Link href={href}>{action}<ArrowRight className="size-4" /></Link></Button></div>;
 }
 
 function AdminLearningTracking() {
@@ -359,13 +359,14 @@ function AdminLearningTracking() {
       <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">{uiText("Seguimiento")}</p><h2 className="mt-1 text-2xl font-semibold">{uiText("Progreso y resultados")}</h2><p className="mt-1 text-sm text-text-secondary">{uiText("Consulta avance, vencimientos, evaluaciones y certificados en el mismo contexto.")}</p></div>
       <Card><CardContent className="grid gap-3 p-4 md:grid-cols-3"><div><Label htmlFor="tracking-course">{uiText("Curso")}</Label><Select value={courseId} onValueChange={setCourseId}><SelectTrigger id="tracking-course"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{uiText("Todos los cursos")}</SelectItem>{(courses.data?.items ?? []).map((course) => <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="tracking-status">{uiText("Estado")}</Label><Select value={status} onValueChange={setStatus}><SelectTrigger id="tracking-status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{uiText("Todos los estados")}</SelectItem>{Object.entries(statusLabels).map(([value, label]) => <SelectItem key={value} value={value}>{uiText(label, undefined, "training-status")}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="tracking-owner">{uiText("Responsable")}</Label><Select value={owner} onValueChange={setOwner}><SelectTrigger id="tracking-owner"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{uiText("Todos los responsables")}</SelectItem>{owners.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></div></CardContent></Card>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><TrackingMetric label={uiText("Asignaciones")} value={filtered.length} /><TrackingMetric label={uiText("En progreso")} value={inProgress} /><TrackingMetric label={uiText("Completadas")} value={completed} tone="success" /><TrackingMetric label={uiText("Vencidas")} value={overdue} tone="danger" /><TrackingMetric label={uiText("Certificados")} value={certificatesForCourse.length} tone="success" /></div>
-      <Card><CardHeader className="flex flex-row items-start justify-between gap-3"><div><CardTitle>{uiText("Detalle de supervisión")}</CardTitle><p className="mt-1 text-sm text-text-secondary">{filtered.length} {uiText(" asignaciones · ")}{resultsForCourse.length} {uiText(" intentos de evaluación · ")}{certificatesForCourse.length} {uiText(" certificados")}</p></div><Button asChild variant="secondary" size="sm"><Link href="/training/results">{uiText("Ver resultados ")}<ArrowRight className="size-4" /></Link></Button></CardHeader><CardContent className="space-y-2">{filtered.slice(0, 12).map((item) => <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-border-default p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-medium">{item.course?.title ?? item.title}</p><p className="text-xs text-text-secondary">{item.user ? `${item.user.firstName} ${item.user.lastName}` : uiText("Usuario")} {uiText(" · Responsable: ")}{item.assignedBy ? `${item.assignedBy.firstName} ${item.assignedBy.lastName}` : "No asignado"}</p></div><div className="flex items-center gap-3"><span className="text-sm">{item.progressPercent}%</span><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : (item.effectiveStatus ?? item.status) === "COMPLETED" ? "success" : "secondary"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge></div></div>)}{!filtered.length ? <p className="py-8 text-center text-sm text-text-secondary">{uiText("No hay datos para los filtros seleccionados.")}</p> : null}</CardContent></Card>
+      <Card><CardHeader className="flex flex-row items-start justify-between gap-3"><div><CardTitle>{uiText("Detalle de supervisión")}</CardTitle><p className="mt-1 text-sm text-text-secondary">{filtered.length} {uiText(" asignaciones · ")}{resultsForCourse.length} {uiText(" intentos de evaluación · ")}{certificatesForCourse.length} {uiText(" certificados")}</p></div><Button asChild variant="secondary" size="sm"><Link href="/training/results">{uiText("Ver resultados ")}<ArrowRight className="size-4" /></Link></Button></CardHeader><CardContent className="space-y-2">{filtered.slice(0, 12).map((item) => <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-border-default p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-medium">{item.course?.title ?? item.title}</p><p className="text-xs text-text-secondary">{item.user ? `${item.user.firstName} ${item.user.lastName}` : uiText("Usuario")} {uiText(" · Responsable: ")}{item.assignedBy ? `${item.assignedBy.firstName} ${item.assignedBy.lastName}` : "No asignado"}</p></div><div className="flex items-center gap-3"><span className="text-sm">{item.progressPercent}%</span><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : (item.effectiveStatus ?? item.status) === "COMPLETED" ? "success" : "secondary"}>{uiText(statusLabels[item.effectiveStatus ?? item.status], undefined, "training-status")}</Badge></div></div>)}{!filtered.length ? <p className="py-8 text-center text-sm text-text-secondary">{uiText("No hay datos para los filtros seleccionados.")}</p> : null}</CardContent></Card>
     </div>
   );
 }
 
 function TrackingMetric({ label, value, tone = "normal" }: { label: string; value: number; tone?: "normal" | "success" | "danger" }) {
-  return <Card><CardContent className="p-4"><p className="text-xs text-text-secondary">{label}</p><p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p></CardContent></Card>;
+  const uiText = useUiText();
+  return <Card><CardContent className="p-4"><p className="text-xs text-text-secondary">{uiText(label)}</p><p className={`mt-1 text-2xl font-semibold ${tone === "success" ? "text-status-success" : tone === "danger" ? "text-status-danger" : "text-foreground"}`}>{value}</p></CardContent></Card>;
 }
 
 /**
@@ -944,7 +945,7 @@ function CreateLaunchDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     onError: (error) => {
       setOutcome({
         status: "error",
-        headline: "No se pudo crear la campaña",
+        headline: uiText("No se pudo crear la campaña"),
         detail: getApiErrorMessage(error, "El servidor rechazó la campaña."),
         retryable: true,
       });
@@ -979,7 +980,7 @@ function CreateLaunchDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         lines: [
           { label: uiText("Audiencia"), before: "Sin campaña", after: audienceLine },
           {
-            label: "Reparto",
+            label: uiText("Reparto"),
             before: "—",
             after:
               audience === "USERS"
@@ -992,7 +993,7 @@ function CreateLaunchDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             after: draft.dueAt ? new Date(draft.dueAt).toLocaleString(uiText.locale, { dateStyle: "medium", timeStyle: "short" }) : "Sin fecha límite",
             adverse: !draft.dueAt,
           },
-          { label: "Carácter", before: "—", after: draft.isRequired ? "Obligatoria para toda la audiencia" : "Opcional" },
+          { label: uiText("Carácter"), before: "—", after: draft.isRequired ? "Obligatoria para toda la audiencia" : "Opcional" },
         ],
         warnings: [
           {
@@ -1163,7 +1164,7 @@ function personName(item: AdminAssignmentRow) {
 function assignmentColumns(uiText: ReturnType<typeof useUiText>): Array<DataColumn<AdminAssignmentRow>> { return [
   {
     key: "person",
-    header: "Persona",
+    header: uiText("Persona"),
     priority: "identity",
     render: (item) => (
       <div className="min-w-0">
@@ -1175,14 +1176,14 @@ function assignmentColumns(uiText: ReturnType<typeof useUiText>): Array<DataColu
   },
   {
     key: "course",
-    header: "Curso",
+    header: uiText("Curso"),
     priority: "secondary",
     render: (item) => item.course?.title ?? item.title,
     sortValue: (item) => item.course?.title ?? item.title,
   },
   {
     key: "status",
-    header: "Estado",
+    header: uiText("Estado"),
     priority: "primary",
     render: (item) => {
       const status = item.effectiveStatus ?? item.status;
@@ -1192,7 +1193,7 @@ function assignmentColumns(uiText: ReturnType<typeof useUiText>): Array<DataColu
   },
   {
     key: "progress",
-    header: "Avance",
+    header: uiText("Avance"),
     priority: "primary",
     numeric: true,
     render: (item) => <span className="font-mono tabular-figures">{item.progressPercent} %</span>,
@@ -1200,7 +1201,7 @@ function assignmentColumns(uiText: ReturnType<typeof useUiText>): Array<DataColu
   },
   {
     key: "due",
-    header: "Vencimiento",
+    header: uiText("Vencimiento"),
     priority: "secondary",
     render: (item) => (item.dueAt ? formatDate(item.dueAt, uiText.locale) : "Sin fecha"),
     sortValue: (item) => item.dueAt ?? "",
@@ -1240,7 +1241,7 @@ function AssignmentManagement() {
 
       {query.data?.summary ? (
         <MetricRow>
-          <Metric label="Total" value={String(query.data.summary.total)} />
+          <Metric label={uiText("Total")} value={String(query.data.summary.total)} />
           <Metric label={uiText("Pendientes")} value={String(query.data.summary.notStarted)} />
           <Metric label={uiText("En progreso")} value={String(query.data.summary.inProgress)} />
           <Metric label={uiText("Completados")} value={String(query.data.summary.completed)} tone="success" />
@@ -1255,7 +1256,7 @@ function AssignmentManagement() {
       {query.data?.items.some((item) => ["OVERDUE", "IN_PROGRESS"].includes(item.effectiveStatus ?? item.status)) ? (
         <Card className="border-status-warning/40 bg-status-warning/15">
           <CardHeader className="pb-3"><CardTitle className="text-base">{uiText("Requiere atención")}</CardTitle><p className="text-sm text-muted-foreground">{uiText("Prioriza las asignaciones vencidas o que necesitan seguimiento.")}</p></CardHeader>
-          <CardContent className="space-y-2">{query.data.items.filter((item) => ["OVERDUE", "IN_PROGRESS"].includes(item.effectiveStatus ?? item.status)).slice(0, 5).map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="font-medium">{item.course?.title ?? item.title}</p><p className="text-xs text-muted-foreground">{item.user ? `${item.user.firstName} ${item.user.lastName}` : uiText("Usuario")} · {item.progressPercent}%</p></div><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "secondary"}>{statusLabels[item.effectiveStatus ?? item.status]}</Badge></div>)}</CardContent>
+          <CardContent className="space-y-2">{query.data.items.filter((item) => ["OVERDUE", "IN_PROGRESS"].includes(item.effectiveStatus ?? item.status)).slice(0, 5).map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="font-medium">{item.course?.title ?? item.title}</p><p className="text-xs text-muted-foreground">{item.user ? `${item.user.firstName} ${item.user.lastName}` : uiText("Usuario")} · {item.progressPercent}%</p></div><Badge variant={(item.effectiveStatus ?? item.status) === "OVERDUE" ? "destructive" : "secondary"}>{uiText(statusLabels[item.effectiveStatus ?? item.status], undefined, "training-status")}</Badge></div>)}</CardContent>
         </Card>
       ) : null}
 

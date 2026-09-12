@@ -204,13 +204,13 @@ function FoundationForm({
         <CardContent className="grid gap-4 md:grid-cols-2">
           <TextArea label={uiText("¿Qué necesidad resuelve este curso?")} value={brief.businessNeed} disabled={!editable} onChange={(businessNeed) => setBrief({ ...brief, businessNeed })} />
           <TextArea label={uiText("¿Qué podrá hacer la persona al terminar?")} value={brief.targetOutcome} disabled={!editable} onChange={(targetOutcome) => setBrief({ ...brief, targetOutcome })} />
-          <Field label={uiText("¿Cómo sabrás que funcionó?")} hint="Ej.: 30% menos errores de registro" value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
-          <Field label={uiText("¿Para quién es?")} hint="Ej.: Supervisores de tienda nuevos" value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
+          <Field label={uiText("¿Cómo sabrás que funcionó?")} hint={uiText("Ej.: 30% menos errores de registro")} value={brief.successKpi} disabled={!editable} onChange={(successKpi) => setBrief({ ...brief, successKpi })} />
+          <Field label={uiText("¿Para quién es?")} hint={uiText("Ej.: Supervisores de tienda nuevos")} value={brief.audienceDescription ?? ""} disabled={!editable} onChange={(audienceDescription) => setBrief({ ...brief, audienceDescription })} />
           <details className="md:col-span-2">
             <summary className="cursor-pointer text-sm font-medium text-brand hover:text-brand/80">{uiText("Añadir contexto opcional")}</summary>
             <div className="mt-4 grid gap-4 border-t border-border-default pt-4 md:grid-cols-2">
-              <Field label={uiText("Línea base")} hint="Valor actual antes de capacitar" value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
-              <Field label={uiText("Meta")} hint="Valor que deseas alcanzar" value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
+              <Field label={uiText("Línea base")} hint={uiText("Valor actual antes de capacitar")} value={brief.baselineMetric ?? ""} disabled={!editable} onChange={(baselineMetric) => setBrief({ ...brief, baselineMetric })} />
+              <Field label={uiText("Meta")} hint={uiText("Valor que deseas alcanzar")} value={brief.targetMetric ?? ""} disabled={!editable} onChange={(targetMetric) => setBrief({ ...brief, targetMetric })} />
               <UserChoice label={uiText("Responsable del contenido")} value={brief.contentOwnerId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, contentOwnerId: value === "NONE" ? undefined : value })} />
               <UserChoice label={uiText("Experto de negocio")} value={brief.subjectMatterExpertId ?? "NONE"} users={users} disabled={!editable} onChange={(value) => setBrief({ ...brief, subjectMatterExpertId: value === "NONE" ? undefined : value })} />
               <Field label={uiText("Fecha objetivo")} type="date" value={brief.targetDate?.slice(0, 10) ?? ""} disabled={!editable} onChange={(targetDate) => setBrief({ ...brief, targetDate: targetDate ? new Date(`${targetDate}T12:00:00`).toISOString() : undefined })} />
@@ -289,7 +289,7 @@ function FoundationForm({
         <CardContent className="space-y-3">
           {audienceRules.map((rule, index) => (
             <div key={index} className="grid gap-2 rounded-xl border border-border-default p-3 md:grid-cols-[180px_160px_1fr_auto]">
-              <Select value={rule.ruleType} disabled={!editable} onValueChange={(ruleType) => updateRule(index, { ruleType: ruleType as TrainingAudienceRuleType }, audienceRules, setAudienceRules)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ruleTypes.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
+              <Select value={rule.ruleType} disabled={!editable} onValueChange={(ruleType) => updateRule(index, { ruleType: ruleType as TrainingAudienceRuleType }, audienceRules, setAudienceRules)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ruleTypes.map((item) => <SelectItem key={item.value} value={item.value}>{uiText(item.label)}</SelectItem>)}</SelectContent></Select>
               <Select value={rule.operator} disabled={!editable} onValueChange={(operator) => updateRule(index, { operator: operator as TrainingAudienceOperator }, audienceRules, setAudienceRules)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EQUALS">{uiText("Es igual a")}</SelectItem><SelectItem value="CONTAINS">{uiText("Contiene")}</SelectItem></SelectContent></Select>
               <Input aria-label={uiText("Valor de audiencia")} value={rule.value} disabled={!editable} onChange={(event) => updateRule(index, { value: event.target.value }, audienceRules, setAudienceRules)} />
               {editable ? <Button type="button" size="icon" variant="ghost" aria-label={uiText("Eliminar regla")} onClick={() => setAudienceRules(audienceRules.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4 text-status-danger" /></Button> : null}
@@ -336,19 +336,21 @@ function updateRule(index: number, patch: Partial<TrainingCourseDesignInput["aud
 }
 
 function Field({ label, hint, value, onChange, disabled, type = "text" }: { label: string; hint?: string; value: string; onChange: (value: string) => void; disabled: boolean; type?: string }) {
-  return <label className="space-y-2 text-sm font-medium"><span className="block">{label}{hint ? <span className="mt-1 block text-xs font-normal text-text-secondary">{hint}</span> : null}</span><Input type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
+  const uiText = useUiText();
+  return <label className="space-y-2 text-sm font-medium"><span className="block">{uiText(label)}{hint ? <span className="mt-1 block text-xs font-normal text-text-secondary">{hint}</span> : null}</span><Input type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function TextArea({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) {
-  return <label className="space-y-2 text-sm font-medium">{label}<textarea className="field min-h-24" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
+  const uiText = useUiText();
+  return <label className="space-y-2 text-sm font-medium">{uiText(label)}<textarea className="field min-h-24" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function LevelChoice({ value, onChange, disabled }: { value: TrainingCompetencyLevel; onChange: (value: TrainingCompetencyLevel) => void; disabled: boolean }) {
   const uiText = useUiText();
-  return <Select value={value} disabled={disabled} onValueChange={(next) => onChange(next as TrainingCompetencyLevel)}><SelectTrigger aria-label={uiText("Nivel objetivo")}><SelectValue /></SelectTrigger><SelectContent>{levels.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>;
+  return <Select value={value} disabled={disabled} onValueChange={(next) => onChange(next as TrainingCompetencyLevel)}><SelectTrigger aria-label={uiText("Nivel objetivo")}><SelectValue /></SelectTrigger><SelectContent>{levels.map((item) => <SelectItem key={item.value} value={item.value}>{uiText(item.label)}</SelectItem>)}</SelectContent></Select>;
 }
 
 function UserChoice({ label, value, users, onChange, disabled }: { label: string; value: string; users: UserDto[]; onChange: (value: string) => void; disabled: boolean }) {
   const uiText = useUiText();
-  return <label className="space-y-2 text-sm font-medium">{label}<Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">{uiText("Sin asignar")}</SelectItem>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select></label>;
+  return <label className="space-y-2 text-sm font-medium">{uiText(label)}<Select value={value} disabled={disabled} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">{uiText("Sin asignar")}</SelectItem>{users.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}</SelectContent></Select></label>;
 }

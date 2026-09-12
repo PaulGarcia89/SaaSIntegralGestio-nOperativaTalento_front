@@ -1,3 +1,5 @@
+import { translateUiCopy } from "@/i18n/ui-copy";
+import type { SupportedLocale } from "@/i18n/types";
 import type { ModuleKey, RoleKey, TenantDto, UserDto } from "@/lib/contracts";
 
 export const roleLabels: Record<RoleKey, string> = {
@@ -99,9 +101,10 @@ const technicalLabels: Record<string, string> = {
   STRONG_APPROVE: "Aprobación firme", STRONG_REJECT: "Rechazo firme", DECIDED: "Decidido",
 };
 
-export function technicalLabel(value?: string | null) {
-  if (!value) return "Sin definir";
-  return technicalLabels[value] ?? value.replaceAll("_", " ").toLocaleLowerCase("es").replace(/^./, (letter) => letter.toLocaleUpperCase("es"));
+export function technicalLabel(value?: string | null, locale: SupportedLocale = "es") {
+  if (!value) return translateUiCopy(locale, "Sin definir");
+  const label = technicalLabels[value];
+  return label ? translateUiCopy(locale, label, {}, value === "ACTIVE" ? "status" : undefined) : value.replaceAll("_", " ").toLocaleLowerCase(locale).replace(/^./, (letter) => letter.toLocaleUpperCase(locale));
 }
 
 export function getPreferredUserForTenant(

@@ -166,14 +166,14 @@ export function RestaurantProductionWorkflow({
         setOutcome({
           status: "success",
           headline: applied.length === 1 ? "Producción registrada" : `${applied.length} producciones registradas`,
-          detail: "Existencias, costos y movimientos ya reflejan la operación.",
-          nextAction: { label: "Ver los movimientos", href: "/inventory/restaurant/movements" },
+          detail: uiText("Existencias, costos y movimientos ya reflejan la operación."),
+          nextAction: { label: uiText("Ver los movimientos"), href: "/inventory/restaurant/movements" },
         });
         toast.success("Producción confirmada");
       } else if (applied.length === 0) {
         setOutcome({
           status: "error",
-          headline: "No se registró ninguna producción",
+          headline: uiText("No se registró ninguna producción"),
           detail: failures.join(" · "),
           retryable: true,
         });
@@ -182,7 +182,7 @@ export function RestaurantProductionWorkflow({
           status: "partial",
           headline: `Se aplicaron ${applied.length} de ${lines.length} producciones`,
           detail:
-            "Las que sí se aplicaron ya movieron existencias y no se deshacen desde aquí. Vuelve a registrar solo las que fallaron.",
+            uiText("Las que sí se aplicaron ya movieron existencias y no se deshacen desde aquí. Vuelve a registrar solo las que fallaron."),
           failures,
         });
       }
@@ -264,7 +264,7 @@ export function RestaurantProductionWorkflow({
           affectedCount: impactLines.length,
           affectedLabel: impactLines.length === 1 ? "ingrediente" : "ingredientes",
           lines: impactLines,
-          cost: { label: "Costo de los ingredientes consumidos", amount: formatMoney(cost), adverse: true },
+          cost: { label: uiText("Costo de los ingredientes consumidos"), amount: formatMoney(cost), adverse: true },
           warnings:
             shortages.length > 0 && justificationReady
               ? [

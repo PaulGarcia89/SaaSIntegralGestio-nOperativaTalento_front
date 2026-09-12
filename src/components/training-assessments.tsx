@@ -149,7 +149,7 @@ function AssessmentBuilder() {
     <div className="space-y-6">
       <PageHeader
         eyebrow={uiText("Aprendizaje")}
-        title={enfocado && nombreCurso ? uiText("Evaluaciones de «{{curso}}»", { curso: nombreCurso }) : uiText("Evaluaciones")}
+        title={enfocado && nombreCurso ? uiText("Evaluaciones de «{{curso}}»", { curso: nombreCurso }) : uiText("Evaluaciones", undefined, "capacitacion")}
         description={
           enfocado
             ? uiText("Una evaluación pertenece a un solo curso. Aquí están las de este.")
@@ -319,7 +319,7 @@ function AssessmentBuilderSummary({ assessments }: { assessments: TrainingQuizDt
         <p className="text-sm text-muted-foreground">{uiText("Revisa la preparación antes de abrir una evaluación individual.")}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <AssessmentMetric label={uiText("Evaluaciones")} value={assessments.length} icon={<ClipboardCheck className="size-4" />} />
+        <AssessmentMetric label={uiText("Evaluaciones", undefined, "capacitacion")} value={assessments.length} icon={<ClipboardCheck className="size-4" />} />
         <AssessmentMetric label={uiText("Listas para usar")} value={ready} icon={<CheckCircle2 className="size-4" />} tone="success" />
         <AssessmentMetric label={uiText("Requieren revisión")} value={incomplete} icon={<Settings2 className="size-4" />} tone={incomplete ? "warning" : "normal"} />
         <AssessmentMetric label={uiText("Preguntas")} value={questions} detail={`${attempts} intentos registrados`} icon={<Library className="size-4" />} />
@@ -900,7 +900,7 @@ function ResultMetric({ label, value, tone = "normal" }: { label: string; value:
 function ResultStatusBadge({ attempt }: { attempt: TrainingQuizAttemptDto }) {
   const uiText = useUiText();
   if (attempt.status === "PENDING_REVIEW") return <Badge variant="secondary">{uiText("Revisión pendiente")}</Badge>;
-  if (attempt.status === "GRADED") return <Badge variant={attempt.passed ? "success" : "destructive"}>{attempt.passed ? uiText("Aprobado") : "No aprobado"} · {attempt.score ?? 0}%</Badge>;
+  if (attempt.status === "GRADED") return <Badge variant={attempt.passed ? "success" : "destructive"}>{attempt.passed ? uiText("Aprobado", undefined, "capacitacion") : uiText("No aprobado", undefined, "capacitacion")} · {attempt.score ?? 0}%</Badge>;
   if (attempt.status === "SUBMITTED") return <Badge variant="secondary">{uiText("Enviado")}</Badge>;
   return <Badge>{uiText("En curso")}</Badge>;
 }

@@ -62,6 +62,15 @@ import { RestaurantStatusBadge } from "@/components/restaurant-inventory-ui";
 
 type RecordValue = Record<string, unknown> & { id: string; name?: string; status?: string };
 type FormValues = Record<string, string>;
+/*
+ * El título del diálogo se armaba con `${"Nuevo"} ${labels[kind].toLowerCase()}`,
+ * es decir «Nuevo categorías»: el nombre del catálogo está en plural y el
+ * artículo no concuerda. En inglés habría salido «New categories». Cada
+ * catálogo nombra su singular, que además es lo que se está creando: uno.
+ */
+const TITULO_NUEVO: Record<RestaurantCatalogKind, string> = { categories: "Nueva categoría", units: "Nueva unidad de medida", suppliers: "Nuevo proveedor", warehouses: "Nuevo almacén", ingredients: "Nuevo ingrediente" };
+const TITULO_EDITAR: Record<RestaurantCatalogKind, string> = { categories: "Editar la categoría", units: "Editar la unidad de medida", suppliers: "Editar el proveedor", warehouses: "Editar el almacén", ingredients: "Editar el ingrediente" };
+
 const labels: Record<RestaurantCatalogKind, string> = { categories: "Categorías", units: "Unidades de medida", suppliers: "Proveedores", warehouses: "Almacenes", ingredients: "Ingredientes" };
 
 const fetchers = { categories: fetchRestaurantCategories, units: fetchRestaurantUnits, suppliers: fetchRestaurantSuppliers, warehouses: fetchRestaurantWarehouses, ingredients: fetchRestaurantIngredients };
@@ -98,7 +107,7 @@ export function RestaurantInventoryCatalog({ kind }: { kind: RestaurantCatalogKi
         setSearch(value);
         setPage(1);
       }}
-      searchLabel="Buscar por nombre, código o descripción"
+      searchLabel={uiText("Buscar por nombre, código o descripción")}
       activeCount={status !== "ACTIVE" ? 1 : 0}
       onClear={() => {
         setStatus("ACTIVE");
@@ -277,7 +286,7 @@ function CatalogTable({
   const columns: Array<DataColumn<RecordValue>> = [
     ...headers.map(([key, label], index) => ({
       key,
-      header: label,
+      header: uiText(label),
       // La primera columna identifica el registro; las dos siguientes se leen
       // a su lado en el teléfono y el resto queda en el cuerpo de la ficha.
       priority: (index === 0 ? "identity" : index <= 2 ? "primary" : "secondary") as DataColumn<RecordValue>["priority"],
@@ -342,7 +351,7 @@ function CatalogForm({ kind, item, pending, error, branchId, onClose, onSubmit }
   if (!item && !branchId && kind === "warehouses") return <CatalogModal title={uiText("Nuevo almacén")} onClose={onClose}><InlineNote tone="warning" title={uiText("Falta elegir la sucursal")}>{uiText("Un almacén pertenece a una sucursal; elígela en la barra superior antes de crearlo.")}</InlineNote></CatalogModal>;
   const update = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
   const fields = fieldsFor(kind);
-  return <CatalogModal title={`${item ? "Editar" : "Nuevo"} ${labels[kind].toLowerCase()}`} onClose={onClose}><div className="grid gap-3 sm:grid-cols-2">{fields.map((field) => <div key={field.key}><Label htmlFor={`catalog-${field.key}`}>{field.label}</Label>{field.select ? <select id={`catalog-${field.key}`} className={SELECT_CLASS} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)}><option value="">{uiText("Seleccionar")}</option>{field.select.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : <Input id={`catalog-${field.key}`} type={field.type ?? "text"} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} />}{errors[field.key] ? <p id={`catalog-${field.key}-error`} role="alert" className="mt-1 text-2xs text-status-danger">{errors[field.key]}</p> : null}</div>)}{kind === "ingredients" ? <><SelectField id="catalog-categoryId" label={uiText("Categoría")} value={values.categoryId ?? ""} options={(categoryQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("categoryId", value)} /><SelectField id="catalog-inventoryUnitId" label={uiText("Unidad de inventario")} value={values.inventoryUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("inventoryUnitId", value)} /><SelectField id="catalog-purchaseUnitId" label={uiText("Unidad de compra")} value={values.purchaseUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("purchaseUnitId", value)} /></> : null}</div>{categoryQuery.error || unitQuery.error ? <InlineNote tone="danger" title={uiText("No se pudieron cargar las opciones")}>{getApiErrorMessage(categoryQuery.error ?? unitQuery.error, "Reintenta para cargar categorías y unidades.")}</InlineNote> : null}{error ? <InlineNote tone="danger" title={uiText("No se pudo guardar")}>{getApiErrorMessage(error, "Revisa los datos.")}</InlineNote> : null}<div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>{uiText("Cancelar")}</Button><Button disabled={pending} onClick={() => { const nextErrors = validateRestaurantCatalogForm(kind, values); setErrors(nextErrors); if (!Object.keys(nextErrors).length) onSubmit(values); }}>{pending ? uiText("Guardando…") : uiText("Guardar")}</Button></div></CatalogModal>;
+  return <CatalogModal title={item ? uiText(TITULO_EDITAR[kind]) : uiText(TITULO_NUEVO[kind])} onClose={onClose}><div className="grid gap-3 sm:grid-cols-2">{fields.map((field) => <div key={field.key}><Label htmlFor={`catalog-${field.key}`}>{uiText(field.label)}</Label>{field.select ? <select id={`catalog-${field.key}`} className={SELECT_CLASS} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)}><option value="">{uiText("Seleccionar")}</option>{field.select.map(([value, label]) => <option key={value} value={value}>{uiText(label)}</option>)}</select> : <Input id={`catalog-${field.key}`} type={field.type ?? "text"} value={values[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} />}{errors[field.key] ? <p id={`catalog-${field.key}-error`} role="alert" className="mt-1 text-2xs text-status-danger">{errors[field.key]}</p> : null}</div>)}{kind === "ingredients" ? <><SelectField id="catalog-categoryId" label={uiText("Categoría")} value={values.categoryId ?? ""} options={(categoryQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("categoryId", value)} /><SelectField id="catalog-inventoryUnitId" label={uiText("Unidad de inventario")} value={values.inventoryUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("inventoryUnitId", value)} /><SelectField id="catalog-purchaseUnitId" label={uiText("Unidad de compra")} value={values.purchaseUnitId ?? ""} options={(unitQuery.data?.data ?? []).map((record) => [String(record.id), String(record.name)] as [string, string])} onChange={(value) => update("purchaseUnitId", value)} /></> : null}</div>{categoryQuery.error || unitQuery.error ? <InlineNote tone="danger" title={uiText("No se pudieron cargar las opciones")}>{getApiErrorMessage(categoryQuery.error ?? unitQuery.error, "Reintenta para cargar categorías y unidades.")}</InlineNote> : null}{error ? <InlineNote tone="danger" title={uiText("No se pudo guardar")}>{getApiErrorMessage(error, "Revisa los datos.")}</InlineNote> : null}<div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>{uiText("Cancelar")}</Button><Button disabled={pending} onClick={() => { const nextErrors = validateRestaurantCatalogForm(kind, values); setErrors(nextErrors); if (!Object.keys(nextErrors).length) onSubmit(values); }}>{pending ? uiText("Guardando…") : uiText("Guardar")}</Button></div></CatalogModal>;
 }
 
 function SelectField({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: [string, string][]; onChange: (value: string) => void }) {

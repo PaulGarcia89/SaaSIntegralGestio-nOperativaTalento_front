@@ -139,9 +139,9 @@ export function RestaurantWasteWorkflow({
     onSuccess: async () => {
       setOutcome({
         status: "success",
-        headline: "Merma registrada",
-        detail: "La existencia y el costo del almacén ya reflejan la salida.",
-        nextAction: { label: "Ver los movimientos", href: "/inventory/restaurant/movements" },
+        headline: uiText("Merma registrada"),
+        detail: uiText("La existencia y el costo del almacén ya reflejan la salida."),
+        nextAction: { label: uiText("Ver los movimientos"), href: "/inventory/restaurant/movements" },
       });
       setStep("result");
       toast.success("Merma confirmada");
@@ -156,7 +156,7 @@ export function RestaurantWasteWorkflow({
     onError: (error) => {
       setOutcome({
         status: "error",
-        headline: "No se pudo confirmar la merma",
+        headline: uiText("No se pudo confirmar la merma"),
         detail: getApiErrorMessage(error, "El servidor rechazó la operación."),
         retryable: true,
       });

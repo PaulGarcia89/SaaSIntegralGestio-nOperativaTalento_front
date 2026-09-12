@@ -302,7 +302,7 @@ export function TrainingCourseManager() {
             options={[
               { value: "ALL", label: uiText("Todos") },
               { value: "TENANT", label: uiText("Empresa") },
-              { value: "GLOBAL", label: "Global" },
+              { value: "GLOBAL", label: uiText("Global") },
             ]}
           />
           <FilterSelect
@@ -487,14 +487,15 @@ function FilterSelect({
   onValueChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
+  const uiText = useUiText();
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label>{uiText(label)}</Label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
+        <SelectTrigger aria-label={uiText(label)}><SelectValue /></SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            <SelectItem key={option.value} value={option.value}>{uiText(option.label)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -627,8 +628,8 @@ export function TrainingCourseCreatePage() {
       });
       if (courseTemplate === "VISUAL") {
         const modules = [
-          { title: "Introducción visual", description: "Contexto y conceptos principales mediante videos de apoyo." },
-          { title: "Aplicación práctica", description: "Demostraciones y pasos prácticos para llevar lo aprendido al trabajo." },
+          { title: uiText("Introducción visual"), description: uiText("Contexto y conceptos principales mediante videos de apoyo.") },
+          { title: uiText("Aplicación práctica"), description: uiText("Demostraciones y pasos prácticos para llevar lo aprendido al trabajo.") },
         ];
         for (const [moduleIndex, moduleInput] of modules.entries()) {
           const createdModule = await createTrainingCourseModule(course.id, { ...moduleInput, sortOrder: moduleIndex, isRequired: true });
@@ -1217,11 +1218,11 @@ function PublicationChecklist({
 }) {
   const uiText = useUiText();
   const checks: Array<{ label: string; detail: string; complete: boolean; step: TrainingCourseWizardStep }> = [
-    { label: "Información básica", detail: "Título, resumen y categoría", complete: wizard.completed.GENERAL, step: "GENERAL" },
-    { label: "Fundamento", detail: "Objetivos y audiencia definidos", complete: wizard.completed.FOUNDATION, step: "FOUNDATION" },
+    { label: uiText("Información básica"), detail: uiText("Título, resumen y categoría"), complete: wizard.completed.GENERAL, step: "GENERAL" },
+    { label: uiText("Fundamento"), detail: uiText("Objetivos y audiencia definidos"), complete: wizard.completed.FOUNDATION, step: "FOUNDATION" },
     { label: uiText("Contenido"), detail: `${course.modules.length} módulos configurados`, complete: wizard.completed.STRUCTURE, step: "STRUCTURE" },
     { label: uiText("Evaluación"), detail: course.quizzes?.length ? "Evaluación configurada" : "Evaluación recomendada", complete: wizard.completed.ASSESSMENT, step: "ASSESSMENT" },
-    { label: uiText("Vista previa"), detail: "Experiencia del participante revisada", complete: wizard.completed.PREVIEW, step: "PREVIEW" },
+    { label: uiText("Vista previa"), detail: uiText("Experiencia del participante revisada"), complete: wizard.completed.PREVIEW, step: "PREVIEW" },
   ];
   return (
     <Card className="border-primary/20 bg-primary/5">
@@ -1446,13 +1447,13 @@ function WorkflowActions({
     // para editar un curso publicado: pausar, editar y volver a publicar. Sin
     // esta acción, editar la fundación sube la versión, los gates de la versión
     // anterior dejan de valer y el curso ya no se puede publicar nunca más.
-    { status: ["DRAFT", "PAUSED"], permission: "courses.review", action: "submit-review", label: "Enviar a revisión", icon: <Send className="size-4" /> },
+    { status: ["DRAFT", "PAUSED"], permission: "courses.review", action: "submit-review", label: uiText("Enviar a revisión"), icon: <Send className="size-4" /> },
     // SCHEDULED estaba fuera de esta lista aunque la tabla de transiciones del
     // backend lo admite: un curso programado no se podía editar NI devolver a
     // borrador desde la pantalla, así que quedaba encerrado.
-    { status: ["IN_REVIEW", "SCHEDULED", "PAUSED"], permission: "courses.review", action: "return-draft", label: "Devolver a borrador", icon: <Pencil className="size-4" /> },
+    { status: ["IN_REVIEW", "SCHEDULED", "PAUSED"], permission: "courses.review", action: "return-draft", label: uiText("Devolver a borrador"), icon: <Pencil className="size-4" /> },
     { status: ["IN_REVIEW"], permission: "courses.approve", action: "approve", label: uiText("Aprobar"), icon: <CheckCircle2 className="size-4" /> },
-    { status: ["APPROVED"], permission: "courses.publish", action: "schedule", label: "Programar", icon: <CalendarClock className="size-4" /> },
+    { status: ["APPROVED"], permission: "courses.publish", action: "schedule", label: uiText("Programar"), icon: <CalendarClock className="size-4" /> },
     { status: ["APPROVED", "PAUSED"], permission: "courses.publish", action: "publish", label: uiText("Publicar"), icon: <BookOpen className="size-4" /> },
     { status: ["PUBLISHED"], permission: "courses.publish", action: "pause", label: uiText("Pausar"), icon: <CirclePause className="size-4" /> },
     { status: ["DRAFT", "APPROVED", "SCHEDULED", "PUBLISHED", "PAUSED"], permission: "courses.archive", action: "archive", label: uiText("Archivar"), icon: <Archive className="size-4" /> },

@@ -580,7 +580,7 @@ function PathDialog({
                 value={values.prerequisiteCourseId}
                 onChange={(value) => set("prerequisiteCourseId", value)}
                 options={[
-                  { value: "NONE", label: "Sin prerrequisito" },
+                  { value: "NONE", label: uiText("Sin prerrequisito") },
                   ...(selected?.pathCourses.map((entry) => ({
                     value: entry.courseId,
                     label: entry.course.title,
@@ -604,7 +604,7 @@ function PathDialog({
                 value={values.templateId || initialTemplateId || "ANY"}
                 onChange={(value) => set("templateId", value)}
                 options={[
-                  { value: "ANY", label: "Cualquier plantilla" },
+                  { value: "ANY", label: uiText("Cualquier plantilla") },
                   ...templates.map((template) => ({
                     value: template.id,
                     label: `${template.name} v${template.version}`,
@@ -617,8 +617,8 @@ function PathDialog({
                   value={values.branchScope || "ANY"}
                   onChange={(value) => set("branchScope", value)}
                   options={[
-                    { value: "ANY", label: "Todas las sucursales permitidas" },
-                    { value: "CURRENT", label: "Solo la sucursal activa" },
+                    { value: "ANY", label: uiText("Todas las sucursales permitidas") },
+                    { value: "CURRENT", label: uiText("Solo la sucursal activa") },
                   ]}
                 />
               ) : null}
@@ -627,8 +627,8 @@ function PathDialog({
                 value={values.targetType || "PATH"}
                 onChange={(value) => set("targetType", value)}
                 options={[
-                  { value: "PATH", label: "Ruta de aprendizaje" },
-                  { value: "COURSE", label: "Curso individual" },
+                  { value: "PATH", label: uiText("Ruta de aprendizaje") },
+                  { value: "COURSE", label: uiText("Curso individual") },
                 ]}
               />
               {values.targetType === "COURSE" ? (
@@ -640,7 +640,7 @@ function PathDialog({
                 />
               ) : (
                 <Choice
-                  label={uiText("Ruta")}
+                  label={uiText("Ruta", undefined, "capacitacion")}
                   value={values.pathId}
                   onChange={(value) => set("pathId", value)}
                   options={paths.map((path) => ({ value: path.id, label: path.title }))}

@@ -219,9 +219,9 @@ function CoursePerformance({ data }: { data: TrainingAnalyticsDto }) {
   const uiText = useUiText();
   const columns: Array<DataColumn<TrainingAnalyticsDto["byCourse"][number]>> = [
     { key: "title", header: uiText("Curso"), priority: "identity", render: (row) => row.title, sortValue: (row) => row.title },
-    { key: "assigned", header: "Asignados", priority: "secondary", numeric: true, render: (row) => row.assigned, sortValue: (row) => row.assigned },
+    { key: "assigned", header: uiText("Asignados"), priority: "secondary", numeric: true, render: (row) => row.assigned, sortValue: (row) => row.assigned },
     { key: "completed", header: uiText("Completados"), priority: "primary", numeric: true, render: (row) => row.completed, sortValue: (row) => row.completed },
-    { key: "progress", header: "Progreso medio", priority: "secondary", numeric: true, render: (row) => `${row.averageProgress} %`, sortValue: (row) => row.averageProgress },
+    { key: "progress", header: uiText("Progreso medio"), priority: "secondary", numeric: true, render: (row) => `${row.averageProgress} %`, sortValue: (row) => row.averageProgress },
     { key: "pass", header: uiText("Aprobación"), priority: "secondary", numeric: true, render: (row) => `${row.passRate} %`, sortValue: (row) => row.passRate },
     {
       key: "overdue",
@@ -421,10 +421,10 @@ function ImprovementBacklog({
     onError: (error) => toast.error(getApiErrorMessage(error, "No fue posible actualizar la iniciativa.")),
   });
   const next: Partial<Record<TrainingImprovementStatus, { status: TrainingImprovementStatus; label: string }>> = {
-    OPEN: { status: "PLANNED", label: "Planificar" },
-    PLANNED: { status: "IN_PROGRESS", label: "Iniciar" },
+    OPEN: { status: "PLANNED", label: uiText("Planificar") },
+    PLANNED: { status: "IN_PROGRESS", label: uiText("Iniciar") },
     IN_PROGRESS: { status: "VALIDATING", label: uiText("Validar") },
-    DISMISSED: { status: "OPEN", label: "Reabrir" },
+    DISMISSED: { status: "OPEN", label: uiText("Reabrir") },
   };
   return (
     <Card>
@@ -561,7 +561,7 @@ function ComplianceMatrix({ data }: { data: TrainingAnalyticsDto }) {
     },
     {
       key: "progress",
-      header: "Avance",
+      header: uiText("Avance"),
       priority: "primary",
       numeric: true,
       render: (row) => <span className="font-mono tabular-figures">{row.progressPercent} %</span>,

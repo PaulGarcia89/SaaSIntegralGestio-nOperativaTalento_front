@@ -72,7 +72,7 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
           <div className="rounded-lg border border-line bg-surface-1 p-6">
             <ErrorState
               title={uiText("No encontramos esta credencial")}
-              detail="El código puede estar mal copiado, o la credencial ya no existe. Comprueba el código con quien te lo entregó."
+              detail={uiText("El código puede estar mal copiado, o la credencial ya no existe. Comprueba el código con quien te lo entregó.")}
               onRetry={() => void query.refetch()}
             />
             <Button asChild variant="secondary" className="mt-4 w-full">
@@ -133,7 +133,7 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
                     <p className="truncate font-mono text-xs text-ink-2">{data.verificationCode}</p>
                   </div>
                 </div>
-                <StatusBadge tone={status.tone} label={status.label} />
+                <StatusBadge tone={status.tone} label={uiText(status.label)} />
               </div>
 
               {/* Un estado que no es «Vigente» necesita explicarse: quien
@@ -144,7 +144,7 @@ export function TrainingCertificateVerification({ code }: { code: string }) {
                     tone={status.tone === "danger" ? "danger" : status.tone === "warning" ? "warning" : "info"}
                     title={`Esta credencial figura como «${status.label.toLocaleLowerCase("es")}»`}
                   >
-                    {data.revocationReason ? `Motivo: ${data.revocationReason}` : status.note}
+                    {data.revocationReason ? `Motivo: ${data.revocationReason}` : status.note ? uiText(status.note) : null}
                   </InlineNote>
                 </div>
               ) : null}
@@ -167,13 +167,14 @@ function Detail({
   value: string;
   mono?: boolean;
 }) {
+  const uiText = useUiText();
   return (
     <div className="flex items-start gap-3 rounded-md border border-line p-4">
       <span className="mt-0.5 text-ink-3 [&>svg]:size-5" aria-hidden="true">
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="text-2xs text-ink-3">{label}</p>
+        <p className="text-2xs text-ink-3">{uiText(label)}</p>
         <p className={`mt-1 break-words font-medium text-ink-1 ${mono ? "font-mono text-sm" : ""}`}>{value}</p>
       </div>
     </div>

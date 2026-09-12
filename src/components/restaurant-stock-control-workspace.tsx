@@ -244,7 +244,7 @@ function StockView({
     },
     {
       key: "stock",
-      header: "Existencia",
+      header: uiText("Existencia"),
       priority: "primary",
       numeric: true,
       render: (item) => (
@@ -256,7 +256,7 @@ function StockView({
     },
     {
       key: "status",
-      header: "Situación",
+      header: uiText("Situación"),
       priority: "primary",
       render: (item) =>
         estaBajoMinimo(item) ? (
@@ -269,14 +269,14 @@ function StockView({
           <StatusBadge
             size="sm"
             tone={restaurantStatusTone(String(item.status ?? ""))}
-            label={restaurantStatusLabel(String(item.status ?? ""))}
+            label={uiText(restaurantStatusLabel(String(item.status ?? "")))}
           />
         ),
       sortValue: (item) => (estaBajoMinimo(item) ? 0 : 1),
     },
     {
       key: "minimum",
-      header: "Mínimo",
+      header: uiText("Mínimo"),
       priority: "secondary",
       numeric: true,
       render: (item) => (
@@ -340,7 +340,7 @@ function StockView({
       <FilterBar
         search={search}
         onSearchChange={setSearch}
-        searchLabel="Buscar ingrediente por nombre o SKU"
+        searchLabel={uiText("Buscar ingrediente por nombre o SKU")}
       />
 
       {/*
@@ -364,7 +364,7 @@ function StockView({
                 className="min-h-[var(--control-h-touch)]"
                 onClick={() => setFilter(opcion.id)}
               >
-                {uiText(opcion.label)}
+                {uiText(opcion.label, {}, "inventario")}
                 <span className="font-mono tabular-figures">{opcion.disponible ? conteos[opcion.id] : "—"}</span>
               </Button>
             </li>
@@ -582,7 +582,7 @@ function LotsView({
     },
     {
       key: "status",
-      header: "Alerta",
+      header: uiText("Alerta"),
       priority: "primary",
       /*
        * «Vence en 3 días» y no «EXPIRING».
@@ -681,7 +681,7 @@ function LotsView({
                 className="min-h-[var(--control-h-touch)]"
                 onClick={() => setFilter(id)}
               >
-                {uiText(label)}
+                {uiText(label, {}, "inventario")}
                 <span className="font-mono tabular-figures">{conteo(id)}</span>
               </Button>
             </li>
@@ -727,7 +727,7 @@ function LotsView({
 function AlertaDeVencimiento({ dias, status }: { dias: number | null; status: string }) {
   const uiText = useUiText();
   if (dias === null) {
-    return <StatusBadge size="sm" tone={restaurantStatusTone(status)} label={restaurantStatusLabel(status)} />;
+    return <StatusBadge size="sm" tone={restaurantStatusTone(status)} label={uiText(restaurantStatusLabel(status))} />;
   }
   if (dias < 0) {
     return <StatusBadge size="sm" tone="danger" label={uiText("Venció hace {{n}} días", { n: Math.abs(dias) })} />;
@@ -832,7 +832,7 @@ function MovementView({
           header: columnLabels.type,
           priority: "primary" as const,
           render: (item: (typeof rows)[number]) => (
-            <StatusBadge size="sm" tone="neutral" label={restaurantStatusLabel(item.type)} />
+            <StatusBadge size="sm" tone="neutral" label={uiText(restaurantStatusLabel(item.type))} />
           ),
           sortValue: (item: (typeof rows)[number]) => item.type,
         }
@@ -918,7 +918,7 @@ function MovementView({
       <FilterBar
         search={search}
         onSearchChange={(value) => update({ search: value })}
-        searchLabel="Buscar por ingrediente o referencia"
+        searchLabel={uiText("Buscar por ingrediente o referencia")}
         activeCount={activeFilters}
         onClear={() => update({ search: "", type: "ALL", from: "", to: "" })}
       >
@@ -933,7 +933,7 @@ function MovementView({
             <option value="ALL">{uiText("Todos")}</option>
             {Array.from(new Set((query.data ?? []).map((item) => item.type))).map((item) => (
               <option key={item} value={item}>
-                {restaurantStatusLabel(item)}
+                {uiText(restaurantStatusLabel(item))}
               </option>
             ))}
           </select>
@@ -1023,7 +1023,7 @@ function MovementDetail({
   const uiText = useUiText();
   const values: Array<[string, unknown]> = [
     ["Fecha", formatDate(String(movement.date ?? ""))],
-    ["Tipo", restaurantStatusLabel(String(movement.type ?? ""))],
+    ["Tipo", uiText(restaurantStatusLabel(String(movement.type ?? "")))],
     ["Entrada", formatQuantity(Number(movement.entry ?? 0))],
     ["Salida", formatQuantity(Number(movement.exit ?? 0))],
     ["Saldo", formatQuantity(Number(movement.balance ?? 0))],

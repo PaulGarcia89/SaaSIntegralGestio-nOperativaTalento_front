@@ -1,5 +1,6 @@
 "use client";
 
+import { recruitmentStageLabel } from "@/lib/recruitment-stage-label";
 import Image from "next/image";
 import { BriefcaseBusiness, CheckCircle2, Pencil } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
@@ -55,8 +56,8 @@ export function VacancyReview({ form, imagePreview, branchName, stages, onEdit }
 
     <section className="min-w-0 rounded-xl border border-primary/20 bg-primary/[0.03] p-4 sm:p-5" aria-label={en ? "Selection process" : "Proceso de selección"}>
       <div className="flex items-start gap-2.5"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-status-success" aria-hidden="true" /><div><h3 className="text-sm font-semibold">{en ? "Selection process ready" : "Proceso de selección listo"}</h3><p className="mt-1 text-xs text-text-secondary">{en ? "The stages are configured automatically. You can focus on the role." : "Las etapas se configuran automáticamente. Solo necesitas definir el puesto."}</p></div></div>
-      <ol className="mt-4 flex flex-wrap gap-2">{mainStages.map((stage, index) => <li key={stage.code} className="flex items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-xs"><span className="text-text-secondary">{index + 1}</span><span className="font-medium">{stage.name}</span></li>)}</ol>
-      {rejected ? <p className="mt-3 text-xs text-text-secondary">{en ? "When the application does not continue" : "Si la postulación no continúa"}: {rejected.name}.</p> : null}
+      <ol className="mt-4 flex flex-wrap gap-2">{mainStages.map((stage, index) => <li key={stage.code} className="flex items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-xs"><span className="text-text-secondary">{index + 1}</span><span className="font-medium">{recruitmentStageLabel(stage, locale)}</span></li>)}</ol>
+      {rejected ? <p className="mt-3 text-xs text-text-secondary">{en ? "When the application does not continue" : "Si la postulación no continúa"}: {recruitmentStageLabel(rejected, locale)}.</p> : null}
     </section>
   </div>;
 }
